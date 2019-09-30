@@ -1,0 +1,13 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp3.0</TargetFramework>
+    <RootNamespace>Centaurus.Models</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Centaurus.Common\Centaurus.Common.csproj" />
+    <ProjectReference Include="..\Centaurus.Models\Centaurus.Models.csproj" />
+  </ItemGroup>
+
+</Project>

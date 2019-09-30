@@ -1,0 +1,34 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp3.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="Auditor\**" />
+    <Compile Remove="Handshake\**" />
+    <Compile Remove="Payments\**" />
+    <EmbeddedResource Remove="Auditor\**" />
+    <EmbeddedResource Remove="Handshake\**" />
+    <EmbeddedResource Remove="Payments\**" />
+    <None Remove="Auditor\**" />
+    <None Remove="Handshake\**" />
+    <None Remove="Payments\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="Common\MessageTypes.cs" />
+    <Compile Remove="Common\ResultMessage.cs" />
+    <Compile Remove="ConstellationSettings.cs" />
+    <Compile Remove="Message.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="stellar-dotnet-sdk" Version="2.2.39" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Centaurus.Common\Centaurus.Common.csproj" />
+  </ItemGroup>
+
+</Project>
