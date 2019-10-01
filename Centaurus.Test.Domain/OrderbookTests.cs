@@ -17,7 +17,7 @@ namespace Centaurus.Test
         [SetUp]
         public void Setup()
         {
-            Global.Init();
+            Global.Init(new AlphaSettings { HorizonUrl = "https://horizon-testnet.stellar.org", NetworkPassphrase = "Test SDF Network ; September 2015" });
 
             var account = new Models.Account()
             {

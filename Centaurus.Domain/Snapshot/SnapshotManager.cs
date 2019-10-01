@@ -76,7 +76,7 @@ namespace Centaurus.Domain
         /// </summary>
         public void SavePendingSnapshot()
         {
-            if (!Global.Settings.IsAuditor)
+            if (Global.IsAlpha)
                 throw new InvalidOperationException("Only an auditor can save pending snapshot directly");
 
             SnapshotValidated();

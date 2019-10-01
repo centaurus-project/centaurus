@@ -14,7 +14,7 @@ namespace Centaurus.Domain
         public override async Task Validate(AuditorWebSocketConnection connection, MessageEnvelope envelope)
         {
             //validate that alpha has signed the quantum request
-            if (!envelope.IsSignedBy(Global.Settings.AlphaKeyPair.PublicKey))
+            if (!envelope.IsSignedBy(((AuditorSettings)Global.Settings).AlphaKeyPair.PublicKey))
                 throw new UnauthorizedException();
             await base.Validate(connection, envelope);
         }

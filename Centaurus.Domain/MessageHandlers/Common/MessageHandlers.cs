@@ -13,14 +13,14 @@ namespace Centaurus.Domain
     /// Contains all registered handlers
     /// </summary>
     public static class MessageHandlers<T>
-        where T: BaseWebSocketConnection
+        where T : BaseWebSocketConnection
     {
         static ImmutableDictionary<MessageTypes, BaseMessageHandler<T>> handlers;
 
         public static void Init()
         {
             var currentServerHandlerType = typeof(IAuditorMessageHandler);
-            if (Global.Settings.IsAlpha)
+            if (Global.IsAlpha)
                 currentServerHandlerType = typeof(IAlphaMessageHandler);
 
             var discoveredRequestProcessors = Assembly.GetExecutingAssembly()

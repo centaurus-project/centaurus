@@ -59,7 +59,7 @@ namespace Centaurus.Domain
         public void AddQuantum(MessageEnvelope envelope)
         {
             var quantum = (Quantum)envelope.Message;
-            if (Global.Settings.IsAlpha)
+            if (Global.IsAlpha)
                 quantum.Apex = ++CurrentApex;
             else if (quantum.Apex == default) //when auditor receives quantum, the quantum should already contain apex
                 throw new Exception("Quantum has no apex");

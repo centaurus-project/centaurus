@@ -19,11 +19,14 @@ namespace Centaurus.Auditor
 
         private Logger logger = LogManager.GetCurrentClassLogger();
 
+        public Startup(AuditorSettings settings)
+        {
+            Global.Init(settings);
+        }
+
         public async Task Run()
         {
             _ = new SnapshotSerializer();
-
-            Global.Init();
 
             //AppSettings.Init();
 

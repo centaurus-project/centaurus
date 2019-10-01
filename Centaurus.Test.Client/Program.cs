@@ -113,7 +113,7 @@ namespace Centaurus.Test.Client
 
             MessageHandlers.Init();
 
-            Global.Init();
+            Global.Init(new AlphaSettings { HorizonUrl = "https://horizon-testnet.stellar.org", NetworkPassphrase = "Test SDF Network ; September 2015" });
 
             UserWebSocketConnection ws = new UserWebSocketConnection();
             ws.EstablishConnection().Wait();

@@ -8,14 +8,17 @@ namespace Centaurus.Domain
 {
     public static class Global
     {
-        public static void Init()
+        public static void Init(BaseSettings settings)
         {
-            Settings = AppSettings.Load();
-            StellarNetwork = new StellarNetwork(Settings.StellarNetwork.Passphrase, Settings.StellarNetwork.Horizon);
-            QuantumProcessor = new QuantumProcessorsStorage();
-            AppState = Settings.IsAlpha ? new AlphaStateManager() : (StateManager)new AuditorStateManager();
+            Settings = settings;
+            IsAlpha = Settings is AlphaSettings;
 
-            if (Settings.IsAlpha)
+            StellarNetwork = new StellarNetwork(Settings.NetworkPassphrase, Settings.HorizonUrl);
+            QuantumProcessor = new QuantumProcessorsStorage();
+
+            AppState = IsAlpha ? new AlphaStateManager() : (StateManager)new AuditorStateManager();
+
+            if (IsAlpha)
                 InitTimers();
         }
 
@@ -41,7 +44,7 @@ namespace Centaurus.Domain
 
             WithdrawalStorage = new WithdrawalStorage(snapshot.Withdrawals);
 
-            QuantumHandler = Settings.IsAlpha ? (BaseQuantumHandler)new AlphaQuantumHandler(quanta) : new AuditorQuantumHandler();
+            QuantumHandler = IsAlpha ? (BaseQuantumHandler)new AlphaQuantumHandler(quanta) : new AuditorQuantumHandler();
 
             LedgerManager = new LedgerManager(snapshot.Ledger);
 
@@ -61,7 +64,10 @@ namespace Centaurus.Domain
         public static LedgerManager LedgerManager { get; private set; }
         public static StateManager AppState { get; private set; }
         public static QuantumProcessorsStorage QuantumProcessor { get; private set; }
-        public static AppSettings Settings { get; private set; }
+
+        public static bool IsAlpha { get; private set; }
+
+        public static BaseSettings Settings { get; private set; }
         public static StellarNetwork StellarNetwork { get; private set; }
 
         static Exchange RestoreExchange(Snapshot snapshot)
@@ -99,7 +105,7 @@ namespace Centaurus.Domain
 
         private static void OnSnapshotSuccess()
         {
-            if (Settings.IsAuditor)
+            if (Settings is AuditorSettings)
                 return;
 
             snapshotIsInProgress = false;

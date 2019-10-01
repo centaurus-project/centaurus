@@ -19,7 +19,7 @@ namespace Centaurus.Domain
             var snapshotQuantum = (envelope.Message as SnapshotQuantum)
                 ?? throw new ArgumentException($"Unexpected message type. Only messages of type {typeof(SnapshotQuantum).FullName} are supported.");
             var snapshot = Global.SnapshotManager.InitSnapshot();
-            if (Global.Settings.IsAlpha)
+            if (Global.IsAlpha)
                 snapshotQuantum.Hash = snapshot.ComputeHash();
             else
             {
