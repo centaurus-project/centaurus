@@ -126,7 +126,7 @@ namespace Centaurus.Domain
 
                 //select only quanta that has alpha signature
                 var validatedQuanta = currentQuantaGroup
-                    .Where(q => q.Signatures.Any(s => s.Signer == (RawPubKey)Global.Settings.AlphaKeyPair.PublicKey)
+                    .Where(q => q.Signatures.Any(s => s.Signer == (RawPubKey)Global.Settings.KeyPair.PublicKey)
                         && q.AreSignaturesValid());
 
                 //check if all quanta are the same

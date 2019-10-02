@@ -33,10 +33,10 @@ namespace Centaurus
         {
             services
                 .AddMvc(options => options.EnableEndpointRouting = false);
-                //.AddJsonOptions(options =>
-                //{
-                //    options.JsonSerializerOptions.Converters.Add(new AssetSettingsConverter());
-                //});
+            //.AddJsonOptions(options =>
+            //{
+            //    options.JsonSerializerOptions.Converters.Add(new AssetSettingsConverter());
+            //});
 
             // In production, the React files will be served from this directory
             services.AddSpaStaticFiles(configuration =>
@@ -110,44 +110,6 @@ namespace Centaurus
                     spa.UseReactDevelopmentServer(npmScript: "start");
                 }
             });
-
-            _ = ConfigureConstellation();
-        }
-
-        private async Task ConfigureConstellation()
-        {
-            //force serializers load
-            _ = new SnapshotSerializer();
-
-            Global.Init();
-
-            Global.AppState.StateChanged += Current_StateChanged;
-
-            MessageHandlers<AlphaWebSocketConnection>.Init();
-
-            var lastSnapshot = await SnapshotProviderManager.GetLastSnapshot();
-
-            if (lastSnapshot == null)
-            {
-                Global.AppState.State = ApplicationState.WaitingForInit;
-            }
-            else
-            {
-                Global.Setup(lastSnapshot);
-                Global.AppState.State = ApplicationState.Rising;
-            }
-        }
-
-        private async void Current_StateChanged(object sender, ApplicationState e)
-        {
-            if (e == ApplicationState.Failed)
-            {
-                logger.Error("Application failed");
-
-                ConnectionManager.CloseAllConnections();
-
-                await Program.Shutdown();
-            }
         }
     }
 }

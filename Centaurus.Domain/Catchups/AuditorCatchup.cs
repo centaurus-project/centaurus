@@ -121,8 +121,9 @@ namespace Centaurus.Domain
 
         private static List<RawPubKey> GetKnownAuditors(Snapshot localSnapshot)
         {
+            var settings = (AuditorSettings)Global.Settings;
             //we should have default auditors to make sure that Alpha provides snapshot valid snapshot
-            var knownAuditors = Global.Settings.DefaultAuditors?
+            var knownAuditors = settings.GenesisQuorum
                 .Select(a => (RawPubKey)KeyPair.FromAccountId(a))
                 .ToList();
             if (localSnapshot != null) //set current auditors from local snapshot

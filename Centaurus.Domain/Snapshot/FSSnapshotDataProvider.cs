@@ -12,7 +12,7 @@ namespace Centaurus.Domain
 
         public const string SnaphsotExtension = "snpsht";
 
-        public string SnapshotsDirectory = Global.Settings.SnapshotsDirectory;
+        public string SnapshotsDirectory = Path.Combine(Global.Settings.CWD, "Snapshots");
 
         public FSSnapshotDataProvider()
         {

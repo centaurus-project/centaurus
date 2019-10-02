@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public class LedgerManager: IDisposable
+    public class LedgerManager : IDisposable
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
@@ -20,7 +20,8 @@ namespace Centaurus.Domain
         {
             Ledger = ledger;
 
-            if (Global.Settings.IsAuditor)
+            //only auditors listen to the ledger
+            if (!Global.IsAlpha)
             {
                 var ledgerCursor = (Global.StellarNetwork.Server.Ledgers.Ledger(Ledger).Result).PagingToken;
 

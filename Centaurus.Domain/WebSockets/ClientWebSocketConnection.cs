@@ -12,7 +12,7 @@ namespace Centaurus.Domain
 {
     public abstract class ClientWebSocketConnection : BaseWebSocketConnection
     {
-        public ClientWebSocketConnection() 
+        public ClientWebSocketConnection()
             : base(new ClientWebSocket())
         {
         }
@@ -21,7 +21,7 @@ namespace Centaurus.Domain
 
         public virtual async Task EstablishConnection()
         {
-            await (webSocket as ClientWebSocket).ConnectAsync(new Uri(Global.Settings.AlphaAddress), CancellationToken.None);
+            await (webSocket as ClientWebSocket).ConnectAsync(new Uri(((AuditorSettings)Global.Settings).AlphaAddress), CancellationToken.None);
             _ = Listen();
         }
     }

@@ -32,7 +32,11 @@ namespace Centaurus.Alpha.Controllers
                     Auditors = Global.Constellation.Auditors.Select(a => ((KeyPair)a).AccountId),
                     Global.Constellation.MinAccountBalance,
                     Global.Constellation.MinAllowedLotSize,
-                    Global.Settings.StellarNetwork,
+                    StellarNetwork = new
+                    {
+                        Passphrase = Global.Settings.NetworkPassphrase,
+                        Horizon = Global.Settings.HorizonUrl
+                    },
                     Assets = Global.Constellation.Assets.Select(a => new { a.Id, a.Code, Issuer = (a.IsXlm ? null : ((KeyPair)a.Issuer).AccountId) })
                 };
 
