@@ -10,11 +10,15 @@ namespace Centaurus
 
             Network.Use(Network);
 
-            Server = new Server(horizon);
+            Horizon = horizon;
+
+            Server = new Server(Horizon);
         }
 
         public Server Server { get; }
 
         public Network Network { get; }
+
+        public string Horizon { get; }
     }
 }
