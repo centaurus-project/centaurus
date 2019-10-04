@@ -14,6 +14,11 @@ namespace Centaurus
 
         public KeyPair KeyPair { get; set; }
 
+        [Option("verbose", Default = false, HelpText = "Logs all messages. The verbose option overrides the silent one.")]
+        public bool Verbose { get; set; }
+
+        [Option("silent", Default = false, HelpText = "Logs only errors.")]
+        public bool Silent { get; set; }
 
         [Option(ConfigFileArgName, Required = false, HelpText = "Config file path.")]
         public string ConfigFile { get; set; }
@@ -57,5 +62,8 @@ namespace Centaurus
     }
 
     public class AlphaSettings : BaseSettings
-    { }
+    {
+        [Option("alpha_url", Required = true, HelpText = "The url the alpha will listen on.")]
+        public string AlphaUrl { get; set; }
+    }
 }
