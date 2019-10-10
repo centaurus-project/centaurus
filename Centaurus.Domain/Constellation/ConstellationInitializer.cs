@@ -41,7 +41,7 @@ namespace Centaurus.Domain
                 throw new InvalidOperationException("Alpha is not in the waiting for initialization state.");
 
             if (!await DoesAlphaAccountExist())
-                throw new InvalidOperationException("The vault is not yet funded");
+                throw new InvalidOperationException($"The vault ({Global.Settings.KeyPair.AccountId}) is not yet funded");
 
             var ledgerId = await BuildAndConfigureVault();
 

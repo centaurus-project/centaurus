@@ -61,14 +61,13 @@ namespace Centaurus
                 app.UseHsts();
             }
 
-            app.UseHttpsRedirection();
             app.UseStaticFiles();
 
             app.UseWebSockets();
 
             app.Use(async (context, next) =>
             {
-                if (context.WebSockets.IsWebSocketRequest && context.Request.Path == "/ws")
+                if (context.WebSockets.IsWebSocketRequest && context.Request.Path == "/centaurus")
                 {
                     if (Global.AppState == null || ValidApplicationStates.Contains(Global.AppState.State))
                     {
