@@ -26,6 +26,8 @@ namespace Centaurus.Auditor
                     var startup = new Startup(s);
                     _ = startup.Run();
 
+                    logger.Info("Auditor is started");
+
                     Console.WriteLine("Press Enter to quit");
                     Console.ReadLine();
 

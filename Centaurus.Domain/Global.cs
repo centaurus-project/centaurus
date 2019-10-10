@@ -3,11 +3,13 @@ using System.Collections.Generic;
 using System.Text;
 using System.Timers;
 using Centaurus.Models;
+using NLog;
 
 namespace Centaurus.Domain
 {
     public static class Global
     {
+        static Logger logger = LogManager.GetCurrentClassLogger();
         public static void Init(BaseSettings settings)
         {
             Settings = settings;
@@ -98,7 +100,7 @@ namespace Centaurus.Domain
             snapshotTimoutTimer = new Timer();
             snapshotTimoutTimer.Interval = 10 * 1000;
             snapshotTimoutTimer.AutoReset = false;
-            snapshotTimoutTimer.Elapsed += (s, e) => OnSnapshotFailed();
+            snapshotTimoutTimer.Elapsed += (s, e) => OnSnapshotFailed("Snapshot save timed out.");
         }
 
         private static bool snapshotIsInProgress = false;
@@ -114,8 +116,9 @@ namespace Centaurus.Domain
             snapshotRunTimer.Start();
         }
 
-        private static void OnSnapshotFailed()
+        private static void OnSnapshotFailed(string reason)
         {
+            logger.Error($"Snapshot failed. {reason}");
             AppState.State = ApplicationState.Failed;
         }
 
@@ -127,14 +130,13 @@ namespace Centaurus.Domain
                 return;
             }
 
-            //TODO: we need to trow exception if it running to long
             //check if snapshot process is running
             while (snapshotIsInProgress)
                 System.Threading.Thread.Sleep(100);
 
             var snapshot = new SnapshotQuantum();
             var envelope = snapshot.CreateEnvelope();
-            Global.QuantumHandler.Handle(envelope);
+            QuantumHandler.Handle(envelope);
 #if !DEBUG
             snapshotTimoutTimer.Start();
 #endif
