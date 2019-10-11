@@ -2,6 +2,7 @@
 using stellar_dotnet_sdk;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 
@@ -43,10 +44,39 @@ namespace Centaurus.Domain
         /// <param name="anotherEnvelope">Envelope to aggregate</param>
         public static void AggregateEnvelop(this MessageEnvelope envelope, MessageEnvelope anotherEnvelope)
         {
+            if (envelope == null)
+                throw new ArgumentNullException(nameof(envelope));
+            if (anotherEnvelope == null)
+                throw new ArgumentNullException(nameof(anotherEnvelope));
             //TODO: cache hashes to improve performance
             var hash = envelope.ComputeMessageHash();
-            if (!ByteArrayPrimitives.Equals(anotherEnvelope.ComputeMessageHash(), hash))
-                throw new InvalidOperationException($"Invalid message envelope hash. {hash} != {anotherEnvelope.ComputeMessageHash()}");
+            var anotherHash = anotherEnvelope.ComputeMessageHash();
+            if (!ByteArrayPrimitives.Equals(anotherHash, hash))
+            {
+#if DEBUG
+                var envelopeJson = Newtonsoft.Json.JsonConvert.SerializeObject(envelope);
+                Debug.Print("envelope:\n" + envelopeJson);
+                envelopeJson = Newtonsoft.Json.JsonConvert.SerializeObject(anotherEnvelope);
+                Debug.Print("anotherEnvelope:\n" + envelopeJson);
+#endif
+
+                throw new InvalidOperationException($"Invalid message envelope hash. {hash} != {anotherHash}");
+            }
+            envelope.AggregateEnvelopUnsafe(anotherEnvelope);
+        }
+
+        /// <summary>
+        /// Merges signatures to the source envelope. 
+        /// THIS METHOD DOESN'T VERIFY THAT ENVELOPS CONTAIN THE SAME MESSAGE!!
+        /// </summary>
+        /// <param name="envelope">Source envelope</param>
+        /// <param name="anotherEnvelope">Envelope to aggregate</param>
+        public static void AggregateEnvelopUnsafe(this MessageEnvelope envelope, MessageEnvelope anotherEnvelope)
+        {
+            if (envelope == null)
+                throw new ArgumentNullException(nameof(envelope));
+            if (anotherEnvelope == null)
+                throw new ArgumentNullException(nameof(anotherEnvelope));
             foreach (var signature in anotherEnvelope.Signatures)
             {
                 if (!envelope.Signatures.Contains(signature))

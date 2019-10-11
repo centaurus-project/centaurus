@@ -38,7 +38,7 @@ namespace Centaurus.Domain
         /// <param name="_onSnapshotSuccess">The delegate that is called when the snapshot is successful</param>
         /// <param name="_onSnapshotFailed">The delegate that is called when the snapshot is failed</param>
         /// <param name="snapshot">Init snapshot</param>
-        public SnapshotManager(Action _onSnapshotSuccess, Action _onSnapshotFailed, Snapshot snapshot = null)
+        public SnapshotManager(Action _onSnapshotSuccess, Action<string> _onSnapshotFailed, Snapshot snapshot = null)
         {
             onSnapshotSuccess = _onSnapshotSuccess;
             onSnapshotFailed = _onSnapshotFailed;
@@ -162,12 +162,12 @@ namespace Centaurus.Domain
             catch (Exception exc)
             {
                 logger.Error(exc, "Unable to save snapshot");
-                onSnapshotFailed?.Invoke();
+                onSnapshotFailed?.Invoke("Unable to save snapshot");
             }
         }
 
         private Action onSnapshotSuccess;
-        private Action onSnapshotFailed;
+        private Action<string> onSnapshotFailed;
 
 
         private static SemaphoreSlim saveSnapshotSemaphore = new SemaphoreSlim(1);

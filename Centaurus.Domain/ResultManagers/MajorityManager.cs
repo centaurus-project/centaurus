@@ -1,9 +1,12 @@
 using Centaurus.Models;
+using NLog;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
@@ -11,25 +14,34 @@ namespace Centaurus.Domain
     //TODO: pending aggregates cleanup
     public abstract class MajorityManager
     {
+        protected static Logger logger = LogManager.GetCurrentClassLogger();
+
+        protected static string GetId(MessageEnvelope envelope)
+        {
+            return $"{(int)envelope.Message.MessageType}_{envelope.Message.MessageId}";
+        }
+
         Dictionary<string, ConsensusAggregate> pendingAggregates = new Dictionary<string, ConsensusAggregate>();
 
-        protected MessageEnvelope Aggregate(MessageEnvelope envelope)
+        object syncRoot = new { };
+
+        private ConsensusAggregate GetConsensusAggregate(string id)
         {
-            var id = $"{(int)envelope.Message.MessageType}_{envelope.Message.MessageId}"; 
-            //skip signatures that arrived after the consensus has been reached/failed.
-            if (!pendingAggregates.TryGetValue(id, out var aggregate))
+            lock (syncRoot)
             {
-                aggregate = new ConsensusAggregate();
-                pendingAggregates.Add(id, aggregate);
+                if (!pendingAggregates.ContainsKey(id))
+                    pendingAggregates[id] = new ConsensusAggregate(this);
+                return pendingAggregates[id];
             }
+        }
+
+        protected async Task Aggregate(MessageEnvelope envelope)
+        {
+            var id = GetId(envelope);
+            ConsensusAggregate aggregate = GetConsensusAggregate(id);
+
             //add the signature to the aggregate
-            aggregate.Add(envelope);
-            switch (aggregate.CheckMajority(out var consensus))
-            {
-                case MajorityResults.Unknown: return null;
-                case MajorityResults.Success: return consensus;
-            }
-            throw new Exception("The constellation collapsed.");
+            await aggregate.Add(envelope);
         }
 
         /// <summary>
@@ -38,43 +50,62 @@ namespace Centaurus.Domain
         /// <param name="messageId">Message id key.</param>
         public void Remove(string id)
         {
-            pendingAggregates.Remove(id);
+            lock (syncRoot)
+            {
+                if (pendingAggregates.Remove(id))
+                    logger.Error($"Unable to remove item by id '{id}'");
+                else
+                    logger.Trace($"Item with id '{id}' is removed");
+            }
+        }
+
+        protected virtual Task OnResult(MajorityResults majorityResult, MessageEnvelope confirmation)
+        {
+            if (majorityResult == MajorityResults.Unreachable)
+            {
+                logger.Error("Majority is unreachable. The constellation collapsed.");
+                Global.AppState.State = ApplicationState.Failed;
+            }
+            return Task.CompletedTask;
         }
 
         public class ConsensusAggregate
         {
-            public ConsensusAggregate()
+            public ConsensusAggregate(MajorityManager majorityManager)
             {
-                storage = new ConcurrentDictionary<byte[], MessageEnvelope>(new HashComparer());
+                this.majorityManager = majorityManager;
             }
 
-            private ConcurrentDictionary<byte[], MessageEnvelope> storage;
+            private object syncRoot = new { };
 
-            private MessageEnvelope GetSignaturesContainer(byte[] messageHash, MessageEnvelope envelope)
+            private MajorityManager majorityManager;
+
+            private bool alreadyHasResult = false;
+
+            private Dictionary<byte[], MessageEnvelope> storage = new Dictionary<byte[], MessageEnvelope>(new ByteArrayComparer());
+
+            public async Task Add(MessageEnvelope envelope)
             {
-                if (!storage.TryGetValue(messageHash, out var envelopeAggregate))
+                MessageEnvelope consensus = null;
+                MajorityResults majorityResult = MajorityResults.Unknown;
+                lock (syncRoot)
                 {
-                    envelopeAggregate = new MessageEnvelope { Message = envelope.Message, Signatures = new List<Ed25519Signature>() };
-                    if (!storage.TryAdd(messageHash, envelopeAggregate))
-                    {
-                        //retry in case of conflict
-                        return GetSignaturesContainer(messageHash, envelope);
-                    }
+                    if (alreadyHasResult)
+                        return;
+                    var envelopeHash = envelope.ComputeMessageHash();
+                    if (!storage.ContainsKey(envelopeHash))//first result with such hash
+                        storage[envelopeHash] = envelope;
+                    else
+                        storage[envelopeHash].AggregateEnvelopUnsafe(envelope);//we can use AggregateEnvelopUnsafe, we computing hash for every envelope above
+                    majorityResult = CheckMajority(out consensus);
+                    if (majorityResult != MajorityResults.Unknown)
+                        alreadyHasResult = true;
                 }
-                return envelopeAggregate;
+                if (majorityResult != MajorityResults.Unknown)
+                    await majorityManager.OnResult(majorityResult, consensus);
             }
 
-            public void Add(MessageEnvelope envelope)
-            {
-                var messageHash = envelope.ComputeMessageHash();
-                var container = GetSignaturesContainer(messageHash, envelope);
-                lock (container)
-                {
-                    container.AggregateEnvelop(envelope);
-                }
-            }
-
-            public MajorityResults CheckMajority(out MessageEnvelope consensus)
+            private MajorityResults CheckMajority(out MessageEnvelope consensus)
             {
                 //TODO: remove the item from storage once the majority succeeded of failed.
                 int requiredMajority = MajorityHelper.GetMajorityCount(),

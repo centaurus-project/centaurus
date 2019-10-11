@@ -173,6 +173,7 @@ namespace Centaurus.Domain
             }
             catch
             {
+                logger.Info($"Handling quantum type {envelope.Message.MessageType.ToString()} failed.");
                 Global.AppState.State = ApplicationState.Failed;
                 throw;
             }

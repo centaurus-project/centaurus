@@ -104,6 +104,7 @@ namespace Centaurus.Domain
             Unsubscribe(connection);
             await connection.CloseConnection();
             connection.Dispose();
+            logger.Trace($"{connection.ClientPubKey} is disconnected.");
         }
 
         static void AddConnection(AlphaWebSocketConnection connection)
@@ -115,6 +116,7 @@ namespace Centaurus.Domain
                     RemoveConnection(oldConnection);
                     return connection;
                 });
+                logger.Trace($"{connection.ClientPubKey} is connected.");
             }
         }
 
@@ -155,7 +157,10 @@ namespace Centaurus.Domain
                 var connection = (AlphaWebSocketConnection)baseConnection;
                 AddConnection(connection);
                 if (Global.Constellation.Auditors.Contains(connection.ClientPubKey))
+                {
                     AlphaStateManager.AuditorConnected();
+                    logger.Trace($"Auditor {connection.ClientPubKey} is connected.");
+                }
             }
         }
 

@@ -60,12 +60,14 @@ namespace Centaurus.Domain
         {
             var quantum = (Quantum)envelope.Message;
             if (Global.IsAlpha)
+            {
                 quantum.Apex = ++CurrentApex;
+                quantum.Timestamp = (ulong)DateTime.UtcNow.Ticks;
+            }
             else if (quantum.Apex == default) //when auditor receives quantum, the quantum should already contain apex
                 throw new Exception("Quantum has no apex");
             else
                 CurrentApex = quantum.Apex;
-            quantum.Timestamp = (ulong)DateTime.UtcNow.Ticks;
             storage.Add(quantum.Apex, envelope);
         }
 

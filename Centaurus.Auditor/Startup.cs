@@ -28,10 +28,6 @@ namespace Centaurus.Auditor
         {
             _ = new SnapshotSerializer();
 
-            //AppSettings.Init();
-
-            //AuditorStateManager.Init();
-
             MessageHandlers<AuditorWebSocketConnection>.Init();
 
             Global.AppState.StateChanged += StateChanged;

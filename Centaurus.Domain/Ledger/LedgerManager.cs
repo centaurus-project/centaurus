@@ -54,6 +54,7 @@ namespace Centaurus.Domain
         }
 
         private IEventSource listener;
+        private uint lastHandledLedgerResponseSequence = 0;
 
         private async Task ListenLedger(string ledgerCursor)
         {
@@ -79,6 +80,11 @@ namespace Centaurus.Domain
         {
             try
             {
+                if (ledgerResponse.Sequence == lastHandledLedgerResponseSequence)
+                {
+                    logger.Trace("Already handled ledger arrived");
+                    return;
+                }
                 var pagingToken = (ledgerResponse.Sequence << 32).ToString();
 
                 //TODO: try several time to load resources before throw exception
@@ -104,6 +110,10 @@ namespace Centaurus.Domain
                 }
 
                 var ledger = new LedgerUpdateNotification { Ledger = (uint)ledgerResponse.Sequence, Payments = payments };
+
+                logger.Trace($"Ledger {ledger.Ledger} is handled. Number of payments for account {Global.Constellation.Vault.ToString()} is {ledger.Payments.Count}.");
+
+                lastHandledLedgerResponseSequence = (uint)ledgerResponse.Sequence;
 
                 OutgoingMessageStorage.OnLedger(ledger);
             }
