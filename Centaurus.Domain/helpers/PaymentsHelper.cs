@@ -14,9 +14,10 @@ namespace Centaurus.Domain
             var assetAlphaNum = stellar_dotnet_sdk.Asset.FromXdr(xdrAsset) as stellar_dotnet_sdk.AssetTypeCreditAlphaNum;
 
             asset = 0;
-            string assetSymbol = "XLM";
-            if (xdrAsset.Discriminant.InnerValue != AssetType.AssetTypeEnum.ASSET_TYPE_NATIVE)
-                assetSymbol = $"{assetAlphaNum.Code}-{assetAlphaNum.Issuer}";
+            if (xdrAsset.Discriminant.InnerValue == AssetType.AssetTypeEnum.ASSET_TYPE_NATIVE)
+                return true;
+
+            string assetSymbol = $"{assetAlphaNum.Code}-{assetAlphaNum.Issuer}";
 
             var assetSettings = Global.Constellation.Assets.Find(a => a.ToString() == assetSymbol);
             if (assetSettings == null) return false;

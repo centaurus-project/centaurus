@@ -103,11 +103,16 @@ namespace Centaurus.Domain
                             //we must add it before processing, otherwise the quantum that we are processing here will be different from the quantum that will come to the auditor
                             Global.QuantumStorage.AddQuantum(quantumEnvelope);
 
+                            //we need to sign the quantum here to prevent multiple signatures that can occur if we sign it when sending
+                            quantumEnvelope.Sign(Global.Settings.KeyPair);
+
                             var resultMessage = processor.Process(quantumEnvelope);
 
                             quantum.IsProcessed = true;
 
                             Notifier.OnMessageProcessResult(resultMessage);
+
+                            logger.Trace($"Message of type {quantum.MessageType.ToString()} with apex {quantum.Apex} is handled.");
                         }
                         catch (Exception exc)
                         {

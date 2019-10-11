@@ -14,37 +14,9 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
 
         public override bool IsAuditorOnly { get; } = true;
 
-        public override Task HandleMessage(AlphaWebSocketConnection connection, MessageEnvelope envelope)
+        public override async Task HandleMessage(AlphaWebSocketConnection connection, MessageEnvelope envelope)
         {
-            var aggregationResult = Global.AuditResultManager.Add(envelope);
-            if (aggregationResult == null)
-                return Task.CompletedTask;
-
-            //we lost consensus
-            if (((ResultMessage)aggregationResult.Message).Status != ResultStatusCodes.Success)
-            {
-                Global.AppState.State = ApplicationState.Failed;
-            }
-
-
-            var resultMessage = (ResultMessage)envelope.Message;
-            if (resultMessage.OriginalMessage.Message is SnapshotQuantum)
-            {
-                Global.SnapshotManager.SetResult(aggregationResult);
-                return Task.CompletedTask;
-            }
-
-            RequestMessage requestMessage = null;
-            if (aggregationResult.Message is RequestMessage)
-                requestMessage = (RequestMessage)aggregationResult.Message;
-            else if (aggregationResult.Message is RequestQuantum)
-            {
-                requestMessage = ((RequestQuantum)aggregationResult.Message).RequestEnvelope.Message as RequestMessage;
-            }
-
-            if (requestMessage != null)
-                Notifier.Notify(requestMessage.Account, aggregationResult);
-            return Task.CompletedTask;
+            await Global.AuditResultManager.Add(envelope);
         }
     }
 }
