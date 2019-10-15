@@ -2,12 +2,9 @@
 using NLog;
 using stellar_dotnet_sdk;
 using stellar_dotnet_sdk.responses;
-using stellar_dotnet_sdk.responses.operations;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace Centaurus.Domain
@@ -27,6 +24,8 @@ namespace Centaurus.Domain
 
                 EnsureLedgerListenerIsDisposed();
                 _ = ListenLedger(ledgerCursor);
+
+                lastSentLedgerSequence = currentLedgerSequence = (uint)ledger;
             }
         }
 
@@ -54,7 +53,8 @@ namespace Centaurus.Domain
         }
 
         private IEventSource listener;
-        private uint lastHandledLedgerResponseSequence = 0;
+        private uint lastSentLedgerSequence;
+        private uint currentLedgerSequence;
 
         private async Task ListenLedger(string ledgerCursor)
         {
@@ -80,11 +80,16 @@ namespace Centaurus.Domain
         {
             try
             {
-                if (ledgerResponse.Sequence == lastHandledLedgerResponseSequence)
+                if (ledgerResponse.Sequence == currentLedgerSequence)
                 {
                     logger.Trace("Already handled ledger arrived");
                     return;
                 }
+                else if (ledgerResponse.Sequence != currentLedgerSequence + 1)
+                {
+                    throw new Exception($"The ledger received from the horizon is not sequential. {currentLedgerSequence + 1} was expected, but got {ledgerResponse.Sequence}");
+                }
+
                 var pagingToken = (ledgerResponse.Sequence << 32).ToString();
 
                 //TODO: try several time to load resources before throw exception
@@ -109,13 +114,24 @@ namespace Centaurus.Domain
                     result = result.NextPage().Result;
                 }
 
-                var ledger = new LedgerUpdateNotification { Ledger = (uint)ledgerResponse.Sequence, Payments = payments };
+                currentLedgerSequence++;
 
-                logger.Trace($"Ledger {ledger.Ledger} is handled. Number of payments for account {Global.Constellation.Vault.ToString()} is {ledger.Payments.Count}.");
+                //if there are any payments, or ledger sequence is multiple of 64
+                if (payments.Count > 0 || (((uint)ledgerResponse.Sequence + 1) % 64 == 0))
+                {
+                    var ledger = new LedgerUpdateNotification
+                    {
+                        LedgerFrom = lastSentLedgerSequence + 1,
+                        LedgerTo = (uint)ledgerResponse.Sequence,
+                        Payments = payments
+                    };
 
-                lastHandledLedgerResponseSequence = (uint)ledgerResponse.Sequence;
+                    logger.Trace($"Ledger range from {ledger.LedgerFrom} to {ledger.LedgerTo} is handled. Number of payments for account {Global.Constellation.Vault.ToString()} is {ledger.Payments.Count}.");
 
-                OutgoingMessageStorage.OnLedger(ledger);
+                    lastSentLedgerSequence = (uint)ledgerResponse.Sequence;
+
+                    OutgoingMessageStorage.OnLedger(ledger);
+                }
             }
             catch (Exception exc)
             {
