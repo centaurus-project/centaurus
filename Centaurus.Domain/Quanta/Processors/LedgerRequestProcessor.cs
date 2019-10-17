@@ -15,7 +15,7 @@ namespace Centaurus.Domain
             var ledgerQuantum = (LedgerCommitQuantum)envelope.Message;
             var ledgerNotification = (LedgerUpdateNotification)ledgerQuantum.Source.Message;
 
-            Global.LedgerManager.SetLedger(ledgerNotification.Ledger);
+            Global.LedgerManager.SetLedger(ledgerNotification.LedgerTo);
 
             for (var i = 0; i < ledgerNotification.Payments.Count; i++)
             {
@@ -51,8 +51,8 @@ namespace Centaurus.Domain
             if (!Global.IsAlpha)
                 CheckSignatures(ledgerSourceEnvelope);
 
-            if (!Global.LedgerManager.IsValidNextLedger(ledgerInfo.Ledger))
-                throw new Exception($"Ledger is invalid. Current ledger is {Global.LedgerManager.Ledger} and received ledger is {ledgerInfo.Ledger}");
+            if (!Global.LedgerManager.IsValidNextLedger(ledgerInfo.LedgerFrom))
+                throw new Exception($"Ledger is invalid. Current ledger is {Global.LedgerManager.Ledger} and received ledger range starts with {ledgerInfo.LedgerFrom}");
 
             foreach (var payment in ledgerInfo.Payments)
             {

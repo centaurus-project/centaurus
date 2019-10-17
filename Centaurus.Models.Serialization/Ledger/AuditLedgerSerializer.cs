@@ -9,13 +9,15 @@ namespace Centaurus.Models
     {
         public void Deserialize(ref LedgerUpdateNotification value, XdrReader reader)
         {
-            value.Ledger = reader.ReadUInt32();
+            value.LedgerFrom = reader.ReadUInt32();
+            value.LedgerTo = reader.ReadUInt32();
             value.Payments = reader.ReadList<PaymentBase>();
         }
 
         public void Serialize(LedgerUpdateNotification value, XdrWriter writer)
         {
-            writer.Write(value.Ledger);
+            writer.Write(value.LedgerFrom);
+            writer.Write(value.LedgerTo);
             writer.Write(value.Payments);
         }
     }
