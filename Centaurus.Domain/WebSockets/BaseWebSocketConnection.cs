@@ -37,29 +37,9 @@ namespace Centaurus
         static Logger logger = LogManager.GetCurrentClassLogger();
 
         protected WebSocket webSocket;
-        public BaseWebSocketConnection(WebSocket webSocket, bool heartbeatEnabled = false)
+        public BaseWebSocketConnection(WebSocket webSocket)
         {
             this.webSocket = webSocket;
-#if !DEBUG
-            if (heartbeatEnabled)
-                InitTimer();
-#endif
-        }
-
-        private System.Timers.Timer invalidationTimer = null;
-
-        //If we didn't receive message during specified interval, we should close connection
-        private void InitTimer()
-        {
-            invalidationTimer = new System.Timers.Timer();
-            invalidationTimer.Interval = 5000;
-            invalidationTimer.AutoReset = false;
-            invalidationTimer.Elapsed += InvalidationTimer_Elapsed;
-        }
-
-        private async void InvalidationTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
-        {
-            await CloseConnection(WebSocketCloseStatus.PolicyViolation, "Connection is inactive");
         }
 
         /// <summary>
@@ -96,7 +76,15 @@ namespace Centaurus
             try
             {
                 if (webSocket.State == WebSocketState.Open || webSocket.State == WebSocketState.Connecting)
-                    await webSocket.CloseAsync(status, desc ?? status.ToString(), CancellationToken.None);
+                {
+                    var connectionPubKey = "no public key";
+                    if (ClientPubKey != null)
+                        connectionPubKey = $"public key {ClientPubKey.ToString()}";
+                    desc = desc ?? status.ToString();
+                    logger.Info($"Connection with {connectionPubKey} is closed. Status: {status.ToString()}, description: {desc}");
+
+                    await webSocket.CloseAsync(status, desc, CancellationToken.None);
+                }
                 Dispose();
             }
             catch (Exception e)
@@ -138,9 +126,6 @@ namespace Centaurus
 
                         if (!await HandleMessage(envelope))
                             throw new UnexpectedMessageException($"No handler registered for message type {envelope.Message.MessageType.ToString()}.");
-
-                        if (invalidationTimer != null)
-                            invalidationTimer.Reset();
                     }
                     catch (Exception exc)
                     {

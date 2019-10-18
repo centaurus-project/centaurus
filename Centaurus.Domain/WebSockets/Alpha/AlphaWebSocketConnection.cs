@@ -12,12 +12,33 @@ namespace Centaurus
         static Logger logger = LogManager.GetCurrentClassLogger();
 
         public AlphaWebSocketConnection(WebSocket webSocket)
-            : base(webSocket, true)
+            : base(webSocket)
         {
             var hd = new HandshakeData();
             hd.Randomize();
             HandshakeData = hd;
             _ = SendMessage(new HandshakeInit { HandshakeData = hd });
+
+
+#if !DEBUG
+            InitTimer();
+#endif
+        }
+
+        private System.Timers.Timer invalidationTimer = null;
+
+        //If we didn't receive message during specified interval, we should close connection
+        private void InitTimer()
+        {
+            invalidationTimer = new System.Timers.Timer();
+            invalidationTimer.Interval = 10000;
+            invalidationTimer.AutoReset = false;
+            invalidationTimer.Elapsed += InvalidationTimer_Elapsed;
+        }
+
+        private async void InvalidationTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
+        {
+            await CloseConnection(WebSocketCloseStatus.PolicyViolation, "Connection is inactive");
         }
 
         public HandshakeData HandshakeData { get; }
@@ -49,7 +70,12 @@ namespace Centaurus
 
         protected override async Task<bool> HandleMessage(MessageEnvelope envelope)
         {
-            return await MessageHandlers<AlphaWebSocketConnection>.HandleMessage(this, envelope);
+            var isHandled = await MessageHandlers<AlphaWebSocketConnection>.HandleMessage(this, envelope);
+
+            //reset invalidation timer only if message has been handled
+            if (isHandled && invalidationTimer != null)
+                invalidationTimer.Reset();
+            return isHandled;
         }
 
         public override void Dispose()
