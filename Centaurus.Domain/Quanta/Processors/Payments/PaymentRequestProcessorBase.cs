@@ -7,12 +7,12 @@ using stellar_dotnet_sdk;
 
 namespace Centaurus.Domain
 {
-    public abstract class PaymentRequestProcessorBase : IQuantumRequestProcessor
+    public abstract class PaymentRequestProcessorBase : ClientRequestProcessorBase
     {
-        public abstract MessageTypes SupportedMessageType { get; }
-
-        public ResultMessage Process(MessageEnvelope envelope)
+        public override ResultMessage Process(MessageEnvelope envelope)
         {
+            UpdateNonce(envelope);
+
             var payment = (envelope.Message as RequestQuantum).RequestEnvelope.Message as PaymentRequestBase;
 
             AccountData vaultAccount = Global.VaultAccount;
@@ -44,8 +44,10 @@ namespace Centaurus.Domain
             return envelope.CreateResult(ResultStatusCodes.Success);
         }
 
-        public void Validate(MessageEnvelope envelope)
+        public override void Validate(MessageEnvelope envelope)
         {
+            ValidateNonce(envelope);
+
             var payment = (envelope.Message as RequestQuantum).RequestEnvelope.Message as PaymentRequestBase;
             if (payment == null)
                 throw new InvalidOperationException("The quantum must be an instance of PaymentRequestBase");
