@@ -20,7 +20,7 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
         public override async Task HandleMessage(AlphaWebSocketConnection connection, MessageEnvelope envelope)
         {
             var handshakeInit = envelope.Message as HandshakeInit;
-            if (handshakeInit.HandshakeData.Data == connection.HandshakeData.Data)
+            if (!ByteArrayPrimitives.Equals(handshakeInit.HandshakeData.Data, connection.HandshakeData.Data))
                 throw new ConnectionCloseException(WebSocketCloseStatus.InvalidPayloadData, "Handshake failed");
 
             connection.ClientPubKey = envelope.Signatures[0].Signer;
