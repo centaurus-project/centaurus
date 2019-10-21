@@ -5,18 +5,22 @@ using System.Text;
 
 namespace Centaurus.Domain
 {
-    public class OrderRequestProcessor : IQuantumRequestProcessor
+    public class OrderRequestProcessor : ClientRequestProcessorBase
     {
-        public MessageTypes SupportedMessageType => MessageTypes.OrderRequest;
+        public override MessageTypes SupportedMessageType => MessageTypes.OrderRequest;
 
-        public ResultMessage Process(MessageEnvelope envelope)
+        public override ResultMessage Process(MessageEnvelope envelope)
         {
+            UpdateNonce(envelope);
+
             var quantum = envelope.Message as RequestQuantum;
             return envelope.CreateResult(ResultStatusCodes.Success, Global.Exchange.ExecuteOrder(quantum));
         }
 
-        public void Validate(MessageEnvelope envelope)
+        public override void Validate(MessageEnvelope envelope)
         {
+            ValidateNonce(envelope);
+
             var quantum = envelope.Message as RequestQuantum;
             var orderRequest = (OrderRequest)quantum.RequestEnvelope.Message;
 
