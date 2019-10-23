@@ -34,7 +34,7 @@ namespace Centaurus.Auditor
 
             while (auditor == null)
             {
-                var _auditor = new AuditorWebSocketConnection();
+                var _auditor = new AuditorWebSocketConnection(new ClientWebSocket());
                 try
                 {
                     Subscribe(_auditor);

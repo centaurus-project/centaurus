@@ -12,22 +12,61 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public class AuditorWebSocketConnection : ClientWebSocketConnection
+    public class AuditorWebSocketConnection : BaseWebSocketConnection
     {
 
         static Logger logger = LogManager.GetCurrentClassLogger();
 
         CancellationTokenSource cancellationToken = new CancellationTokenSource();
 
+        public AuditorWebSocketConnection(WebSocket webSocket)
+            : base(webSocket)
+        {
+            //we don't need to create and sign heartbeat message on every sending
+            hearbeatMessage = new Heartbeat().CreateEnvelope();
+            hearbeatMessage.Sign(Global.Settings.KeyPair);
+#if !DEBUG
+            InitTimer();
+#endif
+        }
+
+        private System.Timers.Timer heartbeatTimer = null;
+
+        //If we didn't receive message during specified interval, we should close connection
+        private void InitTimer()
+        {
+            heartbeatTimer = new System.Timers.Timer();
+            heartbeatTimer.Interval = 5000;
+            heartbeatTimer.AutoReset = false;
+            heartbeatTimer.Elapsed += HeartbeatTimer_Elapsed;
+        }
+
+        private MessageEnvelope hearbeatMessage;
+
+        private async void HeartbeatTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
+        {
+            await SendMessage(hearbeatMessage);
+        }
+
+        protected ClientWebSocket clientWebSocket => webSocket as ClientWebSocket;
+
+        public async Task EstablishConnection()
+        {
+            await clientWebSocket.ConnectAsync(new Uri(((AuditorSettings)Global.Settings).AlphaAddress), CancellationToken.None);
+            _ = Listen();
+            _ = ProcessOutgoingMessageQueue();
+        }
+
+        public override async Task SendMessage(MessageEnvelope envelope, CancellationToken ct = default)
+        {
+            await base.SendMessage(envelope, ct);
+            if (heartbeatTimer != null)
+                heartbeatTimer.Reset();
+        }
+
         protected override async Task<bool> HandleMessage(MessageEnvelope envelope)
         {
             return await MessageHandlers<AuditorWebSocketConnection>.HandleMessage(this, envelope);
-        }
-
-        public override async Task EstablishConnection()
-        {
-            await base.EstablishConnection();
-            _ = ProcessOutgoingMessageQueue();
         }
 
         private async Task ProcessOutgoingMessageQueue()
