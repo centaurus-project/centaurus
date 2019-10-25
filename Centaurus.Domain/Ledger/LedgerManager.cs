@@ -34,8 +34,7 @@ namespace Centaurus.Domain
         public void SetLedger(long ledger)
         {
             lock (syncRoot)
-                if (IsValidNextLedger(ledger))
-                    Ledger = ledger;
+                Ledger = ledger;
         }
 
         public bool IsValidNextLedger(long nextLedger)
