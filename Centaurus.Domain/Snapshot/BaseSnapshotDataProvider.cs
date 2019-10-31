@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+﻿using Centaurus.Models;
+using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
@@ -15,14 +16,14 @@ namespace Centaurus.Domain
         /// Fetches last saved snapshot
         /// </summary>
         /// <returns>Snapshot as byte array</returns>
-        public abstract Task<byte[]> GetLastSnapshot();
+        public abstract Task<byte[]> LoadLastSnapshot();
 
         /// <summary>
         /// Fetches snapshot by id
         /// </summary>
         /// <param name="snapshotId"></param>
         /// <returns>Snapshot as byte array</returns>
-        public abstract Task<byte[]> GetSnapshot(ulong snapshotId);
+        public abstract Task<byte[]> LoadSnapshot(ulong snapshotId);
 
         /// <summary>
         /// Saves snapshot
@@ -35,14 +36,33 @@ namespace Centaurus.Domain
         /// <summary>
         /// Saves pending quanta
         /// </summary>
-        /// <param name="quantums"></param>
+        /// <param name="quanta"></param>
         /// <returns>Save task</returns>
-        public abstract Task SavePendingQuantums(byte[] quantums);
+        public abstract Task SavePendingQuanta(byte[] quanta);
 
         /// <summary>
         /// Fetches pending quanta
         /// </summary>
         /// <returns>Pending quanta as byte array</returns>
-        public abstract Task<byte[]> GetPendingQuantums();
+        public abstract Task<byte[]> LoadPendingQuanta();
+
+
+
+        public virtual async Task<PendingQuanta> GetPendingQuanta()
+        {
+            var rawPendingQuanta = await LoadPendingQuanta();
+            if (rawPendingQuanta == null)
+                return null;
+
+            return XdrConverter.Deserialize<PendingQuanta>(rawPendingQuanta);
+        }
+
+        public async Task<Snapshot> GetLastSnapshot()
+        {
+            var lastSnapshotData = await LoadLastSnapshot();
+            if (lastSnapshotData == null)
+                return null;
+            return XdrConverter.Deserialize<Snapshot>(lastSnapshotData);
+        }
     }
 }

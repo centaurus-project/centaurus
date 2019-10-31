@@ -5,6 +5,7 @@ using stellar_dotnet_sdk;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO.Abstractions.TestingHelpers;
 using System.Linq;
 using System.Text;
 
@@ -17,7 +18,12 @@ namespace Centaurus.Test
         [SetUp]
         public void Setup()
         {
-            Global.Init(new AlphaSettings { HorizonUrl = "https://horizon-testnet.stellar.org", NetworkPassphrase = "Test SDF Network ; September 2015" });
+            var settings = new AlphaSettings { 
+                HorizonUrl = "https://horizon-testnet.stellar.org", 
+                NetworkPassphrase = "Test SDF Network ; September 2015",
+                CWD = "AppData"
+            };
+            Global.Init(settings, new MockFileSystem());
 
             var account = new Models.Account()
             {

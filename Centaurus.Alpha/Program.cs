@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Abstractions;
 using System.Linq;
 using System.Threading.Tasks;
 using Centaurus.Domain;
@@ -49,13 +50,13 @@ namespace Centaurus
 
         private static async Task ConfigureConstellation(AlphaSettings settings)
         {
-            Global.Init(settings);
+            Global.Init(settings, new FileSystem());
 
             Global.AppState.StateChanged += Current_StateChanged;
 
             MessageHandlers<AlphaWebSocketConnection>.Init();
 
-            var lastSnapshot = await SnapshotProviderManager.GetLastSnapshot();
+            var lastSnapshot = await Global.SnapshotDataProvider.GetLastSnapshot();
 
             if (lastSnapshot == null)
             {

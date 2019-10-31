@@ -5,6 +5,7 @@ using stellar_dotnet_sdk;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO.Abstractions;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -111,7 +112,13 @@ namespace Centaurus.Test.Client
         {
             MessageHandlers.Init();
 
-            Global.Init(new AlphaSettings { HorizonUrl = "https://horizon-testnet.stellar.org", NetworkPassphrase = "Test SDF Network ; September 2015" });
+            var settings = new AlphaSettings 
+            { 
+                    HorizonUrl = "https://horizon-testnet.stellar.org", 
+                    NetworkPassphrase = "Test SDF Network ; September 2015" 
+            };
+
+            Global.Init(settings, new FileSystem());
 
             UserWebSocketConnection ws = new UserWebSocketConnection();
             ws.EstablishConnection().Wait();

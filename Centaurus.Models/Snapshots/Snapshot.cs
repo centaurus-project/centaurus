@@ -37,7 +37,7 @@ namespace Centaurus.Models
         /// <summary>
         /// Envelope for <see cref="SnapshotQuantum"/> with aggregated auditor signatures.
         /// </summary>
-        [XdrField(8)]
+        [XdrField(8, Optional = true)]
         public MessageEnvelope Confirmation { get; set; }
     }
 }
