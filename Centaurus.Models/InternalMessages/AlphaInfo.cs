@@ -11,5 +11,17 @@ namespace Centaurus.Models
         public ApplicationState State { get; set; }
 
         public Snapshot LastSnapshot { get; set; }
+
+        public void Deserialize(ref AlphaState value, XdrReader reader)
+        {
+            value.State = reader.ReadEnum<ApplicationState>();
+            value.LastSnapshot = reader.ReadObject<Snapshot>();
+        }
+
+        public void Serialize(AlphaState value, XdrWriter writer)
+        {
+            writer.WriteEnum(value.State);
+            writer.WriteObject(value.LastSnapshot);
+        }
     }
 }

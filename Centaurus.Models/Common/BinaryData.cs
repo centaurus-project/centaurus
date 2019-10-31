@@ -5,12 +5,15 @@ using System.Text;
 
 namespace Centaurus.Models
 {
-    public abstract class BinaryData : IEquatable<BinaryData>, IXdrSerializableModel
+    [XdrContract]
+    public abstract class BinaryData : IEquatable<BinaryData>
     {
+        //TODO: implement custom serialization for such cases
         public abstract int ByteLength { get; }
 
         private byte[] _Data;
 
+        [XdrField(0)]
         public byte[] Data
         {
             get
@@ -49,6 +52,16 @@ namespace Centaurus.Models
         {
             if (!(obj is BinaryData)) return false;
             return Equals((BinaryData)obj);
+        }
+
+        public void Deserialize(ref BinaryData value, XdrReader reader)
+        {
+            value.Data = reader.ReadVariable();
+        }
+
+        public void Serialize(BinaryData value, XdrWriter writer)
+        {
+            writer.WriteVariable(value.Data);
         }
     }
 }

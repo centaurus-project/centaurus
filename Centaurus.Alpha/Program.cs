@@ -49,9 +49,6 @@ namespace Centaurus
 
         private static async Task ConfigureConstellation(AlphaSettings settings)
         {
-            //force serializers load
-            _ = new SnapshotSerializer();
-
             Global.Init(settings);
 
             Global.AppState.StateChanged += Current_StateChanged;

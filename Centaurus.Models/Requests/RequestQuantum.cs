@@ -11,6 +11,7 @@ namespace Centaurus.Models
         /// <summary>
         /// Contains original operation request received from a client.
         /// </summary>
+        [XdrField(0)]
         public MessageEnvelope RequestEnvelope { get; set; }
     }
 }

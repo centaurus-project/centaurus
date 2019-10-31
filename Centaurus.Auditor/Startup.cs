@@ -26,8 +26,6 @@ namespace Centaurus.Auditor
 
         public async Task Run()
         {
-            _ = new SnapshotSerializer();
-
             MessageHandlers<AuditorWebSocketConnection>.Init();
 
             Global.AppState.StateChanged += StateChanged;

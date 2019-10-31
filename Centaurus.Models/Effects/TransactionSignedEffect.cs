@@ -8,8 +8,10 @@ namespace Centaurus.Models
     {
         public override EffectTypes EffectType => EffectTypes.TransactionSigned;
 
+        [XdrField(0)]
         public byte[] TransactionHash { get; set; }
 
+        [XdrField(1)]
         public Ed25519Signature Signature { get; set; }
     }
 }

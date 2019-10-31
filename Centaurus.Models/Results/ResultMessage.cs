@@ -10,10 +10,13 @@ namespace Centaurus.Models
     {
         public override MessageTypes MessageType => MessageTypes.ResultMessage;
 
+        [XdrField(0)]
         public MessageEnvelope OriginalMessage { get; set; }
 
+        [XdrField(1)]
         public ResultStatusCodes Status { get; set; }
 
+        [XdrField(2)]
         public List<Effect> Effects { get; set; }
 
         public override ulong MessageId => OriginalMessage.Message.MessageId;
