@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Abstractions;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -9,22 +10,26 @@ namespace Centaurus.Domain
 {
     public class FSSnapshotDataProvider : BaseSnapshotDataProvider
     {
-
         public const string SnaphsotExtension = "snpsht";
 
         public string SnapshotsDirectory = Path.Combine(Global.Settings.CWD, "Snapshots");
 
-        public FSSnapshotDataProvider()
+        IFileSystem fileSystem;
+
+        public FSSnapshotDataProvider(IFileSystem fileSystem)
         {
-            if (!Directory.Exists(SnapshotsDirectory))
-                Directory.CreateDirectory(SnapshotsDirectory);
+            if (fileSystem == null)
+                throw new ArgumentNullException(nameof(fileSystem));
+            this.fileSystem = fileSystem;
+            if (!this.fileSystem.Directory.Exists(SnapshotsDirectory))
+                this.fileSystem.Directory.CreateDirectory(SnapshotsDirectory);
         }
-        public override async Task<byte[]> GetLastSnapshot()
+        public override async Task<byte[]> LoadLastSnapshot()
         {
             var lastSnapshotId = await GetLastSnapshotId();
             if (lastSnapshotId == 0)
                 return null;
-            return await GetSnapshot(lastSnapshotId);
+            return await LoadSnapshot(lastSnapshotId);
         }
 
         public override async Task<ulong> GetLastSnapshotId()
@@ -33,30 +38,30 @@ namespace Centaurus.Domain
             if (file == null)
                 return 0;
             ulong lastId;
-            _ = ulong.TryParse(Path.GetFileNameWithoutExtension(file.Name), out lastId);
+            _ = ulong.TryParse(fileSystem.Path.GetFileNameWithoutExtension(file.Name), out lastId);
             return await Task.FromResult(lastId);
         }
 
-        public override async Task<byte[]> GetSnapshot(ulong snapshotId)
+        public override async Task<byte[]> LoadSnapshot(ulong snapshotId)
         {
             var snapshotFilePath = getSnapshotFilePathById(snapshotId);
-            if (!File.Exists(snapshotFilePath))
+            if (!fileSystem.File.Exists(snapshotFilePath))
                 return null;
-            return await File.ReadAllBytesAsync(snapshotFilePath);
+            return await fileSystem.File.ReadAllBytesAsync(snapshotFilePath);
         }
 
         public override async Task SaveSnapshot(ulong snapshotId, byte[] snapshotData)
         {
             var snapshotFilePath = getSnapshotFilePathById(snapshotId);
-            if (File.Exists(snapshotFilePath))
+            if (fileSystem.File.Exists(snapshotFilePath))
                 throw new InvalidOperationException($"Snapshot {snapshotId} is already exists");
 
-            await File.WriteAllBytesAsync(snapshotFilePath, snapshotData);
+            await fileSystem.File.WriteAllBytesAsync(snapshotFilePath, snapshotData);
         }
 
         private string getSnapshotFilePathById(ulong snapshotId)
         {
-            return Path.Combine(SnapshotsDirectory, $"{snapshotId}.{SnaphsotExtension}");
+            return fileSystem.Path.Combine(SnapshotsDirectory, $"{snapshotId}.{SnaphsotExtension}");
         }
 
         private IEnumerable<FileInfo> getOrderedSnapshotFiles()
@@ -68,21 +73,21 @@ namespace Centaurus.Domain
 
         private string getPendingQuantumsFileName()
         {
-            return Path.Combine(SnapshotsDirectory, $"pending.qnts");
+            return fileSystem.Path.Combine(SnapshotsDirectory, $"pending.qnts");
         }
 
 
-        public override async Task SavePendingQuantums(byte[] quantums)
+        public override async Task SavePendingQuanta(byte[] quantums)
         {
-            await File.WriteAllBytesAsync(getPendingQuantumsFileName(), quantums);
+            await fileSystem.File.WriteAllBytesAsync(getPendingQuantumsFileName(), quantums);
         }
 
-        public override async Task<byte[]> GetPendingQuantums()
+        public override async Task<byte[]> LoadPendingQuanta()
         {
             var pendingQuantumsFileName = getPendingQuantumsFileName();
-            if (!File.Exists(pendingQuantumsFileName))
+            if (!fileSystem.File.Exists(pendingQuantumsFileName))
                 return null;
-            return await File.ReadAllBytesAsync(pendingQuantumsFileName);
+            return await fileSystem.File.ReadAllBytesAsync(pendingQuantumsFileName);
         }
     }
 }

@@ -8,6 +8,7 @@ using System.Text;
 using stellar_dotnet_sdk;
 using System.Linq;
 using System.Runtime;
+using System.IO.Abstractions.TestingHelpers;
 
 namespace Centaurus.Test
 {
@@ -18,7 +19,13 @@ namespace Centaurus.Test
         [SetUp]
         public void Setup()
         {
-            Global.Init(new AlphaSettings { HorizonUrl = "https://horizon-testnet.stellar.org", NetworkPassphrase = "Test SDF Network ; September 2015" });
+            var settings = new AlphaSettings 
+            { 
+                    HorizonUrl = "https://horizon-testnet.stellar.org", 
+                    NetworkPassphrase = "Test SDF Network ; September 2015",
+                    CWD = "AppData"
+            };
+            Global.Init(settings, new MockFileSystem());
         }
 
         [TearDown]
@@ -36,6 +43,7 @@ namespace Centaurus.Test
         [TestCase(100, 10, 50, 20)]
         public void SnapshotPerformanceTest(int iterations, int totalAccounts, int totalMarkets, int totalOrdersPerAccountPerMarket)
         {
+
             Global.Setup(new Snapshot
             {
                 Accounts = new List<Models.Account>(),

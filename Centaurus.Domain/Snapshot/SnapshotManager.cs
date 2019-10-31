@@ -135,7 +135,7 @@ namespace Centaurus.Domain
             if (pendingQuantums.Count() > 0)
             {
                 var pendingQuantumsSanapshot = new PendingQuanta { Quanta = new List<MessageEnvelope>(pendingQuantums) };
-                await SnapshotProviderManager.SnapshotDataProvider.SavePendingQuantums(XdrConverter.Serialize(pendingQuantumsSanapshot));
+                await Global.SnapshotDataProvider.SavePendingQuanta(XdrConverter.Serialize(pendingQuantumsSanapshot));
             }
         }
 
@@ -177,7 +177,7 @@ namespace Centaurus.Domain
             await saveSnapshotSemaphore.WaitAsync();
             try
             {
-                await SnapshotProviderManager.SnapshotDataProvider.SaveSnapshot(id, snapshot);
+                await Global.SnapshotDataProvider.SaveSnapshot(id, snapshot);
             }
             finally
             {

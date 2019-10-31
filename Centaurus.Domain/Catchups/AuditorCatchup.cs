@@ -37,7 +37,7 @@ namespace Centaurus.Domain
 
         private static async Task RestorePendingQuanta()
         {
-            var pendingQuanta = (await SnapshotProviderManager.GetPendingQuantums())?.Quanta ?? new List<MessageEnvelope>();
+            var pendingQuanta = (await Global.SnapshotDataProvider.GetPendingQuanta())?.Quanta ?? new List<MessageEnvelope>();
             foreach (var quantum in pendingQuanta)
                 Global.QuantumHandler.Handle(quantum);
         }
@@ -47,7 +47,7 @@ namespace Centaurus.Domain
             try
             {
                 //TODO: discuss if there is anything else that we need to validate
-                var localSnapshot = await SnapshotProviderManager.GetLastSnapshot();
+                var localSnapshot = await Global.SnapshotDataProvider.GetLastSnapshot();
                 if (localSnapshot != null && localSnapshot.Id > snapshot.Id)
                 {
                     throw new Exception("The local snapshot is newer than provided");

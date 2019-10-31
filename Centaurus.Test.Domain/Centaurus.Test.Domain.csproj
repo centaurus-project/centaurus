@@ -25,6 +25,8 @@
     <PackageReference Include="NUnit3TestAdapter" Version="3.15.1" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.3.0" />
     <PackageReference Include="stellar-dotnet-sdk" Version="2.2.39" />
+    <PackageReference Include="System.IO.Abstractions" Version="7.0.7" />
+    <PackageReference Include="System.IO.Abstractions.TestingHelpers" Version="7.0.7" />
   </ItemGroup>
 
   <ItemGroup>
