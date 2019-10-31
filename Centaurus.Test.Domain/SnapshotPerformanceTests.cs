@@ -19,7 +19,6 @@ namespace Centaurus.Test
         public void Setup()
         {
             Global.Init(new AlphaSettings { HorizonUrl = "https://horizon-testnet.stellar.org", NetworkPassphrase = "Test SDF Network ; September 2015" });
-            var tmp = new AccountSerializer();
         }
 
         [TearDown]
@@ -37,7 +36,6 @@ namespace Centaurus.Test
         [TestCase(100, 10, 50, 20)]
         public void SnapshotPerformanceTest(int iterations, int totalAccounts, int totalMarkets, int totalOrdersPerAccountPerMarket)
         {
-
             Global.Setup(new Snapshot
             {
                 Accounts = new List<Models.Account>(),
@@ -46,6 +44,7 @@ namespace Centaurus.Test
                 Ledger = 1,
                 Orders = new List<Order>(),
                 VaultSequence = 1,
+                Withdrawals = new List<PaymentRequestBase>(),
                 Settings = new ConstellationSettings()
                 {
                     Auditors = Enumerable.Repeat(0, 11).Select(_ => (RawPubKey)KeyPair.Random()).ToList(),
@@ -88,6 +87,33 @@ namespace Centaurus.Test
                 for (var i = 0; i < iterations; i++)
                 {
                     var snapshot = Global.SnapshotManager.InitSnapshot();
+                    snapshot.Confirmation = new MessageEnvelope()
+                    {
+                        Message = new ResultMessage()
+                        {
+                            Effects = new List<Effect>(),
+                            Status = ResultStatusCodes.Success,
+                            OriginalMessage = new MessageEnvelope()
+                            {
+                                Message = new SnapshotQuantum
+                                {
+                                    Apex = 1,
+                                    Hash = 32.RandomBytes(),
+                                    IsProcessed = true,
+                                    Timestamp = 12123
+                                },
+                                Signatures = new List<Ed25519Signature>
+                            {
+                                FakeModelsFactory.RandomSignature()
+                            }
+                            }
+                        },
+                        Signatures = new List<Ed25519Signature>{
+                        FakeModelsFactory.RandomSignature(),
+                        FakeModelsFactory.RandomSignature(),
+                        FakeModelsFactory.RandomSignature(),
+                    }
+                    };
                     snapshot.ComputeHash();
                 }
             }, () => $"snapshot.InitSnapshot() + snapshot.ComputeHash() ({iterations} iterations, {totalAccounts} totalAccounts, {totalMarkets} totalMarkets, {totalOrdersPerAccountPerMarket} totalOrdersPerAccount)");

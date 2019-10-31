@@ -109,8 +109,6 @@ namespace Centaurus.Test.Client
 
         static void Client()
         {
-            _ = new OrderRequestSerializer();
-
             MessageHandlers.Init();
 
             Global.Init(new AlphaSettings { HorizonUrl = "https://horizon-testnet.stellar.org", NetworkPassphrase = "Test SDF Network ; September 2015" });

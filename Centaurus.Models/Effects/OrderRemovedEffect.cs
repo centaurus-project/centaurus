@@ -8,6 +8,7 @@ namespace Centaurus.Models
     {
         public override EffectTypes EffectType => EffectTypes.OrderRemoved;
 
+        [XdrField(0)]
         public ulong OrderId { get; set; }
     }
 }

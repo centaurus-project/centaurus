@@ -11,10 +11,13 @@ namespace Centaurus.Models
     {
         public override MessageTypes MessageType => MessageTypes.AuditorState;
 
+        [XdrField(0)]
         public ApplicationState State { get; set; }
 
+        [XdrField(1, Optional = true)]
         public Snapshot LastSnapshot { get; set; }
 
+        [XdrField(2)]
         public List<MessageEnvelope> PendingQuantums { get; set; } = new List<MessageEnvelope>();
     }
 }

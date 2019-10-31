@@ -19,10 +19,9 @@ namespace Centaurus.Domain
         public static async Task<PendingQuanta> GetPendingQuantums()
         {
             var rawPendingQuantums = await SnapshotDataProvider.GetPendingQuantums();
-            if (rawPendingQuantums == null)
-                return null;
+            if (rawPendingQuantums == null) return null;
 
-            return PendingQuanta.FromByteArray(rawPendingQuantums);
+            return XdrConverter.Deserialize<PendingQuanta>(rawPendingQuantums);
         }
 
         public static async Task<Snapshot> GetLastSnapshot()

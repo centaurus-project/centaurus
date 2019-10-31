@@ -11,22 +11,25 @@ namespace Centaurus.Models
     public class LedgerUpdateNotification : Message
     {
         public override MessageTypes MessageType => MessageTypes.LedgerUpdateNotification;
-        
+
+        public override ulong MessageId => LedgerFrom;
+
         /// <summary>
         /// Ledgers range start.
         /// </summary>
+        [XdrField(0)]
         public uint LedgerFrom { get; set; }
 
         /// <summary>
         /// Ledgers range end.
         /// </summary>
+        [XdrField(1)]
         public uint LedgerTo { get; set; }
 
         /// <summary>
         /// List of payments witnessed by an auditor.
         /// </summary>
+        [XdrField(2)]
         public List<PaymentBase> Payments { get; set; } = new List<PaymentBase>();
-
-        public override ulong MessageId => LedgerFrom;
     }
 }
