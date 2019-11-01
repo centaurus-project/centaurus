@@ -31,8 +31,13 @@ namespace Centaurus
             return new string(result);
         }
 
-        public static byte[] ComputeHash(this byte[] bytes)
+        public static byte[] ComputeHash(this object objToSerialize)
         {
+            byte[] bytes = objToSerialize as byte[];
+            if (bytes == null)
+            {
+                bytes = XdrConverter.Serialize(objToSerialize);
+            }
             return SHA256.Create().ComputeHash(bytes);
         }
     }

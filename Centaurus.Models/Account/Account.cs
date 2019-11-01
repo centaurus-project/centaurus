@@ -2,12 +2,16 @@
 
 namespace Centaurus.Models
 {
-    public class Account: IXdrSerializableModel
+    [XdrContract]
+    public class Account
     {
+        [XdrField(0)]
         public RawPubKey Pubkey { get; set; }
 
+        [XdrField(1)]
         public ulong Nonce { get; set; }
 
+        [XdrField(2)]
         public List<Balance> Balances { get; set; }
     }
 }

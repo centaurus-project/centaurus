@@ -8,6 +8,7 @@ namespace Centaurus.Models
     {
         public override MessageTypes MessageType => MessageTypes.SnapshotQuantum;
 
+        [XdrField(0)]
         public byte[] Hash { get; set; }
     }
 }

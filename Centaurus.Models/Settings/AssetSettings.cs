@@ -7,24 +7,28 @@ namespace Centaurus.Models
     /// <summary>
     /// Asset settings and cluster-specific limits.
     /// </summary>
-    public class AssetSettings: IXdrSerializableModel
+    [XdrContract]
+    public class AssetSettings
     {
         /// <summary>
         /// Unique asset id.
         /// </summary>
+        [XdrField(0)]
         public int Id { get; set; }
 
         /// <summary>
         /// Asset code.
         /// </summary>
+        [XdrField(1, Optional = true)]
         public string Code { get; set; }
 
         /// <summary>
         /// Asset issuer address.
         /// </summary>
+        [XdrField(2, Optional = true)]
         public RawPubKey Issuer { get; set; }
 
-        public bool IsXlm { get { return Issuer == null; } }
+        public bool IsXlm => Issuer == null;
 
         public override string ToString()
         {

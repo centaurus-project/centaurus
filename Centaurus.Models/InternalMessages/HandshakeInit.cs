@@ -6,6 +6,7 @@ namespace Centaurus.Models
     {
         public override MessageTypes MessageType => MessageTypes.HandshakeInit;
 
+        [XdrField(0)]
         public HandshakeData HandshakeData { get; set; }
     }
 }

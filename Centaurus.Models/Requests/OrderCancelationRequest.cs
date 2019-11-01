@@ -9,6 +9,7 @@ namespace Centaurus.Models
     {
         public override MessageTypes MessageType => MessageTypes.OrderCancellationRequest;
 
+        [XdrField(0)]
         public ulong OrderId { get; set; }
     }
 }

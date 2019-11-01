@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO.Abstractions;
 using System.Text;
 using System.Timers;
 using Centaurus.Models;
@@ -10,9 +11,14 @@ namespace Centaurus.Domain
     public static class Global
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
-        public static void Init(BaseSettings settings)
+        public static void Init(BaseSettings settings, IFileSystem fileSystem)
         {
-            Settings = settings;
+            Settings = settings ?? throw new ArgumentNullException(nameof(settings));
+            if (fileSystem == null)
+                throw new ArgumentNullException(nameof(fileSystem));
+
+            SnapshotDataProvider = new FSSnapshotDataProvider(fileSystem);
+
             IsAlpha = Settings is AlphaSettings;
 
             StellarNetwork = new StellarNetwork(Settings.NetworkPassphrase, Settings.HorizonUrl);
@@ -26,7 +32,7 @@ namespace Centaurus.Domain
 
         public static void Setup(Snapshot snapshot, IEnumerable<MessageEnvelope> quanta = null)
         {
-            //TODO: disposed objects if not null
+            //TODO: dispose objects if not null
 
             SnapshotManager = new SnapshotManager(OnSnapshotSuccess, OnSnapshotFailed, snapshot);
 
@@ -52,7 +58,7 @@ namespace Centaurus.Domain
 
             AppState.State = ApplicationState.Running;
         }
-
+        public static BaseSnapshotDataProvider SnapshotDataProvider { get; private set; }
         public static Exchange Exchange { get; private set; }
         public static SnapshotManager SnapshotManager { get; private set; }
         public static ConstellationSettings Constellation { get; private set; }

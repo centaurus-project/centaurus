@@ -6,8 +6,9 @@ namespace Centaurus.Models
 {
     public class Withdrawal: PaymentBase
     {
-        public RawPubKey Source { get; set; }
-
         public override PaymentTypes Type => PaymentTypes.Withdrawal;
+
+        [XdrField(0)]
+        public RawPubKey Source { get; set; }
     }
 }

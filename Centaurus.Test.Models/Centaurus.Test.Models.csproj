@@ -19,7 +19,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Centaurus.Models.Serialization\Centaurus.Models.Serialization.csproj" />
     <ProjectReference Include="..\Centaurus.Models\Centaurus.Models.csproj" />
     <ProjectReference Include="..\Centaurus.Test.Utils\Centaurus.Test.Utils.csproj" />
   </ItemGroup>

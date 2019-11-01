@@ -4,6 +4,7 @@ using NLog;
 using stellar_dotnet_sdk;
 using System;
 using System.Collections.Generic;
+using System.IO.Abstractions;
 using System.Net.WebSockets;
 using System.Text;
 using System.Threading;
@@ -21,13 +22,11 @@ namespace Centaurus.Auditor
 
         public Startup(AuditorSettings settings)
         {
-            Global.Init(settings);
+            Global.Init(settings, new FileSystem());
         }
 
         public async Task Run()
         {
-            _ = new SnapshotSerializer();
-
             MessageHandlers<AuditorWebSocketConnection>.Init();
 
             Global.AppState.StateChanged += StateChanged;

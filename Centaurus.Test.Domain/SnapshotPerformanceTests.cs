@@ -8,6 +8,7 @@ using System.Text;
 using stellar_dotnet_sdk;
 using System.Linq;
 using System.Runtime;
+using System.IO.Abstractions.TestingHelpers;
 
 namespace Centaurus.Test
 {
@@ -18,8 +19,13 @@ namespace Centaurus.Test
         [SetUp]
         public void Setup()
         {
-            Global.Init(new AlphaSettings { HorizonUrl = "https://horizon-testnet.stellar.org", NetworkPassphrase = "Test SDF Network ; September 2015" });
-            var tmp = new AccountSerializer();
+            var settings = new AlphaSettings 
+            { 
+                    HorizonUrl = "https://horizon-testnet.stellar.org", 
+                    NetworkPassphrase = "Test SDF Network ; September 2015",
+                    CWD = "AppData"
+            };
+            Global.Init(settings, new MockFileSystem());
         }
 
         [TearDown]
@@ -46,6 +52,7 @@ namespace Centaurus.Test
                 Ledger = 1,
                 Orders = new List<Order>(),
                 VaultSequence = 1,
+                Withdrawals = new List<PaymentRequestBase>(),
                 Settings = new ConstellationSettings()
                 {
                     Auditors = Enumerable.Repeat(0, 11).Select(_ => (RawPubKey)KeyPair.Random()).ToList(),
@@ -88,6 +95,33 @@ namespace Centaurus.Test
                 for (var i = 0; i < iterations; i++)
                 {
                     var snapshot = Global.SnapshotManager.InitSnapshot();
+                    snapshot.Confirmation = new MessageEnvelope()
+                    {
+                        Message = new ResultMessage()
+                        {
+                            Effects = new List<Effect>(),
+                            Status = ResultStatusCodes.Success,
+                            OriginalMessage = new MessageEnvelope()
+                            {
+                                Message = new SnapshotQuantum
+                                {
+                                    Apex = 1,
+                                    Hash = 32.RandomBytes(),
+                                    IsProcessed = true,
+                                    Timestamp = 12123
+                                },
+                                Signatures = new List<Ed25519Signature>
+                            {
+                                FakeModelsFactory.RandomSignature()
+                            }
+                            }
+                        },
+                        Signatures = new List<Ed25519Signature>{
+                        FakeModelsFactory.RandomSignature(),
+                        FakeModelsFactory.RandomSignature(),
+                        FakeModelsFactory.RandomSignature(),
+                    }
+                    };
                     snapshot.ComputeHash();
                 }
             }, () => $"snapshot.InitSnapshot() + snapshot.ComputeHash() ({iterations} iterations, {totalAccounts} totalAccounts, {totalMarkets} totalMarkets, {totalOrdersPerAccountPerMarket} totalOrdersPerAccount)");

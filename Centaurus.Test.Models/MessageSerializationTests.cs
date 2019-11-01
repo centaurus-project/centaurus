@@ -12,11 +12,6 @@ namespace Centaurus.Test
 {
     public class MessageSerializationTests
     {
-        public MessageSerializationTests()
-        {
-            var tmp = new AccountSerializer();
-        }
-
         [Test]
         public void OrderSerializationTest()
         {
@@ -83,11 +78,11 @@ namespace Centaurus.Test
 
             //backward compatibility
             var fastWriter = new XdrWriter();
-            fastWriter.Write(435);
-            fastWriter.Write((uint)435);
-            fastWriter.Write(new double[] { 435.15, 64656.11 });
-            fastWriter.Write("oiewurouqwe");
-            fastWriter.Write(testArray);
+            fastWriter.WriteInt32(435);
+            fastWriter.WriteUInt32((uint)435);
+            fastWriter.WriteDoubleArray(new double[] { 435.15, 64656.11 });
+            fastWriter.WriteString("oiewurouqwe");
+            fastWriter.WriteVariable(testArray);
 
             var legacyXdrReader = new XdrDataInputStream(fastWriter.ToArray());
             Assert.AreEqual(435, legacyXdrReader.ReadInt());
@@ -170,9 +165,9 @@ namespace Centaurus.Test
                     var stream = new XdrWriter();
                     for (var i = 0; i < iterations; i++)
                     {
-                        stream.Write(435);
-                        stream.Write("oiewurouqwe");
-                        stream.Write(testArray);
+                        stream.WriteInt32(435);
+                        stream.WriteString("oiewurouqwe");
+                        stream.WriteVariable(testArray);
                     }
                     stream.ToArray();
                 }
@@ -191,9 +186,9 @@ namespace Centaurus.Test
             var stream = new XdrWriter();
             for (var i = 0; i < iterations; i++)
             {
-                stream.Write(435);
-                stream.Write("oiewurouqwe");
-                stream.Write(testArray);
+                stream.WriteInt32(435);
+                stream.WriteString("oiewurouqwe");
+                stream.WriteVariable(testArray);
             }
             var serialized = stream.ToArray();
 

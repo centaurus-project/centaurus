@@ -75,7 +75,7 @@ namespace Centaurus.Domain
         /// <param name="snapshot">Majority's snapshot</param>
         private static async Task ValidateSnapshot(Snapshot snapshot)
         {
-            var localSnapshot = await SnapshotProviderManager.GetLastSnapshot();
+            var localSnapshot = await Global.SnapshotDataProvider.GetLastSnapshot();
             if (!ByteArrayPrimitives.Equals(snapshot.ComputeHash(), localSnapshot.ComputeHash()))
                 throw new Exception("Local snapshot doesn't equal to majority's one");
         }
@@ -88,7 +88,7 @@ namespace Centaurus.Domain
                 lastSnapshot.Confirmation = largestGroup.Select(g => g.LastSnapshot.Confirmation).ToList().AggregateEnvelops();
 
             if (lastSnapshot == null)
-                lastSnapshot = await SnapshotProviderManager.GetLastSnapshot();
+                lastSnapshot = await Global.SnapshotDataProvider.GetLastSnapshot();
 
             //alpha could be empty
             //await ValidateSnapshot(lastSnapshot);
@@ -100,6 +100,8 @@ namespace Centaurus.Domain
             var alphaStateManager = (AlphaStateManager)Global.AppState;
 
             alphaStateManager.AlphaRised();
+
+            Global.QuantumHandler.Start();
 
             Notifier.NotifyAuditors(alphaStateManager.GetCurrentAlphaState());
         }

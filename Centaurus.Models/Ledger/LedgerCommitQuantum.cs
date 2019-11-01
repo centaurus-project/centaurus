@@ -13,6 +13,7 @@ namespace Centaurus.Models
     {
         public override MessageTypes MessageType => MessageTypes.LedgerCommitQuantum;
 
+        [XdrField(0)]
         public MessageEnvelope Source { get; set; }
     }
 }

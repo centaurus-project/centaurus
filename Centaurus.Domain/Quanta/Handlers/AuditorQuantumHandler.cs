@@ -10,18 +10,18 @@ using System.Threading;
 
 namespace Centaurus.Domain
 {
-    public class AuditorQuantumHandler: BaseQuantumHandler
+    public class AuditorQuantumHandler : BaseQuantumHandler
     {
         /// <summary>
         /// Starts quanta processor thread
         /// </summary>
-        public override void Start()
+        protected override void StartInternal()
         {
             lock (syncRoot)
             {
                 lastAddedApex = Global.QuantumStorage.CurrentApex;
             }
-            _ = ProcessQuantumQueue();
+            Task.Factory.StartNew(RunQuantumWorker, cancellationToken.Token);
         }
 
         /// <summary>
@@ -58,8 +58,6 @@ namespace Centaurus.Domain
 
         Dictionary<ulong, MessageEnvelope> queue = new Dictionary<ulong, MessageEnvelope>();
 
-        object syncRoot = new { };
-
         CancellationTokenSource cancellationToken = new CancellationTokenSource();
 
         void Add(MessageEnvelope envelope)
@@ -91,57 +89,54 @@ namespace Centaurus.Domain
         }
 
 
-        async Task ProcessQuantumQueue()
+        void RunQuantumWorker()
         {
-            await Task.Factory.StartNew(() =>
+            while (!cancellationToken.Token.IsCancellationRequested)
             {
-                while (!cancellationToken.Token.IsCancellationRequested)
+                try
                 {
-                    try
+                    //try to get next quantum
+                    ulong targetQuantumApex = Global.QuantumStorage.CurrentApex + 1;
+                    if (TryRemove(targetQuantumApex, out MessageEnvelope envelope))
                     {
-                        //try to get next quantum
-                        ulong targetQuantumApex = Global.QuantumStorage.CurrentApex + 1;
-                        if (TryRemove(targetQuantumApex, out MessageEnvelope envelope))
+                        var result = envelope.CreateResult();
+                        try
                         {
-                            var result = envelope.CreateResult();
-                            try
+                            InternalHandle(envelope);
+                            result.Status = ResultStatusCodes.Success;
+                            if (envelope is ITransactionContainer)
                             {
-                                InternalHandle(envelope);
-                                result.Status = ResultStatusCodes.Success;
-                                if (envelope is ITransactionContainer)
+                                var transaction = ((ITransactionContainer)envelope).GetTransaction();
+                                var txHash = transaction.Hash();
+                                result.Effects.Add(new TransactionSignedEffect()
                                 {
-                                    var transaction = ((ITransactionContainer)envelope).GetTransaction();
-                                    var txHash = transaction.Hash();
-                                    result.Effects.Add(new TransactionSignedEffect()
+                                    TransactionHash = txHash,
+                                    Signature = new Ed25519Signature()
                                     {
-                                        TransactionHash = txHash,
-                                        Signature = new Ed25519Signature()
-                                        {
-                                            Signature = Global.Settings.KeyPair.Sign(txHash),
-                                            Signer = new RawPubKey { Data = Global.Settings.KeyPair.PublicKey }
-                                        }
-                                    });
-                                }
+                                        Signature = Global.Settings.KeyPair.Sign(txHash),
+                                        Signer = new RawPubKey { Data = Global.Settings.KeyPair.PublicKey }
+                                    }
+                                });
                             }
-                            catch (Exception exc)
-                            {
-                                logger.Error(exc);
-                                result.Status = ResultStatusCodes.InternalError;
-                            }
-
-                            OutgoingMessageStorage.EnqueueMessage(result);
                         }
-                        else
+                        catch (Exception exc)
                         {
-                            Thread.Sleep(50);
+                            logger.Error(exc);
+                            result.Status = ResultStatusCodes.InternalError;
                         }
+
+                        OutgoingMessageStorage.EnqueueMessage(result);
                     }
-                    catch (Exception e)
+                    else
                     {
-                        logger.Error(e);
+                        Thread.Sleep(50);
                     }
                 }
-            }, cancellationToken.Token);
+                catch (Exception e)
+                {
+                    logger.Error(e);
+                }
+            }
         }
 
         Message InternalHandle(MessageEnvelope envelope)

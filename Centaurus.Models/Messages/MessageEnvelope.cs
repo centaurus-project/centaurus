@@ -4,13 +4,16 @@ using System.Text;
 
 namespace Centaurus.Models
 {
-    public class MessageEnvelope: IXdrSerializableModel
+    [XdrContract]
+    public class MessageEnvelope
     {
+        [XdrField(0)]
         public Message Message { get; set; }
 
         //TODO: do not serialize hashes
         //public byte[] Hash { get; set; }
 
+        [XdrField(1)]
         public List<Ed25519Signature> Signatures { get; set; }
     }
 }
