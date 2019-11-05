@@ -39,7 +39,7 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
                 if (Global.AppState.State != ApplicationState.Ready)
                     throw new ConnectionCloseException(WebSocketCloseStatus.ProtocolError, "Alpha is not in Ready state.");
                 connection.ConnectionState = ConnectionState.Ready;
-                resultMessage = new ResultMessage { Status = ResultStatusCodes.Success, OriginalMessage = envelope };
+                resultMessage = envelope.CreateResult(ResultStatusCodes.Success);
             }
             await connection.SendMessage(resultMessage);
         }

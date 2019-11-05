@@ -92,6 +92,8 @@ namespace Centaurus.Domain
 
                 Notifier.OnMessageProcessResult(resultMessage);
 
+                QuantumIsHandled(envelope);
+
                 logger.Trace($"Message of type {quantum.MessageType.ToString()} with apex {quantum.Apex} is handled.");
             }
             catch (Exception exc)
@@ -102,6 +104,8 @@ namespace Centaurus.Domain
                     Status = ClientExceptionHelper.GetExceptionStatusCode(exc),
                     OriginalMessage = envelope
                 });
+
+                QuantumHandleFailed(envelope, exc);
             }
         }
 

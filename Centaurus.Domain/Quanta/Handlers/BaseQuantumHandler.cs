@@ -44,8 +44,7 @@ namespace Centaurus.Domain
                 }
                 catch (Exception exc)
                 {
-                    if (!awaitedQuanta.Remove(envelope, out _))
-                        logger.Error("Unable to remove the quantum from the awaited quanta");
+                    QuantumHandleFailed(envelope, exc);
                     quantumCompletionSource.SetException(exc);
                 }
                 return quantumCompletionSource.Task;
@@ -58,8 +57,26 @@ namespace Centaurus.Domain
             {
                 if (awaitedQuanta.Remove(envelope, out TaskCompletionSource<MessageEnvelope> quantumCompletionSource))
                 {
-                    quantumCompletionSource.SetResult(envelope);
-                    logger.Trace($"Envelope '{envelope.Message.MessageType.ToString()}:{envelope.Message.MessageId}' was removed from the awaited quanta");
+                    Task.Factory.StartNew(() =>
+                    {
+                        quantumCompletionSource.SetResult(envelope);
+                        logger.Trace($"Envelope '{envelope.Message.MessageType.ToString()}:{envelope.Message.MessageId}' was removed from the awaited quanta");
+                    });
+                }
+            }
+        }
+
+        protected void QuantumHandleFailed(MessageEnvelope envelope, Exception exception)
+        {
+            lock (syncRoot)
+            {
+                if (awaitedQuanta.Remove(envelope, out TaskCompletionSource<MessageEnvelope> quantumCompletionSource))
+                {
+                    Task.Factory.StartNew(() =>
+                    {
+                        quantumCompletionSource.SetException(exception);
+                        logger.Trace($"Envelope '{envelope.Message.MessageType.ToString()}:{envelope.Message.MessageId}' was removed from the awaited quanta");
+                    });
                 }
             }
         }

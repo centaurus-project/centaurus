@@ -123,6 +123,7 @@ namespace Centaurus.Test
                     }
                     };
                     snapshot.ComputeHash();
+                    Global.SnapshotManager.AbortPendingSnapshot();
                 }
             }, () => $"snapshot.InitSnapshot() + snapshot.ComputeHash() ({iterations} iterations, {totalAccounts} totalAccounts, {totalMarkets} totalMarkets, {totalOrdersPerAccountPerMarket} totalOrdersPerAccount)");
         }

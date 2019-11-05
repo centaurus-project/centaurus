@@ -11,7 +11,6 @@ namespace Centaurus
     public abstract class BaseSettings
     {
         public const string ConfigFileArgName = "configFile";
-        public const string DefaultCWD = "AppData";
 
         public KeyPair KeyPair { get; set; }
 
@@ -27,8 +26,8 @@ namespace Centaurus
         [Option('s', "secret", Required = true, HelpText = "Current application secret key.")]
         public string Secret { get; set; }
 
-        [Option("cwd", Default = DefaultCWD, Required = false, HelpText = "Working directory for snapshots and other files.")]
-        public string CWD { get; set; } = DefaultCWD;
+        [Option("cwd", Required = false, HelpText = "Working directory for snapshots and other files.")]
+        public string CWD { get; set; }
 
         [Option("network_passphrase", Required = true, HelpText = "Stellar network passphrase.")]
         public string NetworkPassphrase { get; set; }
