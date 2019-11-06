@@ -105,7 +105,7 @@ namespace Centaurus.Domain
                     OriginalMessage = envelope
                 });
 
-                QuantumHandleFailed(envelope, exc);
+                QuantumFailed(envelope, exc);
             }
         }
 

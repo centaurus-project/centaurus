@@ -126,7 +126,7 @@ namespace Centaurus.Domain
                             logger.Error(exc);
                             result.Status = ResultStatusCodes.InternalError;
 
-                            QuantumHandleFailed(envelope, exc);
+                            QuantumFailed(envelope, exc);
                         }
 
                         OutgoingMessageStorage.EnqueueMessage(result);

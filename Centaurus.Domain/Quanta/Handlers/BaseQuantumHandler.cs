@@ -44,7 +44,7 @@ namespace Centaurus.Domain
                 }
                 catch (Exception exc)
                 {
-                    QuantumHandleFailed(envelope, exc);
+                    QuantumFailed(envelope, exc);
                     quantumCompletionSource.SetException(exc);
                 }
                 return quantumCompletionSource.Task;
@@ -66,7 +66,7 @@ namespace Centaurus.Domain
             }
         }
 
-        protected void QuantumHandleFailed(MessageEnvelope envelope, Exception exception)
+        protected void QuantumFailed(MessageEnvelope envelope, Exception exception)
         {
             lock (syncRoot)
             {

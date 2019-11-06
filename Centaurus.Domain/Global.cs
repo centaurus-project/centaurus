@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO.Abstractions;
+using System.Linq;
 using System.Text;
 using System.Timers;
 using Centaurus.Models;
@@ -58,10 +59,26 @@ namespace Centaurus.Domain
 
             AppState.State = ApplicationState.Running;
         }
+
         public static BaseSnapshotDataProvider SnapshotDataProvider { get; private set; }
         public static Exchange Exchange { get; private set; }
         public static SnapshotManager SnapshotManager { get; private set; }
-        public static ConstellationSettings Constellation { get; private set; }
+
+        private static ConstellationSettings constellation;
+        public static ConstellationSettings Constellation
+        {
+            get
+            {
+                return constellation;
+            }
+            private set
+            {
+                constellation = value;
+                AssetIds = constellation != null 
+                    ? new HashSet<int>(constellation.Assets.Select(a => a.Id).Concat(new int[] { 0 })) 
+                    : new HashSet<int>();
+            }
+        }
         public static QuantumStorage QuantumStorage { get; private set; }
         public static AccountData VaultAccount { get; private set; }
         public static AccountStorage AccountStorage { get; private set; }
@@ -77,6 +94,8 @@ namespace Centaurus.Domain
 
         public static BaseSettings Settings { get; private set; }
         public static StellarNetwork StellarNetwork { get; private set; }
+
+        public static HashSet<int> AssetIds { get; private set; }
 
         static Exchange RestoreExchange(Snapshot snapshot)
         {
