@@ -18,6 +18,7 @@
     <ProjectReference Include="..\Centaurus.Common\Centaurus.Common.csproj" />
     <ProjectReference Include="..\Centaurus.Domain\Centaurus.Domain.csproj" />
     <ProjectReference Include="..\Centaurus.Models\Centaurus.Models.csproj" />
+    <ProjectReference Include="..\Centaurus.Test.Utils\Centaurus.Test.Utils.csproj" />
   </ItemGroup>
 
 </Project>

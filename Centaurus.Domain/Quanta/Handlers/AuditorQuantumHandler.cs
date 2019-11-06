@@ -118,11 +118,15 @@ namespace Centaurus.Domain
                                     }
                                 });
                             }
+
+                            QuantumIsHandled(envelope);
                         }
                         catch (Exception exc)
                         {
                             logger.Error(exc);
                             result.Status = ResultStatusCodes.InternalError;
+
+                            QuantumFailed(envelope, exc);
                         }
 
                         OutgoingMessageStorage.EnqueueMessage(result);

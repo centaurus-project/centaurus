@@ -52,7 +52,7 @@ namespace Centaurus.Domain
                 CheckSignatures(ledgerSourceEnvelope);
 
             if (!Global.LedgerManager.IsValidNextLedger(ledgerInfo.LedgerFrom))
-                throw new Exception($"Ledger is invalid. Current ledger is {Global.LedgerManager.Ledger} and received ledger range starts with {ledgerInfo.LedgerFrom}");
+                throw new InvalidOperationException($"Ledger is invalid. Current ledger is {Global.LedgerManager.Ledger} and received ledger range starts with {ledgerInfo.LedgerFrom}");
 
             foreach (var payment in ledgerInfo.Payments)
             {
@@ -73,10 +73,10 @@ namespace Centaurus.Domain
         private void CheckSignatures(MessageEnvelope envelope)
         {
             if (!MajorityHelper.HasMajority(envelope))
-                throw new Exception("No majority");
+                throw new InvalidOperationException("No majority");
 
             if (!envelope.AreSignaturesValid())
-                throw new Exception("Signatures is invalid");
+                throw new InvalidOperationException("Signatures is invalid");
         }
 
         private void ValidateDeposite(Deposit deposite)

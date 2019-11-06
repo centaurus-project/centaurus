@@ -49,11 +49,14 @@ namespace Centaurus.Domain
         /// <summary>
         /// Initiates snapshot process
         /// </summary>
-        /// <returns>A snapshot object if it is different from the last snapshot, otherwise null</returns>
+        /// <returns>A snapshot object</returns>
         public Snapshot InitSnapshot()
         {
             lock (syncRoot)
             {
+                if (pendingSnapshot != null)
+                    throw new InvalidOperationException("Snapshot process is already initialized");
+
                 var snapshot = new Snapshot();
                 snapshot.Id = (LastSnapshot?.Id ?? 0) + 1;
                 //if snapshot is valid, then snapshot quantum will be generated and current apex will be incremented

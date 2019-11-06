@@ -15,8 +15,53 @@ using System.Timers;
 
 namespace Centaurus.Test.Client
 {
-    public class UserWebSocketConnection : ClientWebSocketConnection
+    public class UserWebSocketConnection : BaseWebSocketConnection
     {
+        public UserWebSocketConnection()
+        : base(new ClientWebSocket())
+        {
+            //we don't need to create and sign heartbeat message on every sending
+            hearbeatMessage = new Heartbeat().CreateEnvelope();
+            hearbeatMessage.Sign(Global.Settings.KeyPair);
+#if !DEBUG
+            InitTimer();
+#endif
+        }
+
+        private System.Timers.Timer heartbeatTimer = null;
+
+        //If we didn't receive message during specified interval, we should close connection
+        private void InitTimer()
+        {
+            heartbeatTimer = new System.Timers.Timer();
+            heartbeatTimer.Interval = 5000;
+            heartbeatTimer.AutoReset = false;
+            heartbeatTimer.Elapsed += HeartbeatTimer_Elapsed;
+        }
+
+        private MessageEnvelope hearbeatMessage;
+
+        private async void HeartbeatTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
+        {
+            await SendMessage(hearbeatMessage);
+        }
+
+        protected ClientWebSocket clientWebSocket => webSocket as ClientWebSocket;
+
+        public virtual async Task EstablishConnection()
+        {
+            await (webSocket as ClientWebSocket).ConnectAsync(new Uri(((AuditorSettings)Global.Settings).AlphaAddress), CancellationToken.None);
+            _ = Listen();
+        }
+
+        public override async Task SendMessage(MessageEnvelope envelope, CancellationToken ct = default)
+        {
+            await base.SendMessage(envelope, ct);
+            if (heartbeatTimer != null)
+                heartbeatTimer.Reset();
+        }
+
+
         static Logger logger = LogManager.GetCurrentClassLogger();
 
         public ConcurrentDictionary<ulong, TaskCompletionSource<MessageEnvelope>> Requests { get; } = new ConcurrentDictionary<ulong, TaskCompletionSource<MessageEnvelope>>();

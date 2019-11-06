@@ -26,7 +26,7 @@ namespace Centaurus
         [Option('s', "secret", Required = true, HelpText = "Current application secret key.")]
         public string Secret { get; set; }
 
-        [Option("cwd", Default = "AppData", Required = false, HelpText = "Working directory for snapshots and other files.")]
+        [Option("cwd", Required = false, HelpText = "Working directory for snapshots and other files.")]
         public string CWD { get; set; }
 
         [Option("network_passphrase", Required = true, HelpText = "Stellar network passphrase.")]

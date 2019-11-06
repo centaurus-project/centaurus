@@ -45,7 +45,7 @@ namespace Centaurus
         /// <summary>
         /// Current connection public key
         /// </summary>
-        public RawPubKey ClientPubKey { get; internal set; }
+        public RawPubKey ClientPubKey { get; set; }
 
         ConnectionState connectionState;
         /// <summary>
@@ -57,7 +57,7 @@ namespace Centaurus
             {
                 return connectionState;
             }
-            protected internal set
+            set
             {
                 if (connectionState != value)
                 {

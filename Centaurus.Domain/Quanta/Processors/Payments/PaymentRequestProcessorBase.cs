@@ -58,8 +58,8 @@ namespace Centaurus.Domain
             if (payment.Amount <= 0)
                 throw new InvalidOperationException("Amount should be greater than 0");
 
-            if (!Global.Constellation.Assets.Any(a => a.Id == payment.Asset))
-                throw new InvalidOperationException("Asset is not supported");
+            if (!Global.AssetIds.Contains(payment.Asset))
+                throw new InvalidOperationException($"Asset {payment.Asset} is not supported");
 
             var account = Global.AccountStorage.GetAccount(payment.Account);
             if (account == null)

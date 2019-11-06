@@ -17,6 +17,7 @@ namespace Centaurus.Domain
             return envelope.CreateResult(ResultStatusCodes.Success, Global.Exchange.ExecuteOrder(quantum));
         }
 
+        //TODO: replace all system exceptions that occur on validation with our client exceptions
         public override void Validate(MessageEnvelope envelope)
         {
             ValidateNonce(envelope);
