@@ -19,7 +19,7 @@ namespace Centaurus.Test
         public static AlphaSettings GetAlphaSettings()
         {
             var settings = new AlphaSettings();
-            SetCommonSettings(settings, TestEnvironment.AlphaSecret);
+            SetCommonSettings(settings, TestEnvironment.AlphaKeyPair.SecretSeed);
             settings.Build();
             return settings;
         }
@@ -32,9 +32,9 @@ namespace Centaurus.Test
         public static AuditorSettings GetAuditorSettings()
         {
             var settings = new AuditorSettings();
-            SetCommonSettings(settings, TestEnvironment.Auditor1Secret);
-            settings.AlphaPubKey = KeyPair.FromSecretSeed(TestEnvironment.AlphaSecret).AccountId;
-            settings.GenesisQuorum = new string[] { KeyPair.FromSecretSeed(TestEnvironment.Auditor1Secret).AccountId };
+            SetCommonSettings(settings, TestEnvironment.Auditor1KeyPair.SecretSeed);
+            settings.AlphaPubKey = TestEnvironment.AlphaKeyPair.AccountId;
+            settings.GenesisQuorum = new string[] { TestEnvironment.Auditor1KeyPair.AccountId };
             settings.Build();
             return settings;
         }
@@ -66,36 +66,34 @@ namespace Centaurus.Test
 
         private static void DefaultSetup(BaseSettings baseSettings)
         {
-            Setup(new string[] { TestEnvironment.Client1Secret, TestEnvironment.Client2Secret }, new string[] { TestEnvironment.Auditor1Secret }, baseSettings);
+            Setup(new List<KeyPair> { TestEnvironment.Client1KeyPair, TestEnvironment.Client2KeyPair }, new List<KeyPair> { TestEnvironment.Auditor1KeyPair }, baseSettings);
         }
 
         /// <summary>
         /// This method inits Global, generates genesis snapshot and adds clients to constellation
         /// </summary>
-        /// <param name="clientSecrets">Clients to add to constellation</param>
-        /// <param name="auditorSecrets">Auditors to add to constellation</param>
+        /// <param name="clients">Clients to add to constellation</param>
+        /// <param name="auditors">Auditors to add to constellation</param>
         /// <param name="settings">Settings that will be used to init Global</param>
-        public static void Setup(string[] clientSecrets, string[] auditorSecrets, BaseSettings settings)
+        public static void Setup(List<KeyPair> clients, List<KeyPair> auditors, BaseSettings settings)
         {
             Global.Init(settings, new MockFileSystem());
 
-            var auditorKeyPairs = auditorSecrets.Select(s => KeyPair.FromSecretSeed(s)).ToList();
+            var clientAccounts = GenerateClientAccounts(clients);
 
-            var clientAccounts = GenerateClientAccounts(clientSecrets);
-
-            var snapshot = GenerateSnapshot(clientAccounts, auditorKeyPairs);
+            var snapshot = GenerateSnapshot(clientAccounts, auditors);
 
             Global.Setup(snapshot);
         }
 
-        private static List<Models.Account> GenerateClientAccounts(string[] clientSecrets)
+        private static List<Models.Account> GenerateClientAccounts(List<KeyPair> clients)
         {
             var accounts = new List<Models.Account>();
-            foreach (var clientSecret in clientSecrets)
+            foreach (var client in clients)
             {
                 var account = new Models.Account()
                 {
-                    Pubkey = KeyPair.FromSecretSeed(clientSecret),
+                    Pubkey = client,
                     Balances = new List<Balance>
                     {
                         new Balance { Amount = 10_000_000, Asset = 0 },

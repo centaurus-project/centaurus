@@ -27,9 +27,8 @@ namespace Centaurus.Test
             await Global.QuantumHandler.HandleAsync(envelope);
 
             //emulate quorum
-            var auditorKeyPair = KeyPair.FromSecretSeed(TestEnvironment.Auditor1Secret);
             var res = envelope.CreateResult(ResultStatusCodes.Success).CreateEnvelope();
-            res.Sign(auditorKeyPair);
+            res.Sign(TestEnvironment.Auditor1KeyPair);
 
             Global.SnapshotManager.SetResult(res);
 

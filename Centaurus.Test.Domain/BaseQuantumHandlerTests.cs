@@ -22,12 +22,9 @@ namespace Centaurus.Test
         {
             try
             {
-                var client1KeyPair = KeyPair.FromSecretSeed(TestEnvironment.Client1Secret);
-                var client2KeyPair = KeyPair.FromSecretSeed(TestEnvironment.Client2Secret);
-                var auditorKeyPair = KeyPair.FromSecretSeed(TestEnvironment.Auditor1Secret);
 
                 var client1StartBalanceAmount = (long)0;
-                var clientAccountBalance = Global.AccountStorage.GetAccount(client1KeyPair).GetBalance(asset);
+                var clientAccountBalance = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair).GetBalance(asset);
                 if (clientAccountBalance != null && amount > 0)
                 {
                     client1StartBalanceAmount = clientAccountBalance.Amount;
@@ -43,21 +40,21 @@ namespace Centaurus.Test
                         new Deposit
                         {
                             Amount = amount,
-                            Destination = client1KeyPair,
+                            Destination = TestEnvironment.Client1KeyPair,
                             Asset = asset
                         },
                         new Withdrawal
                         {
                             Amount = amount,
-                            Destination = client2KeyPair,
-                            Source = client1KeyPair,
+                            Destination = TestEnvironment.Client2KeyPair,
+                            Source = TestEnvironment.Client1KeyPair,
                             Asset = asset,
                             PaymentResult = PaymentResults.Success
                         }
                     }
                 };
                 var ledgerNotificationEnvelope = ledgerNotification.CreateEnvelope();
-                ledgerNotificationEnvelope.Sign(auditorKeyPair);
+                ledgerNotificationEnvelope.Sign(TestEnvironment.Auditor1KeyPair);
 
                 var ledgerCommit = new LedgerCommitQuantum
                 {
@@ -69,7 +66,7 @@ namespace Centaurus.Test
 
                 Assert.AreEqual(Global.LedgerManager.Ledger, ledgerNotification.LedgerTo);
 
-                var account1 = Global.AccountStorage.GetAccount(client1KeyPair);
+                var account1 = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
 
                 Assert.AreEqual(account1.GetBalance(asset).Liabilities, 0);
                 Assert.AreEqual(account1.GetBalance(asset).Amount, client1StartBalanceAmount); //acc balance + deposit - withdrawal
@@ -93,10 +90,9 @@ namespace Centaurus.Test
         {
             try
             {
-                var clientKeyPair = KeyPair.FromSecretSeed(TestEnvironment.Client1Secret);
                 var order = new OrderRequest
                 {
-                    Account = clientKeyPair,
+                    Account = TestEnvironment.Client1KeyPair,
                     Nonce = (ulong)nonce,
                     Amount = amount,
                     Asset = asset,
