@@ -19,32 +19,32 @@ namespace Centaurus.Test
             Global.QuantumHandler.Start();
         }
 
-        [Test]
-        public async Task SnapshotQuantumTest()
-        {
-            var snapshot = new SnapshotQuantum();
-            var envelope = snapshot.CreateEnvelope();
-            await Global.QuantumHandler.HandleAsync(envelope);
+        //[Test]
+        //public async Task SnapshotQuantumTest()
+        //{
+        //    var snapshot = new SnapshotQuantum();
+        //    var envelope = snapshot.CreateEnvelope();
+        //    await Global.QuantumHandler.HandleAsync(envelope);
 
-            //emulate quorum
-            var res = envelope.CreateResult(ResultStatusCodes.Success).CreateEnvelope();
-            res.Sign(TestEnvironment.Auditor1KeyPair);
+        //    //emulate quorum
+        //    var res = envelope.CreateResult(ResultStatusCodes.Success).CreateEnvelope();
+        //    res.Sign(TestEnvironment.Auditor1KeyPair);
 
-            Global.SnapshotManager.SetResult(res);
+        //    Global.SnapshotManager.SetResult(res);
 
-            Assert.AreEqual(Global.SnapshotManager.LastSnapshot.Id, 2);
-        }
+        //    Assert.AreEqual(Global.SnapshotManager.LastSnapshot.Id, 2);
+        //}
 
-        [Test]
-        public async Task SnapshotFailQuantumTest()
-        {
-            var snapshot = new SnapshotQuantum();
-            var envelope = snapshot.CreateEnvelope();
-            await Global.QuantumHandler.HandleAsync(envelope);
+        //[Test]
+        //public async Task SnapshotFailQuantumTest()
+        //{
+        //    var snapshot = new SnapshotQuantum();
+        //    var envelope = snapshot.CreateEnvelope();
+        //    await Global.QuantumHandler.HandleAsync(envelope);
 
-            snapshot = new SnapshotQuantum();
-            envelope = snapshot.CreateEnvelope();
-            Assert.ThrowsAsync<InvalidOperationException>(async () => await Global.QuantumHandler.HandleAsync(envelope));
-        }
+        //    snapshot = new SnapshotQuantum();
+        //    envelope = snapshot.CreateEnvelope();
+        //    Assert.ThrowsAsync<InvalidOperationException>(async () => await Global.QuantumHandler.HandleAsync(envelope));
+        //}
     }
 }

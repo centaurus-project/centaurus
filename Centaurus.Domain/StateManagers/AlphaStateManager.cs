@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
@@ -40,12 +41,12 @@ namespace Centaurus.Domain
             }
         }
 
-        public AlphaState GetCurrentAlphaState()
+        public async Task<AlphaState> GetCurrentAlphaState()
         {
             return new AlphaState
             {
                 State = State,
-                LastSnapshot = Global.SnapshotManager.LastSnapshot
+                LastSnapshot = await Global.SnapshotManager.GetSnapshot(ulong.MaxValue)
             };
         }
     }

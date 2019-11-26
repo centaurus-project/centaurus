@@ -6,11 +6,15 @@
 
   <ItemGroup>
     <PackageReference Include="NLog" Version="4.6.7" />
-    <PackageReference Include="System.IO.Abstractions" Version="7.0.7" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Centaurus.DAL\Centaurus.DAL.csproj" />
     <ProjectReference Include="..\Centaurus.Models\Centaurus.Models.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Effects\Payments\" />
   </ItemGroup>
 
 </Project>

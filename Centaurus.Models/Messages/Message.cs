@@ -10,7 +10,6 @@ namespace Centaurus.Models
     [XdrUnion((int)MessageTypes.OrderRequest, typeof(OrderRequest))]
     [XdrUnion((int)MessageTypes.RequestQuantum, typeof(RequestQuantum))]
     [XdrUnion((int)MessageTypes.LedgerCommitQuantum, typeof(LedgerCommitQuantum))]
-    [XdrUnion((int)MessageTypes.SnapshotQuantum, typeof(SnapshotQuantum))]
     [XdrUnion((int)MessageTypes.ResultMessage, typeof(ResultMessage))]
     [XdrUnion((int)MessageTypes.LedgerUpdateNotification, typeof(LedgerUpdateNotification))]
     [XdrUnion((int)MessageTypes.AuditorState, typeof(AuditorState))]

@@ -75,7 +75,7 @@ namespace Centaurus.Domain
         /// <param name="snapshot">Majority's snapshot</param>
         private static async Task ValidateSnapshot(Snapshot snapshot)
         {
-            var localSnapshot = await Global.SnapshotDataProvider.GetLastSnapshot();
+            var localSnapshot = await Global.SnapshotManager.GetSnapshot();
             if (!ByteArrayPrimitives.Equals(snapshot.ComputeHash(), localSnapshot.ComputeHash()))
                 throw new Exception("Local snapshot doesn't equal to majority's one");
         }
@@ -88,7 +88,7 @@ namespace Centaurus.Domain
                 lastSnapshot.Confirmation = largestGroup.Select(g => g.LastSnapshot.Confirmation).ToList().AggregateEnvelops();
 
             if (lastSnapshot == null)
-                lastSnapshot = await Global.SnapshotDataProvider.GetLastSnapshot();
+                lastSnapshot = await Global.SnapshotManager.GetSnapshot();
 
             //alpha could be empty
             //await ValidateSnapshot(lastSnapshot);
@@ -103,7 +103,7 @@ namespace Centaurus.Domain
 
             Global.QuantumHandler.Start();
 
-            Notifier.NotifyAuditors(alphaStateManager.GetCurrentAlphaState());
+            Notifier.NotifyAuditors(await alphaStateManager.GetCurrentAlphaState());
         }
 
         private static IEnumerable<MessageEnvelope> GetValidQuanta(Snapshot snapshot, IEnumerable<AuditorState> auditorStates)

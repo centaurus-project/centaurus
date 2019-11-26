@@ -50,7 +50,7 @@ namespace Centaurus.Domain
                             throw new Exception("Unable to find withdrawal by hash");
                         payment = new Withdrawal
                         {
-                            Source = withdrawal.Account
+                            Source = ((RequestMessage)withdrawal.RequestEnvelope.Message).Account
                         };
                     }
                     if (payment != null)

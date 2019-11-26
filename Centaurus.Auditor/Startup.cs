@@ -1,10 +1,10 @@
-﻿using Centaurus.Domain;
+﻿using Centaurus.DAL.Mongo;
+using Centaurus.Domain;
 using Centaurus.Models;
 using NLog;
 using stellar_dotnet_sdk;
 using System;
 using System.Collections.Generic;
-using System.IO.Abstractions;
 using System.Net.WebSockets;
 using System.Text;
 using System.Threading;
@@ -22,7 +22,7 @@ namespace Centaurus.Auditor
 
         public Startup(AuditorSettings settings)
         {
-            Global.Init(settings, new FileSystem());
+            Global.Init(settings, new MongoStorage());
         }
 
         public async Task Run()
@@ -56,7 +56,7 @@ namespace Centaurus.Auditor
             if (state == ApplicationState.Failed)
             {
                 await Abort();
-                await Global.SnapshotManager.SavePendingQuantums();
+                await Global.SnapshotManager.SaveSnapshot(Global.PendingUpdates);
 
                 //TODO: restart after some timeout
             }

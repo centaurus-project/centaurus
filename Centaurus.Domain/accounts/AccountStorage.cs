@@ -14,18 +14,10 @@ namespace Centaurus.Domain
             if (accounts == null)
                 accounts = new Account[] { };
 
-            this.accounts = new ConcurrentDictionary<RawPubKey, Account>(accounts.ToDictionary(m => m.Pubkey));
+            this.accounts = new Dictionary<RawPubKey, Account>(accounts.ToDictionary(m => m.Pubkey));
         }
 
-        ConcurrentDictionary<RawPubKey, Account> accounts = new ConcurrentDictionary<RawPubKey, Account>();
-
-        public void Add(Account account)
-        {
-            if (account == null) throw new ArgumentNullException(nameof(account));
-
-            if (!accounts.TryAdd(account.Pubkey, account))
-                throw new Exception("Account with specified public key already exists");
-        }
+        Dictionary<RawPubKey, Account> accounts = new Dictionary<RawPubKey, Account>();
 
         /// <summary>
         /// Retrieve account record by its public key.
@@ -39,27 +31,34 @@ namespace Centaurus.Domain
             return accounts.GetValueOrDefault(pubkey);
         }
 
-
-        private readonly object syncRoot = new { };
-        public Account CreateAccount(RawPubKey pubkey, List<Balance> balances)
+        public Account CreateAccount(RawPubKey pubkey)
         {
             if (pubkey == null)
                 throw new ArgumentNullException(nameof(pubkey));
 
-            lock (syncRoot)
-            {
-                var acc = GetAccount(pubkey);
-                if (acc != null)
-                    throw new InvalidOperationException("Account already exists");
+            if (accounts.ContainsKey(pubkey))
+                throw new InvalidOperationException($"Account with public key {pubkey} already exists");
 
-                acc = new Account
-                {
-                    Pubkey = pubkey,
-                    Balances = balances?.ToList() ?? new List<Balance>()
-                };
-                Add(acc);
-                return acc;
-            }
+            var acc = new Account
+            {
+                Pubkey = pubkey,
+                Balances = new List<Balance>()
+            };
+            accounts.Add(pubkey, acc);
+
+            return acc;
+        }
+
+        public void RemoveAccount(RawPubKey pubkey)
+        {
+            if (pubkey == null)
+                throw new ArgumentNullException(nameof(pubkey));
+
+            if (!accounts.ContainsKey(pubkey))
+                throw new InvalidOperationException($"Account with public key {pubkey} doesn't exist");
+
+            if (!accounts.Remove(pubkey))
+                throw new Exception($"Unable to remove the account with public key {pubkey}");
         }
 
         public IEnumerable<Account> GetAll()

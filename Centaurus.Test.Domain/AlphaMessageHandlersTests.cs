@@ -162,7 +162,7 @@ namespace Centaurus.Test
                 var envelope = new AuditorState
                 {
                     PendingQuantums = new List<MessageEnvelope>(),
-                    LastSnapshot = Global.SnapshotManager.LastSnapshot,
+                    LastSnapshot = await Global.SnapshotManager.GetSnapshot(),
                     State = ApplicationState.Running
                 }.CreateEnvelope();
                 envelope.Sign(clientKeyPair);

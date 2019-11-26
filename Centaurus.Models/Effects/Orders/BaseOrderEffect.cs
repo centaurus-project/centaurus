@@ -4,11 +4,12 @@ using System.Text;
 
 namespace Centaurus.Models
 {
-    public class OrderRemovedEffect: Effect
+    public abstract class BaseOrderEffect: Effect
     {
-        public override EffectTypes EffectType => EffectTypes.OrderRemoved;
-
         [XdrField(0)]
         public ulong OrderId { get; set; }
+
+        [XdrField(1)]
+        public double Price { get; set; }
     }
 }

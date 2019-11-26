@@ -15,7 +15,9 @@ namespace Centaurus.Domain
             var ledgerQuantum = (LedgerCommitQuantum)envelope.Message;
             var ledgerNotification = (LedgerUpdateNotification)ledgerQuantum.Source.Message;
 
-            Global.LedgerManager.SetLedger(ledgerNotification.LedgerTo);
+            var effectsContainer = new EffectProcessorsContainer(Global.PendingUpdates, envelope);
+
+            effectsContainer.Add(LedgerUpdateEffectProcessor.GetProcessor(ledgerQuantum.Apex, ledgerNotification.LedgerTo, Global.LedgerManager));
 
             for (var i = 0; i < ledgerNotification.Payments.Count; i++)
             {
@@ -24,15 +26,17 @@ namespace Centaurus.Domain
                 switch (payment.Type)
                 {
                     case PaymentTypes.Deposit:
-                        ProcessDeposite(payment as Deposit);
+                        ProcessDeposite(payment as Deposit, ledgerQuantum.Apex, effectsContainer);
                         break;
                     case PaymentTypes.Withdrawal:
-                        ProcessWithdrawal(payment as Withdrawal);
+                        ProcessWithdrawal(payment as Withdrawal, ledgerQuantum.Apex, effectsContainer);
                         break;
                     default:
                         throw new InvalidOperationException("Unsupported payment type");
                 }
             }
+
+            effectsContainer.Commit();
 
             return envelope.CreateResult(ResultStatusCodes.Success);
         }
@@ -91,16 +95,18 @@ namespace Centaurus.Domain
                 throw new InvalidOperationException("Amount should be greater than 0");
         }
 
-        private void ProcessDeposite(Deposit deposite)
+        private void ProcessDeposite(Deposit deposite, ulong apex, EffectProcessorsContainer effectsContainer)
         {
             if (deposite.PaymentResult == PaymentResults.Failed)
                 return;
             var account = Global.AccountStorage.GetAccount(deposite.Destination);
             if (account == null)
-                account = Global.AccountStorage.CreateAccount(deposite.Destination, null);
+                effectsContainer.Add(AccountCreateEffectProcessor.GetProcessor(apex, Global.AccountStorage, deposite.Destination));
 
-            var balance = account.GetBalance(deposite.Asset, true);
-            balance.UpdateBalance(deposite.Amount);
+            if (!account.HasBalance(deposite.Asset))
+                effectsContainer.Add(BalanceCreateEffectProcessor.GetProcessor(apex, account, deposite.Asset));
+
+            effectsContainer.Add(BalanceUpdateEffectProcesor.GetProcessor(apex, account, deposite.Asset, deposite.Amount));
         }
 
         private void ValidateWithdrawal(Withdrawal withdrawal)
@@ -115,18 +121,20 @@ namespace Centaurus.Domain
                 throw new InvalidOperationException("Amount should be greater than 0");
         }
 
-        private void ProcessWithdrawal(Withdrawal withdrawal)
+        private void ProcessWithdrawal(Withdrawal withdrawal, ulong apex, EffectProcessorsContainer effectsContainer)
         {
             var account = Global.AccountStorage.GetAccount(withdrawal.Source);
             if (account == null)
-                account = Global.AccountStorage.CreateAccount(withdrawal.Source, null);
+                throw new Exception("Source account doesn't exist");
 
-            var balance = account.GetBalance(withdrawal.Asset);
 
-            balance.UnlockLiabilities(withdrawal.Amount);
+            effectsContainer.Add(UnlockLiabilitiesEffectProcessor.GetProcessor(apex, account, withdrawal.Asset, withdrawal.Amount));
 
             if (withdrawal.PaymentResult == PaymentResults.Success)
-                balance.UpdateBalance(-withdrawal.Amount);
+                effectsContainer.Add(UnlockLiabilitiesEffectProcessor.GetProcessor(apex, account, withdrawal.Asset, -withdrawal.Amount));
+
+
+            //TODO: withdrawal remove effect
         }
     }
 }

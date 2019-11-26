@@ -9,29 +9,31 @@ namespace Centaurus.Domain
 {
     public class WithdrawalStorage
     {
-        public WithdrawalStorage(IEnumerable<PaymentRequestBase> payments)
+        public WithdrawalStorage(IEnumerable<RequestQuantum> payments)
         {
-            withdrawals = new ConcurrentDictionary<byte[], PaymentRequestBase>(new HashComparer());
+            withdrawals = new ConcurrentDictionary<byte[], RequestQuantum>(new HashComparer());
 
             if (payments == null)
                 return;
             foreach (var payment in payments)
             {
-                withdrawals.TryAdd(payment.TransactionHash, payment);
+                Add(payment);
             }
         }
 
-        ConcurrentDictionary<byte[], PaymentRequestBase> withdrawals;
+        ConcurrentDictionary<byte[], RequestQuantum> withdrawals;
 
-        public void Add(PaymentRequestBase payment)
+        public void Add(RequestQuantum payment)
         {
             if (payment == null) throw new ArgumentNullException(nameof(payment));
+            if (!(payment.RequestEnvelope.Message is PaymentRequestBase)) throw new ArgumentException("Message is not PaymentRequestBase");
 
-            if (!withdrawals.TryAdd(payment.TransactionHash, payment))
+            var currentPaymentHash = ((PaymentRequestBase)payment.RequestEnvelope.Message).TransactionHash;
+            if (!withdrawals.TryAdd(currentPaymentHash, payment))
                 throw new Exception("Payment with specified transaction hash already exists");
         }
 
-        public PaymentRequestBase GetWithdrawal(byte[] transactionHash)
+        public RequestQuantum GetWithdrawal(byte[] transactionHash)
         {
             if (transactionHash == null) throw new ArgumentNullException(nameof(transactionHash));
 
@@ -43,7 +45,7 @@ namespace Centaurus.Domain
             withdrawals.Clear();
         }
 
-        public IEnumerable<PaymentRequestBase> GetAll()
+        public IEnumerable<RequestQuantum> GetAll()
         {
             return withdrawals.Values;
         }

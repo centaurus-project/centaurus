@@ -32,7 +32,7 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
             //We set Ready state to an auditor only after the auditor sets apex cursor
             if (Global.Constellation.Auditors.Contains(connection.ClientPubKey))
             {
-                resultMessage = alphaStateManager.GetCurrentAlphaState();
+                resultMessage = await alphaStateManager.GetCurrentAlphaState();
             }
             else
             {

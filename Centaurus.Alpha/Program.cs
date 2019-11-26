@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.IO.Abstractions;
 using System.Linq;
 using System.Threading.Tasks;
+using Centaurus.DAL.Mongo;
 using Centaurus.Domain;
 using Centaurus.Models;
 using CommandLine;
@@ -50,14 +50,13 @@ namespace Centaurus
 
         private static async Task ConfigureConstellation(AlphaSettings settings)
         {
-            Global.Init(settings, new FileSystem());
+            Global.Init(settings, new MongoStorage());
 
             Global.AppState.StateChanged += Current_StateChanged;
 
             MessageHandlers<AlphaWebSocketConnection>.Init();
 
-            var lastSnapshot = await Global.SnapshotDataProvider.GetLastSnapshot();
-
+            var lastSnapshot = await Global.SnapshotManager.GetSnapshot();
             if (lastSnapshot == null)
             {
                 Global.AppState.State = ApplicationState.WaitingForInit;

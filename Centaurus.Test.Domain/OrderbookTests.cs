@@ -1,11 +1,11 @@
-﻿using Centaurus.Domain;
+﻿using Centaurus.DAL.Mongo;
+using Centaurus.Domain;
 using Centaurus.Models;
 using NUnit.Framework;
 using stellar_dotnet_sdk;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO.Abstractions.TestingHelpers;
 using System.Linq;
 using System.Text;
 
@@ -23,20 +23,20 @@ namespace Centaurus.Test
                 NetworkPassphrase = "Test SDF Network ; September 2015",
                 CWD = "AppData"
             };
-            Global.Init(settings, new MockFileSystem());
+            Global.Init(settings, new MockStorage());
 
             var account = new Models.Account()
             {
                 Pubkey = new RawPubKey() { Data = testPubKey },
                 Balances = new List<Balance>()
             };
-            account.Balances.Add(new Balance() { Asset = 0, Amount = 10000000000 });
-            account.Balances.Add(new Balance() { Asset = 1, Amount = 10000000000 });
+
+            account.Balances.Add(new Balance() { Asset = 0, Amount = 10000000000, Account = account });
+            account.Balances.Add(new Balance() { Asset = 1, Amount = 10000000000, Account = account });
             Global.Setup(new Snapshot
             {
                 Accounts = new List<Models.Account> { account },
                 Apex = 0,
-                Id = 1,
                 Ledger = 1,
                 Orders = new List<Order>(),
                 VaultSequence = 1,
@@ -59,7 +59,7 @@ namespace Centaurus.Test
         public void SimpleMatchingTest()
         {
             var pubkey = new RawPubKey() { Data = testPubKey };
-            var orderCreatedResult = Global.Exchange.ExecuteOrder(new RequestQuantum
+            var order = new RequestQuantum
             {
                 Apex = 1,
                 RequestEnvelope = new MessageEnvelope
@@ -74,11 +74,15 @@ namespace Centaurus.Test
                         Side = OrderSides.Sell
                     }
                 }
-            });
+            };
+
+            var orderEffectsContainer = new EffectProcessorsContainer(new PendingUpdates(), order.CreateEnvelope());
+
+            var orderCreatedResult = Global.Exchange.ExecuteOrder(order, orderEffectsContainer);
             Assert.AreEqual(orderCreatedResult.Count, 1);
             Assert.AreEqual(orderCreatedResult[0].EffectType, EffectTypes.OrderPlaced);
 
-            var tradeResult = Global.Exchange.ExecuteOrder(new RequestQuantum
+            var conterOrder = new RequestQuantum
             {
                 Apex = 2,
                 RequestEnvelope = new MessageEnvelope
@@ -93,7 +97,11 @@ namespace Centaurus.Test
                         Side = OrderSides.Buy
                     }
                 }
-            });
+            };
+
+            var conterOrderEffectsContainer = new EffectProcessorsContainer(new PendingUpdates(), conterOrder.CreateEnvelope());
+
+            var tradeResult = Global.Exchange.ExecuteOrder(conterOrder, conterOrderEffectsContainer);
             Assert.AreEqual(tradeResult.Count, 2);
             Assert.AreEqual(tradeResult[0].EffectType, EffectTypes.Trade);
             Assert.AreEqual(tradeResult[1].EffectType, EffectTypes.Trade);
@@ -109,7 +117,7 @@ namespace Centaurus.Test
             var rnd = new Random();
             var pubkey = new RawPubKey() { Data = testPubKey };
 
-            var testTradeReuests = new List<RequestQuantum>();
+            var testTradeReuests = new Dictionary<RequestQuantum, EffectProcessorsContainer>();
             for (var i = 1; i < iterations; i++)
             {
                 var price = useNormalDistribution ? rnd.NextNormallyDistributed() + 50 : rnd.NextDouble() * 100;
@@ -129,13 +137,15 @@ namespace Centaurus.Test
                         }
                     }
                 };
-                testTradeReuests.Add(trade);
+
+                var conterOrderEffectsContainer = new EffectProcessorsContainer(new PendingUpdates(), trade.CreateEnvelope());
+                testTradeReuests.Add(trade, conterOrderEffectsContainer);
             }
 
             PerfCounter.MeasureTime(() =>
             {
                 foreach (var trade in testTradeReuests)
-                    Global.Exchange.ExecuteOrder(trade);
+                    Global.Exchange.ExecuteOrder(trade.Key, trade.Value);
             }, () =>
             {
                 var market = Global.Exchange.GetMarket(1);

@@ -14,7 +14,9 @@ namespace Centaurus.Domain
             UpdateNonce(envelope);
 
             var quantum = envelope.Message as RequestQuantum;
-            return envelope.CreateResult(ResultStatusCodes.Success, Global.Exchange.ExecuteOrder(quantum));
+
+            var effectsContainer = new EffectProcessorsContainer(Global.PendingUpdates, envelope);
+            return envelope.CreateResult(ResultStatusCodes.Success, Global.Exchange.ExecuteOrder(quantum, effectsContainer));
         }
 
         //TODO: replace all system exceptions that occur on validation with our client exceptions

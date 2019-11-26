@@ -16,9 +16,12 @@ namespace Centaurus.Domain
         /// </summary>
         /// <param name="orderRequest">Order request quantum</param>
         /// <returns></returns>
-        public List<Effect> ExecuteOrder(RequestQuantum orderRequestQuantum)
+        public List<Effect> ExecuteOrder(RequestQuantum orderRequestQuantum, EffectProcessorsContainer effectsContainer)
         {
-            return new OrderMatcher(orderRequestQuantum.RequestEnvelope.Message as OrderRequest, orderRequestQuantum.Apex).Match();
+            var orderRequest = (OrderRequest)orderRequestQuantum.RequestEnvelope.Message;
+            new OrderMatcher(orderRequest, orderRequestQuantum.Apex, effectsContainer).Match();
+            effectsContainer.Commit();
+            return effectsContainer.GetEffects().Where(e => e.Pubkey.Equals(orderRequest.Account)).ToList();
         }
 
         internal IEnumerable<Market> GetAllMarkets()
@@ -34,7 +37,7 @@ namespace Centaurus.Domain
 
         public Market AddMarket(AssetSettings asset)
         {
-            var market = asset.CreateMarket();
+            var market = asset.CreateMarket(OrderMap);
             Markets.Add(asset.Id, market);
             return market;
         }
@@ -49,6 +52,22 @@ namespace Centaurus.Domain
         {
             var parts = OrderIdConverter.Decode(offerId);
             return GetMarket(parts.Asset).GetOrderbook(parts.Side);
+        }
+
+        public static Exchange RestoreExchange(List<AssetSettings> assets, List<Order> orders)
+        {
+            var exchange = new Exchange();
+            foreach (var asset in assets)
+                exchange.AddMarket(asset);
+
+            foreach (var order in orders)
+            {
+                var orderData = OrderIdConverter.Decode(order.OrderId);
+                var market = exchange.GetMarket(orderData.Asset);
+                var orderbook = market.GetOrderbook(orderData.Side);
+                orderbook.InsertOrder(order);
+            }
+            return exchange;
         }
     }
 }

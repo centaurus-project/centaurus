@@ -37,9 +37,10 @@ namespace Centaurus.Domain
 
         private static async Task RestorePendingQuanta()
         {
-            var pendingQuanta = (await Global.SnapshotDataProvider.GetPendingQuanta())?.Quanta ?? new List<MessageEnvelope>();
-            foreach (var quantum in pendingQuanta)
-                Global.QuantumHandler.Handle(quantum);
+            //TODO: create storage for pending quanta
+            //var pendingQuanta = (await Global.SnapshotDataProvider.GetPendingQuanta())?.Quanta ?? new List<MessageEnvelope>();
+            //foreach (var quantum in pendingQuanta)
+            //    Global.QuantumHandler.Handle(quantum);
         }
 
         private static async Task<bool> IsSnapshotValid(Snapshot snapshot)
@@ -47,15 +48,11 @@ namespace Centaurus.Domain
             try
             {
                 //TODO: discuss if there is anything else that we need to validate
-                var localSnapshot = await Global.SnapshotDataProvider.GetLastSnapshot();
-                if (localSnapshot != null && localSnapshot.Id > snapshot.Id)
-                {
-                    throw new Exception("The local snapshot is newer than provided");
-                }
+                var localSnapshot = await Global.SnapshotManager.GetSnapshot();
 
                 var knownAudiotors = GetKnownAuditors(localSnapshot);
 
-                if (snapshot.Id == 1)
+                if (snapshot.Apex == 0)
                 {
                     ValidateInitSnapshot(snapshot, knownAudiotors);
                     return true;
@@ -74,42 +71,43 @@ namespace Centaurus.Domain
 
         private static void ValidateSnapshotSignatures(Snapshot snapshot, List<RawPubKey> knownAudiotors)
         {
-            var majorityCount = MajorityHelper.GetMajorityCount(knownAudiotors.Count);
-            var validSignatures = 0;
+            throw new NotImplementedException();
+            //var majorityCount = MajorityHelper.GetMajorityCount(knownAudiotors.Count);
+            //var validSignatures = 0;
 
-            var confirmation = snapshot.Confirmation;
-            //check if signatures belong to the current snapshot
-            {
-                //set Confirmation to null, because snapshot computes without it
-                //TODO: add possibility to ignore specific fields on hash computing
-                snapshot.Confirmation = null;
+            //var confirmation = snapshot.Confirmation;
+            ////check if signatures belong to the current snapshot
+            //{
+            //    //set Confirmation to null, because snapshot computes without it
+            //    //TODO: add possibility to ignore specific fields on hash computing
+            //    snapshot.Confirmation = null;
 
-                var confirmationMessageResult = (ResultMessage)confirmation.Message;
-                var snapshotQuantum = (SnapshotQuantum)confirmationMessageResult.OriginalMessage.Message;
-                var snapshotHash = snapshot.ComputeHash();
+            //    var confirmationMessageResult = (ResultMessage)confirmation.Message;
+            //    var snapshotQuantum = (SnapshotQuantum)confirmationMessageResult.OriginalMessage.Message;
+            //    var snapshotHash = snapshot.ComputeHash();
 
-                if (!ByteArrayPrimitives.Equals(snapshotHash, snapshotQuantum.Hash))
-                {
-                    throw new Exception("Signatures don't belong to the current snapshot");
-                }
-            }
-            if (confirmation != null)
-            {
-                var snapshotMessageHash = confirmation.ComputeMessageHash();
-                foreach (var signature in confirmation.Signatures)
-                {
-                    if (!knownAudiotors.Contains(signature.Signer))
-                        continue;
+            //    if (!ByteArrayPrimitives.Equals(snapshotHash, snapshotQuantum.Hash))
+            //    {
+            //        throw new Exception("Signatures don't belong to the current snapshot");
+            //    }
+            //}
+            //if (confirmation != null)
+            //{
+            //    var snapshotMessageHash = confirmation.ComputeMessageHash();
+            //    foreach (var signature in confirmation.Signatures)
+            //    {
+            //        if (!knownAudiotors.Contains(signature.Signer))
+            //            continue;
 
-                    if (signature.IsValid(snapshotMessageHash))
-                        validSignatures++;
-                    if (validSignatures >= majorityCount)
-                        break;
-                }
-            }
+            //        if (signature.IsValid(snapshotMessageHash))
+            //            validSignatures++;
+            //        if (validSignatures >= majorityCount)
+            //            break;
+            //    }
+            //}
 
-            if (validSignatures < majorityCount)
-                throw new Exception("Snapshot has no majority");
+            //if (validSignatures < majorityCount)
+            //    throw new Exception("Snapshot has no majority");
         }
 
         private static void ValidateInitSnapshot(Snapshot snapshot, List<RawPubKey> knownAudiotors)

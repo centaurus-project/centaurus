@@ -1,9 +1,9 @@
-﻿using Centaurus.Domain;
+﻿using Centaurus.DAL.Mongo;
+using Centaurus.Domain;
 using Centaurus.Models;
 using stellar_dotnet_sdk;
 using System;
 using System.Collections.Generic;
-using System.IO.Abstractions.TestingHelpers;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -77,7 +77,7 @@ namespace Centaurus.Test
         /// <param name="settings">Settings that will be used to init Global</param>
         public static void Setup(List<KeyPair> clients, List<KeyPair> auditors, BaseSettings settings)
         {
-            Global.Init(settings, new MockFileSystem());
+            Global.Init(settings, new MongoStorage());
 
             var clientAccounts = GenerateClientAccounts(clients);
 
@@ -91,15 +91,17 @@ namespace Centaurus.Test
             var accounts = new List<Models.Account>();
             foreach (var client in clients)
             {
-                var account = new Models.Account()
+                var account = new Models.Account
                 {
-                    Pubkey = client,
-                    Balances = new List<Balance>
-                    {
-                        new Balance { Amount = 10_000_000, Asset = 0 },
-                        new Balance { Amount = 10_000_000, Asset = 1 },
-                    }
+                    Pubkey = client
                 };
+
+
+                account.Balances = new List<Balance>
+                    {
+                        new Balance { Amount = 10_000_000, Asset = 0, Account = account },
+                        new Balance { Amount = 10_000_000, Asset = 1, Account = account },
+                    };
                 accounts.Add(account);
             }
             return accounts;
@@ -111,10 +113,9 @@ namespace Centaurus.Test
             {
                 Accounts = accounts,
                 Apex = 0,
-                Id = 1,
                 Ledger = 1,
                 Orders = new List<Order>(),
-                Withdrawals = new List<PaymentRequestBase>(),
+                Withdrawals = new List<RequestQuantum>(),
                 VaultSequence = 1,
                 Settings = new ConstellationSettings
                 {
@@ -124,11 +125,11 @@ namespace Centaurus.Test
                 }
             };
 
-            var snapshotEnvelope = new SnapshotQuantum { Hash = snapshot.ComputeHash() }.CreateEnvelope();
-            var confEnvelope = snapshotEnvelope.CreateResult(ResultStatusCodes.Success).CreateEnvelope();
-            foreach (var auditorKeyPair in auditorKeyPairs)
-                confEnvelope.Sign(auditorKeyPair);
-            snapshot.Confirmation = confEnvelope;
+            //var snapshotEnvelope = new SnapshotQuantum { Hash = snapshot.ComputeHash() }.CreateEnvelope();
+            //var confEnvelope = snapshotEnvelope.CreateResult(ResultStatusCodes.Success).CreateEnvelope();
+            //foreach (var auditorKeyPair in auditorKeyPairs)
+            //    confEnvelope.Sign(auditorKeyPair);
+            //snapshot.Confirmation = confEnvelope;
             return snapshot;
         }
     }

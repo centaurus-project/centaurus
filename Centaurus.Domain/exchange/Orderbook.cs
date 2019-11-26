@@ -6,8 +6,15 @@ using System.Text;
 
 namespace Centaurus.Domain
 {
-    public class Orderbook: IEnumerable// : IXdrSerializableModel
+    public class Orderbook : IEnumerable// : IXdrSerializableModel
     {
+        private OrderMap orderMap;
+
+        public Orderbook(OrderMap orderMap)
+        {
+            this.orderMap = orderMap;
+        }
+
         public OrderSides Side { get; set; }
 
         public Order Head { get; set; }
@@ -99,7 +106,63 @@ namespace Centaurus.Domain
             TotalAmount += order.Amount;
             Volume += (long)(order.Amount * order.Price);
             //add to the map
-            Global.Exchange.OrderMap.AddOrder(order);
+            orderMap.AddOrder(order);
+        }
+
+
+        /// <summary>
+        /// Remove the first executed order from the orderbook.
+        /// </summary>
+        public void RemoveEmptyHeadOrder()
+        {
+            var currentHead = Head;
+            if (currentHead.Amount > 0L) throw new Exception($"Requested order removal for the non-empty order {Head.OrderId}.");
+            var newHead = currentHead.Next;
+            if (newHead != null)
+            {
+                newHead.Prev = null;
+                Head = newHead;
+            }
+            else
+            {
+                Head = Tail = null;
+            }
+            Count--;
+            orderMap.RemoveOrder(currentHead.OrderId);
+        }
+
+        /// <summary>
+        /// Get orderbook best price.
+        /// </summary>
+        /// <returns>Best price.</returns>
+        public double GetBestPrice()
+        {
+            return Head?.Price ?? .0;
+        }
+
+        /// <summary>
+        /// Removes order by id
+        /// </summary>
+        /// <param name="orderId"></param>
+        /// <returns>Removal result.</returns>
+        public bool RemoveOrder(ulong orderId)
+        {
+            var enumerator = GetEnumerator();
+
+            while (enumerator.MoveNext())
+            {
+                var currentOrder = enumerator.Current;
+                if (enumerator.Current.OrderId == orderId)
+                {
+                    if (currentOrder.Prev != null)
+                        currentOrder.Prev.Next = currentOrder.Next;
+                    if (currentOrder.Next != null)
+                        currentOrder.Next.Prev = currentOrder.Prev;
+                    orderMap.RemoveOrder(orderId);
+                    return true;
+                }
+            }
+            return false;
         }
     }
 }

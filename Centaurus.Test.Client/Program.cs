@@ -1,11 +1,11 @@
-﻿using Centaurus.Domain;
+﻿using Centaurus.DAL.Mongo;
+using Centaurus.Domain;
 using Centaurus.Models;
 using NUnit.Framework;
 using stellar_dotnet_sdk;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO.Abstractions;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -118,7 +118,7 @@ namespace Centaurus.Test.Client
                     NetworkPassphrase = "Test SDF Network ; September 2015" 
             };
 
-            Global.Init(settings, new FileSystem());
+            Global.Init(settings, new MongoStorage());
 
             UserWebSocketConnection ws = new UserWebSocketConnection();
             ws.EstablishConnection().Wait();

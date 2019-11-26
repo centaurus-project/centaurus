@@ -15,6 +15,8 @@ namespace Centaurus.Models
         [XdrField(2)]
         public long Liabilities { get; set; }
 
+        public Account Account { get; set; }
+
         public override string ToString()
         {
             return $"Asset: {Asset}, amount: {Amount}, liabilities: {Liabilities}.";

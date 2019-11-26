@@ -13,7 +13,9 @@ namespace Centaurus.Domain
         {
             UpdateNonce(envelope);
 
-            var payment = (envelope.Message as RequestQuantum).RequestEnvelope.Message as PaymentRequestBase;
+            var requestQuantum = (RequestQuantum)envelope.Message;
+
+            var payment = (PaymentRequestBase)requestQuantum.RequestEnvelope.Message;
 
             AccountData vaultAccount = Global.VaultAccount;
 
@@ -33,7 +35,7 @@ namespace Centaurus.Domain
                 payment.TransactionXdr = transaction.ToRawEnvelopeXdr();
                 payment.TransactionHash = transaction.Hash();
 
-                Global.WithdrawalStorage.Add(payment);
+                Global.WithdrawalStorage.Add(requestQuantum);
             }
 
             var account = Global.AccountStorage.GetAccount(payment.Account);
