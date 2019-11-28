@@ -154,10 +154,15 @@ namespace Centaurus.Domain
                 var currentOrder = enumerator.Current;
                 if (enumerator.Current.OrderId == orderId)
                 {
+                    if (Head == currentOrder)
+                        Head = currentOrder.Next;
+                    if (Tail == currentOrder)
+                        Tail = currentOrder.Prev;
                     if (currentOrder.Prev != null)
                         currentOrder.Prev.Next = currentOrder.Next;
                     if (currentOrder.Next != null)
                         currentOrder.Next.Prev = currentOrder.Prev;
+
                     orderMap.RemoveOrder(orderId);
                     return true;
                 }

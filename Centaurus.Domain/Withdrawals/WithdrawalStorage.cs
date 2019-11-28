@@ -9,9 +9,9 @@ namespace Centaurus.Domain
 {
     public class WithdrawalStorage
     {
-        public WithdrawalStorage(IEnumerable<RequestQuantum> payments)
+        public WithdrawalStorage(IEnumerable<Withdrawal> payments)
         {
-            withdrawals = new ConcurrentDictionary<byte[], RequestQuantum>(new HashComparer());
+            withdrawals = new Dictionary<byte[], Withdrawal>(new HashComparer());
 
             if (payments == null)
                 return;
@@ -21,19 +21,25 @@ namespace Centaurus.Domain
             }
         }
 
-        ConcurrentDictionary<byte[], RequestQuantum> withdrawals;
+        Dictionary<byte[], Withdrawal> withdrawals;
 
-        public void Add(RequestQuantum payment)
+        public void Add(Withdrawal payment)
         {
             if (payment == null) throw new ArgumentNullException(nameof(payment));
-            if (!(payment.RequestEnvelope.Message is PaymentRequestBase)) throw new ArgumentException("Message is not PaymentRequestBase");
 
-            var currentPaymentHash = ((PaymentRequestBase)payment.RequestEnvelope.Message).TransactionHash;
-            if (!withdrawals.TryAdd(currentPaymentHash, payment))
+            if (!withdrawals.TryAdd(payment.TransactionHash, payment))
                 throw new Exception("Payment with specified transaction hash already exists");
         }
 
-        public RequestQuantum GetWithdrawal(byte[] transactionHash)
+        public void Remove(byte[] transactionHash)
+        {
+            if (transactionHash == null) throw new ArgumentNullException(nameof(transactionHash));
+
+            if (!withdrawals.Remove(transactionHash))
+                throw new Exception("Withdrawal with specified hash is not found");
+        }
+
+        public Withdrawal GetWithdrawal(byte[] transactionHash)
         {
             if (transactionHash == null) throw new ArgumentNullException(nameof(transactionHash));
 
@@ -45,7 +51,7 @@ namespace Centaurus.Domain
             withdrawals.Clear();
         }
 
-        public IEnumerable<RequestQuantum> GetAll()
+        public IEnumerable<Withdrawal> GetAll()
         {
             return withdrawals.Values;
         }

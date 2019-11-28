@@ -16,12 +16,11 @@ namespace Centaurus.Domain
         /// </summary>
         /// <param name="orderRequest">Order request quantum</param>
         /// <returns></returns>
-        public List<Effect> ExecuteOrder(RequestQuantum orderRequestQuantum, EffectProcessorsContainer effectsContainer)
+        public void ExecuteOrder(EffectProcessorsContainer effectsContainer)
         {
+            RequestQuantum orderRequestQuantum = (RequestQuantum)effectsContainer.Envelope.Message;
             var orderRequest = (OrderRequest)orderRequestQuantum.RequestEnvelope.Message;
-            new OrderMatcher(orderRequest, orderRequestQuantum.Apex, effectsContainer).Match();
-            effectsContainer.Commit();
-            return effectsContainer.GetEffects().Where(e => e.Pubkey.Equals(orderRequest.Account)).ToList();
+            new OrderMatcher(orderRequest, effectsContainer).Match();
         }
 
         internal IEnumerable<Market> GetAllMarkets()

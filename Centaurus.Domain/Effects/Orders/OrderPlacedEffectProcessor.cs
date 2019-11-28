@@ -17,37 +17,15 @@ namespace Centaurus.Domain
             this.order = order;
         }
 
-        public override UpdatedObject[] CommitEffect()
+        public override void CommitEffect()
         {
             //add order to the orderbook
             orderBook.InsertOrder(order);
-            return new UpdatedObject[] { new UpdatedObject(order) };
         }
 
         public override void RevertEffect()
         {
             orderBook.RemoveOrder(Effect.OrderId);
-        }
-
-        public static OrderPlacedEffectProcessor GetProcessor(ulong apex, Orderbook orderBook, Order order, int asset, OrderSides side)
-        {
-            var effect = new OrderPlacedEffect
-            {
-                Apex = apex,
-                Pubkey = order.Pubkey,
-                Asset = asset,
-                Amount = order.Amount,
-                Price = order.Price,
-                OrderId = order.OrderId,
-                OrderSide = side
-            };
-
-            return GetProcessor(effect, orderBook, order);
-        }
-
-        public static OrderPlacedEffectProcessor GetProcessor(OrderPlacedEffect effect, Orderbook orderBook, Order order)
-        {
-            return new OrderPlacedEffectProcessor(effect, orderBook, order);
         }
     }
 }

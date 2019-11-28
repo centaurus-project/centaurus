@@ -13,12 +13,14 @@ namespace Centaurus.Domain
 
         public abstract void Validate(MessageEnvelope envelope);
 
-        public void UpdateNonce(MessageEnvelope envelope)
+        public void UpdateNonce(EffectProcessorsContainer effectProcessorsContainer)
         {
-            var requestQuantum = (RequestQuantum)envelope.Message;
-            var requestMessage = requestQuantum.RequestEnvelope.Message as RequestMessage;
+            var requestQuantum = (RequestQuantum)effectProcessorsContainer.Envelope.Message;
+            var requestMessage = requestQuantum.RequestMessage;
+
             var currentUser = Global.AccountStorage.GetAccount(requestMessage.Account);
-            currentUser.Nonce = requestMessage.Nonce;
+
+            effectProcessorsContainer.AddNonceUpdate(currentUser, requestMessage.Nonce);
         }
 
         public void ValidateNonce(MessageEnvelope envelope)

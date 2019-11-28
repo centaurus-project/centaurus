@@ -10,6 +10,6 @@ namespace Centaurus.Models
         public override EffectTypes EffectType => EffectTypes.WithdrawalCreate;
 
         [XdrField(0)]
-        public byte[] TransactionHash { get; set; }
+        public Withdrawal Withdrawal { get; set; }
     }
 }

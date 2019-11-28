@@ -9,11 +9,6 @@ namespace Centaurus.Domain
 {
     public static class AccountModelExtensions
     {
-        public static AccountModel FromAccount(Account account)
-        {
-            return new AccountModel { Nonce = account.Nonce, PubKey = account.Pubkey.Data };
-        }
-
         public static Account ToAccount(this AccountModel accountModel, BalanceModel[] balances)
         {
             var acc = new Account

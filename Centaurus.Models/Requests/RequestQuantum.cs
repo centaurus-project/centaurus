@@ -13,5 +13,13 @@ namespace Centaurus.Models
         /// </summary>
         [XdrField(0)]
         public MessageEnvelope RequestEnvelope { get; set; }
+
+        public RequestMessage RequestMessage
+        {
+            get
+            {
+                return RequestEnvelope?.Message as RequestMessage;
+            }
+        }
     }
 }

@@ -4,7 +4,7 @@ using System.Text;
 
 namespace Centaurus.DAL.Models
 {
-    public class AssetSettingsModel
+    public class AssetModel
     {
         public ulong Apex { get; set; }
 

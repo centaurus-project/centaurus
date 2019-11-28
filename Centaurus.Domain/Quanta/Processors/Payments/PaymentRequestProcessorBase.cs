@@ -11,13 +11,18 @@ namespace Centaurus.Domain
     {
         public override ResultMessage Process(MessageEnvelope envelope)
         {
-            UpdateNonce(envelope);
+            var effectProcessorsContainer = new EffectProcessorsContainer(envelope, Global.PendingUpdates);
+
+            UpdateNonce(effectProcessorsContainer);
 
             var requestQuantum = (RequestQuantum)envelope.Message;
 
             var payment = (PaymentRequestBase)requestQuantum.RequestEnvelope.Message;
 
-            AccountData vaultAccount = Global.VaultAccount;
+            AccountData vaultAccount = Global.VaultAccount; 
+            
+            var account = Global.AccountStorage.GetAccount(payment.Account);
+            effectProcessorsContainer.AddUnlockLiabilities(account, payment.Asset, payment.Amount);
 
             //if withdrawal requested or if account doesn't exist in Centaurus, we need to build transaction
             if (payment.MessageType == MessageTypes.WithdrawalRequest || Global.AccountStorage.GetAccount(payment.Destination) == null)
@@ -35,15 +40,33 @@ namespace Centaurus.Domain
                 payment.TransactionXdr = transaction.ToRawEnvelopeXdr();
                 payment.TransactionHash = transaction.Hash();
 
-                Global.WithdrawalStorage.Add(requestQuantum);
+                var withdrawal = new Withdrawal
+                {
+                    Source = payment.Account,
+                    Destination = payment.Destination,
+                    Amount = payment.Amount,
+                    Asset = payment.Asset,
+                    TransactionHash = payment.TransactionHash
+                };
+
+                effectProcessorsContainer.AddWithdrawalCreate(withdrawal, Global.WithdrawalStorage);
+            }
+            else
+            { 
+                //if the current request is payment, then we can process it immediately
+                var destAccount = Global.AccountStorage.GetAccount(payment.Destination);
+                effectProcessorsContainer.AddBalanceUpdate(destAccount, payment.Asset, payment.Amount);
+
+                effectProcessorsContainer.AddUnlockLiabilities(account, payment.Asset, payment.Amount);
+                effectProcessorsContainer.AddBalanceUpdate(account, payment.Asset, -payment.Amount);
             }
 
-            var account = Global.AccountStorage.GetAccount(payment.Account);
-            var balance = account.Balances.Find(b => b.Asset == payment.Asset);
-            balance.LockLiabilities(payment.Amount);
+            effectProcessorsContainer.Commit();
 
-            //TODO: add effects
-            return envelope.CreateResult(ResultStatusCodes.Success);
+            var effects = effectProcessorsContainer.GetEffects();
+
+            var accountEffects = effects.Where(e => e.Pubkey == payment.Account).ToList();
+            return envelope.CreateResult(ResultStatusCodes.Success, accountEffects);
         }
 
         public override void Validate(MessageEnvelope envelope)
@@ -56,6 +79,12 @@ namespace Centaurus.Domain
 
             if (payment.Account == null || payment.Account.IsZero())
                 throw new InvalidOperationException("Source should be valid public key");
+
+            if (payment.Destination == null || payment.Destination.IsZero())
+                throw new InvalidOperationException("Destination should be valid public key");
+
+            if (payment.Destination.Equals(payment.Account))
+                throw new InvalidOperationException("Source and destination must be different public keys");
 
             if (payment.Amount <= 0)
                 throw new InvalidOperationException("Amount should be greater than 0");

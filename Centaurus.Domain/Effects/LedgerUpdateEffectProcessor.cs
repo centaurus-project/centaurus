@@ -15,10 +15,9 @@ namespace Centaurus.Domain
             this.ledgerManager = ledgerManager;
         }
 
-        public override UpdatedObject[] CommitEffect()
+        public override void CommitEffect()
         {
             ledgerManager.SetLedger(Effect.Ledger);
-            return new UpdatedObject[] { new UpdatedObject(ledgerManager) };
         }
 
         public override void RevertEffect()

@@ -24,10 +24,5 @@ namespace Centaurus.Domain
                 TimeStamp = DateTime.UtcNow
             };
         }
-
-        public static Quantum ToQuantum(this QuantumModel quantum)
-        {
-            return XdrConverter.Deserialize<Quantum>(quantum.RawQuantum);
-        }
     }
 }

@@ -9,19 +9,7 @@ namespace Centaurus.Domain
 {
     public static class SettingsModelExtensions
     {
-        public static SettingsModel FromSettings(ConstellationSettings settings)
-        {
-            return new SettingsModel
-            {
-                Apex = settings.Apex,
-                Auditors = settings.Auditors.Select(a => a.Data).ToArray(),
-                MinAccountBalance = settings.MinAccountBalance,
-                MinAllowedLotSize = settings.MinAllowedLotSize,
-                Vault = settings.Vault.Data
-            };
-        }
-
-        public static ConstellationSettings ToSettings(this SettingsModel settings, List<AssetSettingsModel> assetSettings)
+        public static ConstellationSettings ToSettings(this SettingsModel settings, List<AssetModel> assetSettings)
         { 
             return new ConstellationSettings
             {

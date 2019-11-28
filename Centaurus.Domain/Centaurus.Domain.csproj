@@ -13,8 +13,4 @@
     <ProjectReference Include="..\Centaurus.Models\Centaurus.Models.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Effects\Payments\" />
-  </ItemGroup>
-
 </Project>

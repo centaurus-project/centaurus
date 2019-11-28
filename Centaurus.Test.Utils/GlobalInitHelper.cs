@@ -77,7 +77,7 @@ namespace Centaurus.Test
         /// <param name="settings">Settings that will be used to init Global</param>
         public static void Setup(List<KeyPair> clients, List<KeyPair> auditors, BaseSettings settings)
         {
-            Global.Init(settings, new MongoStorage());
+            Global.Init(settings, new MockStorage());
 
             var clientAccounts = GenerateClientAccounts(clients);
 
@@ -115,7 +115,7 @@ namespace Centaurus.Test
                 Apex = 0,
                 Ledger = 1,
                 Orders = new List<Order>(),
-                Withdrawals = new List<RequestQuantum>(),
+                Withdrawals = new List<Withdrawal>(),
                 VaultSequence = 1,
                 Settings = new ConstellationSettings
                 {

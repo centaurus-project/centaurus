@@ -14,31 +14,14 @@ namespace Centaurus.Domain
         {
             this.accountStorage = accountStorage;
         }
-        public override UpdatedObject[] CommitEffect()
+        public override void CommitEffect()
         {
-            var account = accountStorage.CreateAccount(Effect.Pubkey);
-            return new UpdatedObject[] { new UpdatedObject(account, false) };
+            accountStorage.CreateAccount(Effect.Pubkey);
         }
 
         public override void RevertEffect()
         {
             accountStorage.RemoveAccount(Effect.Pubkey);
-        }
-
-        public static AccountCreateEffectProcessor GetProcessor(ulong apex, AccountStorage accountStorage, RawPubKey publicKey)
-        {
-            return GetProcessor(
-                new AccountCreateEffect { Pubkey = publicKey, Apex = apex },
-                accountStorage
-            );
-        }
-
-        public static AccountCreateEffectProcessor GetProcessor(AccountCreateEffect effect, AccountStorage accountStorage)
-        {
-            return new AccountCreateEffectProcessor(
-                effect,
-                accountStorage
-            );
         }
     }
 }

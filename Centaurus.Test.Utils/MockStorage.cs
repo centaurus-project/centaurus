@@ -13,15 +13,15 @@ namespace Centaurus.Test
     public class MockStorage : BaseStorage
     {
 
-        private List<OrderModel> ordersCollection;
-        private List<AccountModel> accountsCollection;
-        private List<BalanceModel> balancesCollection;
-        private List<QuantumModel> quantaCollection;
-        private List<WithdrawalModel> withdrawalsCollection;
-        private List<EffectModel> effectsCollection;
-        private List<SettingsModel> settingsCollection;
-        private List<AssetSettingsModel> assetSettings;
-        private StellarData stellarData;
+        private List<OrderModel> ordersCollection = new List<OrderModel>();
+        private List<AccountModel> accountsCollection = new List<AccountModel>();
+        private List<BalanceModel> balancesCollection = new List<BalanceModel>();
+        private List<QuantumModel> quantaCollection = new List<QuantumModel>();
+        private List<WithdrawalModel> withdrawalsCollection = new List<WithdrawalModel>();
+        private List<EffectModel> effectsCollection = new List<EffectModel>();
+        private List<SettingsModel> settingsCollection = new List<SettingsModel>();
+        private List<AssetModel> assetSettings = new List<AssetModel>();
+        private StellarData stellarData = new StellarData();
 
         public override Task OpenConnection(string connectionString)
         {
@@ -79,7 +79,7 @@ namespace Centaurus.Test
             return Task.FromResult(settings);
         }
 
-        public override Task<List<AssetSettingsModel>> LoadAssets(ulong apex)
+        public override Task<List<AssetModel>> LoadAssets(ulong apex)
         {
             var assets = assetSettings
                 .Where(s => s.Apex <= apex)
@@ -103,11 +103,11 @@ namespace Centaurus.Test
             return Task.FromResult(stellarData);
         }
 
-        public override Task Update(UpdateObject update)
+        public override Task Update(DiffObject update)
         {
             UpdateSettings(update.Settings, update.Assets);
 
-            UpdateStellarData(update.StellarData);
+            UpdateStellarData(update.StellarInfoData);
 
             UpdateAccount(update.Accounts);
 
@@ -134,7 +134,7 @@ namespace Centaurus.Test
             quantaCollection.AddRange(quanta);
         }
 
-        private void UpdateSettings(SettingsModel settings, List<AssetSettingsModel> assets)
+        private void UpdateSettings(SettingsModel settings, List<AssetModel> assets)
         {
             if (settings != null)
             {
@@ -148,7 +148,7 @@ namespace Centaurus.Test
             }
         }
 
-        private void UpdateStellarData(StellarDataCalcModel _stellarData)
+        private void UpdateStellarData(DiffObject.StellarInfo _stellarData)
         {
             if (_stellarData != null)
             {
@@ -157,7 +157,7 @@ namespace Centaurus.Test
             }
         }
 
-        private void UpdateWithdrawals(List<WithdrawalCalcModel> withdrawals)
+        private void UpdateWithdrawals(List<DiffObject.Withdrawal> withdrawals)
         {
             for (int i = 0; i < withdrawals.Count; i++)
             {
@@ -174,7 +174,7 @@ namespace Centaurus.Test
             }
         }
 
-        private void UpdateAccount(List<AccountCalcModel> accounts)
+        private void UpdateAccount(List<DiffObject.Account> accounts)
         {
             var accLength = accounts.Count;
             for (int i = 0; i < accLength; i++)
@@ -191,7 +191,7 @@ namespace Centaurus.Test
             }
         }
 
-        private void GetBalanceUpdates(List<BalanceCalcModel> balances)
+        private void GetBalanceUpdates(List<DiffObject.Balance> balances)
         {
             var balancesLength = balances.Count;
 
@@ -223,7 +223,7 @@ namespace Centaurus.Test
             }
         }
 
-        private void UpdateOrders(List<OrderCalcModel> orders)
+        private void UpdateOrders(List<DiffObject.Order> orders)
         {
             var ordersLength = orders.Count;
 

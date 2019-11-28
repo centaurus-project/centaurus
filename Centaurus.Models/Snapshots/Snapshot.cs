@@ -29,7 +29,7 @@ namespace Centaurus.Models
         /// Pending withdrawals
         /// </summary>
         [XdrField(6)]
-        public List<RequestQuantum> Withdrawals { get; set; }
+        public List<Withdrawal> Withdrawals { get; set; }
 
         /// <summary>
         /// Envelope for <see cref="SnapshotQuantum"/> with aggregated auditor signatures.

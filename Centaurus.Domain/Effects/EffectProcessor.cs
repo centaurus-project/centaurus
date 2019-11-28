@@ -10,7 +10,7 @@ namespace Centaurus.Domain
     {
         public T Effect { get; }
 
-        public UpdatedObject[] CommitEffect();
+        public void CommitEffect();
         public void RevertEffect();
     }
 
@@ -26,7 +26,7 @@ namespace Centaurus.Domain
 
         public T Effect { get; }
 
-        public abstract UpdatedObject[] CommitEffect();
+        public abstract void CommitEffect();
         public abstract void RevertEffect();
     }
 }

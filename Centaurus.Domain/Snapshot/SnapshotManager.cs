@@ -46,7 +46,7 @@ namespace Centaurus.Domain
 
             var snapshot = new Snapshot();
             snapshot.Ledger = ledger;
-            snapshot.Withdrawals = new List<RequestQuantum>();
+            snapshot.Withdrawals = new List<Withdrawal>();
             snapshot.Accounts = new List<Account>();
             snapshot.Orders = new List<Order>();
             snapshot.Settings = settings;
@@ -90,7 +90,22 @@ namespace Centaurus.Domain
             }
         }
 
-        public async Task<Snapshot> GetSnapshot(ulong apex = ulong.MaxValue)
+        /// <summary>
+        /// Fetches current snapshot
+        /// </summary>
+        /// <returns></returns>
+        public async Task<Snapshot> GetSnapshot()
+        {
+            //if we pass ulong.MaxValue it will return current snapshot
+            return await GetSnapshot(ulong.MaxValue);
+        }
+
+        /// <summary>
+        /// Builds snapshot for specified apex
+        /// </summary>
+        /// <param name="apex"></param>
+        /// <returns></returns>
+        public async Task<Snapshot> GetSnapshot(ulong apex)
         {
             var settings = await GetConstellationSettings(apex);
             if (settings == null)
@@ -110,7 +125,16 @@ namespace Centaurus.Domain
 
             var exchange = await GetRestoredExchange(orders);
 
+            var withdrawalsStorage = new WithdrawalStorage(withdrawals);
+
             var effectModels = await Global.PermanentStorage.LoadEffectsAboveApex(apex);
+            var withdrawalEffectTypes = new EffectTypes[] { EffectTypes.WithdrawalCreate, EffectTypes.WithdrawalRemove };
+            var withdrawalEffectApexes = effectModels
+                .Where(e => Array.IndexOf(withdrawalEffectTypes, e.EffectType) >= 0)
+                .Select(e => e.Apex)
+                .ToArray();
+            var withdrawalQuanta = (await Global.PermanentStorage.LoadQuanta(withdrawalEffectApexes))
+                .ToDictionary(q => q.Apex, q => XdrConverter.Deserialize<MessageEnvelope>(q.RawQuantum));
             for (var i = effectModels.Count - 1; i >= 0; i--)
             {
                 var currentEffect = XdrConverter.Deserialize<Effect>(effectModels[i].RawEffect);
@@ -120,40 +144,50 @@ namespace Centaurus.Domain
                 switch (currentEffect)
                 {
                     case AccountCreateEffect accountCreateEffect:
-                        processor = AccountCreateEffectProcessor.GetProcessor(accountCreateEffect, accountStorage);
+                        processor = new AccountCreateEffectProcessor(accountCreateEffect, accountStorage);
                         break;
                     case NonceUpdateEffect nonceUpdateEffect:
-                        processor = NonceUpdateEffectProcessor.GetProcessor(nonceUpdateEffect, currentAccount.Value);
+                        processor = new NonceUpdateEffectProcessor(nonceUpdateEffect, currentAccount.Value);
                         break;
                     case BalanceCreateEffect balanceCreateEffect:
-                        processor = BalanceCreateEffectProcessor.GetProcessor(balanceCreateEffect, currentAccount.Value);
+                        processor = new BalanceCreateEffectProcessor(balanceCreateEffect, currentAccount.Value);
                         break;
                     case BalanceUpdateEffect balanceUpdateEffect:
-                        processor = BalanceUpdateEffectProcesor.GetProcessor(balanceUpdateEffect, currentAccount.Value);
+                        processor = new BalanceUpdateEffectProcesor(balanceUpdateEffect, currentAccount.Value);
                         break;
                     case LockLiabilitiesEffect lockLiabilitiesEffect:
-                        processor = LockLiabilitiesEffectProcessor.GetProcessor(lockLiabilitiesEffect, currentAccount.Value);
+                        processor = new LockLiabilitiesEffectProcessor(lockLiabilitiesEffect, currentAccount.Value);
                         break;
                     case UnlockLiabilitiesEffect unlockLiabilitiesEffect:
-                        processor = UnlockLiabilitiesEffectProcessor.GetProcessor(unlockLiabilitiesEffect, currentAccount.Value);
+                        processor = new UnlockLiabilitiesEffectProcessor(unlockLiabilitiesEffect, currentAccount.Value);
                         break;
                     case OrderPlacedEffect orderPlacedEffect:
                         {
                             var orderBook = exchange.GetOrderbook(orderPlacedEffect.OrderId);
                             var order = exchange.OrderMap.GetOrder(orderPlacedEffect.OrderId);
-                            processor = OrderPlacedEffectProcessor.GetProcessor(orderPlacedEffect, orderBook, order);
+                            processor = new OrderPlacedEffectProcessor(orderPlacedEffect, orderBook, order);
                         }
                         break;
                     case OrderRemovedEffect orderRemovedEffect:
                         {
                             var orderBook = exchange.GetOrderbook(orderRemovedEffect.OrderId);
-                            processor = OrderRemovedEffectProccessor.GetProcessor(orderRemovedEffect, orderBook);
+                            processor = new OrderRemovedEffectProccessor(orderRemovedEffect, orderBook);
                         }
                         break;
                     case TradeEffect tradeEffect:
                         {
                             var order = exchange.OrderMap.GetOrder(tradeEffect.OrderId);
-                            processor = TradeEffectProcessor.GetProcessor(tradeEffect, order);
+                            processor = new TradeEffectProcessor(tradeEffect, order);
+                        }
+                        break;
+                    case WithdrawalCreateEffect withdrawalCreate:
+                        {
+                            processor = new WithdrawalCreateEffectProcessor(withdrawalCreate, withdrawalsStorage);
+                        }
+                        break;
+                    case WithdrawalRemoveEffect withdrawalRemove:
+                        {
+                            processor = new WithdrawalRemoveEffectProcessor(withdrawalRemove, withdrawalsStorage);
                         }
                         break;
                     default:
@@ -209,23 +243,11 @@ namespace Centaurus.Domain
             return accounts;
         }
 
-        private async Task<List<RequestQuantum>> GetWithdrawals()
+        private async Task<List<Withdrawal>> GetWithdrawals()
         {
             var withdrawalModels = await Global.PermanentStorage.LoadWithdrawals();
-            var withdrawalQuantumModels = await Global.PermanentStorage.LoadQuanta(withdrawalModels.Select(w => w.Apex).ToArray());
 
-            var withdrawalLength = withdrawalQuantumModels.Count;
-            if (withdrawalLength != withdrawalModels.Count)
-                throw new Exception("Not all withdrawals were found.");
-
-            var withdrawals = new List<RequestQuantum>();
-            for (int i = 0; i < withdrawalLength; i++)
-            {
-                var envelope = XdrConverter.Deserialize<MessageEnvelope>(withdrawalQuantumModels[i].RawQuantum);
-                withdrawals.Add((RequestQuantum)envelope.Message);
-            }
-
-            return withdrawals;
+            return withdrawalModels.Select(w => XdrConverter.Deserialize<Withdrawal>(w.RawWithdrawal)).ToList();
         }
 
         private async Task<List<Order>> GetOrders()

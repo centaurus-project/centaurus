@@ -20,10 +20,5 @@ namespace Centaurus.Domain
                 Timestamp = DateTime.UtcNow
             };
         }
-
-        public static Effect ToAccount(this EffectModel effectModel)
-        {
-            return XdrConverter.Deserialize<Effect>(effectModel.RawEffect);
-        }
     }
 }

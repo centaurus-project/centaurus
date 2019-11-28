@@ -1,6 +1,7 @@
 ﻿using Centaurus.Models;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace Centaurus.Domain
@@ -11,12 +12,21 @@ namespace Centaurus.Domain
 
         public override ResultMessage Process(MessageEnvelope envelope)
         {
-            UpdateNonce(envelope);
+            var quantum = (RequestQuantum)envelope.Message;
+            var requestMessage = quantum.RequestMessage;
 
-            var quantum = envelope.Message as RequestQuantum;
+            var effectsContainer = new EffectProcessorsContainer(envelope, Global.PendingUpdates);
 
-            var effectsContainer = new EffectProcessorsContainer(Global.PendingUpdates, envelope);
-            return envelope.CreateResult(ResultStatusCodes.Success, Global.Exchange.ExecuteOrder(quantum, effectsContainer));
+            UpdateNonce(effectsContainer);
+
+            Global.Exchange.ExecuteOrder(effectsContainer);
+            effectsContainer.Commit();
+
+            var accountEffects = effectsContainer.GetEffects()
+                .Where(e => e.Pubkey.Equals(requestMessage.Account))
+                .ToList();
+
+            return envelope.CreateResult(ResultStatusCodes.Success, accountEffects);
         }
 
         //TODO: replace all system exceptions that occur on validation with our client exceptions

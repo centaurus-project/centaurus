@@ -38,7 +38,7 @@ namespace Centaurus.DAL
         /// </summary>
         /// <param name="apex"></param>
         /// <returns></returns>
-        public abstract Task<List<AssetSettingsModel>> LoadAssets(ulong apex);
+        public abstract Task<List<AssetModel>> LoadAssets(ulong apex);
 
         public abstract Task<List<WithdrawalModel>> LoadWithdrawals();
 
@@ -46,6 +46,6 @@ namespace Centaurus.DAL
 
         public abstract Task<StellarData> LoadStellarData();
 
-        public abstract Task Update(UpdateObject update);
+        public abstract Task Update(DiffObject update);
     }
 }

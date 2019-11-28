@@ -12,19 +12,24 @@ namespace Centaurus.Domain
 {
     public static class UpdatesAggregator
     {
-        public static async Task<UpdateObject> Aggregate(Dictionary<MessageEnvelope, Effect[]> update)
+        /// <summary>
+        /// Builds update with all changes based ob effects
+        /// </summary>
+        /// <param name="update"></param>
+        /// <returns></returns>
+        public static async Task<DiffObject> Aggregate(Dictionary<MessageEnvelope, Effect[]> update)
         {
             SettingsModel constellationSettings = null;
 
-            var stellarData = new StellarDataCalcModel(0, 0);
+            var stellarData = new DiffObject.StellarInfo();
 
-            var accounts = new Dictionary<byte[], AccountCalcModel>(new ByteArrayComparer());
-            var balances = new Dictionary<byte[], Dictionary<int, BalanceCalcModel>>(new ByteArrayComparer());
+            var accounts = new Dictionary<byte[], DiffObject.Account>(new ByteArrayComparer());
+            var balances = new Dictionary<byte[], Dictionary<int, DiffObject.Balance>>(new ByteArrayComparer());
 
-            var orders = new Dictionary<ulong, OrderCalcModel>();
-            var withdrawals = new List<WithdrawalCalcModel>();
+            var orders = new Dictionary<ulong, DiffObject.Order>();
+            var withdrawals = new List<DiffObject.Withdrawal>();
 
-            var assets = new List<AssetSettingsModel>();
+            var assets = new List<AssetModel>();
 
 
             var updateLength = update.Count;
@@ -49,8 +54,9 @@ namespace Centaurus.Domain
                     {
                         case ConstellationInitEffect constellationInit:
                             constellationSettings = GetConstellationSettings(constellationInit);
-                            stellarData = new StellarDataCalcModel(constellationInit.Ledger, constellationInit.VaultSequence) { IsInserted = true };
-                            assets = GetAssets(constellationInit, (await Global.PermanentStorage.LoadAssets(ulong.MaxValue)));
+                            stellarData = GetStellarData(constellationInit.Ledger, constellationInit.VaultSequence);
+                            stellarData.IsInserted = true;
+                            assets = GetAssets(constellationInit, null);
                             break;
                         case ConstellationUpdateEffect constellationUpdate:
                             constellationSettings = GetConstellationSettings(constellationUpdate);
@@ -59,14 +65,14 @@ namespace Centaurus.Domain
                         case AccountCreateEffect accountCreateEffect:
                             {
                                 var pubKey = accountCreateEffect.Pubkey.Data;
-                                accounts.Add(pubKey, new AccountCalcModel { PubKey = pubKey, IsInserted = true });
+                                accounts.Add(pubKey, new DiffObject.Account { PubKey = pubKey, IsInserted = true });
                             }
                             break;
                         case NonceUpdateEffect nonceUpdateEffect:
                             {
                                 var pubKey = nonceUpdateEffect.Pubkey.Data;
                                 if (!accounts.ContainsKey(pubKey))
-                                    accounts.Add(pubKey, new AccountCalcModel { PubKey = pubKey });
+                                    accounts.Add(pubKey, new DiffObject.Account { PubKey = pubKey });
                                 accounts[pubKey].Nonce = nonceUpdateEffect.Nonce;
                             }
                             break;
@@ -75,7 +81,7 @@ namespace Centaurus.Domain
                                 var pubKey = balanceCreateEffect.Pubkey.Data;
                                 var asset = balanceCreateEffect.Asset;
                                 EnsureBalanceRowExists(balances, pubKey);
-                                balances[pubKey].Add(asset, new BalanceCalcModel { IsInserted = true, AssetId = asset });
+                                balances[pubKey].Add(asset, new DiffObject.Balance { IsInserted = true, AssetId = asset });
                             }
                             break;
                         case BalanceUpdateEffect balanceUpdateEffect:
@@ -105,7 +111,7 @@ namespace Centaurus.Domain
                         case OrderPlacedEffect orderPlacedEffect:
                             {
                                 var orderId = orderPlacedEffect.OrderId;
-                                orders.Add(orderId, new OrderCalcModel
+                                orders.Add(orderId, new DiffObject.Order
                                 {
                                     Amount = orderPlacedEffect.Amount,
                                     IsInserted = true,
@@ -119,7 +125,7 @@ namespace Centaurus.Domain
                             {
                                 var orderId = orderRemovedEffect.OrderId;
                                 if (!orders.ContainsKey(orderId))
-                                    orders.Add(orderId, new OrderCalcModel { OrderId = orderId });
+                                    orders.Add(orderId, new DiffObject.Order { OrderId = orderId });
                                 orders[orderId].IsDeleted = true;
                             }
                             break;
@@ -127,7 +133,7 @@ namespace Centaurus.Domain
                             {
                                 var orderId = tradeEffect.OrderId;
                                 if (!orders.ContainsKey(orderId))
-                                    orders.Add(orderId, new OrderCalcModel { OrderId = orderId });
+                                    orders.Add(orderId, new DiffObject.Order { OrderId = orderId });
                                 orders[orderId].Amount += tradeEffect.AssetAmount;
                             }
                             break;
@@ -138,15 +144,16 @@ namespace Centaurus.Domain
                             stellarData.VaultSequence = vaultSequenceUpdateEffect.Sequence;
                             break;
                         case WithdrawalCreateEffect withdrawalEffect:
-                            withdrawals.Add(new WithdrawalCalcModel
+                            withdrawals.Add(new DiffObject.Withdrawal
                             {
                                 Apex = withdrawalEffect.Apex,
-                                TransactionHash = withdrawalEffect.TransactionHash,
+                                TransactionHash = withdrawalEffect.Withdrawal.TransactionHash,
+                                RawWithdrawal = XdrConverter.Serialize(withdrawalEffect.Withdrawal),
                                 IsInserted = true
                             });
                             break;
                         case WithdrawalRemoveEffect withdrawalEffect:
-                            withdrawals.Add(new WithdrawalCalcModel
+                            withdrawals.Add(new DiffObject.Withdrawal
                             {
                                 Apex = withdrawalEffect.Apex,
                                 IsDeleted = true
@@ -158,7 +165,7 @@ namespace Centaurus.Domain
                 }
             }
 
-            return new UpdateObject
+            return new DiffObject
             {
                 Accounts = accounts.Values.ToList(),
                 Balances = balances.Values.SelectMany(b => b.Values).ToList(),
@@ -167,30 +174,30 @@ namespace Centaurus.Domain
                 Assets = assets,
                 Orders = orders.Values.ToList(),
                 Settings = constellationSettings,
-                StellarData = stellarData.Ledger > 0 && stellarData.VaultSequence > 0 ? stellarData : null,
+                StellarInfoData = stellarData.Ledger > 0 || stellarData.VaultSequence > 0 ? stellarData : null,
                 Widthrawals = withdrawals
             };
         }
 
 
 
-        private static void EnsureBalanceRowExists(Dictionary<byte[], Dictionary<int, BalanceCalcModel>> balances, byte[] pubKey)
+        private static void EnsureBalanceRowExists(Dictionary<byte[], Dictionary<int, DiffObject.Balance>> balances, byte[] pubKey)
         {
             if (!balances.ContainsKey(pubKey))
-                balances.Add(pubKey, new Dictionary<int, BalanceCalcModel>());
+                balances.Add(pubKey, new Dictionary<int, DiffObject.Balance>());
         }
 
 
-        private static void EnsureBalanceExists(Dictionary<byte[], Dictionary<int, BalanceCalcModel>> balances, byte[] pubKey, int asset)
+        private static void EnsureBalanceExists(Dictionary<byte[], Dictionary<int, DiffObject.Balance>> balances, byte[] pubKey, int asset)
         {
             EnsureBalanceRowExists(balances, pubKey);
             if (!balances[pubKey].ContainsKey(asset))
-                balances[pubKey].Add(asset, new BalanceCalcModel { AssetId = asset, PubKey = pubKey });
+                balances[pubKey].Add(asset, new DiffObject.Balance { AssetId = asset, PubKey = pubKey });
         }
 
-        private static StellarData GetStellarData(long ledger, long vaultSequence)
+        private static DiffObject.StellarInfo GetStellarData(long ledger, long vaultSequence)
         {
-            return new StellarData { Ledger = ledger, VaultSequence = vaultSequence };
+            return new DiffObject.StellarInfo { Ledger = ledger, VaultSequence = vaultSequence };
         }
 
         private static SettingsModel GetConstellationSettings(ConstellationEffect constellationInit)
@@ -204,19 +211,21 @@ namespace Centaurus.Domain
             };
         }
 
-        private static List<AssetSettingsModel> GetAssets(ConstellationEffect constellationEffect, List<AssetSettingsModel> permanentAssets)
+        private static List<AssetModel> GetAssets(ConstellationEffect constellationEffect, List<AssetModel> permanentAssets)
         {
-            var permanentAssetsIds = permanentAssets.Select(a => a.AssetId);
+            var newAssets = constellationEffect.Assets;
+            if (permanentAssets != null && permanentAssets.Count > 0)
+            {
+                var permanentAssetsIds = permanentAssets.Select(a => a.AssetId);
+                newAssets = constellationEffect.Assets.Where(a => !permanentAssetsIds.Contains(a.Id)).ToList();
+            }
 
-            var newAssets = constellationEffect.Assets.Where(a => !permanentAssetsIds.Contains(a.Id)).ToArray();
-
-            var assetsLength = newAssets.Length;
-
-            var assets = new List<AssetSettingsModel>();
+            var assetsLength = newAssets.Count;
+            var assets = new List<AssetModel>();
             for (var i = 0; i < assetsLength; i++)
             {
                 var currentAsset = newAssets[i];
-                var assetModel = new AssetSettingsModel { AssetId = currentAsset.Id, Code = currentAsset.Code, Issuer = currentAsset.Issuer.Data };
+                var assetModel = new AssetModel { AssetId = currentAsset.Id, Code = currentAsset.Code, Issuer = currentAsset.Issuer.Data };
                 assets[i] = assetModel;
             }
 

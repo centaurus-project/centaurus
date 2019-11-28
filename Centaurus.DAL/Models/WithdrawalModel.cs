@@ -9,5 +9,7 @@ namespace Centaurus.DAL.Models
         public ulong Apex { get; set; }
 
         public byte[] TransactionHash { get; set; }
+
+        public byte[] RawWithdrawal { get; set; }
     }
 }

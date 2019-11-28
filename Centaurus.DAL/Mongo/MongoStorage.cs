@@ -20,34 +20,14 @@ namespace Centaurus.DAL.Mongo
         private IMongoCollection<StellarData> stellarDataCollection;
         private IMongoCollection<WithdrawalModel> withdrawalsCollection;
         private IMongoCollection<EffectModel> effectsCollection;
-        private IMongoCollection<SettingsModel> constellationSettingsCollection;
-        private IMongoCollection<AssetSettingsModel> assetsCollection;
+        private IMongoCollection<SettingsModel> settingsCollection;
+        private IMongoCollection<AssetModel> assetsCollection;
 
         private async Task CreateIndexes()
         {
-            await effectsCollection.Indexes.CreateOneAsync(
-                 new CreateIndexModel<EffectModel>(Builders<EffectModel>.IndexKeys.Ascending(a => a.Apex),
-                 new CreateIndexOptions { Background = true })
-            );
-
-            await constellationSettingsCollection.Indexes.CreateOneAsync(
-                 new CreateIndexModel<SettingsModel>(Builders<SettingsModel>.IndexKeys.Ascending(a => a.Apex),
+            await accountsCollection.Indexes.CreateOneAsync(
+                 new CreateIndexModel<AccountModel>(Builders<AccountModel>.IndexKeys.Ascending(a => a.PubKey),
                  new CreateIndexOptions { Unique = true, Background = true })
-            );
-
-            await assetsCollection.Indexes.CreateManyAsync(
-                new CreateIndexModel<AssetSettingsModel>[] {
-                    new CreateIndexModel<AssetSettingsModel>(Builders<AssetSettingsModel>.IndexKeys.Ascending(a => a.AssetId),
-                        new CreateIndexOptions { Unique = true, Background = true }
-                    ),
-                    new CreateIndexModel<AssetSettingsModel>(
-                        Builders<AssetSettingsModel>.IndexKeys.Combine(
-                            Builders<AssetSettingsModel>.IndexKeys.Ascending(a => a.Code),
-                            Builders<AssetSettingsModel>.IndexKeys.Ascending(a => a.Issuer)
-                        ),
-                        new CreateIndexOptions { Unique = true, Background = true }
-                    )
-                }
             );
         }
 
@@ -67,9 +47,9 @@ namespace Centaurus.DAL.Mongo
 
             effectsCollection = database.GetCollection<EffectModel>("effects");
 
-            constellationSettingsCollection = database.GetCollection<SettingsModel>("constellationSettings");
+            settingsCollection = database.GetCollection<SettingsModel>("constellationSettings");
 
-            assetsCollection = database.GetCollection<AssetSettingsModel>("assets");
+            assetsCollection = database.GetCollection<AssetModel>("assets");
 
             await CreateIndexes();
         }
@@ -97,16 +77,16 @@ namespace Centaurus.DAL.Mongo
         {
             var filter = Builders<SettingsModel>.Filter.Lte(s => s.Apex, apex);
 
-            return await constellationSettingsCollection
+            return await settingsCollection
                 .Find(filter)
                 .SortByDescending(s => s.Apex)
                 .FirstOrDefaultAsync();
         }
 
-        public override async Task<List<AssetSettingsModel>> LoadAssets(ulong apex)
+        public override async Task<List<AssetModel>> LoadAssets(ulong apex)
         {
             return await assetsCollection
-                .Find(Builders<AssetSettingsModel>.Filter.Lte(s => s.Apex, apex))
+                .Find(Builders<AssetModel>.Filter.Lte(s => s.Apex, apex))
                 .ToListAsync();
         }
 
@@ -178,7 +158,7 @@ namespace Centaurus.DAL.Mongo
 
         #region Updates
 
-        public override async Task Update(UpdateObject update)
+        public override async Task Update(DiffObject update)
         {
             using (var session = await client.StartSessionAsync())
             {
@@ -190,12 +170,12 @@ namespace Centaurus.DAL.Mongo
 
                     if (update.Settings != null)
                     {
-                        updateTasks.Add(constellationSettingsCollection.InsertOneAsync(update.Settings));
+                        updateTasks.Add(settingsCollection.InsertOneAsync(update.Settings));
                         updateTasks.Add(assetsCollection.InsertManyAsync(update.Assets));
                     }
 
-                    if (update.StellarData != null)
-                        updateTasks.Add(stellarDataCollection.BulkWriteAsync(GetStellarDataUpdate(update.StellarData)));
+                    if (update.StellarInfoData != null)
+                        updateTasks.Add(stellarDataCollection.BulkWriteAsync(GetStellarDataUpdate(update.StellarInfoData)));
 
                     updateTasks.Add(accountsCollection.BulkWriteAsync(GetAccountUpdates(update.Accounts)));
 
@@ -218,7 +198,7 @@ namespace Centaurus.DAL.Mongo
             }
         }
 
-        private WriteModel<WithdrawalModel>[] GetWithdrawalsUpdates(List<WithdrawalCalcModel> widthrawals)
+        private WriteModel<WithdrawalModel>[] GetWithdrawalsUpdates(List<DiffObject.Withdrawal> widthrawals)
         {
             var filter = Builders<WithdrawalModel>.Filter;
             var update = Builders<WithdrawalModel>.Update;
@@ -231,9 +211,15 @@ namespace Centaurus.DAL.Mongo
                 var widthrawal = widthrawals[i];
                 var apex = widthrawal.Apex;
                 var trHash = widthrawal.TransactionHash;
+                var raw = widthrawal.RawWithdrawal;
                 var currentWidthrawalFilter = filter.Eq(a => a.Apex, apex);
                 if (widthrawal.IsInserted)
-                    updates[i] = new InsertOneModel<WithdrawalModel>(new WithdrawalModel { Apex = apex, TransactionHash = trHash });
+                    updates[i] = new InsertOneModel<WithdrawalModel>(new WithdrawalModel
+                    {
+                        Apex = apex,
+                        TransactionHash = trHash,
+                        RawWithdrawal = raw
+                    });
                 else if (widthrawal.IsDeleted)
                     updates[i] = new DeleteOneModel<WithdrawalModel>(currentWidthrawalFilter);
                 else
@@ -242,7 +228,7 @@ namespace Centaurus.DAL.Mongo
             return updates;
         }
 
-        private WriteModel<StellarData>[] GetStellarDataUpdate(StellarDataCalcModel stellarData)
+        private WriteModel<StellarData>[] GetStellarDataUpdate(DiffObject.StellarInfo stellarData)
         {
             var filter = Builders<StellarData>.Filter;
             var update = Builders<StellarData>.Update;
@@ -261,7 +247,7 @@ namespace Centaurus.DAL.Mongo
             return new WriteModel<StellarData>[] { updateModel };
         }
 
-        private WriteModel<AccountModel>[] GetAccountUpdates(List<AccountCalcModel> accounts)
+        private WriteModel<AccountModel>[] GetAccountUpdates(List<DiffObject.Account> accounts)
         {
             var filter = Builders<AccountModel>.Filter;
             var update = Builders<AccountModel>.Update;
@@ -284,7 +270,7 @@ namespace Centaurus.DAL.Mongo
             return updates;
         }
 
-        private WriteModel<BalanceModel>[] GetBalanceUpdates(List<BalanceCalcModel> balances)
+        private WriteModel<BalanceModel>[] GetBalanceUpdates(List<DiffObject.Balance> balances)
         {
             var filter = Builders<BalanceModel>.Filter;
             var update = Builders<BalanceModel>.Update;
@@ -325,7 +311,7 @@ namespace Centaurus.DAL.Mongo
             return updates;
         }
 
-        private WriteModel<OrderModel>[] GetOrderUpdates(List<OrderCalcModel> orders)
+        private WriteModel<OrderModel>[] GetOrderUpdates(List<DiffObject.Order> orders)
         {
             var filter = Builders<OrderModel>.Filter;
             var update = Builders<OrderModel>.Update;
