@@ -129,9 +129,8 @@ namespace Centaurus.Domain
 
 
             effectsContainer.AddUnlockLiabilities(account, withdrawal.Asset, withdrawal.Amount);
-
             if (withdrawal.PaymentResult == PaymentResults.Success)
-                effectsContainer.AddUnlockLiabilities(account, withdrawal.Asset, -withdrawal.Amount);
+                effectsContainer.AddBalanceUpdate(account, withdrawal.Asset, -withdrawal.Amount);
 
             effectsContainer.AddWithdrawalRemove(withdrawal, Global.WithdrawalStorage);
         }

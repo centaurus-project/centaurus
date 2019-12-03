@@ -17,7 +17,7 @@ namespace Centaurus.Domain
         /// </summary>
         /// <param name="update"></param>
         /// <returns></returns>
-        public static async Task<DiffObject> Aggregate(Dictionary<MessageEnvelope, Effect[]> update)
+        public static async Task<DiffObject> Aggregate(List<PendingUpdates.PendingUpdatesItem> update)
         {
             SettingsModel constellationSettings = null;
 
@@ -33,16 +33,16 @@ namespace Centaurus.Domain
 
 
             var updateLength = update.Count;
-            var quanta = new List<QuantumModel>(updateLength);
+            var quanta = new List<QuantumModel>();
             var effects = new List<EffectModel>();
 
-            var keys = update.Keys.ToArray();
             for (int i = 0; i < updateLength; i++)
             {
-                var quantum = keys[i];
-                quanta[i] = QuantumModelExtensions.FromQuantum(quantum);
+                var currentUpdateItem = update[i];
+                if (currentUpdateItem.Quantum != null) //it could be null on constellation init
+                    quanta.Add(QuantumModelExtensions.FromQuantum(currentUpdateItem.Quantum));
 
-                var quatumEffects = update[quantum];
+                var quatumEffects = update[i].Effects;
                 var quatumEffectsLength = quatumEffects.Length;
                 for (var c = 0; c < quatumEffectsLength; c++)
                 {
@@ -204,7 +204,7 @@ namespace Centaurus.Domain
         {
             return new SettingsModel
             {
-                Auditors = constellationInit.Auditors.Cast<byte[]>().ToArray(),
+                Auditors = constellationInit.Auditors.Select(a => a.Data).ToArray(),
                 MinAccountBalance = constellationInit.MinAccountBalance,
                 MinAllowedLotSize = constellationInit.MinAllowedLotSize,
                 Vault = constellationInit.Vault.Data
@@ -226,7 +226,7 @@ namespace Centaurus.Domain
             {
                 var currentAsset = newAssets[i];
                 var assetModel = new AssetModel { AssetId = currentAsset.Id, Code = currentAsset.Code, Issuer = currentAsset.Issuer.Data };
-                assets[i] = assetModel;
+                assets.Add(assetModel);
             }
 
             return assets.ToList();

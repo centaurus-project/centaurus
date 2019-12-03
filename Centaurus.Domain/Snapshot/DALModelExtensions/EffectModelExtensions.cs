@@ -14,7 +14,7 @@ namespace Centaurus.Domain
             {
                 Index = index,
                 Apex = effect.Apex,
-                Account = effect.Pubkey.Data,
+                Account = effect.Pubkey?.Data,
                 EffectType = (int)effect.EffectType,
                 RawEffect = XdrConverter.Serialize(effect),
                 Timestamp = DateTime.UtcNow

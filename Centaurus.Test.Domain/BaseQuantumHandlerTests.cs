@@ -22,14 +22,36 @@ namespace Centaurus.Test
         {
             try
             {
+                ulong apex = 0;
 
                 var client1StartBalanceAmount = (long)0;
                 var clientAccountBalance = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair).GetBalance(asset);
+
+                var trHash = KeyPair.Random().PublicKey;
+                var withdrawalDest = KeyPair.Random().PublicKey;
                 if (clientAccountBalance != null && amount > 0)
                 {
                     client1StartBalanceAmount = clientAccountBalance.Amount;
-                    clientAccountBalance.LockLiabilities(amount);//emulate lock liabilities for the withdrawal
+
+                    var withdrawal = new WithdrawalRequest
+                    {
+                        Account = TestEnvironment.Client1KeyPair,
+                        Destination = withdrawalDest,
+                        Amount = amount,
+                        Asset = asset,
+                        Nonce = (ulong)DateTime.UtcNow.Ticks,
+                        TransactionHash = trHash
+                    };
+
+                    Message quantum = withdrawal;
+                    if (!Global.IsAlpha)
+                        quantum = new RequestQuantum { Apex = ++apex, RequestEnvelope = withdrawal.CreateEnvelope(), Timestamp = (ulong)DateTime.UtcNow.Ticks };
+
+                    //create withdrawal
+                    await Global.QuantumHandler.HandleAsync(quantum.CreateEnvelope());
                 }
+
+                var depositeAmount = new Random().Next(10, 1000);
 
                 var ledgerNotification = new LedgerUpdateNotification
                 {
@@ -39,16 +61,17 @@ namespace Centaurus.Test
                     {
                         new Deposit
                         {
-                            Amount = amount,
+                            Amount = depositeAmount,
                             Destination = TestEnvironment.Client1KeyPair,
                             Asset = asset
                         },
                         new Withdrawal
                         {
                             Amount = amount,
-                            Destination = TestEnvironment.Client2KeyPair,
+                            Destination = withdrawalDest,
                             Source = TestEnvironment.Client1KeyPair,
                             Asset = asset,
+                            TransactionHash = trHash,
                             PaymentResult = PaymentResults.Success
                         }
                     }
@@ -59,7 +82,7 @@ namespace Centaurus.Test
                 var ledgerCommit = new LedgerCommitQuantum
                 {
                     Source = ledgerNotificationEnvelope,
-                    Apex = 1
+                    Apex = ++apex
                 };
 
                 await Global.QuantumHandler.HandleAsync(ledgerCommit.CreateEnvelope());
@@ -69,7 +92,7 @@ namespace Centaurus.Test
                 var account1 = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
 
                 Assert.AreEqual(account1.GetBalance(asset).Liabilities, 0);
-                Assert.AreEqual(account1.GetBalance(asset).Amount, client1StartBalanceAmount); //acc balance + deposit - withdrawal
+                Assert.AreEqual(account1.GetBalance(asset).Amount, client1StartBalanceAmount - amount + depositeAmount); //acc balance + deposit - withdrawal
             }
             catch (Exception exc)
             {
@@ -82,10 +105,10 @@ namespace Centaurus.Test
         [Test]
         [TestCase(0, 0, 0, OrderSides.Sell, typeof(UnauthorizedException))]
         [TestCase(1, 0, 0, OrderSides.Sell, typeof(InvalidOperationException))]
-        [TestCase(1, 1, 0, OrderSides.Sell, typeof(ArgumentException))]
+        [TestCase(1, 1, 0, OrderSides.Sell, typeof(BadRequestException))]
         [TestCase(1, 1, 1000000000, OrderSides.Sell, typeof(BadRequestException))]
-        [TestCase(1, 1, 10000, OrderSides.Sell, null)]
-        [TestCase(1, 1, 10000, OrderSides.Buy, null)]
+        [TestCase(1, 1, 100, OrderSides.Sell, null)]
+        [TestCase(1, 1, 100, OrderSides.Buy, null)]
         public async Task OrderQuantumTest(int nonce, int asset, int amount, OrderSides side, Type excpectedException)
         {
             try

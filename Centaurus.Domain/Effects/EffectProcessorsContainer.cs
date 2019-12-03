@@ -78,11 +78,10 @@ namespace Centaurus.Domain
 
         public void AddWithdrawalCreate(Withdrawal withdrawal, WithdrawalStorage withdrawalStorage)
         {
-            var request = RequestQuantum;
             var effect = new WithdrawalCreateEffect
             {
                 Apex = Apex,
-                Pubkey = request.RequestMessage.Account,
+                Pubkey = withdrawal.Source,
                 Withdrawal = withdrawal
             };
             Add(new WithdrawalCreateEffectProcessor(effect, withdrawalStorage));
@@ -90,12 +89,11 @@ namespace Centaurus.Domain
 
         public void AddWithdrawalRemove(Withdrawal withdrawal, WithdrawalStorage withdrawalStorage)
         {
-            var request = RequestQuantum;
             var effect = new WithdrawalRemoveEffect
             {
                 Apex = Apex,
-                Pubkey = request.RequestMessage.Account,
-                Withdrawal = withdrawal
+                Withdrawal = withdrawal,
+                Pubkey = withdrawal.Source
             };
             Add(new WithdrawalRemoveEffectProcessor(effect, withdrawalStorage));
         }

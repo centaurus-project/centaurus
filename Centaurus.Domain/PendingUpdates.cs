@@ -8,14 +8,27 @@ namespace Centaurus.Domain
 {
     public class PendingUpdates
     {
-        Dictionary<MessageEnvelope, Effect[]> updates = new Dictionary<MessageEnvelope, Effect[]>();
+        public class PendingUpdatesItem
+        {
+            public PendingUpdatesItem(MessageEnvelope quantum, Effect[] effects)
+            {
+                Quantum = quantum;
+                Effects = effects;
+            }
+
+            public MessageEnvelope Quantum { get; }
+
+            public Effect[] Effects { get; }
+        }
+
+        List<PendingUpdatesItem> updates = new List<PendingUpdatesItem>();
 
         public void Add(MessageEnvelope quantum, Effect[] effects)
         {
-            updates.Add(quantum, effects);
+            updates.Add(new PendingUpdatesItem(quantum, effects));
         }
 
-        public Dictionary<MessageEnvelope, Effect[]> GetAll()
+        public List<PendingUpdatesItem> GetAll()
         {
             return updates;
         }

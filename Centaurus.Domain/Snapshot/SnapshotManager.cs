@@ -27,7 +27,6 @@ namespace Centaurus.Domain
 
         public static async Task<Snapshot> BuildGenesisSnapshot(ConstellationSettings settings, long ledger, long vaultSequence)
         {
-            //updateObject.Settings[0] = settings;
             var initEffect = new ConstellationInitEffect
             {
                 Assets = settings.Assets,
@@ -94,7 +93,7 @@ namespace Centaurus.Domain
         /// Fetches current snapshot
         /// </summary>
         /// <returns></returns>
-        public async Task<Snapshot> GetSnapshot()
+        public static async Task<Snapshot> GetSnapshot()
         {
             //if we pass ulong.MaxValue it will return current snapshot
             return await GetSnapshot(ulong.MaxValue);
@@ -105,7 +104,7 @@ namespace Centaurus.Domain
         /// </summary>
         /// <param name="apex"></param>
         /// <returns></returns>
-        public async Task<Snapshot> GetSnapshot(ulong apex)
+        public static async Task<Snapshot> GetSnapshot(ulong apex)
         {
             var settings = await GetConstellationSettings(apex);
             if (settings == null)
@@ -128,13 +127,6 @@ namespace Centaurus.Domain
             var withdrawalsStorage = new WithdrawalStorage(withdrawals);
 
             var effectModels = await Global.PermanentStorage.LoadEffectsAboveApex(apex);
-            var withdrawalEffectTypes = new EffectTypes[] { EffectTypes.WithdrawalCreate, EffectTypes.WithdrawalRemove };
-            var withdrawalEffectApexes = effectModels
-                .Where(e => Array.IndexOf(withdrawalEffectTypes, e.EffectType) >= 0)
-                .Select(e => e.Apex)
-                .ToArray();
-            var withdrawalQuanta = (await Global.PermanentStorage.LoadQuanta(withdrawalEffectApexes))
-                .ToDictionary(q => q.Apex, q => XdrConverter.Deserialize<MessageEnvelope>(q.RawQuantum));
             for (var i = effectModels.Count - 1; i >= 0; i--)
             {
                 var currentEffect = XdrConverter.Deserialize<Effect>(effectModels[i].RawEffect);
@@ -209,13 +201,13 @@ namespace Centaurus.Domain
             };
         }
 
-        private async Task<Exchange> GetRestoredExchange(List<Order> orders)
+        private static async Task<Exchange> GetRestoredExchange(List<Order> orders)
         {
             var assets = await Global.PermanentStorage.LoadAssets(ulong.MaxValue);//we need to load all assets, otherwise errors could occur during exchange restore
             return Exchange.RestoreExchange(assets.Select(a => a.ToAssetSettings()).ToList(), orders);
         }
 
-        private async Task<ConstellationSettings> GetConstellationSettings(ulong apex)
+        private static async Task<ConstellationSettings> GetConstellationSettings(ulong apex)
         {
             var settingsModel = await Global.PermanentStorage.LoadSettings(apex);
             if (settingsModel == null)
@@ -226,31 +218,37 @@ namespace Centaurus.Domain
             return settingsModel.ToSettings(assets);
         }
 
-        private async Task<List<Account>> GetAccounts()
+        private static async Task<List<Account>> GetAccounts()
         {
             var accountModels = await Global.PermanentStorage.LoadAccounts();
             var balanceModels = await Global.PermanentStorage.LoadBalances();
 
-            var groupedBalances = balanceModels.GroupBy(b => b.Account, new ByteArrayComparer()).ToDictionary(g => g.Key, g => g);
+            var comparer = new ByteArrayComparer();
+            var groupedBalances = balanceModels.GroupBy(b => b.Account, comparer).ToDictionary(g => g.Key, g => g, comparer);
             var accountsCount = accountModels.Count;
             var accounts = new List<Account>();
             for (var i = 0; i < accountsCount; i++)
             {
                 var acc = accountModels[i];
-                accounts.Add(acc.ToAccount(groupedBalances[acc.PubKey].ToArray()));
+                var balances = new BalanceModel[] { };
+                if (groupedBalances.ContainsKey(acc.PubKey))
+                {
+                    balances = groupedBalances[acc.PubKey].ToArray();
+                }
+                accounts.Add(acc.ToAccount(balances));
             }
 
             return accounts;
         }
 
-        private async Task<List<Withdrawal>> GetWithdrawals()
+        private static async Task<List<Withdrawal>> GetWithdrawals()
         {
             var withdrawalModels = await Global.PermanentStorage.LoadWithdrawals();
 
             return withdrawalModels.Select(w => XdrConverter.Deserialize<Withdrawal>(w.RawWithdrawal)).ToList();
         }
 
-        private async Task<List<Order>> GetOrders()
+        private static async Task<List<Order>> GetOrders()
         {
             var orderModels = await Global.PermanentStorage.LoadOrders();
 

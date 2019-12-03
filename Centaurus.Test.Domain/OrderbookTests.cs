@@ -101,6 +101,7 @@ namespace Centaurus.Test
 
             var orderEffectsContainer = new EffectProcessorsContainer(order.CreateEnvelope());
             Global.Exchange.ExecuteOrder(orderEffectsContainer);
+            orderEffectsContainer.Commit();
             var effects = orderEffectsContainer.GetEffects();
             Assert.AreEqual(effects.Length, 2);
             Assert.AreEqual(effects[0].EffectType, EffectTypes.LockLiabilities);
@@ -137,15 +138,16 @@ namespace Centaurus.Test
 
             var conterOrderEffectsContainer = new EffectProcessorsContainer(conterOrder.CreateEnvelope());
             Global.Exchange.ExecuteOrder(conterOrderEffectsContainer);
+            conterOrderEffectsContainer.Commit();
             if (orderRequest2.Side == OrderSides.Sell)
             {
                 Assert.AreEqual(account2.Balances[1].Liabilities, acc2AssetLiabilities + (orderRequest2.Amount - orderRequest1.Amount));
-                Assert.AreEqual(account2.Balances[1].Amount, acc1AssetAmount - orderRequest1.Amount);
+                Assert.AreEqual(account2.Balances[1].Amount, acc2AssetAmount - orderRequest1.Amount);
             }
             else
             {
-                Assert.AreEqual(account2.Balances[0].Liabilities, acc1XlmLiabilities + orderRequest1.Amount);
-                Assert.AreEqual(account2.Balances[0].Amount, acc1XlmAmount);
+                Assert.AreEqual(account2.Balances[0].Liabilities, acc2XlmLiabilities + orderRequest2.Amount * orderRequest2.Price);
+                Assert.AreEqual(account2.Balances[0].Amount, acc2XlmAmount);
             }
         }
 

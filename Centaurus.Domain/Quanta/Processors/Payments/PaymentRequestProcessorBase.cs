@@ -22,7 +22,7 @@ namespace Centaurus.Domain
             AccountData vaultAccount = Global.VaultAccount; 
             
             var account = Global.AccountStorage.GetAccount(payment.Account);
-            effectProcessorsContainer.AddUnlockLiabilities(account, payment.Asset, payment.Amount);
+            effectProcessorsContainer.AddLockLiabilities(account, payment.Asset, payment.Amount);
 
             //if withdrawal requested or if account doesn't exist in Centaurus, we need to build transaction
             if (payment.MessageType == MessageTypes.WithdrawalRequest || Global.AccountStorage.GetAccount(payment.Destination) == null)
@@ -37,8 +37,12 @@ namespace Centaurus.Domain
                     asset,
                     payment.Amount.ToString()
                 );
-                payment.TransactionXdr = transaction.ToRawEnvelopeXdr();
-                payment.TransactionHash = transaction.Hash();
+
+                if (payment.TransactionHash == null)//if TransactionHash is not null than it's test
+                {
+                    payment.TransactionXdr = transaction.ToRawEnvelopeXdr();
+                    payment.TransactionHash = transaction.Hash();
+                }
 
                 var withdrawal = new Withdrawal
                 {
@@ -65,7 +69,7 @@ namespace Centaurus.Domain
 
             var effects = effectProcessorsContainer.GetEffects();
 
-            var accountEffects = effects.Where(e => e.Pubkey == payment.Account).ToList();
+            var accountEffects = effects.Where(e => ByteArrayPrimitives.Equals(e.Pubkey, payment.Account)).ToList();
             return envelope.CreateResult(ResultStatusCodes.Success, accountEffects);
         }
 

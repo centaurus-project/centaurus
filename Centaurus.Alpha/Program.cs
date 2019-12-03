@@ -56,7 +56,7 @@ namespace Centaurus
 
             MessageHandlers<AlphaWebSocketConnection>.Init();
 
-            var lastSnapshot = await Global.SnapshotManager.GetSnapshot();
+            var lastSnapshot = await SnapshotManager.GetSnapshot();
             if (lastSnapshot == null)
             {
                 Global.AppState.State = ApplicationState.WaitingForInit;

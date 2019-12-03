@@ -48,7 +48,7 @@ namespace Centaurus.Domain
             try
             {
                 //TODO: discuss if there is anything else that we need to validate
-                var localSnapshot = await Global.SnapshotManager.GetSnapshot();
+                var localSnapshot = await SnapshotManager.GetSnapshot();
 
                 var knownAudiotors = GetKnownAuditors(localSnapshot);
 

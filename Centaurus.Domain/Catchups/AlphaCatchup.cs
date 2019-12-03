@@ -62,7 +62,7 @@ namespace Centaurus.Domain
             //group auditor states by snapshot hash
             var groupedSnapshots = auditorStates.Values
                 //snapshot could be null if it's first auditor connection
-                .GroupBy(s => s.LastSnapshot?.ComputeHash() ?? new byte[] { }, new ByteArrayComparer());
+                .GroupBy(s => s.Snapshot?.ComputeHash() ?? new byte[] { }, new ByteArrayComparer());
             var largestGroup = groupedSnapshots.OrderByDescending(g => g.Count()).First();
             if (largestGroup.Count() >= MajorityHelper.GetMajorityCount())
                 return largestGroup;
@@ -75,7 +75,7 @@ namespace Centaurus.Domain
         /// <param name="snapshot">Majority's snapshot</param>
         private static async Task ValidateSnapshot(Snapshot snapshot)
         {
-            var localSnapshot = await Global.SnapshotManager.GetSnapshot();
+            var localSnapshot = await SnapshotManager.GetSnapshot();
             if (!ByteArrayPrimitives.Equals(snapshot.ComputeHash(), localSnapshot.ComputeHash()))
                 throw new Exception("Local snapshot doesn't equal to majority's one");
         }
@@ -83,12 +83,12 @@ namespace Centaurus.Domain
         private static async Task ApplyAuditorsData(IEnumerable<AuditorState> largestGroup)
         {
             //if last snapshot is not null, we should aggregate all envelopes
-            var lastSnapshot = largestGroup.First().LastSnapshot;
-            if (lastSnapshot != null)
-                lastSnapshot.Confirmation = largestGroup.Select(g => g.LastSnapshot.Confirmation).ToList().AggregateEnvelops();
+            var lastSnapshot = largestGroup.First().Snapshot;
+            if (lastSnapshot != null && lastSnapshot.Apex != 0)
+                lastSnapshot.Confirmation = largestGroup.Select(g => g.Snapshot.Confirmation).ToList().AggregateEnvelops();
 
             if (lastSnapshot == null)
-                lastSnapshot = await Global.SnapshotManager.GetSnapshot();
+                lastSnapshot = await SnapshotManager.GetSnapshot();
 
             //alpha could be empty
             //await ValidateSnapshot(lastSnapshot);

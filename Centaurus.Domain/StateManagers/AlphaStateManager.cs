@@ -46,7 +46,7 @@ namespace Centaurus.Domain
             return new AlphaState
             {
                 State = State,
-                LastSnapshot = await Global.SnapshotManager.GetSnapshot(ulong.MaxValue)
+                LastSnapshot = await SnapshotManager.GetSnapshot(ulong.MaxValue)
             };
         }
     }

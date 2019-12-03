@@ -20,12 +20,12 @@ namespace Centaurus.Domain
             //if Alpha is rising, we need to send the current auditor state, and wait for a new AlphaState message
             if (alphaInfo.State == ApplicationState.Rising)
             {
-                var lastSnapshot = await Global.SnapshotManager.GetSnapshot();
-                var pendingQuantums = Global.QuantumStorage?.GetAllQuantums(lastSnapshot?.Apex ?? 0) ?? new MessageEnvelope[] { };
+                var snapshot = await SnapshotManager.GetSnapshot();
+                var pendingQuantums = Global.QuantumStorage?.GetAllQuantums(snapshot?.Apex ?? 0) ?? new MessageEnvelope[] { };
                 _ = connection.SendMessage(new AuditorState
                 {
                     State = Global.AppState.State,
-                    LastSnapshot = lastSnapshot,
+                    Snapshot = snapshot,
                     PendingQuantums = new List<MessageEnvelope>(pendingQuantums)
                 });
             }
