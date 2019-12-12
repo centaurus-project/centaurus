@@ -6,7 +6,8 @@ namespace Centaurus.DAL.Models
 {
     public class WithdrawalModel
     {
-        public ulong Apex { get; set; }
+        //it stores ulong
+        public long Apex { get; set; }
 
         public byte[] TransactionHash { get; set; }
 

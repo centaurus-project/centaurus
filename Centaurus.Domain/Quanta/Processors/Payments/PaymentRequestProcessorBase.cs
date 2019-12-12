@@ -21,8 +21,7 @@ namespace Centaurus.Domain
 
             AccountData vaultAccount = Global.VaultAccount; 
             
-            var account = Global.AccountStorage.GetAccount(payment.Account);
-            effectProcessorsContainer.AddLockLiabilities(account, payment.Asset, payment.Amount);
+            effectProcessorsContainer.AddLockLiabilities(Global.AccountStorage, payment.Account, payment.Asset, payment.Amount);
 
             //if withdrawal requested or if account doesn't exist in Centaurus, we need to build transaction
             if (payment.MessageType == MessageTypes.WithdrawalRequest || Global.AccountStorage.GetAccount(payment.Destination) == null)
@@ -59,10 +58,10 @@ namespace Centaurus.Domain
             { 
                 //if the current request is payment, then we can process it immediately
                 var destAccount = Global.AccountStorage.GetAccount(payment.Destination);
-                effectProcessorsContainer.AddBalanceUpdate(destAccount, payment.Asset, payment.Amount);
+                effectProcessorsContainer.AddBalanceUpdate(Global.AccountStorage, payment.Destination, payment.Asset, payment.Amount);
 
-                effectProcessorsContainer.AddUnlockLiabilities(account, payment.Asset, payment.Amount);
-                effectProcessorsContainer.AddBalanceUpdate(account, payment.Asset, -payment.Amount);
+                effectProcessorsContainer.AddUnlockLiabilities(Global.AccountStorage, payment.Account, payment.Asset, payment.Amount);
+                effectProcessorsContainer.AddBalanceUpdate(Global.AccountStorage, payment.Account, payment.Asset, -payment.Amount);
             }
 
             effectProcessorsContainer.Commit();

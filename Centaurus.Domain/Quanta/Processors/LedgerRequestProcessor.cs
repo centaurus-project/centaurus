@@ -103,10 +103,10 @@ namespace Centaurus.Domain
             if (account == null)
                 effectsContainer.AddAccountCreate(Global.AccountStorage, deposite.Destination);
 
-            if (!account.HasBalance(deposite.Asset))
-                effectsContainer.AddBalanceCreate(account, deposite.Asset);
+            if (account == null || !account.HasBalance(deposite.Asset))
+                effectsContainer.AddBalanceCreate(Global.AccountStorage, deposite.Destination, deposite.Asset);
 
-            effectsContainer.AddBalanceUpdate(account, deposite.Asset, deposite.Amount);
+            effectsContainer.AddBalanceUpdate(Global.AccountStorage, deposite.Destination, deposite.Asset, deposite.Amount);
         }
 
         private void ValidateWithdrawal(Withdrawal withdrawal)
@@ -128,9 +128,9 @@ namespace Centaurus.Domain
                 throw new Exception("Source account doesn't exist");
 
 
-            effectsContainer.AddUnlockLiabilities(account, withdrawal.Asset, withdrawal.Amount);
+            effectsContainer.AddUnlockLiabilities(Global.AccountStorage, withdrawal.Source, withdrawal.Asset, withdrawal.Amount);
             if (withdrawal.PaymentResult == PaymentResults.Success)
-                effectsContainer.AddBalanceUpdate(account, withdrawal.Asset, -withdrawal.Amount);
+                effectsContainer.AddBalanceUpdate(Global.AccountStorage, withdrawal.Source, withdrawal.Asset, -withdrawal.Amount);
 
             effectsContainer.AddWithdrawalRemove(withdrawal, Global.WithdrawalStorage);
         }

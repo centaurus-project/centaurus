@@ -27,8 +27,7 @@ namespace Centaurus.Domain
 
             AppState = IsAlpha ? new AlphaStateManager() : (StateManager)new AuditorStateManager();
 
-            if (IsAlpha)
-                InitTimers();
+            InitTimers();
         }
 
         public static void Setup(Snapshot snapshot, IEnumerable<MessageEnvelope> quanta = null)
@@ -75,8 +74,8 @@ namespace Centaurus.Domain
             private set
             {
                 constellation = value;
-                AssetIds = constellation != null 
-                    ? new HashSet<int>(constellation.Assets.Select(a => a.Id).Concat(new int[] { 0 })) 
+                AssetIds = constellation != null
+                    ? new HashSet<int>(constellation.Assets.Select(a => a.Id).Concat(new int[] { 0 }))
                     : new HashSet<int>();
             }
         }
@@ -118,9 +117,6 @@ namespace Centaurus.Domain
 
         private static void OnSnapshotSuccess()
         {
-            if (Settings is AuditorSettings)
-                return;
-
             snapshotIsInProgress = false;
 
             snapshotTimoutTimer.Stop();
@@ -147,7 +143,7 @@ namespace Centaurus.Domain
 
             var updates = PendingUpdates;
             PendingUpdates = new PendingUpdates();
-           _ = SnapshotManager.SaveSnapshot(updates);
+            _ = SnapshotManager.SaveSnapshot(updates);
 
 #if !DEBUG
             snapshotTimoutTimer.Start();

@@ -6,7 +6,8 @@ namespace Centaurus.DAL.Models
 {
     public class AssetModel
     {
-        public ulong Apex { get; set; }
+        //it stores ulong
+        public long Apex { get; set; }
 
         public int AssetId { get; set; }
 

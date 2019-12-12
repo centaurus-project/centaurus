@@ -13,7 +13,7 @@ namespace Centaurus.Domain
             return new Order
             {
                 Amount = order.Amount,
-                OrderId = order.OrderId,
+                OrderId = unchecked((ulong)order.OrderId),
                 Price = order.Price,
                 Pubkey = order.Pubkey
             };

@@ -6,7 +6,9 @@ namespace Centaurus.DAL.Models
 {
     public class EffectModel
     {
-        public ulong Apex { get; set; }
+
+        //it stores ulong
+        public long Apex { get; set; }
 
         public byte[] Account { get; set; }
 

@@ -106,35 +106,35 @@ namespace Centaurus.Domain
             ));
         }
 
-        public void AddBalanceCreate(Account account, int asset)
+        public void AddBalanceCreate(AccountStorage accountStorage, RawPubKey publicKey, int asset)
         {
             Add(new BalanceCreateEffectProcessor(
-                new BalanceCreateEffect { Pubkey = account.Pubkey, Asset = asset, Apex = Apex },
-                account
+                new BalanceCreateEffect { Pubkey = publicKey, Asset = asset, Apex = Apex },
+                accountStorage
             ));
         }
 
-        public void AddBalanceUpdate(Account account, int asset, long amount)
+        public void AddBalanceUpdate(AccountStorage accountStorage, RawPubKey publicKey, int asset, long amount)
         {
             Add(new BalanceUpdateEffectProcesor(
-                new BalanceUpdateEffect { Pubkey = account.Pubkey, Amount = amount, Asset = asset, Apex = Apex },
-                account
+                new BalanceUpdateEffect { Pubkey = publicKey, Amount = amount, Asset = asset, Apex = Apex },
+                accountStorage
             ));
         }
 
-        public void AddUnlockLiabilities(Account account, int asset, long amount)
+        public void AddUnlockLiabilities(AccountStorage accountStorage, RawPubKey publicKey, int asset, long amount)
         {
             Add(new UnlockLiabilitiesEffectProcessor(
-                new UnlockLiabilitiesEffect { Amount = amount, Asset = asset, Pubkey = account.Pubkey, Apex = Apex },
-                account
+                new UnlockLiabilitiesEffect { Amount = amount, Asset = asset, Pubkey = publicKey, Apex = Apex },
+                accountStorage
             ));
         }
 
-        public void AddLockLiabilities(Account account, int asset, long amount)
+        public void AddLockLiabilities(AccountStorage accountStorage, RawPubKey publicKey, int asset, long amount)
         {
             Add(new LockLiabilitiesEffectProcessor(
-                new LockLiabilitiesEffect { Amount = amount, Asset = asset, Pubkey = account.Pubkey, Apex = Apex },
-                account
+                new LockLiabilitiesEffect { Amount = amount, Asset = asset, Pubkey = publicKey, Apex = Apex },
+                accountStorage
             ));
         }
 

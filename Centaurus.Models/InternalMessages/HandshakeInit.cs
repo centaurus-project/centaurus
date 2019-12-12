@@ -8,5 +8,22 @@ namespace Centaurus.Models
 
         [XdrField(0)]
         public HandshakeData HandshakeData { get; set; }
+
+        [XdrField(1, Optional = true)]
+        public HandshakePayload Payload { get; set; }
+    }
+
+    [XdrContract]
+    [XdrUnion(0, typeof(AuditorHandshakePayload))]
+    public abstract class HandshakePayload
+    {
+
+    }
+
+
+    [XdrContract]
+    public class AuditorHandshakePayload: HandshakePayload
+    {
+        public ulong Apex { get; set; }
     }
 }

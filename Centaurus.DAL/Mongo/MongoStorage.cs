@@ -1,7 +1,11 @@
 ﻿using Centaurus.DAL.Models;
+using MongoDB.Bson.Serialization;
+using MongoDB.Bson.Serialization.Conventions;
+using MongoDB.Bson.Serialization.Options;
 using MongoDB.Driver;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Text;
@@ -34,6 +38,9 @@ namespace Centaurus.DAL.Mongo
         public override async Task OpenConnection(string connectionString)
         {
             var mongoUrl = new MongoUrl(connectionString);
+
+            var conventionPack = new ConventionPack { new IgnoreExtraElementsConvention(true) };
+            ConventionRegistry.Register("IgnoreExtraElements", conventionPack, type => true);
 
             client = new MongoClient(mongoUrl);
             database = client.GetDatabase(mongoUrl.DatabaseName);
@@ -75,19 +82,55 @@ namespace Centaurus.DAL.Mongo
 
         public override async Task<SettingsModel> LoadSettings(ulong apex)
         {
-            var filter = Builders<SettingsModel>.Filter.Lte(s => s.Apex, apex);
+            unchecked
+            {
+                var lApex = (long)apex;
+                var filterBldr = Builders<SettingsModel>.Filter;
 
-            return await settingsCollection
-                .Find(filter)
-                .SortByDescending(s => s.Apex)
-                .FirstOrDefaultAsync();
+                //all settings where apex is less or equal to current apex
+                var filter = filterBldr.Where(e => e.Apex <= lApex);
+                if (lApex < 0) //if apex is less than zero (after casting to long), we need get all settings where apex is greater than 0
+                    filter = filterBldr.Or(filterBldr.Where(e => e.Apex >= 0), filter);
+
+                var currentSettingsApex = (await settingsCollection
+                    .Find(filter)
+                    .Project(s => s.Apex)
+                    .ToListAsync())
+                    .Select(s => (ulong)s)
+                    .OrderByDescending(s => s)
+                    .FirstOrDefault();
+
+                return await settingsCollection
+                    .Find(s => s.Apex == (long)currentSettingsApex)
+                    .FirstOrDefaultAsync();
+            }
         }
 
         public override async Task<List<AssetModel>> LoadAssets(ulong apex)
         {
-            return await assetsCollection
-                .Find(Builders<AssetModel>.Filter.Lte(s => s.Apex, apex))
-                .ToListAsync();
+            unchecked
+            {
+                var lApex = (long)apex;
+
+                var filterBldr = Builders<AssetModel>.Filter;
+
+                //all assets where apex is less or equal to current apex
+                var filter = filterBldr.Where(e => e.Apex <= lApex);
+                if (lApex < 0) //if apex is less than zero (after casting to long), we need get all assets where apex is greater than 0
+                    filter = filterBldr.Or(filterBldr.Where(e => e.Apex >= 0), filter);
+
+                var allAssets = (await assetsCollection
+                    .Find(filter)
+                    .Project(s => new { s.Apex, s.AssetId })
+                    .ToListAsync())
+                    .Select(a => new { Apex = (ulong)a.Apex, a.AssetId });
+
+                var currentAssets = allAssets.Where(s => s.Apex <= apex);
+
+                return await assetsCollection
+                    .Find(filterBldr.In(q => q.AssetId, currentAssets.Select(a => a.AssetId)))
+                    .ToListAsync();
+            }
         }
 
         public override async Task<List<AccountModel>> LoadAccounts()
@@ -115,10 +158,10 @@ namespace Centaurus.DAL.Mongo
         {
             var filter = FilterDefinition<QuantumModel>.Empty;
             if (apexes.Length > 0)
-                filter = Builders<QuantumModel>.Filter.In(q => q.Apex, apexes);
+                filter = Builders<QuantumModel>.Filter.In(q => q.Apex, apexes.Select(a => unchecked((long)a)));
 
             var res = await quantaCollection
-                .Find(FilterDefinition<QuantumModel>.Empty)
+                .Find(filter)
                 .ToListAsync();
 
 
@@ -130,30 +173,51 @@ namespace Centaurus.DAL.Mongo
 
         public async Task<List<QuantumModel>> LoadQuantumModels(params ulong[] quantumIds)
         {
-            return await quantaCollection.Find(Builders<QuantumModel>.Filter.In(q => q.Apex, quantumIds)).ToListAsync();
+            return await quantaCollection.Find(
+                    Builders<QuantumModel>.Filter.In(q => q.Apex, quantumIds.Select(q => unchecked((long)q)))
+                )
+                .ToListAsync();
         }
 
         public override async Task<List<EffectModel>> LoadEffectsForApex(ulong apex)
         {
             return await effectsCollection
-                .Find(e => e.Apex >= apex)
+                .Find(e => e.Apex == unchecked((long)apex))
                 .ToListAsync();
         }
 
         public override async Task<List<EffectModel>> LoadEffectsAboveApex(ulong apex)
         {
+            var lAPex = unchecked((long)apex);
+            var filterBldr = Builders<EffectModel>.Filter;
+
+            var filter = filterBldr.Where(e => e.Apex > lAPex);
+            if (lAPex < 0)
+                filter = filterBldr.Or(filterBldr.Where(e => e.Apex > 0), filter);
+
             return await effectsCollection
-                .Find(e => e.Apex > apex)
+                .Find(filter)
                 .ToListAsync();
         }
 
         public override async Task<ulong> GetLastApex()
         {
-            return await quantaCollection
-                .Find(FilterDefinition<QuantumModel>.Empty)
-                .SortByDescending(q => q.Apex)
-                .Project(q => q.Apex)
-                .FirstOrDefaultAsync();
+            unchecked
+            {
+                var lastQuantum = await quantaCollection
+                    .Find(Builders<QuantumModel>.Filter.Where(q => q.Apex < 0))
+                    .SortBy(q => q.Apex)
+                    .FirstOrDefaultAsync();
+                if (lastQuantum != null)
+                    return (ulong)lastQuantum.Apex;
+
+                lastQuantum = await quantaCollection
+                    .Find(FilterDefinition<QuantumModel>.Empty)
+                    .SortByDescending(q => q.Apex)
+                    .FirstOrDefaultAsync();
+
+                return (ulong)(lastQuantum?.Apex ?? 0);
+            }
         }
 
         #region Updates
@@ -200,32 +264,34 @@ namespace Centaurus.DAL.Mongo
 
         private WriteModel<WithdrawalModel>[] GetWithdrawalsUpdates(List<DiffObject.Withdrawal> widthrawals)
         {
-            var filter = Builders<WithdrawalModel>.Filter;
-            var update = Builders<WithdrawalModel>.Update;
-
-            var widthrawalsLength = widthrawals.Count;
-            var updates = new WriteModel<WithdrawalModel>[widthrawalsLength];
-
-            for (int i = 0; i < widthrawalsLength; i++)
+            unchecked
             {
-                var widthrawal = widthrawals[i];
-                var apex = widthrawal.Apex;
-                var trHash = widthrawal.TransactionHash;
-                var raw = widthrawal.RawWithdrawal;
-                var currentWidthrawalFilter = filter.Eq(a => a.Apex, apex);
-                if (widthrawal.IsInserted)
-                    updates[i] = new InsertOneModel<WithdrawalModel>(new WithdrawalModel
-                    {
-                        Apex = apex,
-                        TransactionHash = trHash,
-                        RawWithdrawal = raw
-                    });
-                else if (widthrawal.IsDeleted)
-                    updates[i] = new DeleteOneModel<WithdrawalModel>(currentWidthrawalFilter);
-                else
-                    throw new InvalidOperationException("Withdrawal object cannot be updated");
+                var filter = Builders<WithdrawalModel>.Filter;
+                var update = Builders<WithdrawalModel>.Update;
+
+                var widthrawalsLength = widthrawals.Count;
+                var updates = new WriteModel<WithdrawalModel>[widthrawalsLength];
+
+                for (int i = 0; i < widthrawalsLength; i++)
+                {
+                    var widthrawal = widthrawals[i];
+                    var apex = widthrawal.Apex;
+                    var trHash = widthrawal.TransactionHash;
+                    var raw = widthrawal.RawWithdrawal;
+                    if (widthrawal.IsInserted)
+                        updates[i] = new InsertOneModel<WithdrawalModel>(new WithdrawalModel
+                        {
+                            Apex = (long)apex,
+                            TransactionHash = trHash,
+                            RawWithdrawal = raw
+                        });
+                    else if (widthrawal.IsDeleted)
+                        updates[i] = new DeleteOneModel<WithdrawalModel>(filter.Eq(a => a.Apex, (long)apex));
+                    else
+                        throw new InvalidOperationException("Withdrawal object cannot be updated");
+                }
+                return updates;
             }
-            return updates;
         }
 
         private WriteModel<StellarData>[] GetStellarDataUpdate(DiffObject.StellarInfo stellarData)
@@ -249,25 +315,28 @@ namespace Centaurus.DAL.Mongo
 
         private WriteModel<AccountModel>[] GetAccountUpdates(List<DiffObject.Account> accounts)
         {
-            var filter = Builders<AccountModel>.Filter;
-            var update = Builders<AccountModel>.Update;
-
-            var accLength = accounts.Count;
-            var updates = new WriteModel<AccountModel>[accLength];
-
-            for (int i = 0; i < accLength; i++)
+            unchecked
             {
-                var acc = accounts[i];
-                var pubKey = acc.PubKey;
-                var currentAccFilter = filter.Eq(a => a.PubKey, pubKey);
-                if (acc.IsInserted)
-                    updates[i] = new InsertOneModel<AccountModel>(new AccountModel { Nonce = acc.Nonce, PubKey = pubKey });
-                else if (acc.IsDeleted)
-                    updates[i] = new DeleteOneModel<AccountModel>(currentAccFilter);
-                else
-                    updates[i] = new UpdateOneModel<AccountModel>(currentAccFilter, update.Set(a => a.Nonce, acc.Nonce));
+                var filter = Builders<AccountModel>.Filter;
+                var update = Builders<AccountModel>.Update;
+
+                var accLength = accounts.Count;
+                var updates = new WriteModel<AccountModel>[accLength];
+
+                for (int i = 0; i < accLength; i++)
+                {
+                    var acc = accounts[i];
+                    var pubKey = acc.PubKey;
+                    var currentAccFilter = filter.Eq(a => a.PubKey, pubKey);
+                    if (acc.IsInserted)
+                        updates[i] = new InsertOneModel<AccountModel>(new AccountModel { Nonce = (long)acc.Nonce, PubKey = pubKey });
+                    else if (acc.IsDeleted)
+                        updates[i] = new DeleteOneModel<AccountModel>(currentAccFilter);
+                    else
+                        updates[i] = new UpdateOneModel<AccountModel>(currentAccFilter, update.Set(a => a.Nonce, (long)acc.Nonce));
+                }
+                return updates;
             }
-            return updates;
         }
 
         private WriteModel<BalanceModel>[] GetBalanceUpdates(List<DiffObject.Balance> balances)
@@ -313,41 +382,44 @@ namespace Centaurus.DAL.Mongo
 
         private WriteModel<OrderModel>[] GetOrderUpdates(List<DiffObject.Order> orders)
         {
-            var filter = Builders<OrderModel>.Filter;
-            var update = Builders<OrderModel>.Update;
-
-            var ordersLength = orders.Count;
-            var updates = new WriteModel<OrderModel>[ordersLength];
-
-            for (int i = 0; i < ordersLength; i++)
+            unchecked
             {
-                var order = orders[i];
-                var orderId = order.OrderId;
-                var price = order.Price;
-                var amount = order.Amount;
-                var pubKey = order.Pubkey;
+                var filter = Builders<OrderModel>.Filter;
+                var update = Builders<OrderModel>.Update;
 
-                var currentOrderFilter = filter.And(filter.Eq(s => s.OrderId, orderId));
+                var ordersLength = orders.Count;
+                var updates = new WriteModel<OrderModel>[ordersLength];
 
-                if (order.IsInserted)
-                    updates[i] = new InsertOneModel<OrderModel>(new OrderModel
-                    {
-                        OrderId = orderId,
-                        Amount = amount,
-                        Price = price,
-                        Pubkey = pubKey
-                    });
-                else if (order.IsDeleted)
-                    updates[i] = new DeleteOneModel<OrderModel>(currentOrderFilter);
-                else
+                for (int i = 0; i < ordersLength; i++)
                 {
-                    updates[i] = new UpdateOneModel<OrderModel>(
-                        currentOrderFilter,
-                        update.Inc(b => b.Amount, amount)
-                    );
+                    var order = orders[i];
+                    var orderId = order.OrderId;
+                    var price = order.Price;
+                    var amount = order.Amount;
+                    var pubKey = order.Pubkey;
+
+                    var currentOrderFilter = filter.And(filter.Eq(s => s.OrderId, (long)orderId));
+
+                    if (order.IsInserted)
+                        updates[i] = new InsertOneModel<OrderModel>(new OrderModel
+                        {
+                            OrderId = (long)orderId,
+                            Amount = amount,
+                            Price = price,
+                            Pubkey = pubKey
+                        });
+                    else if (order.IsDeleted)
+                        updates[i] = new DeleteOneModel<OrderModel>(currentOrderFilter);
+                    else
+                    {
+                        updates[i] = new UpdateOneModel<OrderModel>(
+                            currentOrderFilter,
+                            update.Inc(b => b.Amount, amount)
+                        );
+                    }
                 }
+                return updates;
             }
-            return updates;
         }
 
         #endregion

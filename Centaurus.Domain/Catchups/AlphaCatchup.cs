@@ -13,60 +13,52 @@ namespace Centaurus.Domain
     /// <summary>
     /// This class manages auditor snapshots and quanta when Alpha is rising
     /// </summary>
-    internal static class AlphaCatchup
+    public static class AlphaCatchup
     {
         private static Logger logger = LogManager.GetCurrentClassLogger();
 
-        private static object syncRoot = new { };
+        private static AuditorStateMajorityCalc auditorStateMajorityCalc = new AuditorStateMajorityCalc();
 
-        private static Dictionary<RawPubKey, AuditorState> auditorStates = new Dictionary<RawPubKey, AuditorState>();
+        private static ApexMajorityCalc apexMajorityCalc = new ApexMajorityCalc();
 
-        private static bool hasMajority = false;
-
-        public static void CatchupAuditorState(RawPubKey pubKey, AuditorState auditorState)
+        /// <summary>
+        /// We need to discover smallest auditor apex to get snapshot for it
+        /// </summary>
+        public static async Task SetApex(RawPubKey pubKey, ulong apex)
         {
             if (Global.AppState.State != ApplicationState.Rising)
                 throw new InvalidOperationException("Auditor state messages can be only handled when Alpha is in rising state");
 
-            lock (syncRoot)
+            apexMajorityCalc.Add(pubKey, apex);
+            if (apexMajorityCalc.MajorityResult == MajorityResults.Success)
             {
-                //use dictionary to prevent duplicate messages
-                auditorStates[pubKey] = auditorState;
-
-                if (!hasMajority
-                    && auditorStates.Count >= MajorityHelper.GetMajorityCount())
-                {
-                    var majorityData = GetMajorityData();
-                    if (majorityData != null)
-                    {
-                        hasMajority = true;
-#if !DEBUG
-                    //Sleep for 10 seconds to make sure that all active auditors are connected
-                    Thread.Sleep(10000);
-
-#endif
-                        //reload data. Some new quanta could arrive during timeout
-                        majorityData = GetMajorityData();
-                        ApplyAuditorsData(majorityData).Wait();
-                    }
-                    else
-                    {
-                        logger.Error("Majority of auditors are connected, but there is no consensus");
-                    }
-                }
+                var alphaStateManager = (AlphaStateManager)Global.AppState;
+                var stateMessage = await alphaStateManager.GetCurrentAlphaState();
+                Notifier.NotifyAuditors(stateMessage);
+            }
+            else if (auditorStateMajorityCalc.MajorityResult == MajorityResults.Unreachable)
+            {
+                Global.AppState.State = ApplicationState.Failed;
+                logger.Error("Majority of auditors are connected, but there is no consensus");
             }
         }
 
-        private static IEnumerable<AuditorState> GetMajorityData()
+        public static async Task AddAuditorState(RawPubKey pubKey, AuditorState auditorState)
         {
-            //group auditor states by snapshot hash
-            var groupedSnapshots = auditorStates.Values
-                //snapshot could be null if it's first auditor connection
-                .GroupBy(s => s.Snapshot?.ComputeHash() ?? new byte[] { }, new ByteArrayComparer());
-            var largestGroup = groupedSnapshots.OrderByDescending(g => g.Count()).First();
-            if (largestGroup.Count() >= MajorityHelper.GetMajorityCount())
-                return largestGroup;
-            return null;
+            if (Global.AppState.State != ApplicationState.Rising)
+                throw new InvalidOperationException("Auditor state messages can be only handled when Alpha is in rising state");
+
+            auditorStateMajorityCalc.Add(pubKey, auditorState);
+
+            if (auditorStateMajorityCalc.MajorityResult == MajorityResults.Success)
+            {
+                await ApplyAuditorsData(auditorStateMajorityCalc.MajorityData);
+            }
+            else if (auditorStateMajorityCalc.MajorityResult == MajorityResults.Unreachable)
+            {
+                Global.AppState.State = ApplicationState.Failed;
+                logger.Error("Majority of auditors are connected, but there is no consensus");
+            }
         }
 
         /// <summary>
@@ -144,6 +136,78 @@ namespace Centaurus.Domain
             }
 
             return validQuanta;
+        }
+
+        private abstract class MajorityCalc<T>
+        {
+            private object syncRoot = new { };
+
+            internal void Add(RawPubKey pubKey, T data)
+            {
+                lock (syncRoot)
+                {
+                    if (rawData.ContainsKey(pubKey))
+                        return;
+                    rawData.Add(pubKey, data);
+
+                    int majority = MajorityHelper.GetMajorityCount(),
+                    totalAuditorsCount = MajorityHelper.GetTotalAuditorsCount();
+
+                    if (MajorityResult != MajorityResults.Unknown || rawData.Count < majority)
+                        return;
+
+                    var biggestConsensusCount = GetConsensusGroup().Count();
+                    var possibleConsensusCount = (totalAuditorsCount - rawData.Count) + biggestConsensusCount;
+                    if (biggestConsensusCount >= majority)
+                    {
+                        MajorityResult = MajorityResults.Success;
+                    }
+                    else if (possibleConsensusCount < majority)
+                    {
+                        MajorityResult = MajorityResults.Unreachable;
+                        return;
+                    }
+
+                }
+
+                //we have a consensus if we get here
+#if !DEBUG
+                    //Sleep for 10 seconds to make sure that all active auditors are connected
+                    Thread.Sleep(10000);
+#endif
+
+                //reload data. New data could arrive during timeout
+                MajorityData = GetConsensusGroup();
+            }
+
+            protected Dictionary<RawPubKey, T> rawData { get; } = new Dictionary<RawPubKey, T>();
+
+            protected abstract IEnumerable<T> GetConsensusGroup();
+
+            internal IEnumerable<T> MajorityData { get; private set; }
+
+            internal MajorityResults MajorityResult { get; private set; }
+        }
+
+        private class AuditorStateMajorityCalc : MajorityCalc<AuditorState>
+        {
+            protected override IEnumerable<AuditorState> GetConsensusGroup()
+            {
+                //group auditor states by snapshot hash
+                var groupedSnapshots = rawData.Values
+                    //snapshot could be null if it's first auditor connection
+                    .GroupBy(s => s.Snapshot?.ComputeHash() ?? new byte[] { }, new ByteArrayComparer());
+                return groupedSnapshots.OrderByDescending(g => g.Count()).First();
+            }
+        }
+
+        private class ApexMajorityCalc : MajorityCalc<ulong>
+        {
+            protected override IEnumerable<ulong> GetConsensusGroup()
+            {
+                //just return repeated smallest apex to make shared code work
+                return Enumerable.Repeat(rawData.Values.Min(), rawData.Count);
+            }
         }
     }
 }

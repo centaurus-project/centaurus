@@ -4,6 +4,7 @@
     {
         public byte[] PubKey { get; set; }
 
-        public ulong Nonce { get; set; }
+        //it stores ulong
+        public long Nonce { get; set; }
     }
 }

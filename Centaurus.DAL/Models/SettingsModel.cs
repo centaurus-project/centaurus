@@ -14,6 +14,7 @@ namespace Centaurus.DAL.Models
         
         public long MinAllowedLotSize { get; set; }
 
-        public ulong Apex { get; set; }
+        //it stores ulong
+        public long Apex { get; set; }
     }
 }

@@ -29,9 +29,9 @@ namespace Centaurus.Domain
             market = Global.Exchange.GetMarket(asset);
             orderbook = market.GetOrderbook(side.Inverse());
             //fetch balances
-            takerAccount = Global.AccountStorage.GetAccount(takerOrder.Pubkey);
+            var takerAccount = Global.AccountStorage.GetAccount(takerOrder.Pubkey);
             if (!takerAccount.HasBalance(asset))
-                resultEffects.AddBalanceCreate(takerAccount, asset);
+                resultEffects.AddBalanceCreate(Global.AccountStorage, takerOrder.Pubkey, asset);
         }
 
         private readonly Order takerOrder;
@@ -41,8 +41,6 @@ namespace Centaurus.Domain
         private readonly int asset;
 
         private readonly OrderSides side;
-
-        private readonly Account takerAccount;
 
         private readonly Orderbook orderbook;
 
@@ -96,11 +94,11 @@ namespace Centaurus.Domain
             if (side == OrderSides.Buy)
             {
                 //TODO: check this - potential rounding error with multiple trades
-                resultEffects.AddLockLiabilities(takerAccount, 0, xmlAmount);
+                resultEffects.AddLockLiabilities(Global.AccountStorage, takerOrder.Pubkey, 0, xmlAmount);
             }
             else
             {
-                resultEffects.AddLockLiabilities(takerAccount, asset, emulatedAmount);
+                resultEffects.AddLockLiabilities(Global.AccountStorage, takerOrder.Pubkey, asset, emulatedAmount);
             }
             //select the market to add new order
             var reminderOrderbook = market.GetOrderbook(side);
@@ -153,28 +151,28 @@ namespace Centaurus.Domain
                 if (matcher.side == OrderSides.Buy)
                 {
                     //unlock required asset amount on maker's side
-                    matcher.resultEffects.AddUnlockLiabilities(makerAccount, matcher.asset, AssetAmount);
+                    matcher.resultEffects.AddUnlockLiabilities(Global.AccountStorage, makerOrder.Pubkey, matcher.asset, AssetAmount);
 
                     //transfer asset from maker to taker
-                    matcher.resultEffects.AddBalanceUpdate(makerAccount, matcher.asset, -AssetAmount);
-                    matcher.resultEffects.AddBalanceUpdate(matcher.takerAccount, matcher.asset, AssetAmount);
+                    matcher.resultEffects.AddBalanceUpdate(Global.AccountStorage, makerOrder.Pubkey, matcher.asset, -AssetAmount);
+                    matcher.resultEffects.AddBalanceUpdate(Global.AccountStorage, matcher.takerOrder.Pubkey, matcher.asset, AssetAmount);
 
                     //transfer XLM from taker to maker
-                    matcher.resultEffects.AddBalanceUpdate(matcher.takerAccount, 0, -xlmAmount);
-                    matcher.resultEffects.AddBalanceUpdate(makerAccount, 0, xlmAmount);
+                    matcher.resultEffects.AddBalanceUpdate(Global.AccountStorage, matcher.takerOrder.Pubkey, 0, -xlmAmount);
+                    matcher.resultEffects.AddBalanceUpdate(Global.AccountStorage, makerOrder.Pubkey, 0, xlmAmount);
                 }
                 else
                 {
                     //unlock required XLM amount on maker's side
-                    matcher.resultEffects.AddUnlockLiabilities(makerAccount, 0, xlmAmount);
+                    matcher.resultEffects.AddUnlockLiabilities(Global.AccountStorage, makerOrder.Pubkey, 0, xlmAmount);
 
                     //transfer asset from taker to maker
-                    matcher.resultEffects.AddBalanceUpdate(matcher.takerAccount, matcher.asset, -AssetAmount);
-                    matcher.resultEffects.AddBalanceUpdate(makerAccount, matcher.asset, AssetAmount);
+                    matcher.resultEffects.AddBalanceUpdate(Global.AccountStorage, matcher.takerOrder.Pubkey, matcher.asset, -AssetAmount);
+                    matcher.resultEffects.AddBalanceUpdate(Global.AccountStorage, makerOrder.Pubkey, matcher.asset, AssetAmount);
 
                     //transfer XLM from maker to taker
-                    matcher.resultEffects.AddBalanceUpdate(makerAccount, 0, -xlmAmount);
-                    matcher.resultEffects.AddBalanceUpdate(matcher.takerAccount, 0, xlmAmount);
+                    matcher.resultEffects.AddBalanceUpdate(Global.AccountStorage, makerOrder.Pubkey, 0, -xlmAmount);
+                    matcher.resultEffects.AddBalanceUpdate(Global.AccountStorage, matcher.takerOrder.Pubkey, 0, xlmAmount);
                 }
 
                 //record trade effects

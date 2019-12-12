@@ -19,20 +19,43 @@ namespace Centaurus.Test
             MessageHandlers<AlphaWebSocketConnection>.Init();
         }
 
-        [Test]
-        public async Task HandshakeTest()
+
+
+        static object[] HandshakeTestCases =
         {
-            Global.AppState.State = ApplicationState.Ready;
+            new object[] { TestEnvironment.Client1KeyPair, null, ApplicationState.Rising, typeof(ConnectionCloseException) },
+            new object[] { TestEnvironment.Client1KeyPair, null, ApplicationState.Ready, null },
+            new object[] { TestEnvironment.Auditor1KeyPair, null, ApplicationState.Rising, typeof(ConnectionCloseException) },
+            new object[] { TestEnvironment.Auditor1KeyPair, (ulong?)1, ApplicationState.Rising, null },
+            new object[] { TestEnvironment.Auditor1KeyPair,  null, ApplicationState.Ready, null }
+        };
+
+        [Test]
+        [TestCaseSource(nameof(HandshakeTestCases))]
+        public async Task HandshakeTest(KeyPair clientKeyPair, ulong? currentAditorApex, ApplicationState alphaState, Type expectedException)
+        {
+            Global.AppState.State = alphaState;
 
             var clientConnection = new AlphaWebSocketConnection(new FakeWebSocket());
 
-            var envelope = new HandshakeInit { HandshakeData = clientConnection.HandshakeData }.CreateEnvelope();
-            envelope.Sign(TestEnvironment.Client1KeyPair);
-            var isHandled = await MessageHandlers<AlphaWebSocketConnection>.HandleMessage(clientConnection, envelope);
+            var message = new HandshakeInit { HandshakeData = clientConnection.HandshakeData };
+            if (currentAditorApex.HasValue)
+                message.Payload = new AuditorHandshakePayload { Apex = currentAditorApex.Value };
+            var envelope = message.CreateEnvelope();
+            envelope.Sign(clientKeyPair);
+            if (expectedException == null)
+            {
+                var isHandled = await MessageHandlers<AlphaWebSocketConnection>.HandleMessage(clientConnection, envelope);
 
-            Assert.IsTrue(isHandled);
-            Assert.AreEqual(clientConnection.ClientPubKey, new RawPubKey(TestEnvironment.Client1KeyPair.AccountId));
-            Assert.AreEqual(clientConnection.ConnectionState, ConnectionState.Ready);
+                Assert.IsTrue(isHandled);
+                Assert.AreEqual(clientConnection.ClientPubKey, new RawPubKey(clientKeyPair.AccountId));
+                if (clientConnection.ClientPubKey.Equals((RawPubKey)TestEnvironment.Auditor1KeyPair))
+                    Assert.AreEqual(clientConnection.ConnectionState, ConnectionState.Validated);
+                else
+                    Assert.AreEqual(clientConnection.ConnectionState, ConnectionState.Ready);
+            }
+            else
+                Assert.ThrowsAsync(expectedException, async () => await MessageHandlers<AlphaWebSocketConnection>.HandleMessage(clientConnection, envelope));
         }
 
         [Test]

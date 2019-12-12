@@ -13,7 +13,7 @@ namespace Centaurus.Domain
             return new EffectModel
             {
                 Index = index,
-                Apex = effect.Apex,
+                Apex = (long)effect.Apex,
                 Account = effect.Pubkey?.Data,
                 EffectType = (int)effect.EffectType,
                 RawEffect = XdrConverter.Serialize(effect),

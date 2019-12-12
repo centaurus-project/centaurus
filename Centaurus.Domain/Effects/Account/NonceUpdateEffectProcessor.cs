@@ -5,11 +5,14 @@ using System.Text;
 
 namespace Centaurus.Domain
 {
-    public class NonceUpdateEffectProcessor : BaseAccountEffectProcessor<NonceUpdateEffect>
+    public class NonceUpdateEffectProcessor : EffectProcessor<NonceUpdateEffect>
     {
+        private Account account;
+
         public NonceUpdateEffectProcessor(NonceUpdateEffect effect, Account account)
-            : base(effect, account)
+            : base(effect)
         {
+            this.account = account;
         }
 
         public override void CommitEffect()

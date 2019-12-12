@@ -126,7 +126,7 @@ namespace Centaurus.Domain
 
             var withdrawalsStorage = new WithdrawalStorage(withdrawals);
 
-            var effectModels = await Global.PermanentStorage.LoadEffectsAboveApex(apex);
+            var effectModels = await Global.PermanentStorage.LoadEffectsAboveApex(snapshotApex);
             for (var i = effectModels.Count - 1; i >= 0; i--)
             {
                 var currentEffect = XdrConverter.Deserialize<Effect>(effectModels[i].RawEffect);
@@ -142,16 +142,16 @@ namespace Centaurus.Domain
                         processor = new NonceUpdateEffectProcessor(nonceUpdateEffect, currentAccount.Value);
                         break;
                     case BalanceCreateEffect balanceCreateEffect:
-                        processor = new BalanceCreateEffectProcessor(balanceCreateEffect, currentAccount.Value);
+                        processor = new BalanceCreateEffectProcessor(balanceCreateEffect, accountStorage);
                         break;
                     case BalanceUpdateEffect balanceUpdateEffect:
-                        processor = new BalanceUpdateEffectProcesor(balanceUpdateEffect, currentAccount.Value);
+                        processor = new BalanceUpdateEffectProcesor(balanceUpdateEffect, accountStorage);
                         break;
                     case LockLiabilitiesEffect lockLiabilitiesEffect:
-                        processor = new LockLiabilitiesEffectProcessor(lockLiabilitiesEffect, currentAccount.Value);
+                        processor = new LockLiabilitiesEffectProcessor(lockLiabilitiesEffect, accountStorage);
                         break;
                     case UnlockLiabilitiesEffect unlockLiabilitiesEffect:
-                        processor = new UnlockLiabilitiesEffectProcessor(unlockLiabilitiesEffect, currentAccount.Value);
+                        processor = new UnlockLiabilitiesEffectProcessor(unlockLiabilitiesEffect, accountStorage);
                         break;
                     case OrderPlacedEffect orderPlacedEffect:
                         {

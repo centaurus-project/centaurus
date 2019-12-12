@@ -7,21 +7,21 @@ namespace Centaurus.Domain
 {
     public class UnlockLiabilitiesEffectProcessor : BaseAccountEffectProcessor<UnlockLiabilitiesEffect>
     {
-        public UnlockLiabilitiesEffectProcessor(UnlockLiabilitiesEffect effect, Account account)
-            : base(effect, account)
+        public UnlockLiabilitiesEffectProcessor(UnlockLiabilitiesEffect effect, AccountStorage accountStorage)
+            : base(effect, accountStorage)
         {
 
         }
 
         public override void CommitEffect()
         {
-            var balance = account.GetBalance(Effect.Asset);
+            var balance = Account.GetBalance(Effect.Asset);
             balance.UnlockLiabilities(Effect.Amount);
         }
 
         public override void RevertEffect()
         {
-            account.GetBalance(Effect.Asset).LockLiabilities(Effect.Amount);
+            Account.GetBalance(Effect.Asset).LockLiabilities(Effect.Amount);
         }
     }
 }

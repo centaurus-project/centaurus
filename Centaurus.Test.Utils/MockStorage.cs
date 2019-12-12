@@ -36,14 +36,15 @@ namespace Centaurus.Test
         public override Task<ulong> GetLastApex()
         {
             var res = settingsCollection.LastOrDefault()?.Apex ?? 0;
-            return Task.FromResult(res);
+            return Task.FromResult(unchecked((ulong)res));
         }
 
         public override Task<List<QuantumModel>> LoadQuanta(params ulong[] apexes)
         {
             List<QuantumModel> res = quantaCollection;
+            var convertedApexes = apexes.Select(a => unchecked((long)a));
             if (apexes.Length > 0)
-                res = quantaCollection.Where(q => apexes.Contains(q.Apex)).ToList();
+                res = quantaCollection.Where(q => convertedApexes.Contains(q.Apex)).ToList();
             if (res.Count != apexes.Length)
                 throw new Exception("Not all quanta were found");
             return Task.FromResult(res);
@@ -51,13 +52,14 @@ namespace Centaurus.Test
 
         public override Task<List<EffectModel>> LoadEffectsAboveApex(ulong apex)
         {
-            var effects = effectsCollection.Where(e => e.Apex > apex).ToList();
+            var effects = effectsCollection.Where(e => unchecked((ulong)e.Apex) > apex).ToList();
             return Task.FromResult(effects);
         }
 
         public override Task<List<EffectModel>> LoadEffectsForApex(ulong apex)
         {
-            var effects = effectsCollection.Where(e => e.Apex == apex).ToList();
+            var lApex = unchecked((long)apex);
+            var effects = effectsCollection.Where(e => e.Apex == lApex).ToList();
             return Task.FromResult(effects);
         }
 
@@ -73,16 +75,19 @@ namespace Centaurus.Test
 
         public override Task<SettingsModel> LoadSettings(ulong apex)
         {
-            var settings = settingsCollection
-                .OrderByDescending(s => s.Apex)
-                .FirstOrDefault(s => s.Apex <= apex);
-            return Task.FromResult(settings);
+            unchecked
+            {
+                var settings = settingsCollection
+                    .OrderByDescending(s => (ulong)s.Apex)
+                    .FirstOrDefault(s => ((ulong)s.Apex) <= apex);
+                return Task.FromResult(settings);
+            }
         }
 
         public override Task<List<AssetModel>> LoadAssets(ulong apex)
         {
             var assets = assetSettings
-                .Where(s => s.Apex <= apex)
+                .Where(s => unchecked((ulong)s.Apex) <= apex)
                 .ToList();
 
             return Task.FromResult(assets);
@@ -162,7 +167,7 @@ namespace Centaurus.Test
             for (int i = 0; i < withdrawals.Count; i++)
             {
                 var withdrawal = withdrawals[i];
-                var apex = withdrawal.Apex;
+                var apex = (long)withdrawal.Apex;
                 var trHash = withdrawal.TransactionHash;
                 var currentWidthrawal = withdrawalsCollection.FirstOrDefault(w => w.Apex == apex);
                 if (withdrawal.IsInserted)
@@ -183,11 +188,11 @@ namespace Centaurus.Test
                 var pubKey = acc.PubKey;
                 var currentAcc = accountsCollection.FirstOrDefault(a => ByteArrayPrimitives.Equals(a.PubKey, pubKey));
                 if (acc.IsInserted)
-                    accountsCollection.Add(new AccountModel { PubKey = pubKey, Nonce = acc.Nonce });
+                    accountsCollection.Add(new AccountModel { PubKey = pubKey, Nonce = (long)acc.Nonce });
                 else if (acc.IsDeleted)
                     accountsCollection.Remove(currentAcc);
                 else
-                    currentAcc.Nonce = acc.Nonce;
+                    currentAcc.Nonce = (long)acc.Nonce;
             }
         }
 
@@ -235,12 +240,12 @@ namespace Centaurus.Test
                 var amount = order.Amount;
                 var pubKey = order.Pubkey;
 
-                var currentOrder = ordersCollection.FirstOrDefault(s => s.OrderId == orderId);
+                var currentOrder = ordersCollection.FirstOrDefault(s => s.OrderId == (long)orderId);
 
                 if (order.IsInserted)
                     ordersCollection.Add(new OrderModel
                     {
-                        OrderId = orderId,
+                        OrderId = (long)orderId,
                         Amount = amount,
                         Price = price,
                         Pubkey = pubKey

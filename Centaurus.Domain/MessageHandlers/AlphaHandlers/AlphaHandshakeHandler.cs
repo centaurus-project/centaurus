@@ -26,22 +26,29 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
             connection.ClientPubKey = envelope.Signatures[0].Signer;
             connection.ConnectionState = ConnectionState.Validated;
 
-            var alphaStateManager = (AlphaStateManager)Global.AppState;
-            Message resultMessage;
-            //if current client is auditor, then we should send current state to it. 
-            //We set Ready state to an auditor only after the auditor sets apex cursor
             if (Global.Constellation.Auditors.Contains(connection.ClientPubKey))
             {
-                resultMessage = await alphaStateManager.GetCurrentAlphaState();
+                if (Global.AppState.State == ApplicationState.Rising)
+                {
+                    var payload = handshakeInit.Payload as AuditorHandshakePayload;
+                    if (payload == null)
+                        throw new ConnectionCloseException(WebSocketCloseStatus.InvalidPayloadData, "No auditor payload data.");
+                    await AlphaCatchup.SetApex(connection.ClientPubKey, payload.Apex);
+                }
+                else
+                {
+                    var alphaStateManager = (AlphaStateManager)Global.AppState;
+                    var stateMessage = await alphaStateManager.GetCurrentAlphaState();
+                    await connection.SendMessage(stateMessage);
+                }
             }
             else
             {
                 if (Global.AppState.State != ApplicationState.Ready)
                     throw new ConnectionCloseException(WebSocketCloseStatus.ProtocolError, "Alpha is not in Ready state.");
                 connection.ConnectionState = ConnectionState.Ready;
-                resultMessage = envelope.CreateResult(ResultStatusCodes.Success);
+                await connection.SendMessage(envelope.CreateResult(ResultStatusCodes.Success));
             }
-            await connection.SendMessage(resultMessage);
         }
     }
 }

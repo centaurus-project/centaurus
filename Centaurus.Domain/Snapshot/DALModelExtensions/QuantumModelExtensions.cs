@@ -19,7 +19,7 @@ namespace Centaurus.Domain
                 account = ((RequestQuantum)quantumMessage).RequestEnvelope.Signatures.First().Signer.Data;
             return new QuantumModel
             {
-                Apex = quantumMessage.Apex,
+                Apex = (long)quantumMessage.Apex,
                 Account = account,
                 RawQuantum = XdrConverter.Serialize(quantum),
                 Type = (int)quantumMessage.MessageType,

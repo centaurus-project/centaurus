@@ -13,7 +13,7 @@ namespace Centaurus.Domain
         { 
             return new ConstellationSettings
             {
-                Apex = settings.Apex,
+                Apex = unchecked((ulong)settings.Apex),
                 Auditors = settings.Auditors.Select(a => (RawPubKey)a).ToList(),
                 MinAccountBalance = settings.MinAccountBalance,
                 MinAllowedLotSize = settings.MinAllowedLotSize,

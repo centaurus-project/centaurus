@@ -81,7 +81,7 @@ namespace Centaurus.Domain
                                 var pubKey = balanceCreateEffect.Pubkey.Data;
                                 var asset = balanceCreateEffect.Asset;
                                 EnsureBalanceRowExists(balances, pubKey);
-                                balances[pubKey].Add(asset, new DiffObject.Balance { IsInserted = true, AssetId = asset });
+                                balances[pubKey].Add(asset, new DiffObject.Balance { IsInserted = true, AssetId = asset, PubKey = pubKey });
                             }
                             break;
                         case BalanceUpdateEffect balanceUpdateEffect:
