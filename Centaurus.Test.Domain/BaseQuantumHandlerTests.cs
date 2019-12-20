@@ -22,7 +22,7 @@ namespace Centaurus.Test
         {
             try
             {
-                ulong apex = 0;
+                long apex = 0;
 
                 var client1StartBalanceAmount = (long)0;
                 var clientAccountBalance = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair).GetBalance(asset);
@@ -45,7 +45,7 @@ namespace Centaurus.Test
 
                     Message quantum = withdrawal;
                     if (!Global.IsAlpha)
-                        quantum = new RequestQuantum { Apex = ++apex, RequestEnvelope = withdrawal.CreateEnvelope(), Timestamp = (ulong)DateTime.UtcNow.Ticks };
+                        quantum = new RequestQuantum { Apex = ++apex, RequestEnvelope = withdrawal.CreateEnvelope(), Timestamp = DateTime.UtcNow.Ticks };
 
                     //create withdrawal
                     await Global.QuantumHandler.HandleAsync(quantum.CreateEnvelope());

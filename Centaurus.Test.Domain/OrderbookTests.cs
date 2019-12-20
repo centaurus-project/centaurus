@@ -166,7 +166,7 @@ namespace Centaurus.Test
                 var price = useNormalDistribution ? rnd.NextNormallyDistributed() + 50 : rnd.NextDouble() * 100;
                 var trade = new RequestQuantum
                 {
-                    Apex = (ulong)i,
+                    Apex = i,
                     RequestEnvelope = new MessageEnvelope
                     {
                         Message = new OrderRequest

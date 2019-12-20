@@ -23,31 +23,44 @@ namespace Centaurus.Auditor
         public Startup(AuditorSettings settings)
         {
             Global.Init(settings, new MongoStorage());
+
+            Global.AppState.StateChanged += StateChanged;
         }
 
         public async Task Run()
         {
-            MessageHandlers<AuditorWebSocketConnection>.Init();
-
-            Global.AppState.StateChanged += StateChanged;
-
-            while (auditor == null)
+            try
             {
-                var _auditor = new AuditorWebSocketConnection(new ClientWebSocket());
-                try
-                {
-                    Subscribe(_auditor);
-                    await _auditor.EstablishConnection();
-                    auditor = _auditor;
-                }
-                catch (Exception exc)
-                {
-                    Unsubscribe(_auditor);
-                    await CloseConnection(_auditor);
+                MessageHandlers<AuditorWebSocketConnection>.Init();
 
-                    logger.Error(exc, "Unable establish connection. Retry in 5000ms");
-                    Thread.Sleep(5000);
+                //setup auditor, if it has snapshot
+                var snapshot = await SnapshotManager.GetSnapshot();
+                if (snapshot != null)
+                    Global.Setup(snapshot);
+
+                while (auditor == null)
+                {
+                    var _auditor = new AuditorWebSocketConnection(new ClientWebSocket());
+                    try
+                    {
+                        Subscribe(_auditor);
+                        await _auditor.EstablishConnection();
+                        auditor = _auditor;
+                    }
+                    catch (Exception exc)
+                    {
+                        Unsubscribe(_auditor);
+                        await CloseConnection(_auditor);
+
+                        logger.Error(exc, "Unable establish connection. Retry in 5000ms");
+                        Thread.Sleep(5000);
+                    }
                 }
+            }
+            catch (Exception exc)
+            {
+                logger.Error(exc);
+                Global.AppState.State = ApplicationState.Failed;
             }
         }
 

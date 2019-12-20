@@ -16,7 +16,7 @@ namespace Centaurus.Domain
         {
             //add payload and send message back. The message contains handshake data
             var handshakeMessage = (HandshakeInit)envelope.Message;
-            handshakeMessage.Payload = new AuditorHandshakePayload { Apex = await Global.PermanentStorage.GetLastApex() };
+            handshakeMessage.Payload = new AuditorHandshakePayload { Apex = await SnapshotManager.GetLastApex() };
             await connection.SendMessage(handshakeMessage);
         }
     }

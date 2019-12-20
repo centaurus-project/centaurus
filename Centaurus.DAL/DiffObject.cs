@@ -5,7 +5,7 @@ namespace Centaurus.DAL
 {
     public class DiffObject
     {
-        public StellarInfo StellarInfoData { get; set; }
+        public ConstellationState StellarInfoData { get; set; }
         public List<Account> Accounts { get; set; }
         public List<Balance> Balances { get; set; }
         public List<EffectModel> Effects { get; set; }
@@ -78,14 +78,15 @@ namespace Centaurus.DAL
 
             public byte[] Pubkey { get; set; }
         }
-        public class StellarInfo : BaseDiffModel
+        public class ConstellationState : BaseDiffModel
         {
             public long Ledger { get; set; }
             public long VaultSequence { get; set; }
+            public long CurrentApex { get; set; }
         }
         public class Withdrawal : BaseDiffModel
         {
-            public ulong Apex { get; set; }
+            public long Apex { get; set; }
 
             public byte[] RawWithdrawal { get; set; }
             

@@ -9,7 +9,7 @@ namespace Centaurus.Models
     public class ConstellationSettings
     {
         [XdrField(0)]
-        public ulong Apex { get; set; }
+        public long Apex { get; set; }
 
         [XdrField(1)]
         public RawPubKey Vault { get; set; }

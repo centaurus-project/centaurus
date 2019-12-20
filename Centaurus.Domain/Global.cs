@@ -13,6 +13,12 @@ namespace Centaurus.Domain
     public static class Global
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
+
+        /// <summary>
+        /// Initializes Global object
+        /// </summary>
+        /// <param name="settings">Application config</param>
+        /// <param name="storage">Permanent storage object</param>
         public static void Init(BaseSettings settings, BaseStorage storage)
         {
             Settings = settings ?? throw new ArgumentNullException(nameof(settings));
@@ -26,6 +32,14 @@ namespace Centaurus.Domain
             QuantumProcessor = new QuantumProcessorsStorage();
 
             AppState = IsAlpha ? new AlphaStateManager() : (StateManager)new AuditorStateManager();
+
+            //try to load last settings, we need it to know current auditors
+            var lastApex = SnapshotManager.GetLastApex().Result;
+            if (lastApex >= 0)
+                Constellation = SnapshotManager.GetConstellationSettings(lastApex).Result;
+
+            //if no settings found, the app is in init state
+            AppState.State = Constellation == null ? ApplicationState.WaitingForInit : ApplicationState.Rising;
 
             InitTimers();
         }
@@ -55,6 +69,8 @@ namespace Centaurus.Domain
             WithdrawalStorage = new WithdrawalStorage(snapshot.Withdrawals);
 
             QuantumHandler = IsAlpha ? (BaseQuantumHandler)new AlphaQuantumHandler(quanta) : new AuditorQuantumHandler();
+
+            QuantumHandler.Start();
 
             LedgerManager = new LedgerManager(snapshot.Ledger);
 

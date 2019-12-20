@@ -15,8 +15,6 @@ namespace Centaurus.Test
         public void Setup()
         {
             GlobalInitHelper.DefaultAlphaSetup();
-
-            Global.QuantumHandler.Start();
         }
 
         //[Test]

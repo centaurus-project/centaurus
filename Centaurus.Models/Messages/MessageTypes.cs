@@ -40,10 +40,6 @@ namespace Centaurus.Models
         /// </summary>
         LedgerCommitQuantum = 49,
         /// <summary>
-        /// Snapshot initialization quantum request. Created by Alpha.
-        /// </summary>
-        SnapshotQuantum = 50,
-        /// <summary>
         /// Initiate connection handshake.
         /// </summary>
         HandshakeInit = 100,
@@ -70,6 +66,10 @@ namespace Centaurus.Models
         /// <summary>
         /// Alpha state message. It contains Alpha state and last snapshot.
         /// </summary>
-        AlphaState = 202
+        AlphaState = 202,
+        /// <summary>
+        /// Alpha requests auditor's state for the specified apex
+        /// </summary>
+        AuditorStateRequest = 203
     }
 }

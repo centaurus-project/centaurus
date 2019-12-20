@@ -21,7 +21,7 @@ namespace Centaurus.Test
         private List<EffectModel> effectsCollection = new List<EffectModel>();
         private List<SettingsModel> settingsCollection = new List<SettingsModel>();
         private List<AssetModel> assetSettings = new List<AssetModel>();
-        private StellarData stellarData = new StellarData();
+        private ConstellationState constellationState = new ConstellationState();
 
         public override Task OpenConnection(string connectionString)
         {
@@ -33,30 +33,45 @@ namespace Centaurus.Test
             return Task.CompletedTask;
         }
 
-        public override Task<ulong> GetLastApex()
+        public override Task<long> GetLastApex()
         {
-            var res = settingsCollection.LastOrDefault()?.Apex ?? 0;
-            return Task.FromResult(unchecked((ulong)res));
+            var res = constellationState?.CurrentApex ?? -1;
+            return Task.FromResult(res);
         }
 
-        public override Task<List<QuantumModel>> LoadQuanta(params ulong[] apexes)
+        public override Task<List<QuantumModel>> LoadQuanta(params long[] apexes)
         {
             List<QuantumModel> res = quantaCollection;
-            var convertedApexes = apexes.Select(a => unchecked((long)a));
             if (apexes.Length > 0)
-                res = quantaCollection.Where(q => convertedApexes.Contains(q.Apex)).ToList();
+                res = quantaCollection.Where(q => apexes.Contains(q.Apex)).ToList();
             if (res.Count != apexes.Length)
                 throw new Exception("Not all quanta were found");
             return Task.FromResult(res);
         }
 
-        public override Task<List<EffectModel>> LoadEffectsAboveApex(ulong apex)
+        public override Task<List<QuantumModel>> LoadQuantaAboveApex(long apex)
         {
-            var effects = effectsCollection.Where(e => unchecked((ulong)e.Apex) > apex).ToList();
+            var res = quantaCollection.Where(q => q.Apex > apex).ToList();
+            return Task.FromResult(res);
+        }
+
+        public override Task<long> GetFirstEffectApex()
+        {
+            var firstEffect = effectsCollection
+                   .OrderBy(e => e.Apex)
+                   .FirstOrDefault();
+
+            var firstApex = firstEffect?.Apex ?? -1;
+            return Task.FromResult(firstApex);
+        }
+
+        public override Task<List<EffectModel>> LoadEffectsAboveApex(long apex)
+        {
+            var effects = effectsCollection.Where(e => e.Apex > apex).ToList();
             return Task.FromResult(effects);
         }
 
-        public override Task<List<EffectModel>> LoadEffectsForApex(ulong apex)
+        public override Task<List<EffectModel>> LoadEffectsForApex(long apex)
         {
             var lApex = unchecked((long)apex);
             var effects = effectsCollection.Where(e => e.Apex == lApex).ToList();
@@ -73,21 +88,21 @@ namespace Centaurus.Test
             return Task.FromResult(balancesCollection);
         }
 
-        public override Task<SettingsModel> LoadSettings(ulong apex)
+        public override Task<SettingsModel> LoadSettings(long apex)
         {
             unchecked
             {
                 var settings = settingsCollection
-                    .OrderByDescending(s => (ulong)s.Apex)
-                    .FirstOrDefault(s => ((ulong)s.Apex) <= apex);
+                    .OrderByDescending(s => s.Apex)
+                    .FirstOrDefault(s => s.Apex <= apex);
                 return Task.FromResult(settings);
             }
         }
 
-        public override Task<List<AssetModel>> LoadAssets(ulong apex)
+        public override Task<List<AssetModel>> LoadAssets(long apex)
         {
             var assets = assetSettings
-                .Where(s => unchecked((ulong)s.Apex) <= apex)
+                .Where(s => s.Apex <= apex)
                 .ToList();
 
             return Task.FromResult(assets);
@@ -103,9 +118,9 @@ namespace Centaurus.Test
             return Task.FromResult(ordersCollection);
         }
 
-        public override Task<StellarData> LoadStellarData()
+        public override Task<ConstellationState> LoadConstellationState()
         {
-            return Task.FromResult(stellarData);
+            return Task.FromResult(constellationState);
         }
 
         public override Task Update(DiffObject update)
@@ -153,12 +168,15 @@ namespace Centaurus.Test
             }
         }
 
-        private void UpdateStellarData(DiffObject.StellarInfo _stellarData)
+        private void UpdateStellarData(DiffObject.ConstellationState _stellarData)
         {
             if (_stellarData != null)
             {
-                stellarData.Ledger = _stellarData.Ledger;
-                stellarData.VaultSequence = _stellarData.VaultSequence;
+                constellationState.CurrentApex = _stellarData.CurrentApex;
+                if (_stellarData.Ledger > 0)
+                    constellationState.Ledger = _stellarData.Ledger;
+                if (_stellarData.VaultSequence > 0)
+                    constellationState.VaultSequence = _stellarData.VaultSequence;
             }
         }
 

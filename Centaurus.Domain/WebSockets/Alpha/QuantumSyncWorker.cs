@@ -13,7 +13,7 @@ namespace Centaurus
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public QuantumSyncWorker(ulong apexCursor, AlphaWebSocketConnection auditor)
+        public QuantumSyncWorker(long apexCursor, AlphaWebSocketConnection auditor)
         {
             this.auditor = auditor;
             this.apexCursor = apexCursor;
@@ -23,7 +23,7 @@ namespace Centaurus
 
         private AlphaWebSocketConnection auditor;
 
-        private ulong apexCursor;
+        private long apexCursor;
 
         private CancellationTokenSource cancellationTokenSource;
 

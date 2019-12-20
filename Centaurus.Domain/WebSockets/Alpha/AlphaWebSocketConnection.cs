@@ -49,7 +49,7 @@ namespace Centaurus
 
         private readonly object apexCursorSyncRoot = new { };
 
-        private void ResetApexCursor(ulong newApexCursor)
+        private void ResetApexCursor(long newApexCursor)
         {
             lock (apexCursorSyncRoot)
             {

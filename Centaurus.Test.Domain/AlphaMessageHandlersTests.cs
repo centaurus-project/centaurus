@@ -26,13 +26,13 @@ namespace Centaurus.Test
             new object[] { TestEnvironment.Client1KeyPair, null, ApplicationState.Rising, typeof(ConnectionCloseException) },
             new object[] { TestEnvironment.Client1KeyPair, null, ApplicationState.Ready, null },
             new object[] { TestEnvironment.Auditor1KeyPair, null, ApplicationState.Rising, typeof(ConnectionCloseException) },
-            new object[] { TestEnvironment.Auditor1KeyPair, (ulong?)1, ApplicationState.Rising, null },
+            new object[] { TestEnvironment.Auditor1KeyPair, (long?)1, ApplicationState.Rising, null },
             new object[] { TestEnvironment.Auditor1KeyPair,  null, ApplicationState.Ready, null }
         };
 
         [Test]
         [TestCaseSource(nameof(HandshakeTestCases))]
-        public async Task HandshakeTest(KeyPair clientKeyPair, ulong? currentAditorApex, ApplicationState alphaState, Type expectedException)
+        public async Task HandshakeTest(KeyPair clientKeyPair, long? currentAditorApex, ApplicationState alphaState, Type expectedException)
         {
             Global.AppState.State = alphaState;
 

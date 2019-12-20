@@ -21,7 +21,7 @@ namespace Centaurus.DAL.Mongo
         private IMongoCollection<AccountModel> accountsCollection;
         private IMongoCollection<BalanceModel> balancesCollection;
         private IMongoCollection<QuantumModel> quantaCollection;
-        private IMongoCollection<StellarData> stellarDataCollection;
+        private IMongoCollection<ConstellationState> constellationStateCollection;
         private IMongoCollection<WithdrawalModel> withdrawalsCollection;
         private IMongoCollection<EffectModel> effectsCollection;
         private IMongoCollection<SettingsModel> settingsCollection;
@@ -49,7 +49,7 @@ namespace Centaurus.DAL.Mongo
             accountsCollection = database.GetCollection<AccountModel>("accounts");
             balancesCollection = database.GetCollection<BalanceModel>("balances");
             quantaCollection = database.GetCollection<QuantumModel>("quanta");
-            stellarDataCollection = database.GetCollection<StellarData>("stellarData");
+            constellationStateCollection = database.GetCollection<ConstellationState>("stellarData");
             withdrawalsCollection = database.GetCollection<WithdrawalModel>("withdrawals");
 
             effectsCollection = database.GetCollection<EffectModel>("effects");
@@ -80,57 +80,19 @@ namespace Centaurus.DAL.Mongo
                 .ToListAsync();
         }
 
-        public override async Task<SettingsModel> LoadSettings(ulong apex)
+        public override async Task<SettingsModel> LoadSettings(long apex)
         {
-            unchecked
-            {
-                var lApex = (long)apex;
-                var filterBldr = Builders<SettingsModel>.Filter;
-
-                //all settings where apex is less or equal to current apex
-                var filter = filterBldr.Where(e => e.Apex <= lApex);
-                if (lApex < 0) //if apex is less than zero (after casting to long), we need get all settings where apex is greater than 0
-                    filter = filterBldr.Or(filterBldr.Where(e => e.Apex >= 0), filter);
-
-                var currentSettingsApex = (await settingsCollection
-                    .Find(filter)
-                    .Project(s => s.Apex)
-                    .ToListAsync())
-                    .Select(s => (ulong)s)
-                    .OrderByDescending(s => s)
-                    .FirstOrDefault();
-
-                return await settingsCollection
-                    .Find(s => s.Apex == (long)currentSettingsApex)
-                    .FirstOrDefaultAsync();
-            }
+            return await settingsCollection
+                .Find(s => s.Apex <= apex)
+                .SortByDescending(s => s.Apex)
+                .FirstOrDefaultAsync();
         }
 
-        public override async Task<List<AssetModel>> LoadAssets(ulong apex)
+        public override async Task<List<AssetModel>> LoadAssets(long apex)
         {
-            unchecked
-            {
-                var lApex = (long)apex;
-
-                var filterBldr = Builders<AssetModel>.Filter;
-
-                //all assets where apex is less or equal to current apex
-                var filter = filterBldr.Where(e => e.Apex <= lApex);
-                if (lApex < 0) //if apex is less than zero (after casting to long), we need get all assets where apex is greater than 0
-                    filter = filterBldr.Or(filterBldr.Where(e => e.Apex >= 0), filter);
-
-                var allAssets = (await assetsCollection
-                    .Find(filter)
-                    .Project(s => new { s.Apex, s.AssetId })
-                    .ToListAsync())
-                    .Select(a => new { Apex = (ulong)a.Apex, a.AssetId });
-
-                var currentAssets = allAssets.Where(s => s.Apex <= apex);
-
-                return await assetsCollection
-                    .Find(filterBldr.In(q => q.AssetId, currentAssets.Select(a => a.AssetId)))
-                    .ToListAsync();
-            }
+            return await assetsCollection
+                .Find(a => a.Apex <= apex)
+                .ToListAsync();
         }
 
         public override async Task<List<AccountModel>> LoadAccounts()
@@ -147,23 +109,22 @@ namespace Centaurus.DAL.Mongo
                 .ToListAsync();
         }
 
-        public override async Task<StellarData> LoadStellarData()
+        public override async Task<ConstellationState> LoadConstellationState()
         {
-            return await stellarDataCollection
-                .Find(FilterDefinition<StellarData>.Empty)
+            return await constellationStateCollection
+                .Find(FilterDefinition<ConstellationState>.Empty)
                 .FirstOrDefaultAsync();
         }
 
-        public override async Task<List<QuantumModel>> LoadQuanta(params ulong[] apexes)
+        public override async Task<List<QuantumModel>> LoadQuanta(params long[] apexes)
         {
             var filter = FilterDefinition<QuantumModel>.Empty;
             if (apexes.Length > 0)
-                filter = Builders<QuantumModel>.Filter.In(q => q.Apex, apexes.Select(a => unchecked((long)a)));
+                filter = Builders<QuantumModel>.Filter.In(q => q.Apex, apexes);
 
             var res = await quantaCollection
                 .Find(filter)
                 .ToListAsync();
-
 
             if (res.Count != apexes.Length)
                 throw new Exception("Not all quanta were found");
@@ -171,53 +132,51 @@ namespace Centaurus.DAL.Mongo
             return res;
         }
 
-        public async Task<List<QuantumModel>> LoadQuantumModels(params ulong[] quantumIds)
+        public async Task<List<QuantumModel>> LoadQuantumModels(params long[] quantumIds)
         {
-            return await quantaCollection.Find(
-                    Builders<QuantumModel>.Filter.In(q => q.Apex, quantumIds.Select(q => unchecked((long)q)))
-                )
+            return await quantaCollection
+                .Find(Builders<QuantumModel>.Filter.In(q => q.Apex, quantumIds))
                 .ToListAsync();
         }
 
-        public override async Task<List<EffectModel>> LoadEffectsForApex(ulong apex)
+        public override async Task<List<QuantumModel>> LoadQuantaAboveApex(long apex)
+        {
+            return await quantaCollection
+                .Find(q => q.Apex > apex)
+                .ToListAsync();
+        }
+
+        public override async Task<long> GetFirstEffectApex()
+        {
+            var firstEffect = await effectsCollection
+                   .Find(FilterDefinition<EffectModel>.Empty)
+                   .SortBy(e => e.Apex)
+                   .FirstOrDefaultAsync();
+
+            return firstEffect?.Apex ?? -1;
+        }
+
+        public override async Task<List<EffectModel>> LoadEffectsForApex(long apex)
         {
             return await effectsCollection
-                .Find(e => e.Apex == unchecked((long)apex))
+                .Find(e => e.Apex == apex)
                 .ToListAsync();
         }
 
-        public override async Task<List<EffectModel>> LoadEffectsAboveApex(ulong apex)
+        public override async Task<List<EffectModel>> LoadEffectsAboveApex(long apex)
         {
-            var lAPex = unchecked((long)apex);
-            var filterBldr = Builders<EffectModel>.Filter;
-
-            var filter = filterBldr.Where(e => e.Apex > lAPex);
-            if (lAPex < 0)
-                filter = filterBldr.Or(filterBldr.Where(e => e.Apex > 0), filter);
-
             return await effectsCollection
-                .Find(filter)
+                .Find(e => e.Apex > apex)
                 .ToListAsync();
         }
 
-        public override async Task<ulong> GetLastApex()
+        public override async Task<long> GetLastApex()
         {
-            unchecked
-            {
-                var lastQuantum = await quantaCollection
-                    .Find(Builders<QuantumModel>.Filter.Where(q => q.Apex < 0))
-                    .SortBy(q => q.Apex)
-                    .FirstOrDefaultAsync();
-                if (lastQuantum != null)
-                    return (ulong)lastQuantum.Apex;
+            var constellationState = await constellationStateCollection
+                .Find(FilterDefinition<ConstellationState>.Empty)
+                .FirstOrDefaultAsync();
 
-                lastQuantum = await quantaCollection
-                    .Find(FilterDefinition<QuantumModel>.Empty)
-                    .SortByDescending(q => q.Apex)
-                    .FirstOrDefaultAsync();
-
-                return (ulong)(lastQuantum?.Apex ?? 0);
-            }
+            return constellationState?.CurrentApex ?? -1;
         }
 
         #region Updates
@@ -237,9 +196,8 @@ namespace Centaurus.DAL.Mongo
                         updateTasks.Add(settingsCollection.InsertOneAsync(update.Settings));
                         updateTasks.Add(assetsCollection.InsertManyAsync(update.Assets));
                     }
-
                     if (update.StellarInfoData != null)
-                        updateTasks.Add(stellarDataCollection.BulkWriteAsync(GetStellarDataUpdate(update.StellarInfoData)));
+                        updateTasks.Add(constellationStateCollection.BulkWriteAsync(GetStellarDataUpdate(update.StellarInfoData)));
 
                     updateTasks.Add(accountsCollection.BulkWriteAsync(GetAccountUpdates(update.Accounts)));
 
@@ -281,12 +239,12 @@ namespace Centaurus.DAL.Mongo
                     if (widthrawal.IsInserted)
                         updates[i] = new InsertOneModel<WithdrawalModel>(new WithdrawalModel
                         {
-                            Apex = (long)apex,
+                            Apex = apex,
                             TransactionHash = trHash,
                             RawWithdrawal = raw
                         });
                     else if (widthrawal.IsDeleted)
-                        updates[i] = new DeleteOneModel<WithdrawalModel>(filter.Eq(a => a.Apex, (long)apex));
+                        updates[i] = new DeleteOneModel<WithdrawalModel>(filter.Eq(a => a.Apex, apex));
                     else
                         throw new InvalidOperationException("Withdrawal object cannot be updated");
                 }
@@ -294,23 +252,36 @@ namespace Centaurus.DAL.Mongo
             }
         }
 
-        private WriteModel<StellarData>[] GetStellarDataUpdate(DiffObject.StellarInfo stellarData)
+        private WriteModel<ConstellationState>[] GetStellarDataUpdate(DiffObject.ConstellationState constellationState)
         {
-            var filter = Builders<StellarData>.Filter;
-            var update = Builders<StellarData>.Update;
+            var filter = Builders<ConstellationState>.Filter;
+            var update = Builders<ConstellationState>.Update;
 
-            var ledger = stellarData.Ledger;
-            var vaultSequence = stellarData.VaultSequence;
+            var ledger = constellationState.Ledger;
+            var vaultSequence = constellationState.VaultSequence;
+            var apex = constellationState.CurrentApex;
 
-            WriteModel<StellarData> updateModel = null;
-            if (stellarData.IsInserted)
-                updateModel = new InsertOneModel<StellarData>(new StellarData { Ledger = ledger, VaultSequence = vaultSequence });
-            else if (stellarData.IsDeleted)
+            WriteModel<ConstellationState> updateModel = null;
+            if (constellationState.IsInserted)
+                updateModel = new InsertOneModel<ConstellationState>(new ConstellationState
+                {
+                    Ledger = ledger,
+                    VaultSequence = vaultSequence,
+                    CurrentApex = apex
+                });
+            else if (constellationState.IsDeleted)
                 throw new InvalidOperationException("Stellar data entry cannot be deleted");
             else
-                updateModel = new UpdateOneModel<StellarData>(filter.Empty, update.Set(s => s.Ledger, ledger).Set(s => s.VaultSequence, vaultSequence));
+            {
+                UpdateDefinition<ConstellationState> updateCommand = update.Set(s => s.CurrentApex, apex);
+                if (ledger > 0)
+                    updateCommand = updateCommand.Set(s => s.Ledger, ledger);
+                if (vaultSequence > 0)
+                    updateCommand = updateCommand.Set(s => s.VaultSequence, vaultSequence);
+                updateModel = new UpdateOneModel<ConstellationState>(filter.Empty, updateCommand);
+            }
 
-            return new WriteModel<StellarData>[] { updateModel };
+            return new WriteModel<ConstellationState>[] { updateModel };
         }
 
         private WriteModel<AccountModel>[] GetAccountUpdates(List<DiffObject.Account> accounts)
@@ -421,7 +392,6 @@ namespace Centaurus.DAL.Mongo
                 return updates;
             }
         }
-
         #endregion
     }
 }

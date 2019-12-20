@@ -11,14 +11,6 @@ namespace Centaurus.Domain
     {
         public override ConnectionState[] ValidConnectionStates { get; } = new ConnectionState[] { ConnectionState.Ready };
 
-        public override async Task Validate(AuditorWebSocketConnection connection, MessageEnvelope envelope)
-        {
-            //validate that alpha has signed the quantum request
-            if (!envelope.IsSignedBy(((AuditorSettings)Global.Settings).AlphaKeyPair.PublicKey))
-                throw new UnauthorizedException();
-            await base.Validate(connection, envelope);
-        }
-
         public override Task HandleMessage(AuditorWebSocketConnection connection, MessageEnvelope messageEnvelope)
         {
             Global.QuantumHandler.Handle(messageEnvelope);

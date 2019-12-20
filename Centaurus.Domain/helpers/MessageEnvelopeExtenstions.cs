@@ -27,13 +27,7 @@ namespace Centaurus.Domain
         /// <param name="keyPair">Key pair to use for signing</param>
         public static void Sign(this MessageEnvelope messageEnvelope, KeyPair keyPair)
         {
-            var rawSignature = keyPair.Sign(messageEnvelope.ComputeMessageHash());
-
-            var signature = new Ed25519Signature()
-            {
-                Signature = rawSignature,
-                Signer = keyPair.PublicKey
-            };
+            var signature = messageEnvelope.ComputeMessageHash().Sign(keyPair);
             messageEnvelope.Signatures.Add(signature);
         }
 

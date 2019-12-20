@@ -19,9 +19,12 @@ namespace Centaurus.Domain
         /// <returns></returns>
         public static async Task<DiffObject> Aggregate(List<PendingUpdates.PendingUpdatesItem> update)
         {
+            if (update == null)
+                throw new ArgumentNullException(nameof(update));
+
             SettingsModel constellationSettings = null;
 
-            var stellarData = new DiffObject.StellarInfo();
+            DiffObject.ConstellationState stellarData = new DiffObject.ConstellationState();
 
             var accounts = new Dictionary<byte[], DiffObject.Account>(new ByteArrayComparer());
             var balances = new Dictionary<byte[], Dictionary<int, DiffObject.Balance>>(new ByteArrayComparer());
@@ -40,7 +43,12 @@ namespace Centaurus.Domain
             {
                 var currentUpdateItem = update[i];
                 if (currentUpdateItem.Quantum != null) //it could be null on constellation init
+                {
                     quanta.Add(QuantumModelExtensions.FromQuantum(currentUpdateItem.Quantum));
+                    var quantumMessage = (Quantum)currentUpdateItem.Quantum.Message;
+                    //update current apex
+                    stellarData.CurrentApex = quantumMessage.Apex;
+                }
 
                 var quatumEffects = update[i].Effects;
                 var quatumEffectsLength = quatumEffects.Length;
@@ -60,7 +68,7 @@ namespace Centaurus.Domain
                             break;
                         case ConstellationUpdateEffect constellationUpdate:
                             constellationSettings = GetConstellationSettings(constellationUpdate);
-                            assets = GetAssets(constellationUpdate, (await Global.PermanentStorage.LoadAssets(ulong.MaxValue)));
+                            assets = GetAssets(constellationUpdate, (await Global.PermanentStorage.LoadAssets(long.MaxValue)));
                             break;
                         case AccountCreateEffect accountCreateEffect:
                             {
@@ -174,9 +182,90 @@ namespace Centaurus.Domain
                 Assets = assets,
                 Orders = orders.Values.ToList(),
                 Settings = constellationSettings,
-                StellarInfoData = stellarData.Ledger > 0 || stellarData.VaultSequence > 0 ? stellarData : null,
+                StellarInfoData = stellarData,
                 Widthrawals = withdrawals
             };
+        }
+
+        /// <summary>
+        /// Builds an update based on the snapshot. All objects will be marked as new.
+        /// </summary>
+        /// <param name="snapshot"></param>
+        public static DiffObject Aggregate(Snapshot snapshot)
+        {
+            var apex = snapshot.Apex;
+
+            var diffObject = new DiffObject();
+
+            //get account diff objects
+            diffObject.Accounts = snapshot.Accounts
+                .Select(a => new DiffObject.Account
+                {
+                    IsInserted = true,
+                    Nonce = a.Nonce,
+                    PubKey = a.Pubkey.Data
+                }).ToList();
+
+            //get account diff objects
+            diffObject.Balances = snapshot.Accounts.SelectMany(bs =>
+            {
+                return bs.Balances.Select(b => new DiffObject.Balance
+                {
+                    IsInserted = true,
+                    Amount = b.Amount,
+                    AssetId = b.Asset,
+                    Liabilities = b.Liabilities,
+                    PubKey = bs.Pubkey.Data
+                });
+            }).ToList();
+
+            diffObject.Settings = new SettingsModel
+            {
+                Apex = apex,
+                Auditors = snapshot.Settings.Auditors.Select(s => s.Data).ToArray(),
+                MinAccountBalance = snapshot.Settings.MinAccountBalance,
+                MinAllowedLotSize = snapshot.Settings.MinAllowedLotSize,
+                Vault = snapshot.Settings.Vault.Data
+            };
+
+            diffObject.Assets = snapshot.Settings.Assets.Select(a => new AssetModel
+            {
+                Apex = apex,
+                AssetId = a.Id,
+                Code = a.Code,
+                Issuer = a.Issuer?.Data
+            }).ToList();
+
+            diffObject.Orders = snapshot.Orders.Select(o => new DiffObject.Order
+            {
+                IsInserted = true,
+                OrderId = o.OrderId,
+                Amount = o.Amount,
+                Price = o.Price,
+                Pubkey = o.Pubkey.Data
+            }).ToList();
+
+            diffObject.Widthrawals = snapshot.Withdrawals.Select(w => new DiffObject.Withdrawal
+            {
+                IsInserted = true,
+                Apex = apex,
+                RawWithdrawal = XdrConverter.Serialize(w),
+                TransactionHash = w.TransactionHash
+            }).ToList();
+
+            diffObject.StellarInfoData = new DiffObject.ConstellationState
+            {
+                IsInserted = true,
+                CurrentApex = apex,
+                Ledger = snapshot.Ledger,
+                VaultSequence = snapshot.VaultSequence
+            };
+
+            diffObject.Quanta = new List<QuantumModel>();
+
+            diffObject.Effects = new List<EffectModel>();
+
+            return diffObject;
         }
 
 
@@ -195,9 +284,9 @@ namespace Centaurus.Domain
                 balances[pubKey].Add(asset, new DiffObject.Balance { AssetId = asset, PubKey = pubKey });
         }
 
-        private static DiffObject.StellarInfo GetStellarData(long ledger, long vaultSequence)
+        private static DiffObject.ConstellationState GetStellarData(long ledger, long vaultSequence)
         {
-            return new DiffObject.StellarInfo { Ledger = ledger, VaultSequence = vaultSequence };
+            return new DiffObject.ConstellationState { Ledger = ledger, VaultSequence = vaultSequence };
         }
 
         private static SettingsModel GetConstellationSettings(ConstellationEffect constellationInit)
@@ -211,6 +300,9 @@ namespace Centaurus.Domain
             };
         }
 
+        /// <summary>
+        /// Builds asset models for only new assets.
+        /// </summary>
         private static List<AssetModel> GetAssets(ConstellationEffect constellationEffect, List<AssetModel> permanentAssets)
         {
             var newAssets = constellationEffect.Assets;

@@ -54,9 +54,9 @@ namespace Centaurus.Domain
 
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        ulong lastAddedApex;
+        long lastAddedApex;
 
-        Dictionary<ulong, MessageEnvelope> queue = new Dictionary<ulong, MessageEnvelope>();
+        Dictionary<long, MessageEnvelope> queue = new Dictionary<long, MessageEnvelope>();
 
         CancellationTokenSource cancellationToken = new CancellationTokenSource();
 
@@ -74,7 +74,7 @@ namespace Centaurus.Domain
             }
         }
 
-        bool TryRemove(ulong apex, out MessageEnvelope envelope)
+        bool TryRemove(long apex, out MessageEnvelope envelope)
         {
             envelope = null;
             lock (syncRoot)
@@ -96,7 +96,7 @@ namespace Centaurus.Domain
                 try
                 {
                     //try to get next quantum
-                    ulong targetQuantumApex = Global.QuantumStorage.CurrentApex + 1;
+                    long targetQuantumApex = Global.QuantumStorage.CurrentApex + 1;
                     if (TryRemove(targetQuantumApex, out MessageEnvelope envelope))
                     {
                         var result = envelope.CreateResult();

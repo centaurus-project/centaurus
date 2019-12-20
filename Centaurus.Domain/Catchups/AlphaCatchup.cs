@@ -24,7 +24,7 @@ namespace Centaurus.Domain
         /// <summary>
         /// We need to discover smallest auditor apex to get snapshot for it
         /// </summary>
-        public static async Task SetApex(RawPubKey pubKey, ulong apex)
+        public static async Task SetApex(RawPubKey pubKey, long apex)
         {
             if (Global.AppState.State != ApplicationState.Rising)
                 throw new InvalidOperationException("Auditor state messages can be only handled when Alpha is in rising state");
@@ -32,9 +32,10 @@ namespace Centaurus.Domain
             apexMajorityCalc.Add(pubKey, apex);
             if (apexMajorityCalc.MajorityResult == MajorityResults.Success)
             {
-                var alphaStateManager = (AlphaStateManager)Global.AppState;
-                var stateMessage = await alphaStateManager.GetCurrentAlphaState();
-                Notifier.NotifyAuditors(stateMessage);
+                //UNDONE: send majority apex
+                //Notifier.NotifyAuditors(new AuditorStateRequest { TargetApex = apexMajorityCalc.MajorityData.First() });
+
+                Notifier.NotifyAuditors(new AuditorStateRequest { TargetApex = await SnapshotManager.GetLastApex() });
             }
             else if (auditorStateMajorityCalc.MajorityResult == MajorityResults.Unreachable)
             {
@@ -61,63 +62,49 @@ namespace Centaurus.Domain
             }
         }
 
-        /// <summary>
-        /// Validates provided snapshot
-        /// </summary>
-        /// <param name="snapshot">Majority's snapshot</param>
-        private static async Task ValidateSnapshot(Snapshot snapshot)
-        {
-            var localSnapshot = await SnapshotManager.GetSnapshot();
-            if (!ByteArrayPrimitives.Equals(snapshot.ComputeHash(), localSnapshot.ComputeHash()))
-                throw new Exception("Local snapshot doesn't equal to majority's one");
-        }
-
         private static async Task ApplyAuditorsData(IEnumerable<AuditorState> largestGroup)
         {
             //if last snapshot is not null, we should aggregate all envelopes
-            var lastSnapshot = largestGroup.First().Snapshot;
-            if (lastSnapshot != null && lastSnapshot.Apex != 0)
-                lastSnapshot.Confirmation = largestGroup.Select(g => g.Snapshot.Confirmation).ToList().AggregateEnvelops();
+            var snapshot = largestGroup.First().Snapshot;
+            var validQuanta = new List<MessageEnvelope>();
 
-            if (lastSnapshot == null)
-                lastSnapshot = await SnapshotManager.GetSnapshot();
+            if (snapshot == null) //if it's null than Alpha was restarted right after initialization
+            {
+                //UNDONE: we need to init alpha with snapshot
+                throw new NotImplementedException();
+                snapshot = await SnapshotManager.GetSnapshot();
+                if (snapshot.Apex != 0)
+                    throw new Exception("Auditor snapshots cannot be null, if there is handled quanta");
+            }
+            else
+                validQuanta = GetValidQuanta(snapshot.Apex, largestGroup);
 
-            //alpha could be empty
-            //await ValidateSnapshot(lastSnapshot);
-
-            var validQuanta = GetValidQuanta(lastSnapshot, largestGroup);
-
-            Global.Setup(lastSnapshot, validQuanta);
+            Global.Setup(snapshot, validQuanta);
 
             var alphaStateManager = (AlphaStateManager)Global.AppState;
 
             alphaStateManager.AlphaRised();
 
-            Global.QuantumHandler.Start();
-
             Notifier.NotifyAuditors(await alphaStateManager.GetCurrentAlphaState());
         }
 
-        private static IEnumerable<MessageEnvelope> GetValidQuanta(Snapshot snapshot, IEnumerable<AuditorState> auditorStates)
+        private static List<MessageEnvelope> GetValidQuanta(long snapshotApex, IEnumerable<AuditorState> auditorStates)
         {
             //group all quanta by their apex
             var quanta = auditorStates
                 .SelectMany(a => a.PendingQuantums)
-                .Where(q => ((Quantum)q.Message).Apex > snapshot.Apex)
+                .Where(q => ((Quantum)q.Message).Apex > snapshotApex)
                 .GroupBy(q => ((Quantum)q.Message).Apex)
                 .OrderBy(q => q.Key);
 
             if (quanta.Count() == 0)
-                return new MessageEnvelope[] { };
+                return new List<MessageEnvelope>();
 
-            var lastQuantumApex = snapshot.Apex;
+            var lastQuantumApex = snapshotApex;
             var validQuanta = new List<MessageEnvelope>();
 
             foreach (var currentQuantaGroup in quanta)
             {
-                //TODO: select only quanta that has a valid alpha signature
-                //TODO: validate that all grouped quanta has the same hash
-
                 //select only quanta that has alpha signature
                 var validatedQuanta = currentQuantaGroup
                     .Where(q => q.Signatures.Any(s => s.Signer == (RawPubKey)Global.Settings.KeyPair.PublicKey)
@@ -201,9 +188,9 @@ namespace Centaurus.Domain
             }
         }
 
-        private class ApexMajorityCalc : MajorityCalc<ulong>
+        private class ApexMajorityCalc : MajorityCalc<long>
         {
-            protected override IEnumerable<ulong> GetConsensusGroup()
+            protected override IEnumerable<long> GetConsensusGroup()
             {
                 //just return repeated smallest apex to make shared code work
                 return Enumerable.Repeat(rawData.Values.Min(), rawData.Count);

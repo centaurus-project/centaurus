@@ -29,6 +29,6 @@ namespace Centaurus.Models
         public RawPubKey Pubkey { get; set; }
 
         [XdrField(0)]
-        public ulong Apex { get; set; }
+        public long Apex { get; set; }
     }
 }

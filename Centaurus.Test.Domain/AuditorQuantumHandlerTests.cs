@@ -15,8 +15,6 @@ namespace Centaurus.Test
         public void Setup()
         {
             GlobalInitHelper.DefaultAuditorSetup();
-
-            Global.QuantumHandler.Start();
         }
 
         //[Test]

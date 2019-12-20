@@ -39,7 +39,6 @@ namespace Centaurus.Domain
                 {
                     lock (syncRoot)
                     {
-
                         MessageEnvelope envelope = null;
                         if (!quantaQueue.TryDequeue(out envelope))
                         {

@@ -27,28 +27,35 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
             connection.ConnectionState = ConnectionState.Validated;
 
             if (Global.Constellation.Auditors.Contains(connection.ClientPubKey))
+                await HandleAuditorHandshake(connection, handshakeInit);
+            else
+                await HandleClientHandshake(connection, envelope);
+
+        }
+
+        private async Task HandleAuditorHandshake(AlphaWebSocketConnection connection, HandshakeInit handshakeInit)
+        {
+            if (Global.AppState.State == ApplicationState.Rising)
             {
-                if (Global.AppState.State == ApplicationState.Rising)
-                {
-                    var payload = handshakeInit.Payload as AuditorHandshakePayload;
-                    if (payload == null)
-                        throw new ConnectionCloseException(WebSocketCloseStatus.InvalidPayloadData, "No auditor payload data.");
-                    await AlphaCatchup.SetApex(connection.ClientPubKey, payload.Apex);
-                }
-                else
-                {
-                    var alphaStateManager = (AlphaStateManager)Global.AppState;
-                    var stateMessage = await alphaStateManager.GetCurrentAlphaState();
-                    await connection.SendMessage(stateMessage);
-                }
+                var payload = handshakeInit.Payload as AuditorHandshakePayload;
+                if (payload == null)
+                    throw new ConnectionCloseException(WebSocketCloseStatus.InvalidPayloadData, "No auditor payload data.");
+                await AlphaCatchup.SetApex(connection.ClientPubKey, payload.Apex);
             }
             else
             {
-                if (Global.AppState.State != ApplicationState.Ready)
-                    throw new ConnectionCloseException(WebSocketCloseStatus.ProtocolError, "Alpha is not in Ready state.");
-                connection.ConnectionState = ConnectionState.Ready;
-                await connection.SendMessage(envelope.CreateResult(ResultStatusCodes.Success));
+                var alphaStateManager = (AlphaStateManager)Global.AppState;
+                var stateMessage = await alphaStateManager.GetCurrentAlphaState();
+                await connection.SendMessage(stateMessage);
             }
+        }
+
+        private async Task HandleClientHandshake(AlphaWebSocketConnection connection, MessageEnvelope envelope)
+        {
+            if (Global.AppState.State != ApplicationState.Ready)
+                throw new ConnectionCloseException(WebSocketCloseStatus.ProtocolError, "Alpha is not in Ready state.");
+            connection.ConnectionState = ConnectionState.Ready;
+            await connection.SendMessage(envelope.CreateResult(ResultStatusCodes.Success));
         }
     }
 }

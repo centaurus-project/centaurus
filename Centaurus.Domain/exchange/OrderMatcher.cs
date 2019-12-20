@@ -13,7 +13,7 @@ namespace Centaurus.Domain
             resultEffects = effectsContainer;
             takerOrder = new Order()
             {
-                OrderId = OrderIdConverter.Encode(effectsContainer.Apex, orderRequest.Asset, orderRequest.Side),
+                OrderId = OrderIdConverter.Encode(unchecked((ulong)effectsContainer.Apex), orderRequest.Asset, orderRequest.Side),
                 Pubkey = orderRequest.Account,
                 Amount = orderRequest.Amount,
                 Price = orderRequest.Price

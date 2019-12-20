@@ -20,10 +20,9 @@ namespace Centaurus.Models
 
     }
 
-
-    [XdrContract]
     public class AuditorHandshakePayload: HandshakePayload
     {
-        public ulong Apex { get; set; }
+        [XdrField(0)]
+        public long Apex { get; set; }
     }
 }

@@ -13,14 +13,25 @@ namespace Centaurus.DAL
 
         public abstract Task CloseConnection();
 
-        public abstract Task<ulong> GetLastApex();
+        /// <summary>
+        /// Fetches last apex presented in DB. Returns -1 if no apex in DB.
+        /// </summary>
+        public abstract Task<long> GetLastApex();
 
         //TODO: return cursor
-        public abstract Task<List<QuantumModel>> LoadQuanta(params ulong[] ids);
+        public abstract Task<List<QuantumModel>> LoadQuanta(params long[] ids);
 
-        public abstract Task<List<EffectModel>> LoadEffectsForApex(ulong apex);
+        public abstract Task<List<QuantumModel>> LoadQuantaAboveApex(long apex);
 
-        public abstract Task<List<EffectModel>> LoadEffectsAboveApex(ulong apex);
+        /// <summary>
+        /// Returns first effect apex. If it's -1 than there is no effects at all.
+        /// </summary>
+        /// <returns></returns>
+        public abstract Task<long> GetFirstEffectApex();
+
+        public abstract Task<List<EffectModel>> LoadEffectsForApex(long apex);
+
+        public abstract Task<List<EffectModel>> LoadEffectsAboveApex(long apex);
 
         public abstract Task<List<AccountModel>> LoadAccounts();
 
@@ -31,20 +42,20 @@ namespace Centaurus.DAL
         /// </summary>
         /// <param name="apex"></param>
         /// <returns></returns>
-        public abstract Task<SettingsModel> LoadSettings(ulong apex);
+        public abstract Task<SettingsModel> LoadSettings(long apex);
 
         /// <summary>
         /// Fetches assets where apex is equal to or lower than specified one. 
         /// </summary>
         /// <param name="apex"></param>
         /// <returns></returns>
-        public abstract Task<List<AssetModel>> LoadAssets(ulong apex);
+        public abstract Task<List<AssetModel>> LoadAssets(long apex);
 
         public abstract Task<List<WithdrawalModel>> LoadWithdrawals();
 
         public abstract Task<List<OrderModel>> LoadOrders();
 
-        public abstract Task<StellarData> LoadStellarData();
+        public abstract Task<ConstellationState> LoadConstellationState();
 
         public abstract Task Update(DiffObject update);
     }

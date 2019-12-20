@@ -25,7 +25,7 @@ namespace Centaurus.Domain
             ledgerManager.SetLedger(Effect.PrevLedger);
         }
 
-        public static LedgerUpdateEffectProcessor GetProcessor(ulong apex, long ledger, LedgerManager ledgerManager)
+        public static LedgerUpdateEffectProcessor GetProcessor(long apex, long ledger, LedgerManager ledgerManager)
         {
             return GetProcessor(
                 new LedgerUpdateEffect { Apex = apex, Ledger = ledger, PrevLedger = ledgerManager.Ledger },

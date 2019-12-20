@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
+    //TODO: rename it.
     public class SnapshotManager
     {
         private static Logger logger = LogManager.GetCurrentClassLogger();
@@ -80,8 +81,12 @@ namespace Centaurus.Domain
             await saveSnapshotSemaphore.WaitAsync();
             try
             {
-                var aggregatedUpdates = await UpdatesAggregator.Aggregate(updates.GetAll());
-                await Global.PermanentStorage.Update(aggregatedUpdates);
+                var updateItems = updates.GetAll();
+                if (updateItems.Count > 0)
+                {
+                    var aggregatedUpdates = await UpdatesAggregator.Aggregate(updates.GetAll());
+                    await Global.PermanentStorage.Update(aggregatedUpdates);
+                }
             }
             finally
             {
@@ -90,13 +95,58 @@ namespace Centaurus.Domain
         }
 
         /// <summary>
+        /// Fetches all quanta where apex is greater than the specified one.
+        /// </summary>
+        /// <param name="apex"></param>
+        /// <returns></returns>
+        public static async Task<List<MessageEnvelope>> GetQuantaAboveApex(long apex)
+        {
+            var quantaModels = await Global.PermanentStorage.LoadQuantaAboveApex(apex);
+            return quantaModels.Select(q => XdrConverter.Deserialize<MessageEnvelope>(q.RawQuantum)).ToList();
+        }
+
+        /// <summary>
+        /// Builds updates based on the snapshot, and saves it to DB
+        /// </summary>
+        public static async Task InitFromSnapshot(Snapshot snapshot)
+        {
+            if (Global.AppState.State != ApplicationState.WaitingForInit)
+                throw new InvalidOperationException("This operation is only permitted when the app is in WaitingForInit state");
+            var aggregatedUpdates = UpdatesAggregator.Aggregate(snapshot);
+            await Global.PermanentStorage.Update(aggregatedUpdates);
+        }
+
+        public static async Task<long> GetLastApex()
+        {
+            return await Global.PermanentStorage.GetLastApex();
+        }
+
+        /// <summary>
         /// Fetches current snapshot
         /// </summary>
         /// <returns></returns>
         public static async Task<Snapshot> GetSnapshot()
         {
-            //if we pass ulong.MaxValue it will return current snapshot
-            return await GetSnapshot(ulong.MaxValue);
+            var lastApex = await GetLastApex();
+            if (lastApex < 0)
+                return null;
+            return await GetSnapshot(lastApex);
+        }
+
+        /// <summary>
+        /// Fetches settings for the specified apex
+        /// </summary>
+        /// <param name="apex"></param>
+        /// <returns></returns>
+        public static async Task<ConstellationSettings> GetConstellationSettings(long apex)
+        {
+            var settingsModel = await Global.PermanentStorage.LoadSettings(apex);
+            if (settingsModel == null)
+                return null;
+
+            var assets = await Global.PermanentStorage.LoadAssets(apex);
+
+            return settingsModel.ToSettings(assets);
         }
 
         /// <summary>
@@ -104,15 +154,24 @@ namespace Centaurus.Domain
         /// </summary>
         /// <param name="apex"></param>
         /// <returns></returns>
-        public static async Task<Snapshot> GetSnapshot(ulong apex)
+        public static async Task<Snapshot> GetSnapshot(long apex)
         {
+            if (apex < 0)
+                throw new ArgumentException("Apex cannot be less than zero.");
+
+            var lastApex = await GetLastApex();
+            if (lastApex < apex)
+                throw new InvalidOperationException("Requested apex is greater than the last known one.");
+
+            var minRevertApex = await GetMinRevertApex();
+            if (apex < minRevertApex)
+                throw new InvalidOperationException($"Lack of data to revert to {apex} apex.");
+
             var settings = await GetConstellationSettings(apex);
             if (settings == null)
                 return null;
 
-            var snapshotApex = apex != ulong.MaxValue ? apex : await Global.PermanentStorage.GetLastApex();
-
-            var stellarData = await Global.PermanentStorage.LoadStellarData();
+            var stellarData = await Global.PermanentStorage.LoadConstellationState();
 
             var accounts = await GetAccounts();
 
@@ -126,7 +185,7 @@ namespace Centaurus.Domain
 
             var withdrawalsStorage = new WithdrawalStorage(withdrawals);
 
-            var effectModels = await Global.PermanentStorage.LoadEffectsAboveApex(snapshotApex);
+            var effectModels = await Global.PermanentStorage.LoadEffectsAboveApex(apex);
             for (var i = effectModels.Count - 1; i >= 0; i--)
             {
                 var currentEffect = XdrConverter.Deserialize<Effect>(effectModels[i].RawEffect);
@@ -191,7 +250,7 @@ namespace Centaurus.Domain
 
             return new Snapshot
             {
-                Apex = snapshotApex,
+                Apex = apex,
                 Accounts = accountStorage.GetAll().ToList(),
                 Ledger = stellarData.Ledger,
                 Orders = exchange.OrderMap.GetAllOrders().ToList(),
@@ -201,21 +260,24 @@ namespace Centaurus.Domain
             };
         }
 
-        private static async Task<Exchange> GetRestoredExchange(List<Order> orders)
+        /// <summary>
+        /// Returns minimal apex a snapshot can be reverted to
+        /// </summary>
+        /// <returns></returns>
+        private static async Task<long> GetMinRevertApex()
         {
-            var assets = await Global.PermanentStorage.LoadAssets(ulong.MaxValue);//we need to load all assets, otherwise errors could occur during exchange restore
-            return Exchange.RestoreExchange(assets.Select(a => a.ToAssetSettings()).ToList(), orders);
+            //obtain min apex we can revert to
+            var minApex = await Global.PermanentStorage.GetFirstEffectApex();
+            if (minApex == -1) //we can't revert at all
+                return -1;
+
+            return minApex - 1; //we can revert effect for that apex, so the minimal apex is first effect apex - 1
         }
 
-        private static async Task<ConstellationSettings> GetConstellationSettings(ulong apex)
+        private static async Task<Exchange> GetRestoredExchange(List<Order> orders)
         {
-            var settingsModel = await Global.PermanentStorage.LoadSettings(apex);
-            if (settingsModel == null)
-                return null;
-
-            var assets = await Global.PermanentStorage.LoadAssets(apex);
-
-            return settingsModel.ToSettings(assets);
+            var assets = await Global.PermanentStorage.LoadAssets(long.MaxValue);//we need to load all assets, otherwise errors could occur during exchange restore
+            return Exchange.RestoreExchange(assets.Select(a => a.ToAssetSettings()).ToList(), orders);
         }
 
         private static async Task<List<Account>> GetAccounts()

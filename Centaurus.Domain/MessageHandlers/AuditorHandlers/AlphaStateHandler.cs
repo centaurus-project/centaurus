@@ -17,32 +17,16 @@ namespace Centaurus.Domain
         {
             var alphaInfo = (AlphaState)messageEnvelope.Message;
 
-            //if Alpha is rising, we need to send the current auditor state, and wait for a new AlphaState message
-            if (alphaInfo.State == ApplicationState.Rising)
-            {
-                var snapshot = await SnapshotManager.GetSnapshot();
-                var pendingQuantums = Global.QuantumStorage?.GetAllQuantums(snapshot?.Apex ?? 0) ?? new MessageEnvelope[] { };
-                _ = connection.SendMessage(new AuditorState
-                {
-                    State = Global.AppState.State,
-                    Snapshot = snapshot,
-                    PendingQuantums = new List<MessageEnvelope>(pendingQuantums)
-                });
-            }
-            else if (alphaInfo.State == ApplicationState.Ready || alphaInfo.State == ApplicationState.Running)
+            //if the app is not in WaitingForInit state, than it has local snapshot and it was already setup
+            if (Global.AppState.State == ApplicationState.WaitingForInit)
             {
                 var statusCode = await AuditorCatchup.Catchup(alphaInfo.LastSnapshot);
                 if (statusCode != ResultStatusCodes.Success)
-                {
                     throw new ConnectionCloseException(WebSocketCloseStatus.ProtocolError, "Auditor rise failed");
-                }
-                else
-                {
-                    connection.ConnectionState = ConnectionState.Ready;
-                    //set apex cursor to start receive quanta
-                    _ = connection.SendMessage(new SetApexCursor() { Apex = Global.QuantumStorage?.CurrentApex ?? 0 });
-                }
+                connection.ConnectionState = ConnectionState.Ready;
             }
+            //set apex cursor to start receive quanta
+            _ = connection.SendMessage(new SetApexCursor() { Apex = Global.QuantumStorage.CurrentApex });
         }
     }
 }

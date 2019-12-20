@@ -27,7 +27,7 @@ namespace Centaurus.Domain
 
         public Quantum Quantum => (Quantum)Envelope.Message;
 
-        public ulong Apex => Quantum.Apex;
+        public long Apex => Quantum.Apex;
 
         public RequestQuantum RequestQuantum => (RequestQuantum)Envelope.Message;
 
