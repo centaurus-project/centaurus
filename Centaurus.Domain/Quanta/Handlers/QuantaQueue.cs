@@ -14,15 +14,9 @@ namespace Centaurus.Domain
 
         readonly LinkedList<MessageEnvelope> messageQueue;
 
-        public QuantaQueue(IEnumerable<MessageEnvelope> quanta)
+        public QuantaQueue()
         {
-            if (quanta != null)
-            {
-                messageQueue = new LinkedList<MessageEnvelope>(quanta);
-                lastAddedQuantum = messageQueue.Last;
-            }
-            else
-                messageQueue = new LinkedList<MessageEnvelope>();
+            messageQueue = new LinkedList<MessageEnvelope>();
         }
 
         /// <summary>

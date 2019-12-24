@@ -14,10 +14,8 @@ namespace Centaurus.Domain
 
         public override async Task HandleMessage(AuditorWebSocketConnection connection, MessageEnvelope envelope)
         {
-            //add payload and send message back. The message contains handshake data
-            var handshakeMessage = (HandshakeInit)envelope.Message;
-            handshakeMessage.Payload = new AuditorHandshakePayload { Apex = await SnapshotManager.GetLastApex() };
-            await connection.SendMessage(handshakeMessage);
+            //send message back. The message contains handshake data
+            await connection.SendMessage(envelope.Message);
         }
     }
 }

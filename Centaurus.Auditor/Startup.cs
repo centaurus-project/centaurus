@@ -25,18 +25,14 @@ namespace Centaurus.Auditor
             Global.Init(settings, new MongoStorage());
 
             Global.AppState.StateChanged += StateChanged;
+
+            MessageHandlers<AuditorWebSocketConnection>.Init();
         }
 
         public async Task Run()
         {
             try
             {
-                MessageHandlers<AuditorWebSocketConnection>.Init();
-
-                //setup auditor, if it has snapshot
-                var snapshot = await SnapshotManager.GetSnapshot();
-                if (snapshot != null)
-                    Global.Setup(snapshot);
 
                 while (auditor == null)
                 {
@@ -69,7 +65,8 @@ namespace Centaurus.Auditor
             if (state == ApplicationState.Failed)
             {
                 await Abort();
-                await Global.SnapshotManager.SaveSnapshot(Global.PendingUpdates);
+
+                Thread.Sleep(10000);//sleep for 10 sec to make sure that pending updates are saved
 
                 //TODO: restart after some timeout
             }

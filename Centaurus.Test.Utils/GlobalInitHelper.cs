@@ -113,59 +113,12 @@ namespace Centaurus.Test
                 Effects = new List<DAL.Models.EffectModel>(),
                 Orders = new List<DiffObject.Order>(),
                 Quanta = new List<DAL.Models.QuantumModel>(),
-                Widthrawals = new List<DiffObject.Withdrawal>()
+                Widthrawals = new List<DiffObject.Withdrawal>(),
             }).Wait();
 
             var snapshot = SnapshotManager.GetSnapshot().Result;
 
             Global.Setup(snapshot);
-        }
-
-        private static List<Models.Account> GenerateClientAccounts(List<KeyPair> clients)
-        {
-            var accounts = new List<Models.Account>();
-            foreach (var client in clients)
-            {
-                var account = new Models.Account
-                {
-                    Pubkey = client
-                };
-
-
-                account.Balances = new List<Balance>
-                    {
-                        new Balance { Amount = 10_000_000, Asset = 0, Account = account },
-                        new Balance { Amount = 10_000_000, Asset = 1, Account = account },
-                    };
-                accounts.Add(account);
-            }
-            return accounts;
-        }
-
-        private static Snapshot GenerateSnapshot(List<Models.Account> accounts, List<KeyPair> auditorKeyPairs)
-        {
-            var snapshot = new Snapshot
-            {
-                Accounts = accounts,
-                Apex = 0,
-                Ledger = 1,
-                Orders = new List<Order>(),
-                Withdrawals = new List<Withdrawal>(),
-                VaultSequence = 1,
-                Settings = new ConstellationSettings
-                {
-                    Vault = KeyPair.Random().PublicKey,
-                    Auditors = auditorKeyPairs.Select(kp => (RawPubKey)kp).ToList(),
-                    Assets = new List<AssetSettings> { new AssetSettings { Id = 1, Code = "X", Issuer = new RawPubKey() } }
-                }
-            };
-
-            //var snapshotEnvelope = new SnapshotQuantum { Hash = snapshot.ComputeHash() }.CreateEnvelope();
-            //var confEnvelope = snapshotEnvelope.CreateResult(ResultStatusCodes.Success).CreateEnvelope();
-            //foreach (var auditorKeyPair in auditorKeyPairs)
-            //    confEnvelope.Sign(auditorKeyPair);
-            //snapshot.Confirmation = confEnvelope;
-            return snapshot;
         }
     }
 }

@@ -15,13 +15,13 @@ namespace Centaurus.Domain
             Envelope = quantum ?? throw new ArgumentNullException(nameof(quantum));
         }
 
-        public EffectProcessorsContainer(MessageEnvelope quantum, PendingUpdates updates)
+        public EffectProcessorsContainer(MessageEnvelope quantum, Action<MessageEnvelope, Effect[]> saveEffectsFn)
             : this(quantum)
         {
-            pendingUpdates = updates ?? throw new ArgumentNullException(nameof(updates));
+            this.saveEffectsFn = saveEffectsFn;
         }
 
-        private PendingUpdates pendingUpdates;
+        private Action<MessageEnvelope, Effect[]> saveEffectsFn;
 
         public MessageEnvelope Envelope { get; }
 
@@ -60,8 +60,7 @@ namespace Centaurus.Domain
                 var currentEffect = container[i];
                 currentEffect.CommitEffect();
             }
-            if (pendingUpdates != null)
-                pendingUpdates.Add(Envelope, GetEffects());
+            saveEffectsFn?.Invoke(Envelope, GetEffects());
         }
 
         /// <summary>

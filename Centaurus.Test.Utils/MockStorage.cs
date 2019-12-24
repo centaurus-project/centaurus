@@ -21,7 +21,7 @@ namespace Centaurus.Test
         private List<EffectModel> effectsCollection = new List<EffectModel>();
         private List<SettingsModel> settingsCollection = new List<SettingsModel>();
         private List<AssetModel> assetSettings = new List<AssetModel>();
-        private ConstellationState constellationState = new ConstellationState();
+        private ConstellationState constellationState;
 
         public override Task OpenConnection(string connectionString)
         {
@@ -73,8 +73,7 @@ namespace Centaurus.Test
 
         public override Task<List<EffectModel>> LoadEffectsForApex(long apex)
         {
-            var lApex = unchecked((long)apex);
-            var effects = effectsCollection.Where(e => e.Apex == lApex).ToList();
+            var effects = effectsCollection.Where(e => e.Apex == apex).ToList();
             return Task.FromResult(effects);
         }
 
@@ -90,13 +89,10 @@ namespace Centaurus.Test
 
         public override Task<SettingsModel> LoadSettings(long apex)
         {
-            unchecked
-            {
-                var settings = settingsCollection
-                    .OrderByDescending(s => s.Apex)
-                    .FirstOrDefault(s => s.Apex <= apex);
-                return Task.FromResult(settings);
-            }
+            var settings = settingsCollection
+                .OrderByDescending(s => s.Apex)
+                .FirstOrDefault(s => s.Apex <= apex);
+            return Task.FromResult(settings);
         }
 
         public override Task<List<AssetModel>> LoadAssets(long apex)
@@ -172,6 +168,8 @@ namespace Centaurus.Test
         {
             if (_stellarData != null)
             {
+                if (constellationState == null)
+                    constellationState = new ConstellationState();
                 constellationState.CurrentApex = _stellarData.CurrentApex;
                 if (_stellarData.Ledger > 0)
                     constellationState.Ledger = _stellarData.Ledger;

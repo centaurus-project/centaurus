@@ -14,10 +14,7 @@ namespace Centaurus.Models
         [XdrField(0)]
         public ApplicationState State { get; set; }
 
-        [XdrField(1, Optional = true)]
-        public Snapshot Snapshot { get; set; }
-
-        [XdrField(2)]
+        [XdrField(1)]
         public List<MessageEnvelope> PendingQuantums { get; set; } = new List<MessageEnvelope>();
     }
 }

@@ -49,7 +49,7 @@ namespace Centaurus.DAL.Mongo
             accountsCollection = database.GetCollection<AccountModel>("accounts");
             balancesCollection = database.GetCollection<BalanceModel>("balances");
             quantaCollection = database.GetCollection<QuantumModel>("quanta");
-            constellationStateCollection = database.GetCollection<ConstellationState>("stellarData");
+            constellationStateCollection = database.GetCollection<ConstellationState>("constellationState");
             withdrawalsCollection = database.GetCollection<WithdrawalModel>("withdrawals");
 
             effectsCollection = database.GetCollection<EffectModel>("effects");

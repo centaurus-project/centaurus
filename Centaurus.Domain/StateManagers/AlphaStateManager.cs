@@ -36,8 +36,10 @@ namespace Centaurus.Domain
         {
             lock (this)
             {
-                if (HasMajority && State == ApplicationState.Running)
+                if (HasMajority)
                     State = ApplicationState.Ready;
+                else
+                    State = ApplicationState.Running;
             }
         }
 

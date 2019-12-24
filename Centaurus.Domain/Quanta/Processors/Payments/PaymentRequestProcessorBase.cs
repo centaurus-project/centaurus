@@ -11,7 +11,7 @@ namespace Centaurus.Domain
     {
         public override ResultMessage Process(MessageEnvelope envelope)
         {
-            var effectProcessorsContainer = new EffectProcessorsContainer(envelope, Global.PendingUpdates);
+            var effectProcessorsContainer = new EffectProcessorsContainer(envelope, Global.AddEffects);
 
             UpdateNonce(effectProcessorsContainer);
 

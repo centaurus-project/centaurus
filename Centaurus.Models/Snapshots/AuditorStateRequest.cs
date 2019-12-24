@@ -11,5 +11,8 @@ namespace Centaurus.Models
 
         [XdrField(0)]
         public long TargetApex { get; set; }
+
+        [XdrField(1)]
+        public byte[] Hash { get; set; }
     }
 }

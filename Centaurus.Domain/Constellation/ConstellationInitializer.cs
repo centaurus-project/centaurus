@@ -62,6 +62,7 @@ namespace Centaurus.Domain
             var snapshot = await SnapshotManager.BuildGenesisSnapshot(settings, ledgerId, vaultAccountInfo.SequenceNumber);
 
             Global.Setup(snapshot);
+            Global.AppState.State = ApplicationState.Running;
         }
 
         private void SetIdToAssets()

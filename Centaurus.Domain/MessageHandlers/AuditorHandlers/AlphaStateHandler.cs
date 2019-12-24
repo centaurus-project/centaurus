@@ -23,10 +23,10 @@ namespace Centaurus.Domain
                 var statusCode = await AuditorCatchup.Catchup(alphaInfo.LastSnapshot);
                 if (statusCode != ResultStatusCodes.Success)
                     throw new ConnectionCloseException(WebSocketCloseStatus.ProtocolError, "Auditor rise failed");
-                connection.ConnectionState = ConnectionState.Ready;
             }
             //set apex cursor to start receive quanta
             _ = connection.SendMessage(new SetApexCursor() { Apex = Global.QuantumStorage.CurrentApex });
+            connection.ConnectionState = ConnectionState.Ready;
         }
     }
 }

@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    //TODO: rename it.
+    //TODO: rename and separate it.
     public class SnapshotManager
     {
         private static Logger logger = LogManager.GetCurrentClassLogger();
@@ -164,7 +164,7 @@ namespace Centaurus.Domain
                 throw new InvalidOperationException("Requested apex is greater than the last known one.");
 
             var minRevertApex = await GetMinRevertApex();
-            if (apex < minRevertApex)
+            if (minRevertApex == -1 && apex != lastApex || apex < minRevertApex)
                 throw new InvalidOperationException($"Lack of data to revert to {apex} apex.");
 
             var settings = await GetConstellationSettings(apex);
@@ -264,7 +264,7 @@ namespace Centaurus.Domain
         /// Returns minimal apex a snapshot can be reverted to
         /// </summary>
         /// <returns></returns>
-        private static async Task<long> GetMinRevertApex()
+        public static async Task<long> GetMinRevertApex()
         {
             //obtain min apex we can revert to
             var minApex = await Global.PermanentStorage.GetFirstEffectApex();

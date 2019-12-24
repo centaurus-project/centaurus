@@ -23,16 +23,12 @@ namespace Centaurus.Domain
             };
 
             //get snapshot for specified Apex
-            var snapshot = await SnapshotManager.GetSnapshot(stateRequestMessage.TargetApex);
-            if (snapshot != null)
-            {
-                var snapshotHash = snapshot.ComputeHash();
-                var signature = snapshotHash.Sign(Global.Settings.KeyPair);
-                snapshot.Signatures = new List<Ed25519Signature> { signature };
-                state.Snapshot = snapshot;
 
-                state.PendingQuantums = await SnapshotManager.GetQuantaAboveApex(snapshot.Apex);
-            }
+            var hasDataForApex = stateRequestMessage.TargetApex >= await SnapshotManager.GetMinRevertApex();
+            if (hasDataForApex)
+                state.PendingQuantums = await SnapshotManager.GetQuantaAboveApex(stateRequestMessage.TargetApex);
+            else
+                throw new Exception("Alpha has newer data than the auditor");
             _ = connection.SendMessage(state);
         }
     }

@@ -23,24 +23,21 @@ namespace Centaurus.Test
 
         static object[] HandshakeTestCases =
         {
-            new object[] { TestEnvironment.Client1KeyPair, null, ApplicationState.Rising, typeof(ConnectionCloseException) },
-            new object[] { TestEnvironment.Client1KeyPair, null, ApplicationState.Ready, null },
-            new object[] { TestEnvironment.Auditor1KeyPair, null, ApplicationState.Rising, typeof(ConnectionCloseException) },
-            new object[] { TestEnvironment.Auditor1KeyPair, (long?)1, ApplicationState.Rising, null },
-            new object[] { TestEnvironment.Auditor1KeyPair,  null, ApplicationState.Ready, null }
+            new object[] { TestEnvironment.Client1KeyPair, ApplicationState.Rising, typeof(ConnectionCloseException) },
+            new object[] { TestEnvironment.Client1KeyPair, ApplicationState.Ready, null },
+            new object[] { TestEnvironment.Auditor1KeyPair, ApplicationState.Rising, null },
+            new object[] { TestEnvironment.Auditor1KeyPair,  ApplicationState.Ready, null }
         };
 
         [Test]
         [TestCaseSource(nameof(HandshakeTestCases))]
-        public async Task HandshakeTest(KeyPair clientKeyPair, long? currentAditorApex, ApplicationState alphaState, Type expectedException)
+        public async Task HandshakeTest(KeyPair clientKeyPair, ApplicationState alphaState, Type expectedException)
         {
             Global.AppState.State = alphaState;
 
             var clientConnection = new AlphaWebSocketConnection(new FakeWebSocket());
 
             var message = new HandshakeInit { HandshakeData = clientConnection.HandshakeData };
-            if (currentAditorApex.HasValue)
-                message.Payload = new AuditorHandshakePayload { Apex = currentAditorApex.Value };
             var envelope = message.CreateEnvelope();
             envelope.Sign(clientKeyPair);
             if (expectedException == null)
@@ -185,7 +182,6 @@ namespace Centaurus.Test
                 var envelope = new AuditorState
                 {
                     PendingQuantums = new List<MessageEnvelope>(),
-                    Snapshot = await SnapshotManager.GetSnapshot(),
                     State = ApplicationState.Running
                 }.CreateEnvelope();
                 envelope.Sign(clientKeyPair);

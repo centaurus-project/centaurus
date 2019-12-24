@@ -14,13 +14,9 @@ namespace Centaurus.Domain
     {
         private Logger logger = LogManager.GetCurrentClassLogger();
 
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="quanta">A quanta array ordered by an apex</param>
-        public AlphaQuantumHandler(IEnumerable<MessageEnvelope> quanta)
+        public AlphaQuantumHandler()
         {
-            quantaQueue = new QuantaQueue(quanta);
+            quantaQueue = new QuantaQueue();
         }
 
         readonly QuantaQueue quantaQueue;

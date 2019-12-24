@@ -15,7 +15,7 @@ namespace Centaurus.Domain
             var ledgerQuantum = (LedgerCommitQuantum)envelope.Message;
             var ledgerNotification = (LedgerUpdateNotification)ledgerQuantum.Source.Message;
 
-            var effectsContainer = new EffectProcessorsContainer(envelope, Global.PendingUpdates);
+            var effectsContainer = new EffectProcessorsContainer(envelope, Global.AddEffects);
 
             effectsContainer.Add(LedgerUpdateEffectProcessor.GetProcessor(ledgerQuantum.Apex, ledgerNotification.LedgerTo, Global.LedgerManager));
 

@@ -15,7 +15,7 @@ namespace Centaurus.Domain
             var quantum = (RequestQuantum)envelope.Message;
             var requestMessage = quantum.RequestMessage;
 
-            var effectsContainer = new EffectProcessorsContainer(envelope, Global.PendingUpdates);
+            var effectsContainer = new EffectProcessorsContainer(envelope, Global.AddEffects);
 
             UpdateNonce(effectsContainer);
 
