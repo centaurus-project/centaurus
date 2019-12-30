@@ -18,9 +18,26 @@ namespace Centaurus.DAL
         /// </summary>
         public abstract Task<long> GetLastApex();
 
-        //TODO: return cursor
-        public abstract Task<List<QuantumModel>> LoadQuanta(params long[] ids);
+        /// <summary>
+        /// Loads quantum with specified apex
+        /// </summary>
+        /// <param name="apex"></param>
+        /// <returns></returns>
+        public abstract Task<QuantumModel> LoadQuantum(long apex);
 
+        //TODO: return cursor
+        /// <summary>
+        /// Loads quanta with specified apexes
+        /// </summary>
+        /// <param name="apexes"></param>
+        /// <returns></returns>
+        public abstract Task<List<QuantumModel>> LoadQuanta(params long[] apexes);
+
+        /// <summary>
+        /// Loads quanta where apex is greater than the specified one
+        /// </summary>
+        /// <param name="apex"></param>
+        /// <returns></returns>
         public abstract Task<List<QuantumModel>> LoadQuantaAboveApex(long apex);
 
         /// <summary>

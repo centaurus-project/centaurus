@@ -35,8 +35,13 @@ namespace Centaurus.Test
 
         public override Task<long> GetLastApex()
         {
-            var res = constellationState?.CurrentApex ?? -1;
+            var res = quantaCollection.FirstOrDefault()?.Apex ?? -1;
             return Task.FromResult(res);
+        }
+
+        public override Task<QuantumModel> LoadQuantum(long apex)
+        {
+            return Task.FromResult(quantaCollection.First(q => q.Apex == apex));
         }
 
         public override Task<List<QuantumModel>> LoadQuanta(params long[] apexes)
@@ -170,7 +175,6 @@ namespace Centaurus.Test
             {
                 if (constellationState == null)
                     constellationState = new ConstellationState();
-                constellationState.CurrentApex = _stellarData.CurrentApex;
                 if (_stellarData.Ledger > 0)
                     constellationState.Ledger = _stellarData.Ledger;
                 if (_stellarData.VaultSequence > 0)

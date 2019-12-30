@@ -42,13 +42,11 @@ namespace Centaurus.Domain
             for (int i = 0; i < updateLength; i++)
             {
                 var currentUpdateItem = update[i];
-                if (currentUpdateItem.Quantum != null) //it could be null on constellation init
-                {
-                    quanta.Add(QuantumModelExtensions.FromQuantum(currentUpdateItem.Quantum));
-                    var quantumMessage = (Quantum)currentUpdateItem.Quantum.Message;
-                    //update current apex
-                    stellarData.CurrentApex = quantumMessage.Apex;
-                }
+
+                quanta.Add(QuantumModelExtensions.FromQuantum(currentUpdateItem.Quantum));
+                var quantumMessage = (Quantum)currentUpdateItem.Quantum.Message;
+                //update current apex
+                stellarData.CurrentApex = quantumMessage.Apex;
 
                 var quatumEffects = update[i].Effects;
                 var quatumEffectsLength = quatumEffects.Length;

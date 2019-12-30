@@ -116,6 +116,13 @@ namespace Centaurus.DAL.Mongo
                 .FirstOrDefaultAsync();
         }
 
+        public override async Task<QuantumModel> LoadQuantum(long apex)
+        {
+            return await quantaCollection
+                   .Find(q => q.Apex == apex)
+                   .FirstAsync();
+        }
+
         public override async Task<List<QuantumModel>> LoadQuanta(params long[] apexes)
         {
             var filter = FilterDefinition<QuantumModel>.Empty;
@@ -130,13 +137,6 @@ namespace Centaurus.DAL.Mongo
                 throw new Exception("Not all quanta were found");
 
             return res;
-        }
-
-        public async Task<List<QuantumModel>> LoadQuantumModels(params long[] quantumIds)
-        {
-            return await quantaCollection
-                .Find(Builders<QuantumModel>.Filter.In(q => q.Apex, quantumIds))
-                .ToListAsync();
         }
 
         public override async Task<List<QuantumModel>> LoadQuantaAboveApex(long apex)
@@ -172,11 +172,12 @@ namespace Centaurus.DAL.Mongo
 
         public override async Task<long> GetLastApex()
         {
-            var constellationState = await constellationStateCollection
-                .Find(FilterDefinition<ConstellationState>.Empty)
-                .FirstOrDefaultAsync();
+            var quanta = await quantaCollection
+                   .Find(FilterDefinition<QuantumModel>.Empty)
+                   .SortByDescending(e => e.Apex)
+                   .FirstOrDefaultAsync();
 
-            return constellationState?.CurrentApex ?? -1;
+            return quanta?.Apex ?? -1;
         }
 
         #region Updates
@@ -266,18 +267,17 @@ namespace Centaurus.DAL.Mongo
                 updateModel = new InsertOneModel<ConstellationState>(new ConstellationState
                 {
                     Ledger = ledger,
-                    VaultSequence = vaultSequence,
-                    CurrentApex = apex
+                    VaultSequence = vaultSequence
                 });
             else if (constellationState.IsDeleted)
                 throw new InvalidOperationException("Stellar data entry cannot be deleted");
             else
             {
-                UpdateDefinition<ConstellationState> updateCommand = update.Set(s => s.CurrentApex, apex);
+                UpdateDefinition<ConstellationState> updateCommand = null;
                 if (ledger > 0)
-                    updateCommand = updateCommand.Set(s => s.Ledger, ledger);
+                    updateCommand = update.Set(s => s.Ledger, ledger);
                 if (vaultSequence > 0)
-                    updateCommand = updateCommand.Set(s => s.VaultSequence, vaultSequence);
+                    updateCommand = updateCommand.Set(s => s.VaultSequence, vaultSequence) ?? update.Set(s => s.VaultSequence, vaultSequence);
                 updateModel = new UpdateOneModel<ConstellationState>(filter.Empty, updateCommand);
             }
 

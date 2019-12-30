@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
@@ -10,7 +11,7 @@ namespace Centaurus.Domain
     {
         public override MessageTypes SupportedMessageType => MessageTypes.OrderRequest;
 
-        public override ResultMessage Process(MessageEnvelope envelope)
+        public override Task<ResultMessage> Process(MessageEnvelope envelope)
         {
             var quantum = (RequestQuantum)envelope.Message;
             var requestMessage = quantum.RequestMessage;
@@ -26,11 +27,11 @@ namespace Centaurus.Domain
                 .Where(e => e.Pubkey.Equals(requestMessage.Account))
                 .ToList();
 
-            return envelope.CreateResult(ResultStatusCodes.Success, accountEffects);
+            return Task.FromResult(envelope.CreateResult(ResultStatusCodes.Success, accountEffects));
         }
 
         //TODO: replace all system exceptions that occur on validation with our client exceptions
-        public override void Validate(MessageEnvelope envelope)
+        public override Task Validate(MessageEnvelope envelope)
         {
             ValidateNonce(envelope);
 
@@ -59,6 +60,8 @@ namespace Centaurus.Domain
                 var balance = account.GetBalance(0);
                 if (!balance.HasSufficientBalance(totalXlmAmountToTrade)) throw new BadRequestException("Insufficient funds");
             }
+
+            return Task.CompletedTask;
         }
     }
 }

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading.Tasks;
 using Centaurus.Models;
 
 namespace Centaurus.Domain
@@ -9,9 +10,9 @@ namespace Centaurus.Domain
     {
         public abstract MessageTypes SupportedMessageType { get; }
 
-        public abstract ResultMessage Process(MessageEnvelope envelope);
+        public abstract Task<ResultMessage> Process(MessageEnvelope envelope);
 
-        public abstract void Validate(MessageEnvelope envelope);
+        public abstract Task Validate(MessageEnvelope envelope);
 
         public void UpdateNonce(EffectProcessorsContainer effectProcessorsContainer)
         {

@@ -143,7 +143,12 @@ namespace Centaurus.Test
                 };
 
                 var ledgerTo = 63;
-                var envelope = new LedgerUpdateNotification { LedgerFrom = 0, LedgerTo = (uint)ledgerTo, Payments = new List<PaymentBase>() }.CreateEnvelope();
+                var envelope = new LedgerUpdateNotification
+                {
+                    LedgerFrom = Global.LedgerManager.Ledger + 1,
+                    LedgerTo = (uint)ledgerTo,
+                    Payments = new List<PaymentBase>()
+                }.CreateEnvelope();
                 envelope.Sign(clientKeyPair);
 
                 var isHandled = await MessageHandlers<AlphaWebSocketConnection>.HandleMessage(clientConnection, envelope);
@@ -221,7 +226,8 @@ namespace Centaurus.Test
 
                 var envelope = new OrderRequest
                 {
-                    Account = TestEnvironment.Client1KeyPair
+                    Account = TestEnvironment.Client1KeyPair,
+                    Nonce = 1
                 }.CreateEnvelope();
                 envelope.Sign(TestEnvironment.Client1KeyPair);
 

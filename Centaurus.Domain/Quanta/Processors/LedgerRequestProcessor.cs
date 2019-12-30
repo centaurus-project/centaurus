@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using Centaurus.Models;
 using stellar_dotnet_sdk;
 
@@ -8,9 +10,39 @@ namespace Centaurus.Domain
 {
     public class LedgerRequestProcessor : IQuantumRequestProcessor
     {
+        /// <summary>
+        /// Manages account and balance creation if needed
+        /// </summary>
+        class AccountBalanceManager
+        {
+            Dictionary<RawPubKey, List<int>> balances = new Dictionary<RawPubKey, List<int>>();
+
+            public void AddAccount(RawPubKey pubKey)
+            {
+                balances.Add(pubKey, new List<int>());
+            }
+
+            public bool ContainsAccount(RawPubKey pubKey)
+            {
+                return balances.ContainsKey(pubKey);
+            }
+
+            public void AddBalance(RawPubKey pubKey, int asset)
+            {
+                if (!ContainsAccount(pubKey))
+                    AddAccount(pubKey);
+                balances[pubKey].Add(asset);
+            }
+
+            public bool ContainsBalance(RawPubKey pubKey, int asset)
+            {
+                return ContainsAccount(pubKey) && balances[pubKey].Any(a => a == asset);
+            }
+        }
+
         public MessageTypes SupportedMessageType => MessageTypes.LedgerCommitQuantum;
 
-        public ResultMessage Process(MessageEnvelope envelope)
+        public Task<ResultMessage> Process(MessageEnvelope envelope)
         {
             var ledgerQuantum = (LedgerCommitQuantum)envelope.Message;
             var ledgerNotification = (LedgerUpdateNotification)ledgerQuantum.Source.Message;
@@ -19,6 +51,7 @@ namespace Centaurus.Domain
 
             effectsContainer.Add(LedgerUpdateEffectProcessor.GetProcessor(ledgerQuantum.Apex, ledgerNotification.LedgerTo, Global.LedgerManager));
 
+            var balanceManager = new AccountBalanceManager();
             for (var i = 0; i < ledgerNotification.Payments.Count; i++)
             {
                 var payment = ledgerNotification.Payments[i];
@@ -26,7 +59,7 @@ namespace Centaurus.Domain
                 switch (payment.Type)
                 {
                     case PaymentTypes.Deposit:
-                        ProcessDeposite(payment as Deposit, effectsContainer);
+                        ProcessDeposite(payment as Deposit, effectsContainer, balanceManager);
                         break;
                     case PaymentTypes.Withdrawal:
                         ProcessWithdrawal(payment as Withdrawal, effectsContainer);
@@ -38,10 +71,10 @@ namespace Centaurus.Domain
 
             effectsContainer.Commit();
 
-            return envelope.CreateResult(ResultStatusCodes.Success);
+            return Task.FromResult(envelope.CreateResult(ResultStatusCodes.Success));
         }
 
-        public void Validate(MessageEnvelope envelope)
+        public Task Validate(MessageEnvelope envelope)
         {
             //TODO: validate type automatically based on the SupportedMessageType
             var ledgerQuantum = envelope.Message as LedgerCommitQuantum
@@ -72,6 +105,8 @@ namespace Centaurus.Domain
                         throw new InvalidOperationException("Unsupported payment type: " + payment.Type.ToString());
                 }
             }
+
+            return Task.CompletedTask;
         }
 
         private void CheckSignatures(MessageEnvelope envelope)
@@ -95,16 +130,27 @@ namespace Centaurus.Domain
                 throw new InvalidOperationException("Amount should be greater than 0");
         }
 
-        private void ProcessDeposite(Deposit deposite, EffectProcessorsContainer effectsContainer)
+        /// <summary>
+        /// Creates balance and account if needed, updates balance
+        /// </summary>
+        private void ProcessDeposite(Deposit deposite, EffectProcessorsContainer effectsContainer, AccountBalanceManager balanceManager)
         {
             if (deposite.PaymentResult == PaymentResults.Failed)
                 return;
-            var account = Global.AccountStorage.GetAccount(deposite.Destination);
-            if (account == null)
-                effectsContainer.AddAccountCreate(Global.AccountStorage, deposite.Destination);
 
-            if (account == null || !account.HasBalance(deposite.Asset))
+            var account = Global.AccountStorage.GetAccount(deposite.Destination);
+            if (account == null && !balanceManager.ContainsAccount(deposite.Destination))
+            {
+                effectsContainer.AddAccountCreate(Global.AccountStorage, deposite.Destination);
+                balanceManager.AddAccount(deposite.Destination);
+            }
+
+            if ((account == null || !account.HasBalance(deposite.Asset))
+                && !balanceManager.ContainsBalance(deposite.Destination, deposite.Asset))
+            {
                 effectsContainer.AddBalanceCreate(Global.AccountStorage, deposite.Destination, deposite.Asset);
+                balanceManager.AddBalance(deposite.Destination, deposite.Asset);
+            }
 
             effectsContainer.AddBalanceUpdate(Global.AccountStorage, deposite.Destination, deposite.Asset, deposite.Amount);
         }
@@ -131,6 +177,10 @@ namespace Centaurus.Domain
             effectsContainer.AddUnlockLiabilities(Global.AccountStorage, withdrawal.Source, withdrawal.Asset, withdrawal.Amount);
             if (withdrawal.PaymentResult == PaymentResults.Success)
                 effectsContainer.AddBalanceUpdate(Global.AccountStorage, withdrawal.Source, withdrawal.Asset, -withdrawal.Amount);
+            else
+            { 
+                //TODO: we need to notify client that something went wrong
+            }
 
             effectsContainer.AddWithdrawalRemove(withdrawal, Global.WithdrawalStorage);
         }

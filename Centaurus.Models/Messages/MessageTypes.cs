@@ -60,6 +60,10 @@ namespace Centaurus.Models
         /// </summary>
         SetApexCursor = 110,
         /// <summary>
+        /// Contains data for init. It will be created by alpha on init.
+        /// </summary>
+        ConstellationInitQuantum = 200,
+        /// <summary>
         /// Upgrade quorum, add/remove auditors, apply new settings etc.
         /// </summary>
         ConstellationUpgradeQuantum = 201,

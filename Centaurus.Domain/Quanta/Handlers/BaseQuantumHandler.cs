@@ -4,97 +4,204 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public abstract class BaseQuantumHandler
+    //TODO: add Stop method
+    public class QuantumHandler
     {
+        protected class HandleItem
+        {
+            public HandleItem(MessageEnvelope quantum)
+            {
+                Quantum = quantum;
+                HandlingTaskSource = new TaskCompletionSource<MessageEnvelope>();
+            }
+            public MessageEnvelope Quantum { get; }
+            public TaskCompletionSource<MessageEnvelope> HandlingTaskSource { get; }
+        }
+
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        bool isStarted;
+        public QuantumHandler()
+        {
+            Start();
+        }
 
-        protected object syncRoot = new { };
-
-        Dictionary<MessageEnvelope, TaskCompletionSource<MessageEnvelope>> awaitedQuanta = new Dictionary<MessageEnvelope, TaskCompletionSource<MessageEnvelope>>();
-
-        /// <summary>
-        /// Handles quantum
-        /// </summary>
-        /// <param name="envelope">Quantum to handle</param>
-        public abstract void Handle(MessageEnvelope envelope);
+        protected BlockingCollection<HandleItem> awaitedQuanta = new BlockingCollection<HandleItem>();
 
         /// <summary>
         /// Handles the quantum and returns Task.
-        /// This method is intended for testing purposes.
         /// </summary>
         /// <param name="envelope">Quantum to handle</param>
-        /// <returns></returns>
         public Task<MessageEnvelope> HandleAsync(MessageEnvelope envelope)
         {
-            lock (syncRoot)
+            var newHandleItem = new HandleItem(envelope);
+            awaitedQuanta.Add(newHandleItem);
+            return newHandleItem.HandlingTaskSource.Task;
+        }
+        private async Task RunQuantumWorker()
+        {
+            try
             {
-                var quantumCompletionSource = new TaskCompletionSource<MessageEnvelope>();
-                if (!awaitedQuanta.TryAdd(envelope, quantumCompletionSource))
-                    throw new Exception("Unable to add envelope to the awaited quanta");
-                try
-                {
-                    Handle(envelope);
-                    logger.Trace($"Envelope '{envelope.Message.MessageType.ToString()}:{envelope.Message.MessageId}' is added to the awaited quanta");
-                }
-                catch (Exception exc)
-                {
-                    QuantumFailed(envelope, exc);
-                    quantumCompletionSource.SetException(exc);
-                }
-                return quantumCompletionSource.Task;
+                foreach (var handlingItem in awaitedQuanta.GetConsumingEnumerable())
+                    await ProcessQuantum(handlingItem);
+            }
+            catch (Exception exc)
+            {
+                logger.Error(exc);
+                if (!Global.IsAlpha) //auditor should fail on quantum processing handling
+                    Global.AppState.State = ApplicationState.Failed;
+                throw;
             }
         }
 
-        protected void QuantumIsHandled(MessageEnvelope envelope)
+        async Task ProcessQuantum(HandleItem handleItem)
         {
-            lock (syncRoot)
+            var envelope = handleItem.Quantum;
+            var tcs = handleItem.HandlingTaskSource;
+            try
             {
-                if (awaitedQuanta.Remove(envelope, out TaskCompletionSource<MessageEnvelope> quantumCompletionSource))
+                await HandleQuantum(envelope);
+
+                tcs.SetResult(envelope);
+
+            }
+            catch (Exception exc)
+            {
+                logger.Error(exc);
+                Notifier.OnMessageProcessResult(new ResultMessage
                 {
-                    Task.Factory.StartNew(() =>
-                    {
-                        quantumCompletionSource.SetResult(envelope);
-                        logger.Trace($"Envelope '{envelope.Message.MessageType.ToString()}:{envelope.Message.MessageId}' was removed from the awaited quanta");
-                    });
-                }
+                    Status = ClientExceptionHelper.GetExceptionStatusCode(exc),
+                    OriginalMessage = envelope
+                });
+
+                tcs.SetException(exc);
             }
         }
 
-        protected void QuantumFailed(MessageEnvelope envelope, Exception exception)
+        MessageEnvelope GetQuantumEnvelope(MessageEnvelope envelope)
         {
-            lock (syncRoot)
+            var quantumEnvelope = envelope;
+            if (Global.IsAlpha && !(envelope.Message is Quantum))//we need to wrap client request
             {
-                if (awaitedQuanta.Remove(envelope, out TaskCompletionSource<MessageEnvelope> quantumCompletionSource))
+                quantumEnvelope = new RequestQuantum { RequestEnvelope = envelope }.CreateEnvelope(); 
+                quantumEnvelope.Sign(Global.Settings.KeyPair); //alpha should sign every quantum
+            }
+            return quantumEnvelope;
+        }
+
+        MessageTypes GetMessageType(MessageEnvelope envelope)
+        {
+            var quantumEnvelope = envelope;
+            if (envelope.Message is RequestQuantum)
+                return ((RequestQuantum)envelope.Message).RequestMessage.MessageType;
+            return envelope.Message.MessageType;
+        }
+
+        async Task HandleQuantum(MessageEnvelope quantumEnvelope)
+        {
+            if (Global.IsAlpha)
+                await AlphaHandleQuantum(quantumEnvelope);
+            else
+                await AuditorHandleQuantum(quantumEnvelope);
+        }
+
+        async Task AlphaHandleQuantum(MessageEnvelope envelope)
+        {
+            var processor = GetProcessor(envelope.Message.MessageType);
+
+            var quantumEnvelope = GetQuantumEnvelope(envelope);
+
+            var quantum = (Quantum)quantumEnvelope.Message;
+
+            quantum.IsProcessed = false;
+
+            await processor.Validate(quantumEnvelope);
+
+            //we must add it before processing, otherwise the quantum that we are processing here will be different from the quantum that will come to the auditor
+            Global.QuantumStorage.AddQuantum(quantumEnvelope);
+
+            var resultMessage = await processor.Process(quantumEnvelope);
+
+            quantum.IsProcessed = true;
+
+            Notifier.OnMessageProcessResult(resultMessage);
+
+            logger.Trace($"Message of type {envelope.Message.ToString()} with apex {quantum.Apex} is handled.");
+
+        }
+
+        async Task AuditorHandleQuantum(MessageEnvelope envelope)
+        {
+            var result = envelope.CreateResult();
+            try
+            {
+                var messageType = GetMessageType(envelope);
+
+                var processor = GetProcessor(messageType);
+
+                await processor.Validate(envelope);
+
+                await processor.Process(envelope);
+
+                Global.QuantumStorage.AddQuantum(envelope);
+
+                result.Status = ResultStatusCodes.Success;
+                ProcessTransaction(envelope, result);
+
+                logger.Trace($"Message of type {messageType.ToString()} with apex {((Quantum)envelope.Message).Apex} is handled.");
+            }
+            catch (Exception exc)
+            {
+                logger.Error(exc);
+                result.Status = ResultStatusCodes.InternalError;
+                throw;
+            }
+
+            OutgoingMessageStorage.EnqueueMessage(result);
+        }
+
+        void ProcessTransaction(MessageEnvelope envelope, ResultMessage result)
+        {
+            var quantum = envelope.Message;
+            if (quantum is RequestQuantum)//unwrap if needed
+                quantum = ((RequestQuantum)quantum).RequestMessage;
+            if (quantum is ITransactionContainer)
+            {
+                var transaction = ((ITransactionContainer)quantum).GetTransaction();
+                var txHash = transaction.Hash();
+                result.Effects.Add(new TransactionSignedEffect()
                 {
-                    Task.Factory.StartNew(() =>
+                    TransactionHash = txHash,
+                    Signature = new Ed25519Signature()
                     {
-                        quantumCompletionSource.SetException(exception);
-                        logger.Trace($"Envelope '{envelope.Message.MessageType.ToString()}:{envelope.Message.MessageId}' was removed from the awaited quanta");
-                    });
-                }
+                        Signature = Global.Settings.KeyPair.Sign(txHash),
+                        Signer = new RawPubKey { Data = Global.Settings.KeyPair.PublicKey }
+                    }
+                });
             }
         }
 
         /// <summary>
-        /// Starts quantum handling
+        /// Looks for a processor for the specified message type
         /// </summary>
-        public void Start()
+        IQuantumRequestProcessor GetProcessor(MessageTypes messageType)
         {
-            lock (syncRoot)
-            {
-                if (isStarted)
-                    throw new InvalidOperationException("Handler is already started");
-                StartInternal();
-                isStarted = true;
-            }
+            if (!Global.QuantumProcessor.TryGetValue(messageType, out IQuantumRequestProcessor processor))
+                //TODO: do not fail here - return unsupported error message;
+                throw new InvalidOperationException($"Quantum {messageType} is not supported.");
+            return processor;
         }
 
-        protected abstract void StartInternal();
+        /// <summary>
+        /// Starts a new worker thread
+        /// </summary>
+        void Start()
+        {
+            Task.Factory.StartNew(RunQuantumWorker, TaskCreationOptions.LongRunning);
+        }
     }
 }

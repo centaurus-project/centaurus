@@ -17,7 +17,7 @@ namespace Centaurus.Domain
 
         public override Task HandleMessage(AlphaWebSocketConnection connection, MessageEnvelope messageEnvelope)
         {
-            Global.QuantumHandler.Handle(messageEnvelope);
+            Global.QuantumHandler.HandleAsync(messageEnvelope);
             return Task.CompletedTask;
         }
     }

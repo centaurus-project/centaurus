@@ -14,33 +14,47 @@ namespace Centaurus.Test
 
         [Test]
         [TestCase(1, 0, 0, 0, typeof(InvalidOperationException))]
-        [TestCase(2, 0, 0, 0, typeof(InvalidOperationException))]
-        [TestCase(2, 63, 0, 0, typeof(InvalidOperationException))]
-        [TestCase(2, 63, 100, 10, typeof(InvalidOperationException))]
-        [TestCase(2, 63, 100, 0, null)]
+        [TestCase(3, 0, 0, 0, typeof(InvalidOperationException))]
+        [TestCase(3, 63, 0, 0, typeof(InvalidOperationException))]
+        [TestCase(3, 63, 100, 10, typeof(InvalidOperationException))]
+        [TestCase(3, 63, 100, 0, null)]
         public async Task LedgerQuantumTest(int ledgerFrom, int ledgerTo, int amount, int asset, Type excpectedException)
         {
             try
             {
-                long apex = 0;
+                long apex = Global.QuantumStorage.CurrentApex;
 
                 var client1StartBalanceAmount = (long)0;
                 var clientAccountBalance = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair).GetBalance(asset);
 
-                var trHash = KeyPair.Random().PublicKey;
-                var withdrawalDest = KeyPair.Random().PublicKey;
+                var withdrawalDest = KeyPair.Random();
+                var txHash = new byte[] { };
                 if (clientAccountBalance != null && amount > 0)
                 {
                     client1StartBalanceAmount = clientAccountBalance.Amount;
 
+                    var transactionBuilder = new Transaction.Builder(Global.VaultAccount.GetAccount());
+                    transactionBuilder.AddOperation(
+                        new PaymentOperation.Builder(
+                            withdrawalDest,
+                            new AssetTypeNative(),
+                            amount.ToString()
+                    ).Build());
+                    var transaction = transactionBuilder.Build();
+
+                    var txXdr = transaction.ToRawEnvelopeXdr();
+
+                    txHash = txXdr.ComputeHash();
+
                     var withdrawal = new WithdrawalRequest
                     {
                         Account = TestEnvironment.Client1KeyPair,
-                        Destination = withdrawalDest,
+                        Destination = withdrawalDest.PublicKey,
                         Amount = amount,
                         Asset = asset,
                         Nonce = (ulong)DateTime.UtcNow.Ticks,
-                        TransactionHash = trHash
+                        TransactionHash = txHash,
+                        TransactionXdr = txXdr
                     };
 
                     Message quantum = withdrawal;
@@ -71,7 +85,7 @@ namespace Centaurus.Test
                             Destination = withdrawalDest,
                             Source = TestEnvironment.Client1KeyPair,
                             Asset = asset,
-                            TransactionHash = trHash,
+                            TransactionHash = txHash,
                             PaymentResult = PaymentResults.Success
                         }
                     }
@@ -127,7 +141,7 @@ namespace Centaurus.Test
 
                 if (!Global.IsAlpha)
                 {
-                    var quantum = new RequestQuantum { Apex = 1, RequestEnvelope = envelope };
+                    var quantum = new RequestQuantum { Apex = Global.QuantumStorage.CurrentApex + 1, RequestEnvelope = envelope };
                     envelope = quantum.CreateEnvelope();
                 }
 

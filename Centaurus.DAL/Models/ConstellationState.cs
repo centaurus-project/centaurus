@@ -11,6 +11,5 @@ namespace Centaurus.DAL.Models
     {
         public long VaultSequence { get; set; }
         public long Ledger { get; set; }
-        public long CurrentApex { get; set; }
     }
 }

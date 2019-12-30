@@ -1,4 +1,5 @@
 ﻿using stellar_dotnet_sdk;
+using stellar_dotnet_sdk.xdr;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -7,10 +8,11 @@ namespace Centaurus.Domain
 {
     public static class TransactionExtensions
     {
-        public static byte[] ToRawEnvelopeXdr(this Transaction tx)
+        public static byte[] ToRawEnvelopeXdr(this stellar_dotnet_sdk.Transaction tx)
         {
-            //TODO: performance: serialize directly, without Base64 encoding
-            return Convert.FromBase64String(tx.ToEnvelopeXdrBase64());
+            var outputStream = new XdrDataOutputStream();
+            TransactionEnvelope.Encode(outputStream, tx.ToUnsignedEnvelopeXdr());
+            return outputStream.ToArray();
         }
     }
 }

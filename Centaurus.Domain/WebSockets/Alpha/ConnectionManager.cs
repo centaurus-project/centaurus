@@ -130,8 +130,20 @@ namespace Centaurus.Domain
                 case ConnectionState.Closed:
                     RemoveConnection((AlphaWebSocketConnection)sender);
                     break;
+                case ConnectionState.Ready:
+                    EnsureAuditorConnected((AlphaWebSocketConnection)sender);
+                    break;
                 default:
                     break;
+            }
+        }
+
+        private static void EnsureAuditorConnected(AlphaWebSocketConnection connection)
+        {
+            if (Global.Constellation.Auditors.Contains(connection.ClientPubKey))
+            {
+                AlphaStateManager.AuditorConnected(connection.ClientPubKey);
+                logger.Trace($"Auditor {connection.ClientPubKey} is connected.");
             }
         }
 
@@ -145,7 +157,7 @@ namespace Centaurus.Domain
                 {
                     connections.TryRemove(connection.ClientPubKey, out _);
                     if (Global.Constellation.Auditors.Contains(connection.ClientPubKey))
-                        AlphaStateManager.AuditorConnectionClosed();
+                        AlphaStateManager.AuditorConnectionClosed(connection.ClientPubKey);
                 }
             }
         }
@@ -156,11 +168,6 @@ namespace Centaurus.Domain
             {
                 var connection = (AlphaWebSocketConnection)baseConnection;
                 AddConnection(connection);
-                if (Global.Constellation.Auditors.Contains(connection.ClientPubKey))
-                {
-                    AlphaStateManager.AuditorConnected();
-                    logger.Trace($"Auditor {connection.ClientPubKey} is connected.");
-                }
             }
         }
 

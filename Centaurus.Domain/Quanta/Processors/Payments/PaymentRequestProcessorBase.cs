@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using Centaurus.Models;
 using stellar_dotnet_sdk;
 
@@ -9,7 +10,7 @@ namespace Centaurus.Domain
 {
     public abstract class PaymentRequestProcessorBase : ClientRequestProcessorBase
     {
-        public override ResultMessage Process(MessageEnvelope envelope)
+        public override Task<ResultMessage> Process(MessageEnvelope envelope)
         {
             var effectProcessorsContainer = new EffectProcessorsContainer(envelope, Global.AddEffects);
 
@@ -39,7 +40,10 @@ namespace Centaurus.Domain
 
                 if (payment.TransactionHash == null)//if TransactionHash is not null than it's test
                 {
-                    payment.TransactionXdr = transaction.ToRawEnvelopeXdr();
+                    var outputStream = new stellar_dotnet_sdk.xdr.XdrDataOutputStream();
+                    stellar_dotnet_sdk.xdr.Transaction.Encode(outputStream, transaction.ToXdr());
+
+                    payment.TransactionXdr = outputStream.ToArray();
                     payment.TransactionHash = transaction.Hash();
                 }
 
@@ -69,10 +73,10 @@ namespace Centaurus.Domain
             var effects = effectProcessorsContainer.GetEffects();
 
             var accountEffects = effects.Where(e => ByteArrayPrimitives.Equals(e.Pubkey, payment.Account)).ToList();
-            return envelope.CreateResult(ResultStatusCodes.Success, accountEffects);
+            return Task.FromResult(envelope.CreateResult(ResultStatusCodes.Success, accountEffects));
         }
 
-        public override void Validate(MessageEnvelope envelope)
+        public override Task Validate(MessageEnvelope envelope)
         {
             ValidateNonce(envelope);
 
@@ -102,6 +106,8 @@ namespace Centaurus.Domain
             var balance = account.Balances.Find(b => b.Asset == payment.Asset);
             if (balance == null || !balance.HasSufficientBalance(payment.Amount))
                 throw new InvalidOperationException("Insufficient funds");
+
+            return Task.CompletedTask;
         }
     }
 }

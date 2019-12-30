@@ -57,6 +57,10 @@ namespace Centaurus.Domain
                 Global.AppState.State = ApplicationState.Failed;
                 logger.Error(exc, "Error on adding auditors state");
             }
+            finally
+            {
+                semaphoreSlim.Release();
+            }
         }
 
         /// <summary>

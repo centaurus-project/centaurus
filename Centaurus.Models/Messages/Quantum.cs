@@ -13,9 +13,15 @@ namespace Centaurus.Models
         public long Apex { get; set; }
 
         /// <summary>
-        /// Operation timestamp. Assigned by Alpha server when it finishes processing a quantum.
+        /// Previous quantum hash.
         /// </summary>
         [XdrField(1)]
+        public byte[] PrevHash { get; set; }
+
+        /// <summary>
+        /// Operation time stamp. Assigned by Alpha server when it finishes processing a quantum.
+        /// </summary>
+        [XdrField(2)]
         public long Timestamp { get; set; }
 
         /// <summary>

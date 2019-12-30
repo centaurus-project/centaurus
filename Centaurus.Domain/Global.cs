@@ -33,7 +33,10 @@ namespace Centaurus.Domain
 
             AppState = IsAlpha ? new AlphaStateManager() : (StateManager)new AuditorStateManager();
 
+            QuantumHandler = new QuantumHandler();
+
             //try to load last settings, we need it to know current auditors
+            var lastHash = new byte[] { };
             var lastApex = SnapshotManager.GetLastApex().Result;
             if (lastApex >= 0)
             {
@@ -48,6 +51,8 @@ namespace Centaurus.Domain
                 //if no snapshot, the app is in init state
                 AppState.State = ApplicationState.WaitingForInit;
 
+            QuantumStorage = new QuantumStorage(lastApex < 0 ? 0 : lastApex, lastHash);
+
             InitTimers();
         }
 
@@ -58,8 +63,6 @@ namespace Centaurus.Domain
             SnapshotManager = new SnapshotManager(OnSnapshotSuccess, OnSnapshotFailed);
 
             Constellation = snapshot.Settings;
-
-            QuantumStorage = new QuantumStorage(snapshot.Apex);
 
             VaultAccount = new AccountData(snapshot.Settings.Vault, snapshot.VaultSequence);
 
@@ -72,10 +75,6 @@ namespace Centaurus.Domain
             AuditResultManager = new AuditResultManager();
 
             WithdrawalStorage = new WithdrawalStorage(snapshot.Withdrawals);
-
-            QuantumHandler = IsAlpha ? (BaseQuantumHandler)new AlphaQuantumHandler() : new AuditorQuantumHandler();
-
-            QuantumHandler.Start();
 
             LedgerManager = new LedgerManager(snapshot.Ledger);
         }
@@ -102,7 +101,7 @@ namespace Centaurus.Domain
         public static AccountData VaultAccount { get; private set; }
         public static AccountStorage AccountStorage { get; private set; }
         public static WithdrawalStorage WithdrawalStorage { get; private set; }
-        public static BaseQuantumHandler QuantumHandler { get; private set; }
+        public static QuantumHandler QuantumHandler { get; private set; }
         public static AuditLedgerManager AuditLedgerManager { get; private set; }
         public static AuditResultManager AuditResultManager { get; private set; }
         public static LedgerManager LedgerManager { get; private set; }
@@ -168,7 +167,7 @@ namespace Centaurus.Domain
 
             var updates = pendingUpdates;
             pendingUpdates = new PendingUpdates();
-            _ = SnapshotManager.SaveSnapshot(updates);
+            _ = SnapshotManager.ApplyUpdates(updates);
 
 #if !DEBUG
             snapshotTimoutTimer.Start();

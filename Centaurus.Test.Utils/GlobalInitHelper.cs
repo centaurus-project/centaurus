@@ -82,43 +82,89 @@ namespace Centaurus.Test
 
             var assets = new List<AssetSettings> { new AssetSettings { Id = 1, Code = "X", Issuer = KeyPair.Random() } };
 
-            var constellationSettings = new ConstellationSettings
+            var initQuantum = new ConstellationInitQuantum
             {
+                Apex = 1,
                 Assets = assets,
                 Auditors = auditors.Select(a => (RawPubKey)a.PublicKey).ToList(),
                 MinAccountBalance = 1,
                 MinAllowedLotSize = 1,
-                Vault = settings is AlphaSettings ? settings.KeyPair.PublicKey : ((AuditorSettings)settings).AlphaKeyPair.PublicKey
+                Vault = settings is AlphaSettings ? settings.KeyPair.PublicKey : ((AuditorSettings)settings).AlphaKeyPair.PublicKey,
+                VaultSequence = 1,
+                Ledger = 1,
+                PrevHash = new byte[] { }
             };
 
-            SnapshotManager.BuildGenesisSnapshot(constellationSettings, 1, 1).Wait();
 
-            var accountUpdates = new List<DiffObject.Account>();
-            var balances = new List<DiffObject.Balance>();
-            for (var i = 0; i < clients.Count; i++)
+            var alphaKeyPair = KeyPair.FromSecretSeed(TestEnvironment.AlphaKeyPair.SecretSeed);
+            var envelope = initQuantum.CreateEnvelope();
+            envelope.Sign(alphaKeyPair);
+
+            Global.QuantumHandler.HandleAsync(envelope).Wait();
+
+
+            var deposits = new List<PaymentBase>();
+            Action<byte[], int> addAssetsFn = (acc, asset) =>
             {
-                accountUpdates.Add(new DiffObject.Account { IsInserted = true, PubKey = clients[i].PublicKey });
-                balances.Add(new DiffObject.Balance { IsInserted = true, PubKey = clients[i].PublicKey, Amount = 10000, AssetId = 0 });
-                for (var c = 0; c < assets.Count; c++)
+                deposits.Add(new Deposit
                 {
-                    balances.Add(new DiffObject.Balance { IsInserted = true, PubKey = clients[i].PublicKey, Amount = 10000, AssetId = assets[c].Id });
-                }
+                    Destination = acc,
+                    Amount = 10000,
+                    Asset = asset,
+                    PaymentResult = PaymentResults.Success
+                });
+            };
+
+            for (int i = 0; i < clients.Count; i++)
+            {
+                //add xlm
+                addAssetsFn(clients[i].PublicKey, 0);
+                for (var c = 0; c < assets.Count; c++)
+                    addAssetsFn(clients[i].PublicKey, assets[c].Id);
             }
 
-            Global.PermanentStorage.Update(new DiffObject
+            var depositeQuantum = new LedgerCommitQuantum
             {
-                Accounts = accountUpdates,
-                Balances = balances,
-                Assets = new List<DAL.Models.AssetModel>(),
-                Effects = new List<DAL.Models.EffectModel>(),
-                Orders = new List<DiffObject.Order>(),
-                Quanta = new List<DAL.Models.QuantumModel>(),
-                Widthrawals = new List<DiffObject.Withdrawal>(),
-            }).Wait();
+                Apex = 2,
+                PrevHash = Global.QuantumStorage.LastQuantumHash,
+                Source = new LedgerUpdateNotification
+                {
+                    LedgerFrom = 2,
+                    LedgerTo = 2,
+                    Payments = deposits
+                }.CreateEnvelope()
+            };
 
-            var snapshot = SnapshotManager.GetSnapshot().Result;
+            depositeQuantum.Source.Sign(TestEnvironment.Auditor1KeyPair);
 
-            Global.Setup(snapshot);
+            Global.QuantumHandler.HandleAsync(depositeQuantum.CreateEnvelope()).Wait();
+
+            //var accountUpdates = new List<DiffObject.Account>();
+            //var balances = new List<DiffObject.Balance>();
+            //for (var i = 0; i < clients.Count; i++)
+            //{
+            //    accountUpdates.Add(new DiffObject.Account { IsInserted = true, PubKey = clients[i].PublicKey });
+            //    balances.Add(new DiffObject.Balance { IsInserted = true, PubKey = clients[i].PublicKey, Amount = 10000, AssetId = 0 });
+            //    for (var c = 0; c < assets.Count; c++)
+            //    {
+            //        balances.Add(new DiffObject.Balance { IsInserted = true, PubKey = clients[i].PublicKey, Amount = 10000, AssetId = assets[c].Id });
+            //    }
+            //}
+
+            //Global.PermanentStorage.Update(new DiffObject
+            //{
+            //    Accounts = accountUpdates,
+            //    Balances = balances,
+            //    Assets = new List<DAL.Models.AssetModel>(),
+            //    Effects = new List<DAL.Models.EffectModel>(),
+            //    Orders = new List<DiffObject.Order>(),
+            //    Quanta = new List<DAL.Models.QuantumModel>(),
+            //    Widthrawals = new List<DiffObject.Withdrawal>()
+            //}).Wait();
+
+            //var snapshot = SnapshotManager.GetSnapshot().Result;
+
+            //Global.Setup(snapshot);
         }
     }
 }

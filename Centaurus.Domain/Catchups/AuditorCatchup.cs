@@ -40,7 +40,7 @@ namespace Centaurus.Domain
             {
                 var knownAudiotors = GetKnownAuditors();
 
-                if (snapshot.Apex == 0)
+                if (snapshot.Apex == 1)
                 {
                     ValidateInitSnapshot(snapshot, knownAudiotors);
                     return true;

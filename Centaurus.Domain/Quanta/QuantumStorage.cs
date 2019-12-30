@@ -21,10 +21,13 @@ namespace Centaurus.Domain
         int cleanupInterval = 60;
         int quantumsInMemoryPeriod = 5 * 60 * 1000;
 
-        public long CurrentApex { get; private set; } = 0;
-        public QuantumStorage(long currentApex)
+        public long CurrentApex { get; private set; }
+        public byte[] LastQuantumHash { get; private set; }
+
+        public QuantumStorage(long currentApex, byte[] lastQuantumHash)
         {
             CurrentApex = currentApex;
+            LastQuantumHash = lastQuantumHash;
 #if !DEBUG
             cleanUpTimer = new Timer();
             cleanUpTimer.Interval = cleanupInterval * 1000;
@@ -62,12 +65,15 @@ namespace Centaurus.Domain
             if (Global.IsAlpha)
             {
                 quantum.Apex = ++CurrentApex;
+                quantum.PrevHash = LastQuantumHash;
                 quantum.Timestamp = DateTime.UtcNow.Ticks;
             }
             else if (quantum.Apex == default) //when auditor receives quantum, the quantum should already contain apex
                 throw new Exception("Quantum has no apex");
             else
                 CurrentApex = quantum.Apex;
+
+            LastQuantumHash = quantum.ComputeHash();
             storage.Add(quantum.Apex, envelope);
         }
 

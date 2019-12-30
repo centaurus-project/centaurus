@@ -26,37 +26,36 @@ namespace Centaurus.Domain
             onSnapshotFailed = _onSnapshotFailed;
         }
 
-        public static async Task<Snapshot> BuildGenesisSnapshot(ConstellationSettings settings, long ledger, long vaultSequence)
+        /// <summary>
+        /// Makes initial save to DB
+        /// </summary>
+        /// <param name="envelope">Envelope that contains constellation init quantum.</param>
+        public static async Task ApplyInitUpdates(MessageEnvelope envelope)
         {
+
+            var initQuantum = (ConstellationInitQuantum)envelope.Message;
+
             var initEffect = new ConstellationInitEffect
             {
-                Assets = settings.Assets,
-                Auditors = settings.Auditors,
-                MinAccountBalance = settings.MinAccountBalance,
-                MinAllowedLotSize = settings.MinAllowedLotSize,
-                Vault = settings.Vault,
-                VaultSequence = vaultSequence,
-                Ledger = ledger
+                Apex = initQuantum.Apex,
+                Assets = initQuantum.Assets,
+                Auditors = initQuantum.Auditors,
+                MinAccountBalance = initQuantum.MinAccountBalance,
+                MinAllowedLotSize = initQuantum.MinAllowedLotSize,
+                Vault = initQuantum.Vault,
+                VaultSequence = initQuantum.VaultSequence,
+                Ledger = initQuantum.Ledger,
+                Pubkey = envelope.Signatures.First().Signer
             };
 
             var updates = new PendingUpdates();
-            updates.Add(null, new Effect[] { initEffect });
+            updates.Add(envelope, new Effect[] { initEffect });
 
             await SaveSnapshotInternal(updates);
-
-            var snapshot = new Snapshot();
-            snapshot.Ledger = ledger;
-            snapshot.Withdrawals = new List<Withdrawal>();
-            snapshot.Accounts = new List<Account>();
-            snapshot.Orders = new List<Order>();
-            snapshot.Settings = settings;
-            snapshot.VaultSequence = vaultSequence;
-
-            return snapshot;
         }
 
         //only one thread can save snapshots. We need make sure that previous snapshot is permanent
-        public async Task SaveSnapshot(PendingUpdates updates)
+        public async Task ApplyUpdates(PendingUpdates updates)
         {
             try
             {
@@ -163,9 +162,12 @@ namespace Centaurus.Domain
             if (lastApex < apex)
                 throw new InvalidOperationException("Requested apex is greater than the last known one.");
 
+            //some auditors can have capped db
             var minRevertApex = await GetMinRevertApex();
             if (minRevertApex == -1 && apex != lastApex || apex < minRevertApex)
                 throw new InvalidOperationException($"Lack of data to revert to {apex} apex.");
+
+            var lastQuantum = (await Global.PermanentStorage.LoadQuantum(apex)).ToMessageEnvelope();
 
             var settings = await GetConstellationSettings(apex);
             if (settings == null)
@@ -256,7 +258,8 @@ namespace Centaurus.Domain
                 Orders = exchange.OrderMap.GetAllOrders().ToList(),
                 Settings = settings,
                 VaultSequence = stellarData.VaultSequence,
-                Withdrawals = withdrawals
+                Withdrawals = withdrawals,
+                LastHash = lastQuantum.Message.ComputeHash()
             };
         }
 

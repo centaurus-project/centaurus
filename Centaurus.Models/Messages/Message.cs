@@ -16,6 +16,8 @@ namespace Centaurus.Models
     [XdrUnion((int)MessageTypes.SetApexCursor, typeof(SetApexCursor))]
     [XdrUnion((int)MessageTypes.AlphaState, typeof(AlphaState))]
     [XdrUnion((int)MessageTypes.AuditorStateRequest, typeof(AuditorStateRequest))]
+    [XdrUnion((int)MessageTypes.ConstellationInitQuantum, typeof(ConstellationInitQuantum))]
+    [XdrUnion((int)MessageTypes.ConstellationUpgradeQuantum, typeof(ConstellationUpgradeQuantum))]
     public abstract class Message 
     {
         public abstract MessageTypes MessageType { get; }
