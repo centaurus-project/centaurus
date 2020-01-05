@@ -45,12 +45,11 @@ namespace Centaurus.Domain
             }
         }
 
-        public async Task<AlphaState> GetCurrentAlphaState()
+        public AlphaState GetCurrentAlphaState()
         {
             return new AlphaState
             {
-                State = State,
-                LastSnapshot = await SnapshotManager.GetSnapshot()
+                State = State
             };
         }
     }

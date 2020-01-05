@@ -74,6 +74,10 @@ namespace Centaurus.Models
         /// <summary>
         /// Alpha requests auditor's state for the specified apex
         /// </summary>
-        AuditorStateRequest = 203
+        AuditorStateRequest = 203,
+        /// <summary>
+        /// Contains batch of quanta
+        /// </summary>
+        QuantaBatch = 204
     }
 }

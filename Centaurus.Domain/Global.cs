@@ -33,8 +33,6 @@ namespace Centaurus.Domain
 
             AppState = IsAlpha ? new AlphaStateManager() : (StateManager)new AuditorStateManager();
 
-            QuantumHandler = new QuantumHandler();
-
             //try to load last settings, we need it to know current auditors
             var lastHash = new byte[] { };
             var lastApex = SnapshotManager.GetLastApex().Result;
@@ -52,6 +50,8 @@ namespace Centaurus.Domain
                 AppState.State = ApplicationState.WaitingForInit;
 
             QuantumStorage = new QuantumStorage(lastApex < 0 ? 0 : lastApex, lastHash);
+
+            QuantumHandler = new QuantumHandler(QuantumStorage.CurrentApex);
 
             InitTimers();
         }

@@ -10,8 +10,5 @@ namespace Centaurus.Models
 
         [XdrField(0)]
         public ApplicationState State { get; set; }
-
-        [XdrField(1)]
-        public Snapshot LastSnapshot { get; set; }
     }
 }

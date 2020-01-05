@@ -121,7 +121,8 @@ namespace Centaurus.Auditor
 
         private void Ready(BaseWebSocketConnection e)
         {
-            Global.AppState.State = ApplicationState.Ready;
+            if (Global.AppState.State != ApplicationState.WaitingForInit)
+                Global.AppState.State = ApplicationState.Ready;
         }
 
         private async void Close(BaseWebSocketConnection e)

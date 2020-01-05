@@ -20,6 +20,12 @@ namespace Centaurus.Domain
             Global.Setup(snapshot);
 
             Global.AppState.State = ApplicationState.Running;
+            if (!Global.IsAlpha) //set auditor to Ready state after init
+            {
+                Global.AppState.State = ApplicationState.Ready;
+                //send new apex cursor message to notify Alpha that the auditor was initialized
+                OutgoingMessageStorage.EnqueueMessage(new SetApexCursor { Apex = 1 });
+            }
 
             return null;
         }
@@ -29,8 +35,7 @@ namespace Centaurus.Domain
             if (Global.AppState.State != ApplicationState.WaitingForInit)
                 throw new InvalidOperationException("Init quantum can be handled only when application is in WaitingForInit state.");
 
-            if (Global.IsAlpha && !envelope.IsSignedBy(Global.Settings.KeyPair.PublicKey)
-                || !Global.IsAlpha && !envelope.IsSignedBy(((AuditorSettings)Global.Settings).AlphaKeyPair.PublicKey))
+            if (!Global.IsAlpha && !envelope.IsSignedBy(((AuditorSettings)Global.Settings).AlphaKeyPair.PublicKey))
                 throw new InvalidOperationException("The quantum isn't signed by Alpha.");
 
             if (!envelope.AreSignaturesValid())

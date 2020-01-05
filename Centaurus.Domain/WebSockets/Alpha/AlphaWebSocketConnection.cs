@@ -64,8 +64,6 @@ namespace Centaurus
         internal void ResetApexCursor(SetApexCursor message)
         {
             ResetApexCursor(message.Apex);
-            if (ConnectionState != ConnectionState.Ready)
-                ConnectionState = ConnectionState.Ready;
         }
 
         protected override async Task<bool> HandleMessage(MessageEnvelope envelope)

@@ -38,7 +38,7 @@ namespace Centaurus.Test.Client
                 var runCount = 1_000_000;
 
                 for (var i = 0; i < runCount; i++)
-                    sockets[0].PlaceOrder(0, 1 * 10_000_000, 1);
+                    _ = sockets[0].PlaceOrder(0, 1 * 10_000_000, 1);
 
 
                 //Parallel.For(0, runCount, async (i) =>

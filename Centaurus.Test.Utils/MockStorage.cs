@@ -54,9 +54,12 @@ namespace Centaurus.Test
             return Task.FromResult(res);
         }
 
-        public override Task<List<QuantumModel>> LoadQuantaAboveApex(long apex)
+        public override Task<List<QuantumModel>> LoadQuantaAboveApex(long apex, int count = 0)
         {
-            var res = quantaCollection.Where(q => q.Apex > apex).ToList();
+            var query = quantaCollection.Where(q => q.Apex > apex);
+            if (count > 0)
+                query = query.Take(count);
+            var res = query.ToList();
             return Task.FromResult(res);
         }
 

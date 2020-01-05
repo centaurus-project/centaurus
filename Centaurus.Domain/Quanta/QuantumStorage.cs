@@ -13,13 +13,12 @@ namespace Centaurus.Domain
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        Dictionary<long, MessageEnvelope> storage = new Dictionary<long, MessageEnvelope>();
+        public List<long> apexes = new List<long>();
 
-        Timer cleanUpTimer;
+        public List<MessageEnvelope> quanta = new List<MessageEnvelope>();
 
-        //cleanup interval in seconds
-        int cleanupInterval = 60;
-        int quantumsInMemoryPeriod = 5 * 60 * 1000;
+        public int QuantaCacheCapacity = 1_000_000;
+        int capacityThreshold = 1000;
 
         public long CurrentApex { get; private set; }
         public byte[] LastQuantumHash { get; private set; }
@@ -28,67 +27,58 @@ namespace Centaurus.Domain
         {
             CurrentApex = currentApex;
             LastQuantumHash = lastQuantumHash;
-#if !DEBUG
-            cleanUpTimer = new Timer();
-            cleanUpTimer.Interval = cleanupInterval * 1000;
-            cleanUpTimer.AutoReset = false;
-            cleanUpTimer.Elapsed += CleanUp;
-            cleanUpTimer.Start();
-#endif
-        }
-
-        private void CleanUp(object sender, ElapsedEventArgs e)
-        {
-            try
-            {
-                var currentTicks = DateTime.UtcNow.Ticks;
-                var quantumsToCleanup = storage
-                    .Where(q => new TimeSpan(currentTicks - ((Quantum)q.Value.Message).Timestamp).TotalMilliseconds > quantumsInMemoryPeriod)
-                    .Select(q => q.Key);
-
-                foreach (var q in quantumsToCleanup)
-                    storage.Remove(q);
-            }
-            catch (Exception exc)
-            {
-                logger.Error(exc);
-            }
-            finally
-            {
-                cleanUpTimer.Start();
-            }
         }
 
         public void AddQuantum(MessageEnvelope envelope)
         {
-            var quantum = (Quantum)envelope.Message;
-            if (Global.IsAlpha)
+            lock (this)
             {
-                quantum.Apex = ++CurrentApex;
-                quantum.PrevHash = LastQuantumHash;
-                quantum.Timestamp = DateTime.UtcNow.Ticks;
+                var quantum = (Quantum)envelope.Message;
+                if (Global.IsAlpha)
+                {
+                    quantum.Apex = ++CurrentApex;
+                    quantum.PrevHash = LastQuantumHash;
+                    quantum.Timestamp = DateTime.UtcNow.Ticks;
+                }
+                else if (quantum.Apex == default) //when auditor receives quantum, the quantum should already contain apex
+                    throw new Exception("Quantum has no apex");
+                else
+                    CurrentApex = quantum.Apex;
+
+                LastQuantumHash = quantum.ComputeHash();
+                apexes.Add(quantum.Apex);
+                quanta.Add(envelope);
+                if (apexes.Count == QuantaCacheCapacity + capacityThreshold) //remove oldest quanta
+                {
+                    apexes.RemoveRange(0, capacityThreshold);
+                    quanta.RemoveRange(0, capacityThreshold);
+                }
             }
-            else if (quantum.Apex == default) //when auditor receives quantum, the quantum should already contain apex
-                throw new Exception("Quantum has no apex");
-            else
-                CurrentApex = quantum.Apex;
-
-            LastQuantumHash = quantum.ComputeHash();
-            storage.Add(quantum.Apex, envelope);
         }
 
-        public MessageEnvelope GetQuantum(long apex)
+        /// <summary>
+        /// Returns batch of quanta from specified apex (including).
+        /// </summary>
+        /// <param name="apexFrom">Batch start.</param>
+        /// <param name="maxCount">Batch max size.</param>
+        /// <param name="messageEnvelopes">Batch itself. Can be null.</param>
+        /// <returns>True if data presented in the storage, otherwise false.</returns>
+        public bool GetQuantaBacth(long apexFrom, int maxCount, out List<MessageEnvelope> messageEnvelopes)
         {
-            if (!storage.ContainsKey(apex))
-                throw new Exception($"Quantum {apex} was not found");
-            return storage[apex];
-        }
+            lock (this)
+            {
+                messageEnvelopes = null;
+                var apexIndex = apexes.IndexOf(apexFrom);
+                if (apexIndex == -1)
+                    return false;
+                messageEnvelopes = quanta.Skip(apexIndex).Take(maxCount).ToList();
 
-        public IEnumerable<MessageEnvelope> GetAllQuantums(long apexCursor = 0)
-        {
-            if (apexCursor == 0)
-                return storage.Values;
-            return storage.Values.Where(q => ((Quantum)q.Message).Apex > apexCursor);
+                var lastItem = messageEnvelopes.LastOrDefault();
+                if (lastItem != null && !((Quantum)lastItem.Message).IsProcessed) //last item can still be processed
+                    messageEnvelopes.RemoveAt(messageEnvelopes.Count - 1);
+
+                return true;
+            }
         }
     }
 }

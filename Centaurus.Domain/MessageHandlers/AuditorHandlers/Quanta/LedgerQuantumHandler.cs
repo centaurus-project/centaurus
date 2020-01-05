@@ -5,7 +5,7 @@ using Centaurus.Models;
 
 namespace Centaurus.Domain
 {
-    public class LedgerMessageHandler : AuditorBaseQuantumHandler
+    public class LedgerQuantumHandler : AuditorBaseQuantumHandler
     {
         public override MessageTypes SupportedMessageType { get; } = MessageTypes.LedgerCommitQuantum;
     }

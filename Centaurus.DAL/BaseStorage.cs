@@ -33,12 +33,14 @@ namespace Centaurus.DAL
         /// <returns></returns>
         public abstract Task<List<QuantumModel>> LoadQuanta(params long[] apexes);
 
+        //TODO: return cursor
         /// <summary>
         /// Loads quanta where apex is greater than the specified one
         /// </summary>
         /// <param name="apex"></param>
+        /// <param name="count">Count of quanta to load. Loads all if equal or less than 0</param>
         /// <returns></returns>
-        public abstract Task<List<QuantumModel>> LoadQuantaAboveApex(long apex);
+        public abstract Task<List<QuantumModel>> LoadQuantaAboveApex(long apex, int count = 0);
 
         /// <summary>
         /// Returns first effect apex. If it's -1 than there is no effects at all.

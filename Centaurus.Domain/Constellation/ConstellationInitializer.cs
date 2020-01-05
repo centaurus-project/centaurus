@@ -48,6 +48,7 @@ namespace Centaurus.Domain
 
             SetIdToAssets();
 
+
             var vaultAccountInfo = await Global.StellarNetwork.Server.Accounts.Account(Global.Settings.KeyPair.AccountId);
 
             var initQuantum = new ConstellationInitQuantum
@@ -63,7 +64,6 @@ namespace Centaurus.Domain
             };
 
             var envelope = initQuantum.CreateEnvelope();
-            envelope.Sign(Global.Settings.KeyPair);
 
             await Global.QuantumHandler.HandleAsync(envelope);
         }

@@ -23,7 +23,6 @@ namespace Centaurus.Domain
             };
 
             //get snapshot for specified Apex
-
             var hasDataForApex = stateRequestMessage.TargetApex >= await SnapshotManager.GetMinRevertApex();
             if (hasDataForApex)
                 state.PendingQuantums = await SnapshotManager.GetQuantaAboveApex(stateRequestMessage.TargetApex);

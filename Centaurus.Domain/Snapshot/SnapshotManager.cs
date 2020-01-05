@@ -97,10 +97,11 @@ namespace Centaurus.Domain
         /// Fetches all quanta where apex is greater than the specified one.
         /// </summary>
         /// <param name="apex"></param>
+        /// <param name="count">Count of quanta to load. Loads all if equal or less than 0</param>
         /// <returns></returns>
-        public static async Task<List<MessageEnvelope>> GetQuantaAboveApex(long apex)
+        public static async Task<List<MessageEnvelope>> GetQuantaAboveApex(long apex, int count = 0)
         {
-            var quantaModels = await Global.PermanentStorage.LoadQuantaAboveApex(apex);
+            var quantaModels = await Global.PermanentStorage.LoadQuantaAboveApex(apex, count);
             return quantaModels.Select(q => XdrConverter.Deserialize<MessageEnvelope>(q.RawQuantum)).ToList();
         }
 

@@ -137,7 +137,7 @@ namespace Centaurus
                         //prevent recursive error sending
                         if (!(envelope.Message is ResultMessage))
                             _ = SendMessage(new ResultMessage { Status = statusCode, OriginalMessage = envelope });
-                        if (statusCode == ResultStatusCodes.InternalError)
+                        if (statusCode == ResultStatusCodes.InternalError || !Global.IsAlpha)
                             logger.Error(exc);
                     }
                     reader = await webSocket.GetInputStreamReader();

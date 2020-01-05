@@ -50,7 +50,6 @@ namespace Centaurus.Test
 
             var envelope = new AlphaState
             {
-                LastSnapshot = await SnapshotManager.GetSnapshot(),
                 State = alphaState
             }.CreateEnvelope();
             envelope.Sign(TestEnvironment.AlphaKeyPair);

@@ -25,8 +25,9 @@ namespace Centaurus.Domain
 
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public QuantumHandler()
+        public QuantumHandler(long lastAddedApex)
         {
+            LastAddedQuantumApex = lastAddedApex;
             Start();
         }
 
@@ -40,8 +41,13 @@ namespace Centaurus.Domain
         {
             var newHandleItem = new HandleItem(envelope);
             awaitedQuanta.Add(newHandleItem);
+            if (!Global.IsAlpha)
+                LastAddedQuantumApex = ((Quantum)envelope.Message).Apex;
             return newHandleItem.HandlingTaskSource.Task;
         }
+
+        public long LastAddedQuantumApex { get; private set; }
+
         private async Task RunQuantumWorker()
         {
             try
@@ -86,16 +92,12 @@ namespace Centaurus.Domain
         {
             var quantumEnvelope = envelope;
             if (Global.IsAlpha && !(envelope.Message is Quantum))//we need to wrap client request
-            {
-                quantumEnvelope = new RequestQuantum { RequestEnvelope = envelope }.CreateEnvelope(); 
-                quantumEnvelope.Sign(Global.Settings.KeyPair); //alpha should sign every quantum
-            }
+                quantumEnvelope = new RequestQuantum { RequestEnvelope = envelope }.CreateEnvelope();
             return quantumEnvelope;
         }
 
         MessageTypes GetMessageType(MessageEnvelope envelope)
         {
-            var quantumEnvelope = envelope;
             if (envelope.Message is RequestQuantum)
                 return ((RequestQuantum)envelope.Message).RequestMessage.MessageType;
             return envelope.Message.MessageType;
@@ -124,6 +126,9 @@ namespace Centaurus.Domain
             //we must add it before processing, otherwise the quantum that we are processing here will be different from the quantum that will come to the auditor
             Global.QuantumStorage.AddQuantum(quantumEnvelope);
 
+            //we need to sign the quantum here to prevent multiple signatures that can occur if we sign it when sending
+            quantumEnvelope.Sign(Global.Settings.KeyPair);
+
             var resultMessage = await processor.Process(quantumEnvelope);
 
             quantum.IsProcessed = true;
@@ -139,6 +144,11 @@ namespace Centaurus.Domain
             var result = envelope.CreateResult();
             try
             {
+                var quantum = (Quantum)envelope.Message;
+
+                if (quantum.Apex != Global.QuantumStorage.CurrentApex + 1)
+                    throw new Exception($"Current quantum apex is {quantum.Apex} but {Global.QuantumStorage.CurrentApex + 1} was expected.");
+
                 var messageType = GetMessageType(envelope);
 
                 var processor = GetProcessor(messageType);
@@ -160,8 +170,10 @@ namespace Centaurus.Domain
                 result.Status = ResultStatusCodes.InternalError;
                 throw;
             }
-
-            OutgoingMessageStorage.EnqueueMessage(result);
+            finally
+            {
+                OutgoingMessageStorage.EnqueueMessage(result);
+            }
         }
 
         void ProcessTransaction(MessageEnvelope envelope, ResultMessage result)

@@ -139,11 +139,13 @@ namespace Centaurus.DAL.Mongo
             return res;
         }
 
-        public override async Task<List<QuantumModel>> LoadQuantaAboveApex(long apex)
+        public override async Task<List<QuantumModel>> LoadQuantaAboveApex(long apex, int count = 0)
         {
-            return await quantaCollection
-                .Find(q => q.Apex > apex)
-                .ToListAsync();
+            var query = quantaCollection
+                .Find(q => q.Apex > apex);
+            if (count > 0)
+                query = query.Limit(count);
+            return await query.ToListAsync();
         }
 
         public override async Task<long> GetFirstEffectApex()

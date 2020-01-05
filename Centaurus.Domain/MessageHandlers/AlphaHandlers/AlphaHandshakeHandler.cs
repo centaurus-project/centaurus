@@ -41,7 +41,7 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
             else
             {
                 var alphaStateManager = (AlphaStateManager)Global.AppState;
-                message = await alphaStateManager.GetCurrentAlphaState();
+                message = alphaStateManager.GetCurrentAlphaState();
             }
             await connection.SendMessage(message);
         }
