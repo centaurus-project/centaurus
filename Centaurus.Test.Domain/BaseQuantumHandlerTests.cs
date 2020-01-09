@@ -20,58 +20,56 @@ namespace Centaurus.Test
         [TestCase(3, 63, 100, 0, null)]
         public async Task LedgerQuantumTest(int ledgerFrom, int ledgerTo, int amount, int asset, Type excpectedException)
         {
-            try
+            long apex = Global.QuantumStorage.CurrentApex;
+
+            var client1StartBalanceAmount = (long)0;
+            var clientAccountBalance = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair).GetBalance(asset);
+
+            var withdrawalDest = KeyPair.Random();
+            var txHash = new byte[] { };
+            if (clientAccountBalance != null && amount > 0)
             {
-                long apex = Global.QuantumStorage.CurrentApex;
+                client1StartBalanceAmount = clientAccountBalance.Amount;
 
-                var client1StartBalanceAmount = (long)0;
-                var clientAccountBalance = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair).GetBalance(asset);
+                var transactionBuilder = new Transaction.Builder(Global.VaultAccount.GetAccount());
+                transactionBuilder.AddOperation(
+                    new PaymentOperation.Builder(
+                        withdrawalDest,
+                        new AssetTypeNative(),
+                        amount.ToString()
+                ).Build());
+                var transaction = transactionBuilder.Build();
 
-                var withdrawalDest = KeyPair.Random();
-                var txHash = new byte[] { };
-                if (clientAccountBalance != null && amount > 0)
+                var txXdr = transaction.ToRawEnvelopeXdr();
+
+                txHash = txXdr.ComputeHash();
+
+                var withdrawal = new WithdrawalRequest
                 {
-                    client1StartBalanceAmount = clientAccountBalance.Amount;
+                    Account = TestEnvironment.Client1KeyPair,
+                    Destination = withdrawalDest.PublicKey,
+                    Amount = amount,
+                    Asset = asset,
+                    Nonce = (ulong)DateTime.UtcNow.Ticks,
+                    TransactionHash = txHash,
+                    TransactionXdr = txXdr
+                };
 
-                    var transactionBuilder = new Transaction.Builder(Global.VaultAccount.GetAccount());
-                    transactionBuilder.AddOperation(
-                        new PaymentOperation.Builder(
-                            withdrawalDest,
-                            new AssetTypeNative(),
-                            amount.ToString()
-                    ).Build());
-                    var transaction = transactionBuilder.Build();
+                Message quantum = withdrawal;
+                if (!Global.IsAlpha)
+                    quantum = new RequestQuantum { Apex = ++apex, RequestEnvelope = withdrawal.CreateEnvelope(), Timestamp = DateTime.UtcNow.Ticks };
 
-                    var txXdr = transaction.ToRawEnvelopeXdr();
+                //create withdrawal
+                await Global.QuantumHandler.HandleAsync(quantum.CreateEnvelope());
+            }
 
-                    txHash = txXdr.ComputeHash();
+            var depositeAmount = new Random().Next(10, 1000);
 
-                    var withdrawal = new WithdrawalRequest
-                    {
-                        Account = TestEnvironment.Client1KeyPair,
-                        Destination = withdrawalDest.PublicKey,
-                        Amount = amount,
-                        Asset = asset,
-                        Nonce = (ulong)DateTime.UtcNow.Ticks,
-                        TransactionHash = txHash,
-                        TransactionXdr = txXdr
-                    };
-
-                    Message quantum = withdrawal;
-                    if (!Global.IsAlpha)
-                        quantum = new RequestQuantum { Apex = ++apex, RequestEnvelope = withdrawal.CreateEnvelope(), Timestamp = DateTime.UtcNow.Ticks };
-
-                    //create withdrawal
-                    await Global.QuantumHandler.HandleAsync(quantum.CreateEnvelope());
-                }
-
-                var depositeAmount = new Random().Next(10, 1000);
-
-                var ledgerNotification = new LedgerUpdateNotification
-                {
-                    LedgerFrom = (uint)ledgerFrom,
-                    LedgerTo = (uint)ledgerTo,
-                    Payments = new List<PaymentBase>
+            var ledgerNotification = new LedgerUpdateNotification
+            {
+                LedgerFrom = (uint)ledgerFrom,
+                LedgerTo = (uint)ledgerTo,
+                Payments = new List<PaymentBase>
                     {
                         new Deposit
                         {
@@ -89,30 +87,25 @@ namespace Centaurus.Test
                             PaymentResult = PaymentResults.Success
                         }
                     }
-                };
-                var ledgerNotificationEnvelope = ledgerNotification.CreateEnvelope();
-                ledgerNotificationEnvelope.Sign(TestEnvironment.Auditor1KeyPair);
+            };
+            var ledgerNotificationEnvelope = ledgerNotification.CreateEnvelope();
+            ledgerNotificationEnvelope.Sign(TestEnvironment.Auditor1KeyPair);
 
-                var ledgerCommit = new LedgerCommitQuantum
-                {
-                    Source = ledgerNotificationEnvelope,
-                    Apex = ++apex
-                };
+            var ledgerCommit = new LedgerCommitQuantum
+            {
+                Source = ledgerNotificationEnvelope,
+                Apex = ++apex
+            };
 
-                await Global.QuantumHandler.HandleAsync(ledgerCommit.CreateEnvelope());
-
+            await AssertQuantumHandling(ledgerCommit.CreateEnvelope(), excpectedException);
+            if (excpectedException == null)
+            {
                 Assert.AreEqual(Global.LedgerManager.Ledger, ledgerNotification.LedgerTo);
 
                 var account1 = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
 
                 Assert.AreEqual(account1.GetBalance(asset).Liabilities, 0);
                 Assert.AreEqual(account1.GetBalance(asset).Amount, client1StartBalanceAmount - amount + depositeAmount); //acc balance + deposit - withdrawal
-            }
-            catch (Exception exc)
-            {
-                //throw if we don't expect this type of exception
-                if (excpectedException == null || excpectedException != exc.GetType())
-                    throw;
             }
         }
 
@@ -125,28 +118,27 @@ namespace Centaurus.Test
         [TestCase(1, 1, 100, OrderSides.Buy, null)]
         public async Task OrderQuantumTest(int nonce, int asset, int amount, OrderSides side, Type excpectedException)
         {
-            try
+            var order = new OrderRequest
             {
-                var order = new OrderRequest
-                {
-                    Account = TestEnvironment.Client1KeyPair,
-                    Nonce = (ulong)nonce,
-                    Amount = amount,
-                    Asset = asset,
-                    Price = 100,
-                    Side = side
-                };
+                Account = TestEnvironment.Client1KeyPair,
+                Nonce = (ulong)nonce,
+                Amount = amount,
+                Asset = asset,
+                Price = 100,
+                Side = side
+            };
 
-                var envelope = order.CreateEnvelope();
+            var envelope = order.CreateEnvelope();
 
-                if (!Global.IsAlpha)
-                {
-                    var quantum = new RequestQuantum { Apex = Global.QuantumStorage.CurrentApex + 1, RequestEnvelope = envelope };
-                    envelope = quantum.CreateEnvelope();
-                }
+            if (!Global.IsAlpha)
+            {
+                var quantum = new RequestQuantum { Apex = Global.QuantumStorage.CurrentApex + 1, RequestEnvelope = envelope };
+                envelope = quantum.CreateEnvelope();
+            }
 
-                await Global.QuantumHandler.HandleAsync(envelope);
-
+            await AssertQuantumHandling(envelope, excpectedException);
+            if (excpectedException == null)
+            {
                 var currentMarket = Global.Exchange.GetMarket(asset);
                 Assert.IsTrue(currentMarket != null);
 
@@ -155,14 +147,42 @@ namespace Centaurus.Test
 
                 Assert.AreEqual(requests.TotalAmount, amount);
                 Assert.AreEqual(requests.Volume, amount * order.Price);
+            }
+        }
 
-            }
-            catch (Exception exc)
+        [Test]
+        [TestCase(0, typeof(UnauthorizedException))]
+        [TestCase(1, null)]
+        public async Task AccountDataRequestTest(int nonce, Type excpectedException)
+        {
+            var order = new AccountDataRequest
             {
-                //throw if we don't expect this type of exception
-                if (excpectedException == null || excpectedException != exc.GetType())
-                    throw;
+                Account = TestEnvironment.Client1KeyPair,
+                Nonce = (ulong)nonce
+            };
+
+            var envelope = order.CreateEnvelope();
+            envelope.Sign(TestEnvironment.Client1KeyPair);
+
+            if (!Global.IsAlpha)
+            {
+                var quantum = new RequestQuantum { Apex = Global.QuantumStorage.CurrentApex + 1, RequestEnvelope = envelope };
+                envelope = quantum.CreateEnvelope();
+                envelope.Sign(TestEnvironment.AlphaKeyPair);
             }
+
+            var res = await AssertQuantumHandling(envelope, excpectedException);
+            if (excpectedException == null)
+                Assert.IsInstanceOf<AccountDataResponse>(res);
+        }
+
+        protected async Task<ResultMessage> AssertQuantumHandling(MessageEnvelope quantum, Type excpectedException = null)
+        {
+            if (excpectedException == null)
+                return await Global.QuantumHandler.HandleAsync(quantum);
+
+            Assert.ThrowsAsync(excpectedException, async () => await Global.QuantumHandler.HandleAsync(quantum));
+            return null;
         }
     }
 }

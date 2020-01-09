@@ -240,7 +240,7 @@ namespace Centaurus.Domain
                 OrderId = o.OrderId,
                 Amount = o.Amount,
                 Price = o.Price,
-                Pubkey = o.Pubkey.Data
+                Pubkey = o.Account.Pubkey.Data
             }).ToList();
 
             diffObject.Widthrawals = snapshot.Withdrawals.Select(w => new DiffObject.Withdrawal

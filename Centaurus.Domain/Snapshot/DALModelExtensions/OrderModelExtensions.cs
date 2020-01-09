@@ -8,14 +8,14 @@ namespace Centaurus.Domain
 {
     public static class OrderModelExtensions
     {
-        public static Order ToOrder(this OrderModel order)
+        public static Order ToOrder(this OrderModel order, AccountStorage accountStorage)
         {
             return new Order
             {
                 Amount = order.Amount,
                 OrderId = unchecked((ulong)order.OrderId),
                 Price = order.Price,
-                Pubkey = order.Pubkey
+                Account = accountStorage.GetAccount(order.Pubkey)
             };
         }
     }

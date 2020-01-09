@@ -6,6 +6,8 @@ namespace Centaurus.Models
     [XdrUnion((int)MessageTypes.HandshakeInit, typeof(HandshakeInit))]
     [XdrUnion((int)MessageTypes.Heartbeat, typeof(Heartbeat))]
     [XdrUnion((int)MessageTypes.WithdrawalRequest, typeof(WithdrawalRequest))]
+    [XdrUnion((int)MessageTypes.AccountDataRequest, typeof(AccountDataRequest))]
+    [XdrUnion((int)MessageTypes.AccountDataResponse, typeof(AccountDataResponse))]
     [XdrUnion((int)MessageTypes.PaymentRequest, typeof(PaymentRequest))]
     [XdrUnion((int)MessageTypes.OrderRequest, typeof(OrderRequest))]
     [XdrUnion((int)MessageTypes.RequestQuantum, typeof(RequestQuantum))]

@@ -32,6 +32,10 @@ namespace Centaurus.Models
         /// </summary>
         OrderCancellationRequest = 5,
         /// <summary>
+        /// A client requested data about it's account.
+        /// </summary>
+        AccountDataRequest = 10,
+        /// <summary>
         /// Wrapper for client request messages. Created by Alpha.
         /// </summary>
         RequestQuantum = 48,
@@ -59,6 +63,10 @@ namespace Centaurus.Models
         /// Set auditor apex cursor.
         /// </summary>
         SetApexCursor = 110,
+        /// <summary>
+        /// Account data request result.
+        /// </summary>
+        AccountDataResponse = 150,
         /// <summary>
         /// Contains data for init. It will be created by alpha on init.
         /// </summary>

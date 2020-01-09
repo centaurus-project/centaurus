@@ -17,10 +17,10 @@ namespace Centaurus.Domain
             public HandleItem(MessageEnvelope quantum)
             {
                 Quantum = quantum;
-                HandlingTaskSource = new TaskCompletionSource<MessageEnvelope>();
+                HandlingTaskSource = new TaskCompletionSource<ResultMessage>();
             }
             public MessageEnvelope Quantum { get; }
-            public TaskCompletionSource<MessageEnvelope> HandlingTaskSource { get; }
+            public TaskCompletionSource<ResultMessage> HandlingTaskSource { get; }
         }
 
         static Logger logger = LogManager.GetCurrentClassLogger();
@@ -37,7 +37,7 @@ namespace Centaurus.Domain
         /// Handles the quantum and returns Task.
         /// </summary>
         /// <param name="envelope">Quantum to handle</param>
-        public Task<MessageEnvelope> HandleAsync(MessageEnvelope envelope)
+        public Task<ResultMessage> HandleAsync(MessageEnvelope envelope)
         {
             var newHandleItem = new HandleItem(envelope);
             awaitedQuanta.Add(newHandleItem);
@@ -70,9 +70,9 @@ namespace Centaurus.Domain
             var tcs = handleItem.HandlingTaskSource;
             try
             {
-                await HandleQuantum(envelope);
+                var res = await HandleQuantum(envelope);
 
-                tcs.SetResult(envelope);
+                tcs.SetResult(res);
 
             }
             catch (Exception exc)
@@ -103,15 +103,14 @@ namespace Centaurus.Domain
             return envelope.Message.MessageType;
         }
 
-        async Task HandleQuantum(MessageEnvelope quantumEnvelope)
+        async Task<ResultMessage> HandleQuantum(MessageEnvelope quantumEnvelope)
         {
-            if (Global.IsAlpha)
-                await AlphaHandleQuantum(quantumEnvelope);
-            else
-                await AuditorHandleQuantum(quantumEnvelope);
+            return Global.IsAlpha
+                ? await AlphaHandleQuantum(quantumEnvelope)
+                : await AuditorHandleQuantum(quantumEnvelope);
         }
 
-        async Task AlphaHandleQuantum(MessageEnvelope envelope)
+        async Task<ResultMessage> AlphaHandleQuantum(MessageEnvelope envelope)
         {
             var processor = GetProcessor(envelope.Message.MessageType);
 
@@ -137,11 +136,12 @@ namespace Centaurus.Domain
 
             logger.Trace($"Message of type {envelope.Message.ToString()} with apex {quantum.Apex} is handled.");
 
+            return resultMessage;
         }
 
-        async Task AuditorHandleQuantum(MessageEnvelope envelope)
+        async Task<ResultMessage> AuditorHandleQuantum(MessageEnvelope envelope)
         {
-            var result = envelope.CreateResult();
+            ResultMessage result = null;
             try
             {
                 var quantum = (Quantum)envelope.Message;
@@ -155,11 +155,10 @@ namespace Centaurus.Domain
 
                 await processor.Validate(envelope);
 
-                await processor.Process(envelope);
+                result = await processor.Process(envelope);
 
                 Global.QuantumStorage.AddQuantum(envelope);
 
-                result.Status = ResultStatusCodes.Success;
                 ProcessTransaction(envelope, result);
 
                 logger.Trace($"Message of type {messageType.ToString()} with apex {((Quantum)envelope.Message).Apex} is handled.");
@@ -167,13 +166,14 @@ namespace Centaurus.Domain
             catch (Exception exc)
             {
                 logger.Error(exc);
-                result.Status = ResultStatusCodes.InternalError;
+                result = envelope.CreateResult(ResultStatusCodes.InternalError);
                 throw;
             }
             finally
             {
                 OutgoingMessageStorage.EnqueueMessage(result);
             }
+                return result;
         }
 
         void ProcessTransaction(MessageEnvelope envelope, ResultMessage result)

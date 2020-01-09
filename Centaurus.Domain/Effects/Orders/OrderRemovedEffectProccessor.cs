@@ -8,11 +8,13 @@ namespace Centaurus.Domain
     public class OrderRemovedEffectProccessor : EffectProcessor<OrderRemovedEffect>
     {
         private Orderbook orderbook;
+        private AccountStorage accountStorage;
 
-        public OrderRemovedEffectProccessor(OrderRemovedEffect effect, Orderbook orderbook)
+        public OrderRemovedEffectProccessor(OrderRemovedEffect effect, Orderbook orderbook, AccountStorage accountStorage)
             : base(effect)
         {
             this.orderbook = orderbook;
+            this.accountStorage = accountStorage;
         }
 
         public override void CommitEffect()
@@ -23,7 +25,7 @@ namespace Centaurus.Domain
 
         public override void RevertEffect()
         {
-            var order = new Order { OrderId = Effect.OrderId, Price = Effect.Price, Amount = 0, Pubkey = Effect.Pubkey };
+            var order = new Order { OrderId = Effect.OrderId, Price = Effect.Price, Amount = 0, Account = accountStorage.GetAccount(Effect.Pubkey) };
             orderbook.InsertOrder(order);
         }
     }

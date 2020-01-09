@@ -41,12 +41,28 @@ namespace Centaurus.Domain
         }
 
         /// <summary>
+        /// Unwraps and returns effects for specified account.
+        /// </summary>
+        /// <returns></returns>
+        public Effect[] GetEffects(RawPubKey pubKey)
+        {
+            return GetEffectsInternal()
+                .Where(e => e.Pubkey.Equals(pubKey))
+                .ToArray();
+        }
+
+        /// <summary>
         /// Unwraps and returns effects
         /// </summary>
         /// <returns></returns>
         public Effect[] GetEffects()
         {
-            return container.Select(ep => ep.Effect).ToArray();
+            return GetEffectsInternal().ToArray();
+        }
+
+        private IEnumerable<Effect> GetEffectsInternal()
+        {
+            return container.Select(ep => ep.Effect);
         }
 
         /// <summary>
@@ -142,7 +158,7 @@ namespace Centaurus.Domain
             var effect = new OrderPlacedEffect
             {
                 Apex = Apex,
-                Pubkey = order.Pubkey,
+                Pubkey = order.Account.Pubkey,
                 Asset = asset,
                 Amount = orderAmount,
                 Price = order.Price,
@@ -159,7 +175,7 @@ namespace Centaurus.Domain
             var trade = new TradeEffect
             {
                 Apex = Apex,
-                Pubkey = order.Pubkey,
+                Pubkey = order.Account.Pubkey,
                 Asset = asset,
                 AssetAmount = assetAmount,
                 XlmAmount = xlmAmount,
@@ -172,11 +188,12 @@ namespace Centaurus.Domain
         }
 
 
-        public void AddOrderRemoved(Orderbook orderbook, Order order)
+        public void AddOrderRemoved(Orderbook orderbook, AccountStorage accountStorage, Order order)
         {
             Add(new OrderRemovedEffectProccessor(
-                new OrderRemovedEffect { Apex = Apex, OrderId = order.OrderId, Price = order.Price, Pubkey = order.Pubkey },
-                orderbook
+                new OrderRemovedEffect { Apex = Apex, OrderId = order.OrderId, Price = order.Price, Pubkey = order.Account.Pubkey },
+                orderbook,
+                accountStorage
                 ));
         }
 

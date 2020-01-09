@@ -23,9 +23,7 @@ namespace Centaurus.Domain
             Global.Exchange.ExecuteOrder(effectsContainer);
             effectsContainer.Commit();
 
-            var accountEffects = effectsContainer.GetEffects()
-                .Where(e => e.Pubkey.Equals(requestMessage.Account))
-                .ToList();
+            var accountEffects = effectsContainer.GetEffects(requestMessage.Account).ToList();
 
             return Task.FromResult(envelope.CreateResult(ResultStatusCodes.Success, accountEffects));
         }

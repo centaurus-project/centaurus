@@ -180,9 +180,9 @@ namespace Centaurus.Domain
 
             var withdrawals = await GetWithdrawals();
 
-            var orders = await GetOrders();
-
             var accountStorage = new AccountStorage(accounts);
+
+            var orders = await GetOrders(accountStorage);
 
             var exchange = await GetRestoredExchange(orders);
 
@@ -225,7 +225,7 @@ namespace Centaurus.Domain
                     case OrderRemovedEffect orderRemovedEffect:
                         {
                             var orderBook = exchange.GetOrderbook(orderRemovedEffect.OrderId);
-                            processor = new OrderRemovedEffectProccessor(orderRemovedEffect, orderBook);
+                            processor = new OrderRemovedEffectProccessor(orderRemovedEffect, orderBook, accountStorage);
                         }
                         break;
                     case TradeEffect tradeEffect:
@@ -314,7 +314,7 @@ namespace Centaurus.Domain
             return withdrawalModels.Select(w => XdrConverter.Deserialize<Withdrawal>(w.RawWithdrawal)).ToList();
         }
 
-        private static async Task<List<Order>> GetOrders()
+        private static async Task<List<Order>> GetOrders(AccountStorage accountStorage)
         {
             var orderModels = await Global.PermanentStorage.LoadOrders();
 
@@ -322,7 +322,7 @@ namespace Centaurus.Domain
             var orderLength = orderModels.Count;
             for (int i = 0; i < orderLength; i++)
             {
-                orders.Add(orderModels[i].ToOrder());
+                orders.Add(orderModels[i].ToOrder(accountStorage));
             }
 
             return orders;
