@@ -1,9 +1,10 @@
-﻿using Centaurus.Domain;
+﻿using Centaurus.DAL;
+using Centaurus.DAL.Mongo;
+using Centaurus.Domain;
 using Centaurus.Models;
 using stellar_dotnet_sdk;
 using System;
 using System.Collections.Generic;
-using System.IO.Abstractions.TestingHelpers;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -77,59 +78,93 @@ namespace Centaurus.Test
         /// <param name="settings">Settings that will be used to init Global</param>
         public static void Setup(List<KeyPair> clients, List<KeyPair> auditors, BaseSettings settings)
         {
-            Global.Init(settings, new MockFileSystem());
+            Global.Init(settings, new MockStorage());
 
-            var clientAccounts = GenerateClientAccounts(clients);
+            var assets = new List<AssetSettings> { new AssetSettings { Id = 1, Code = "X", Issuer = KeyPair.Random() } };
 
-            var snapshot = GenerateSnapshot(clientAccounts, auditors);
-
-            Global.Setup(snapshot);
-        }
-
-        private static List<Models.Account> GenerateClientAccounts(List<KeyPair> clients)
-        {
-            var accounts = new List<Models.Account>();
-            foreach (var client in clients)
+            var initQuantum = new ConstellationInitQuantum
             {
-                var account = new Models.Account()
-                {
-                    Pubkey = client,
-                    Balances = new List<Balance>
-                    {
-                        new Balance { Amount = 10_000_000, Asset = 0 },
-                        new Balance { Amount = 10_000_000, Asset = 1 },
-                    }
-                };
-                accounts.Add(account);
-            }
-            return accounts;
-        }
-
-        private static Snapshot GenerateSnapshot(List<Models.Account> accounts, List<KeyPair> auditorKeyPairs)
-        {
-            var snapshot = new Snapshot
-            {
-                Accounts = accounts,
-                Apex = 0,
-                Id = 1,
-                Ledger = 1,
-                Orders = new List<Order>(),
-                Withdrawals = new List<PaymentRequestBase>(),
+                Apex = 1,
+                Assets = assets,
+                Auditors = auditors.Select(a => (RawPubKey)a.PublicKey).ToList(),
+                MinAccountBalance = 1,
+                MinAllowedLotSize = 1,
+                Vault = settings is AlphaSettings ? settings.KeyPair.PublicKey : ((AuditorSettings)settings).AlphaKeyPair.PublicKey,
                 VaultSequence = 1,
-                Settings = new ConstellationSettings
-                {
-                    Vault = KeyPair.Random().PublicKey,
-                    Auditors = auditorKeyPairs.Select(kp => (RawPubKey)kp).ToList(),
-                    Assets = new List<AssetSettings> { new AssetSettings { Id = 1, Code = "X", Issuer = new RawPubKey() } }
-                }
+                Ledger = 1,
+                PrevHash = new byte[] { }
             };
 
-            var snapshotEnvelope = new SnapshotQuantum { Hash = snapshot.ComputeHash() }.CreateEnvelope();
-            var confEnvelope = snapshotEnvelope.CreateResult(ResultStatusCodes.Success).CreateEnvelope();
-            foreach (var auditorKeyPair in auditorKeyPairs)
-                confEnvelope.Sign(auditorKeyPair);
-            snapshot.Confirmation = confEnvelope;
-            return snapshot;
+
+            var alphaKeyPair = KeyPair.FromSecretSeed(TestEnvironment.AlphaKeyPair.SecretSeed);
+            var envelope = initQuantum.CreateEnvelope();
+            envelope.Sign(alphaKeyPair);
+
+            Global.QuantumHandler.HandleAsync(envelope).Wait();
+
+
+            var deposits = new List<PaymentBase>();
+            Action<byte[], int> addAssetsFn = (acc, asset) =>
+            {
+                deposits.Add(new Deposit
+                {
+                    Destination = acc,
+                    Amount = 10000,
+                    Asset = asset,
+                    PaymentResult = PaymentResults.Success
+                });
+            };
+
+            for (int i = 0; i < clients.Count; i++)
+            {
+                //add xlm
+                addAssetsFn(clients[i].PublicKey, 0);
+                for (var c = 0; c < assets.Count; c++)
+                    addAssetsFn(clients[i].PublicKey, assets[c].Id);
+            }
+
+            var depositeQuantum = new LedgerCommitQuantum
+            {
+                Apex = 2,
+                PrevHash = Global.QuantumStorage.LastQuantumHash,
+                Source = new LedgerUpdateNotification
+                {
+                    LedgerFrom = 2,
+                    LedgerTo = 2,
+                    Payments = deposits
+                }.CreateEnvelope()
+            };
+
+            depositeQuantum.Source.Sign(TestEnvironment.Auditor1KeyPair);
+
+            Global.QuantumHandler.HandleAsync(depositeQuantum.CreateEnvelope()).Wait();
+
+            //var accountUpdates = new List<DiffObject.Account>();
+            //var balances = new List<DiffObject.Balance>();
+            //for (var i = 0; i < clients.Count; i++)
+            //{
+            //    accountUpdates.Add(new DiffObject.Account { IsInserted = true, PubKey = clients[i].PublicKey });
+            //    balances.Add(new DiffObject.Balance { IsInserted = true, PubKey = clients[i].PublicKey, Amount = 10000, AssetId = 0 });
+            //    for (var c = 0; c < assets.Count; c++)
+            //    {
+            //        balances.Add(new DiffObject.Balance { IsInserted = true, PubKey = clients[i].PublicKey, Amount = 10000, AssetId = assets[c].Id });
+            //    }
+            //}
+
+            //Global.PermanentStorage.Update(new DiffObject
+            //{
+            //    Accounts = accountUpdates,
+            //    Balances = balances,
+            //    Assets = new List<DAL.Models.AssetModel>(),
+            //    Effects = new List<DAL.Models.EffectModel>(),
+            //    Orders = new List<DiffObject.Order>(),
+            //    Quanta = new List<DAL.Models.QuantumModel>(),
+            //    Widthrawals = new List<DiffObject.Withdrawal>()
+            //}).Wait();
+
+            //var snapshot = SnapshotManager.GetSnapshot().Result;
+
+            //Global.Setup(snapshot);
         }
     }
 }

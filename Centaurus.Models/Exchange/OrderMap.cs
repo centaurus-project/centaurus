@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace Centaurus.Models
@@ -32,6 +33,11 @@ namespace Centaurus.Models
         public IEnumerable<Order> GetAllOrders()
         {
             return map.Values;
+        }
+
+        public IEnumerable<Order> GetAllAccountOrders(Account account)
+        {
+            return map.Values.Where(o => o.Account == account);
         }
     }
 }

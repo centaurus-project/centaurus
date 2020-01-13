@@ -49,7 +49,7 @@ namespace Centaurus
 
         private readonly object apexCursorSyncRoot = new { };
 
-        private void ResetApexCursor(ulong newApexCursor)
+        private void ResetApexCursor(long newApexCursor)
         {
             lock (apexCursorSyncRoot)
             {
@@ -64,8 +64,6 @@ namespace Centaurus
         internal void ResetApexCursor(SetApexCursor message)
         {
             ResetApexCursor(message.Apex);
-            if (ConnectionState != ConnectionState.Ready)
-                ConnectionState = ConnectionState.Ready;
         }
 
         protected override async Task<bool> HandleMessage(MessageEnvelope envelope)

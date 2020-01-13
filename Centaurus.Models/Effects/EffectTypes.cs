@@ -10,12 +10,27 @@ namespace Centaurus.Models
     {
         Undefined = 0,
 
-        AssetSent = 1,
-        AssetReceived = 2,
+        AccountCreate = 1,
+        NonceUpdate = 2,
+        BalanceCreate = 3,
+        BalanceUpdate = 4,
+        LockLiabilities = 5,
+        UnlockLiabilities = 6,
 
         OrderPlaced = 10,
         OrderRemoved = 11,
         Trade = 12,
+
+        AssetSent = 21,
+        AssetReceived = 22,
+        WithdrawalCreate = 23,
+        WithdrawalRemove = 24,
+
+        ConstellationInit = 31,
+        ConstellationUpdate = 32,
+
+        LedgerUpdate = 51,
+        VaultSequenceUpdate = 52,
 
         TransactionSigned = 100
     }

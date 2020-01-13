@@ -14,15 +14,9 @@ namespace Centaurus.Domain
 
         readonly LinkedList<MessageEnvelope> messageQueue;
 
-        public QuantaQueue(IEnumerable<MessageEnvelope> quanta)
+        public QuantaQueue()
         {
-            if (quanta != null)
-            {
-                messageQueue = new LinkedList<MessageEnvelope>(quanta);
-                lastAddedQuantum = messageQueue.Last;
-            }
-            else
-                messageQueue = new LinkedList<MessageEnvelope>();
+            messageQueue = new LinkedList<MessageEnvelope>();
         }
 
         /// <summary>
@@ -31,16 +25,7 @@ namespace Centaurus.Domain
         /// <param name="envelope">Quantum to add</param>
         public void Enqueue(MessageEnvelope envelope)
         {
-            if (envelope.Message is SnapshotQuantum)
-            {
-                //if the last restored quantum is not processed yet then we need to add the snapshot quantum after it
-                if (lastAddedQuantum == null)
-                    messageQueue.AddFirst(envelope);
-                else
-                    messageQueue.AddAfter(lastAddedQuantum, envelope);
-            }
-            else
-                messageQueue.AddLast(envelope);
+            messageQueue.AddLast(envelope);
         }
 
         /// <summary>

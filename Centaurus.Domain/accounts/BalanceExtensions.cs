@@ -48,7 +48,7 @@ namespace Centaurus.Domain
             if (amount <= 0) throw new ArgumentException("Invalid operation amount: " + amount);
             if (balance == null)
                 return false;
-            return balance.Amount - balance.Liabilities > amount;
+            return balance.Amount - balance.Liabilities >= amount;
         }
     }
 }

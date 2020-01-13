@@ -17,6 +17,8 @@ namespace Centaurus.Domain
         /// <returns>Message hash</returns>
         public static byte[] ComputeMessageHash(this MessageEnvelope messageEnvelope)
         {
+            if (messageEnvelope == null)
+                throw new ArgumentNullException(nameof(messageEnvelope));
             return messageEnvelope.Message.ComputeHash();
         }
 
@@ -27,13 +29,11 @@ namespace Centaurus.Domain
         /// <param name="keyPair">Key pair to use for signing</param>
         public static void Sign(this MessageEnvelope messageEnvelope, KeyPair keyPair)
         {
-            var rawSignature = keyPair.Sign(messageEnvelope.ComputeMessageHash());
-
-            var signature = new Ed25519Signature()
-            {
-                Signature = rawSignature,
-                Signer = keyPair.PublicKey
-            };
+            if (messageEnvelope == null)
+                throw new ArgumentNullException(nameof(messageEnvelope));
+            if (keyPair == null)
+                throw new ArgumentNullException(nameof(keyPair));
+            var signature = messageEnvelope.ComputeMessageHash().Sign(keyPair);
             messageEnvelope.Signatures.Add(signature);
         }
 
@@ -88,31 +88,14 @@ namespace Centaurus.Domain
         }
 
         /// <summary>
-        /// Converts a list of envelops to a single envelope with aggregated signatures.
-        /// </summary>
-        /// <param name="envelopes">List of envelops to aggregate.</param>
-        /// <returns>Aggregated envelope.</returns>
-        public static MessageEnvelope AggregateEnvelops(this List<MessageEnvelope> envelopes)
-        {
-            var res = new MessageEnvelope
-            {
-                Message = envelopes[0].Message,
-                Signatures = new List<Ed25519Signature>()
-            };
-            foreach (var msg in envelopes)
-            {
-                AggregateEnvelop(res, msg);
-            }
-            return res;
-        }
-
-        /// <summary>
         /// Checks that all envelope signatures are valid
         /// </summary>
         /// <param name="envelope">Target envelope</param>
         /// <returns>True if all signatures valid, otherwise false</returns>
         public static bool AreSignaturesValid(this MessageEnvelope envelope)
         {
+            if (envelope == null)
+                throw new ArgumentNullException(nameof(envelope));
             var messageHash = envelope.Message.ComputeHash();
             for (var i = 0; i < envelope.Signatures.Count; i++)
             {
@@ -131,17 +114,39 @@ namespace Centaurus.Domain
         /// <returns>True if signed, otherwise false</returns>
         public static bool IsSignedBy(this MessageEnvelope envelope, RawPubKey pubKey)
         {
+            if (envelope == null)
+                throw new ArgumentNullException(nameof(envelope));
+            if (pubKey == null)
+                throw new ArgumentNullException(nameof(pubKey));
             return envelope.Signatures.Any(s => s.Signer.Equals(pubKey));
+        }
+
+        public static TResultMessage CreateResult<TResultMessage>(this MessageEnvelope envelope, ResultStatusCodes status = ResultStatusCodes.InternalError, List<Effect> effects = null)
+            where TResultMessage: ResultMessage
+        {
+            if (envelope == null)
+                throw new ArgumentNullException(nameof(envelope));
+            var resultMessage = Activator.CreateInstance<TResultMessage>();
+            resultMessage.OriginalMessage = envelope;
+            resultMessage.Status = status;
+            resultMessage.Effects = effects ?? new List<Effect>();
+            return resultMessage;
         }
 
         public static ResultMessage CreateResult(this MessageEnvelope envelope, ResultStatusCodes status = ResultStatusCodes.InternalError, List<Effect> effects = null)
         {
-            return new ResultMessage
+            if (envelope == null)
+                throw new ArgumentNullException(nameof(envelope));
+            if (envelope.Message is RequestQuantum)
+                envelope = ((RequestQuantum)envelope.Message).RequestEnvelope;
+            var message = envelope.Message;
+            switch (message.MessageType)
             {
-                OriginalMessage = envelope,
-                Status = status,
-                Effects = effects ?? new List<Effect>()
-            };
+                case MessageTypes.AccountDataRequest:
+                    return CreateResult<AccountDataResponse>(envelope, status, effects);
+                default:
+                    return CreateResult<ResultMessage>(envelope, status, effects);
+            }
         }
     }
 }

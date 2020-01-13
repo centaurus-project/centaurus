@@ -1,9 +1,7 @@
 ﻿using Centaurus.Models;
 using System;
-using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
-using System.Text;
 
 namespace Centaurus.Domain
 {

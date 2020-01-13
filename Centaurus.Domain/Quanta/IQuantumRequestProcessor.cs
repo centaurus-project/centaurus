@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
@@ -13,12 +14,12 @@ namespace Centaurus.Domain
         /// Validate quantum request preconditions.
         /// </summary>
         /// <param name="envelope">Quantum request</param>
-        public void Validate(MessageEnvelope envelope);
+        public Task Validate(MessageEnvelope envelope);
 
         /// <summary>
         /// Execute quantum request and generate response message.
         /// </summary>
         /// <param name="envelope">Quantum request</param>
-        public ResultMessage Process(MessageEnvelope envelope);
+        public Task<ResultMessage> Process(MessageEnvelope envelope);
     }
 }

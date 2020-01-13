@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Test
 {
-    public class AuditorMessageHandlersTests
+    public class AuditorMessageHandlersTests: BaseMessageHandlerTests
     {
         [SetUp]
         public void Setup()
@@ -50,7 +50,6 @@ namespace Centaurus.Test
 
             var envelope = new AlphaState
             {
-                LastSnapshot = Global.SnapshotManager.LastSnapshot,
                 State = alphaState
             }.CreateEnvelope();
             envelope.Sign(TestEnvironment.AlphaKeyPair);
@@ -58,39 +57,6 @@ namespace Centaurus.Test
             var isHandled = await MessageHandlers<AuditorWebSocketConnection>.HandleMessage(clientConnection, envelope);
 
             Assert.IsTrue(isHandled);
-        }
-
-        static object[] SnapshotQuantumTestCases =
-        {
-            new object[] { TestEnvironment.Client1KeyPair, ConnectionState.Ready, typeof(UnauthorizedException) },
-            new object[] { TestEnvironment.AlphaKeyPair, ConnectionState.Connected, typeof(InvalidStateException) },
-            new object[] { TestEnvironment.AlphaKeyPair, ConnectionState.Ready, null }
-        };
-
-        [Test]
-        [TestCaseSource(nameof(SnapshotQuantumTestCases))]
-        public async Task SnapshotQuantumTest(KeyPair alphaKeyPair, ConnectionState state, Type excpectedException)
-        {
-            try
-            {
-                Global.AppState.State = ApplicationState.Ready;
-
-                var clientConnection = new AuditorWebSocketConnection(new FakeWebSocket()) { ConnectionState = state };
-
-                var currentSnapshotId = Global.SnapshotManager.LastSnapshot.Id;
-                var snapshotQuantumEnvelope = new SnapshotQuantum { Hash = new byte[32] }.CreateEnvelope();
-                snapshotQuantumEnvelope.Sign(alphaKeyPair);
-
-                var isHandled = await MessageHandlers<AuditorWebSocketConnection>.HandleMessage(clientConnection, snapshotQuantumEnvelope);
-
-                Assert.IsTrue(isHandled);
-            }
-            catch (Exception exc)
-            {
-                //throw if we don't expect this type of exception
-                if (excpectedException == null || excpectedException != exc.GetType())
-                    throw;
-            }
         }
 
         static object[] LedgerQuantumTestCases =
@@ -104,35 +70,24 @@ namespace Centaurus.Test
         [TestCaseSource(nameof(LedgerQuantumTestCases))]
         public async Task LedgerQuantumTest(KeyPair alphaKeyPair, ConnectionState state, Type excpectedException)
         {
-            try
+            Global.AppState.State = ApplicationState.Ready;
+
+            var clientConnection = new AuditorWebSocketConnection(new FakeWebSocket()) { ConnectionState = state };
+
+            var ledgerNotification = new LedgerUpdateNotification
             {
-                Global.AppState.State = ApplicationState.Ready;
+                LedgerFrom = 0,
+                LedgerTo = 63,
+                Payments = new List<PaymentBase>()
+            };
 
-                var clientConnection = new AuditorWebSocketConnection(new FakeWebSocket()) { ConnectionState = state };
-
-                var ledgerNotification = new LedgerUpdateNotification
-                {
-                    LedgerFrom = 0,
-                    LedgerTo = 63,
-                    Payments = new List<PaymentBase>()
-                };
-
-                var snapshotQuantumEnvelope = new LedgerCommitQuantum
-                {
-                    Source = ledgerNotification.CreateEnvelope()
-                }.CreateEnvelope();
-                snapshotQuantumEnvelope.Sign(alphaKeyPair);
-
-                var isHandled = await MessageHandlers<AuditorWebSocketConnection>.HandleMessage(clientConnection, snapshotQuantumEnvelope);
-
-                Assert.IsTrue(isHandled);
-            }
-            catch (Exception exc)
+            var envelope = new LedgerCommitQuantum
             {
-                //throw if we don't expect this type of exception
-                if (excpectedException == null || excpectedException != exc.GetType())
-                    throw;
-            }
+                Source = ledgerNotification.CreateEnvelope()
+            }.CreateEnvelope();
+            envelope.Sign(alphaKeyPair);
+
+            await AssertMessageHandling(clientConnection, envelope, excpectedException);
         }
 
         static object[] OrderQuantumTestCases =
@@ -147,34 +102,48 @@ namespace Centaurus.Test
         [TestCaseSource(nameof(OrderQuantumTestCases))]
         public async Task OrderQuantumTest(KeyPair clientKeyPair, KeyPair alphaKeyPair, ConnectionState state, Type excpectedException)
         {
-            try
+            Global.AppState.State = ApplicationState.Ready;
+
+            var clientConnection = new AuditorWebSocketConnection(new FakeWebSocket()) { ConnectionState = state };
+
+            var orderEnvelope = new OrderRequest
             {
-                Global.AppState.State = ApplicationState.Ready;
+                Account = clientKeyPair
+            }.CreateEnvelope();
+            orderEnvelope.Sign(clientKeyPair);
 
-                var clientConnection = new AuditorWebSocketConnection(new FakeWebSocket()) { ConnectionState = state };
-
-                var orderEnvelope = new OrderRequest
-                {
-                    Account = clientKeyPair
-                }.CreateEnvelope();
-                orderEnvelope.Sign(clientKeyPair);
-
-                var orderQuantumEnvelope = new RequestQuantum
-                {
-                    RequestEnvelope = orderEnvelope
-                }.CreateEnvelope();
-                orderQuantumEnvelope.Sign(alphaKeyPair);
-
-                var isHandled = await MessageHandlers<AuditorWebSocketConnection>.HandleMessage(clientConnection, orderQuantumEnvelope);
-
-                Assert.IsTrue(isHandled);
-            }
-            catch (Exception exc)
+            var orderQuantumEnvelope = new RequestQuantum
             {
-                //throw if we don't expect this type of exception
-                if (excpectedException == null || excpectedException != exc.GetType())
-                    throw;
-            }
+                RequestEnvelope = orderEnvelope
+            }.CreateEnvelope();
+            orderQuantumEnvelope.Sign(alphaKeyPair);
+
+
+            await AssertMessageHandling(clientConnection, orderQuantumEnvelope, excpectedException);
+        }
+
+        static object[] QuantaBatchTestCases =
+        {
+            new object[] { TestEnvironment.Client1KeyPair, ConnectionState.Ready, typeof(UnauthorizedException) },
+            new object[] { TestEnvironment.AlphaKeyPair, ConnectionState.Validated, typeof(InvalidStateException) },
+            new object[] { TestEnvironment.AlphaKeyPair, ConnectionState.Ready, null },
+            new object[] { TestEnvironment.AlphaKeyPair, ConnectionState.Connected, null },
+        };
+
+        [Test]
+        [TestCaseSource(nameof(QuantaBatchTestCases))]
+        public async Task QuantaBatchTest(KeyPair alphaKeyPair, ConnectionState state, Type excpectedException)
+        {
+            Global.AppState.State = ApplicationState.Ready;
+
+            var clientConnection = new AuditorWebSocketConnection(new FakeWebSocket()) { ConnectionState = state };
+            var orderEnvelope = new QuantaBatch
+            {
+                Quanta = new List<MessageEnvelope>()
+            }.CreateEnvelope();
+            orderEnvelope.Sign(alphaKeyPair);
+
+            await AssertMessageHandling(clientConnection, orderEnvelope, excpectedException);
         }
     }
 }

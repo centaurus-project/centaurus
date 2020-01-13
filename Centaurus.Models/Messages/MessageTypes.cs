@@ -32,6 +32,10 @@ namespace Centaurus.Models
         /// </summary>
         OrderCancellationRequest = 5,
         /// <summary>
+        /// A client requested data about it's account.
+        /// </summary>
+        AccountDataRequest = 10,
+        /// <summary>
         /// Wrapper for client request messages. Created by Alpha.
         /// </summary>
         RequestQuantum = 48,
@@ -39,10 +43,6 @@ namespace Centaurus.Models
         /// Quantum created by Alpha server that contains aggregated ledger updates provided by <see cref="LedgerUpdateNotification"/>.
         /// </summary>
         LedgerCommitQuantum = 49,
-        /// <summary>
-        /// Snapshot initialization quantum request. Created by Alpha.
-        /// </summary>
-        SnapshotQuantum = 50,
         /// <summary>
         /// Initiate connection handshake.
         /// </summary>
@@ -64,12 +64,28 @@ namespace Centaurus.Models
         /// </summary>
         SetApexCursor = 110,
         /// <summary>
+        /// Account data request result.
+        /// </summary>
+        AccountDataResponse = 150,
+        /// <summary>
+        /// Contains data for init. It will be created by alpha on init.
+        /// </summary>
+        ConstellationInitQuantum = 200,
+        /// <summary>
         /// Upgrade quorum, add/remove auditors, apply new settings etc.
         /// </summary>
         ConstellationUpgradeQuantum = 201,
         /// <summary>
         /// Alpha state message. It contains Alpha state and last snapshot.
         /// </summary>
-        AlphaState = 202
+        AlphaState = 202,
+        /// <summary>
+        /// Alpha requests auditor's state for the specified apex
+        /// </summary>
+        AuditorStateRequest = 203,
+        /// <summary>
+        /// Contains batch of quanta
+        /// </summary>
+        QuantaBatch = 204
     }
 }

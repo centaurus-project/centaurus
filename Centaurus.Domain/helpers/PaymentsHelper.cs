@@ -41,25 +41,27 @@ namespace Centaurus.Domain
                     if (Global.Constellation.Vault.Equals((RawPubKey)destKeypair.PublicKey))
                         payment = new Deposit
                         {
-                            Destination = new RawPubKey() { Data = source.PublicKey }
+                            Destination = new RawPubKey() { Data = source.PublicKey },
+                            Amount = amount,
+                            Asset = asset,
+                            TransactionHash = transactionHash
                         };
                     else if (Global.Constellation.Vault.Equals((RawPubKey)source.PublicKey))
                     {
                         var withdrawal = Global.WithdrawalStorage.GetWithdrawal(transactionHash);
                         if (withdrawal == null)
-                            throw new Exception("Unable to find withdrawal by hash");
-                        payment = new Withdrawal
-                        {
-                            Source = withdrawal.Account
-                        };
+                            throw new Exception("Unable to find withdrawal by hash.");
+                        if (withdrawal.Asset != asset)
+                            throw new Exception("Assets are not equal.");
+                        if (withdrawal.Amount != amount)
+                            throw new Exception("Amounts are not equal.");
+                        if (ByteArrayPrimitives.Equals(withdrawal.Destination, destKeypair))
+                            throw new Exception("Destinations are not equal.");
+                        payment = withdrawal;
                     }
                     if (payment != null)
                     {
-                        payment.Amount = amount;
-                        payment.Asset = asset;
-                        payment.TransactionHash = transactionHash;
                         payment.PaymentResult = pResult;
-
                         result = true;
                     }
 

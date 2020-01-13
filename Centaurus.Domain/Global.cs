@@ -1,9 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO.Abstractions;
 using System.Linq;
 using System.Text;
 using System.Timers;
+using Centaurus.DAL;
+using Centaurus.DAL.Mongo;
 using Centaurus.Models;
 using NLog;
 
@@ -12,40 +13,62 @@ namespace Centaurus.Domain
     public static class Global
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
-        public static void Init(BaseSettings settings, IFileSystem fileSystem)
+
+        /// <summary>
+        /// Initializes Global object
+        /// </summary>
+        /// <param name="settings">Application config</param>
+        /// <param name="storage">Permanent storage object</param>
+        public static void Init(BaseSettings settings, BaseStorage storage)
         {
             Settings = settings ?? throw new ArgumentNullException(nameof(settings));
-            if (fileSystem == null)
-                throw new ArgumentNullException(nameof(fileSystem));
-
-            SnapshotDataProvider = new FSSnapshotDataProvider(fileSystem);
 
             IsAlpha = Settings is AlphaSettings;
+
+            PermanentStorage = storage;
+            PermanentStorage.OpenConnection(settings.ConnectionString).Wait();
 
             StellarNetwork = new StellarNetwork(Settings.NetworkPassphrase, Settings.HorizonUrl);
             QuantumProcessor = new QuantumProcessorsStorage();
 
             AppState = IsAlpha ? new AlphaStateManager() : (StateManager)new AuditorStateManager();
 
-            if (IsAlpha)
-                InitTimers();
+            //try to load last settings, we need it to know current auditors
+            var lastHash = new byte[] { };
+            var lastApex = SnapshotManager.GetLastApex().Result;
+            if (lastApex >= 0)
+            {
+                var snapshot = SnapshotManager.GetSnapshot(lastApex).Result;
+                Setup(snapshot);
+                if (IsAlpha) 
+                    AppState.State = ApplicationState.Rising;//Alpha should ensure that it has all quanta from auditors
+                else
+                    AppState.State = ApplicationState.Running;
+            }
+            else
+                //if no snapshot, the app is in init state
+                AppState.State = ApplicationState.WaitingForInit;
+
+            QuantumStorage = new QuantumStorage(lastApex < 0 ? 0 : lastApex, lastHash);
+
+            QuantumHandler = new QuantumHandler(QuantumStorage.CurrentApex);
+
+            InitTimers();
         }
 
-        public static void Setup(Snapshot snapshot, IEnumerable<MessageEnvelope> quanta = null)
+        public static void Setup(Snapshot snapshot)
         {
             //TODO: dispose objects if not null
 
-            SnapshotManager = new SnapshotManager(OnSnapshotSuccess, OnSnapshotFailed, snapshot);
+            SnapshotManager = new SnapshotManager(OnSnapshotSuccess, OnSnapshotFailed);
 
             Constellation = snapshot.Settings;
-
-            QuantumStorage = new QuantumStorage(snapshot.Apex);
 
             VaultAccount = new AccountData(snapshot.Settings.Vault, snapshot.VaultSequence);
 
             AccountStorage = new AccountStorage(snapshot.Accounts);
 
-            Exchange = RestoreExchange(snapshot);
+            Exchange = Exchange.RestoreExchange(snapshot.Settings.Assets, snapshot.Orders);
 
             AuditLedgerManager = new AuditLedgerManager();
 
@@ -53,14 +76,9 @@ namespace Centaurus.Domain
 
             WithdrawalStorage = new WithdrawalStorage(snapshot.Withdrawals);
 
-            QuantumHandler = IsAlpha ? (BaseQuantumHandler)new AlphaQuantumHandler(quanta) : new AuditorQuantumHandler();
-
             LedgerManager = new LedgerManager(snapshot.Ledger);
-
-            AppState.State = ApplicationState.Running;
         }
 
-        public static BaseSnapshotDataProvider SnapshotDataProvider { get; private set; }
         public static Exchange Exchange { get; private set; }
         public static SnapshotManager SnapshotManager { get; private set; }
 
@@ -74,8 +92,8 @@ namespace Centaurus.Domain
             private set
             {
                 constellation = value;
-                AssetIds = constellation != null 
-                    ? new HashSet<int>(constellation.Assets.Select(a => a.Id).Concat(new int[] { 0 })) 
+                AssetIds = constellation != null
+                    ? new HashSet<int>(constellation.Assets.Select(a => a.Id).Concat(new int[] { 0 }))
                     : new HashSet<int>();
             }
         }
@@ -83,7 +101,7 @@ namespace Centaurus.Domain
         public static AccountData VaultAccount { get; private set; }
         public static AccountStorage AccountStorage { get; private set; }
         public static WithdrawalStorage WithdrawalStorage { get; private set; }
-        public static BaseQuantumHandler QuantumHandler { get; private set; }
+        public static QuantumHandler QuantumHandler { get; private set; }
         public static AuditLedgerManager AuditLedgerManager { get; private set; }
         public static AuditResultManager AuditResultManager { get; private set; }
         public static LedgerManager LedgerManager { get; private set; }
@@ -91,26 +109,17 @@ namespace Centaurus.Domain
         public static QuantumProcessorsStorage QuantumProcessor { get; private set; }
 
         public static bool IsAlpha { get; private set; }
-
+        public static BaseStorage PermanentStorage { get; private set; }
         public static BaseSettings Settings { get; private set; }
         public static StellarNetwork StellarNetwork { get; private set; }
 
         public static HashSet<int> AssetIds { get; private set; }
 
-        static Exchange RestoreExchange(Snapshot snapshot)
-        {
-            var exchange = new Exchange();
-            foreach (var asset in snapshot.Settings.Assets)
-                exchange.AddMarket(asset);
+        private static PendingUpdates pendingUpdates = new PendingUpdates();
 
-            foreach (var order in snapshot.Orders)
-            {
-                var orderData = OrderIdConverter.Decode(order.OrderId);
-                var market = exchange.GetMarket(orderData.Asset);
-                var orderbook = market.GetOrderbook(orderData.Side);
-                orderbook.InsertOrder(order);
-            }
-            return exchange;
+        public static void AddEffects(MessageEnvelope quantum, Effect[] effects)
+        {
+            pendingUpdates?.Add(quantum, effects);
         }
 
         static void InitTimers()
@@ -132,9 +141,6 @@ namespace Centaurus.Domain
 
         private static void OnSnapshotSuccess()
         {
-            if (Settings is AuditorSettings)
-                return;
-
             snapshotIsInProgress = false;
 
             snapshotTimoutTimer.Stop();
@@ -159,9 +165,10 @@ namespace Centaurus.Domain
             while (snapshotIsInProgress)
                 System.Threading.Thread.Sleep(100);
 
-            var snapshot = new SnapshotQuantum();
-            var envelope = snapshot.CreateEnvelope();
-            QuantumHandler.Handle(envelope);
+            var updates = pendingUpdates;
+            pendingUpdates = new PendingUpdates();
+            _ = SnapshotManager.ApplyUpdates(updates);
+
 #if !DEBUG
             snapshotTimoutTimer.Start();
 #endif

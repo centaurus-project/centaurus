@@ -2,30 +2,33 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
     public class AlphaStateManager : StateManager
     {
-        private int ConnectedAuditorsCount = 0;
+        private HashSet<RawPubKey> ConnectedAuditors = new HashSet<RawPubKey>();
 
-        public bool HasMajority => ConnectedAuditorsCount >= MajorityHelper.GetMajorityCount();
+        public bool HasMajority => ConnectedAuditors.Count >= MajorityHelper.GetMajorityCount();
 
-        public void AuditorConnected()
+        public void AuditorConnected(RawPubKey rawPubKey)
         {
             lock (this)
             {
-                ConnectedAuditorsCount++;
+                ConnectedAuditors.Add(rawPubKey);
                 if (HasMajority && State == ApplicationState.Running)
                     State = ApplicationState.Ready;
             }
         }
 
-        public void AuditorConnectionClosed()
+        public void AuditorConnectionClosed(RawPubKey rawPubKey)
         {
             lock (this)
             {
-                ConnectedAuditorsCount--;
+                if (!ConnectedAuditors.Contains(rawPubKey))
+                    return;
+                ConnectedAuditors.Remove(rawPubKey);
                 if (!HasMajority && State == ApplicationState.Ready)
                     State = ApplicationState.Running;
             }
@@ -35,8 +38,10 @@ namespace Centaurus.Domain
         {
             lock (this)
             {
-                if (HasMajority && State == ApplicationState.Running)
+                if (HasMajority)
                     State = ApplicationState.Ready;
+                else
+                    State = ApplicationState.Running;
             }
         }
 
@@ -44,8 +49,7 @@ namespace Centaurus.Domain
         {
             return new AlphaState
             {
-                State = State,
-                LastSnapshot = Global.SnapshotManager.LastSnapshot
+                State = State
             };
         }
     }

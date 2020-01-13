@@ -9,21 +9,21 @@ namespace Centaurus.Domain
 {
     public class WithdrawalStorage
     {
-        public WithdrawalStorage(IEnumerable<PaymentRequestBase> payments)
+        public WithdrawalStorage(IEnumerable<Withdrawal> payments)
         {
-            withdrawals = new ConcurrentDictionary<byte[], PaymentRequestBase>(new HashComparer());
+            withdrawals = new Dictionary<byte[], Withdrawal>(new HashComparer());
 
             if (payments == null)
                 return;
             foreach (var payment in payments)
             {
-                withdrawals.TryAdd(payment.TransactionHash, payment);
+                Add(payment);
             }
         }
 
-        ConcurrentDictionary<byte[], PaymentRequestBase> withdrawals;
+        Dictionary<byte[], Withdrawal> withdrawals;
 
-        public void Add(PaymentRequestBase payment)
+        public void Add(Withdrawal payment)
         {
             if (payment == null) throw new ArgumentNullException(nameof(payment));
 
@@ -31,7 +31,15 @@ namespace Centaurus.Domain
                 throw new Exception("Payment with specified transaction hash already exists");
         }
 
-        public PaymentRequestBase GetWithdrawal(byte[] transactionHash)
+        public void Remove(byte[] transactionHash)
+        {
+            if (transactionHash == null) throw new ArgumentNullException(nameof(transactionHash));
+
+            if (!withdrawals.Remove(transactionHash))
+                throw new Exception("Withdrawal with specified hash is not found");
+        }
+
+        public Withdrawal GetWithdrawal(byte[] transactionHash)
         {
             if (transactionHash == null) throw new ArgumentNullException(nameof(transactionHash));
 
@@ -43,7 +51,7 @@ namespace Centaurus.Domain
             withdrawals.Clear();
         }
 
-        public IEnumerable<PaymentRequestBase> GetAll()
+        public IEnumerable<Withdrawal> GetAll()
         {
             return withdrawals.Values;
         }

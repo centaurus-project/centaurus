@@ -14,21 +14,19 @@ namespace Centaurus.Domain
             await Aggregate(envelope);
         }
 
-        protected override Task OnResult(MajorityResults majorityResult, MessageEnvelope result)
+        protected override async Task OnResult(MajorityResults majorityResult, MessageEnvelope result)
         {
-            base.OnResult(majorityResult, result);
+            await base.OnResult(majorityResult, result);
             if (majorityResult != MajorityResults.Success)
             {
                 logger.Info($"Majority result received ({majorityResult}).");
-                return Task.CompletedTask;
             }
             var quantum = new LedgerCommitQuantum
             {
                 Source = result
             };
             var ledgerCommitEnvelope = quantum.CreateEnvelope();
-            Global.QuantumHandler.Handle(ledgerCommitEnvelope);
-            return Task.CompletedTask;
+            await Global.QuantumHandler.HandleAsync(ledgerCommitEnvelope);
         }
     }
 }

@@ -4,7 +4,7 @@ using System.Text;
 
 namespace Centaurus.Models
 {
-    public class WithdrawalRequest : RequestMessage
+    public class WithdrawalRequest : PaymentRequestBase
     {
         public override MessageTypes MessageType => MessageTypes.WithdrawalRequest;
     }

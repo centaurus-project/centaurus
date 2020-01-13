@@ -78,13 +78,6 @@ namespace Centaurus.Domain
 
         private void ProccessResult(MessageEnvelope confirmation)
         {
-            var resultMessage = (ResultMessage)confirmation.Message;
-            if (resultMessage.OriginalMessage.Message is SnapshotQuantum)
-            {
-                Global.SnapshotManager.SetResult(confirmation);
-                return;
-            }
-
             RequestMessage requestMessage = null;
             if (confirmation.Message is RequestMessage)
                 requestMessage = (RequestMessage)confirmation.Message;
