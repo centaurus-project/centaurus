@@ -1,12 +1,10 @@
-using Centaurus;
 using Centaurus.Models;
-using Centaurus.Test;
-using NUnit.Framework;
-using stellar_dotnet_sdk.xdr;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
+using Centaurus.Xdr;
+using NUnit.Framework;
+using stellar_dotnet_sdk.xdr;
 
 namespace Centaurus.Test
 {

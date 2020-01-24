@@ -5,7 +5,7 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using System.Text;
 
-namespace Centaurus
+namespace Centaurus.Xdr
 {
     public class XdrReader
     {
@@ -230,7 +230,7 @@ namespace Centaurus
                 var tail = ReadAndAdvance(padding);
                 for (var i = 0; i < padding; i++)
                 {
-                    if (tail[i] != 0b0) throw new FormatException($"Non-zero variable padding at position {position - padding}.");
+                    if (tail[i] != 0b0) throw new FormatException($"Non-zero variable padding at position {position + i - padding}.");
                 }
             }
             return res;

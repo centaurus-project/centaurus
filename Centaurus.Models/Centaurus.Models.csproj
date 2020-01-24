@@ -24,10 +24,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="stellar-dotnet-sdk" Version="2.2.39" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\Centaurus.Common\Centaurus.Common.csproj" />
   </ItemGroup>
 

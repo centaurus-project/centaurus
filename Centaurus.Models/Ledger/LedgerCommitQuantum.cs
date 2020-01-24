@@ -1,8 +1,6 @@
-﻿using stellar_dotnet_sdk.xdr;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Security.Cryptography;
-using System.Text;
+using Centaurus.Xdr;
 
 namespace Centaurus.Models
 {

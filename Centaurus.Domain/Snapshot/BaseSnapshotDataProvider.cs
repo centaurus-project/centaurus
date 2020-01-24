@@ -1,5 +1,6 @@
-﻿using Centaurus.Models;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
+using Centaurus.Models;
+using Centaurus.Xdr;
 
 namespace Centaurus.Domain
 {

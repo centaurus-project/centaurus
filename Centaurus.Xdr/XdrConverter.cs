@@ -4,13 +4,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace Centaurus
+namespace Centaurus.Xdr
 {
     public static class XdrConverter
     {
         static XdrConverter()
         {
-            serializerMapping = new XdrSerializationTypeMapper().Map();
+            serializerMapping = XdrSerializationTypeMapper.Map();
         }
 
         private static readonly Dictionary<Type, XdrContractSerializer> serializerMapping;
@@ -26,7 +26,7 @@ namespace Centaurus
 
         internal static void Serialize(object value, XdrWriter writer)
         {
-            if (value == null) 
+            if (value == null)
                 throw new NullReferenceException("Failed to serialize null value. All values should be initialized before the serialization.");
             var serializer = LookupSerializer(value.GetType());
             serializer.DynamicSerializer.Serialize(value, writer);
@@ -61,7 +61,8 @@ namespace Centaurus
                 //otherwise we need to lookup for serialization vector each time
                 foreach (XdrContractSerializer item in value)
                 {
-                    if (value == null) throw new NullReferenceException("Failed to serialize null value. All values should be initialized before the serialization.");
+                    if (value == null) 
+                        throw new NullReferenceException("Failed to serialize null value. All values should be initialized before the serialization.");
                     var serializer = LookupSerializer(item.GetType());
                     serializer.DynamicSerializer.Serialize(item, writer);
                 }
@@ -80,7 +81,9 @@ namespace Centaurus
             //resolve unions
             while (serializer.IsUnion)
             {
-                type = serializer.ReadUnionType(reader);
+                var typeId = reader.ReadInt32();
+                if (!serializer.UnionSwitch.TryGetValue(typeId, out type))
+                    throw new InvalidOperationException($"Failed to find type mapping for union type id {typeId}.");
                 serializer = LookupSerializer(type);
             }
             //create new instance of the target model

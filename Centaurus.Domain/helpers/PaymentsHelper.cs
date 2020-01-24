@@ -64,7 +64,8 @@ namespace Centaurus.Domain
                     }
 
                     break;
-                case OperationTypeEnum.PATH_PAYMENT:
+                case OperationTypeEnum.PATH_PAYMENT_STRICT_SEND:
+                case OperationTypeEnum.PATH_PAYMENT_STRICT_RECEIVE:
                     //TODO: handle path payment
                     break;
                 case OperationTypeEnum.ACCOUNT_MERGE:

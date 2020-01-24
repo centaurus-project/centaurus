@@ -4,7 +4,7 @@ using System.Reflection;
 using System.Reflection.Emit;
 using System.Text;
 
-namespace Centaurus
+namespace Centaurus.Xdr
 {
     internal static class DynamicModule
     {

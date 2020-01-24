@@ -1,4 +1,4 @@
-﻿using System.Text;
+﻿using Centaurus.Xdr;
 
 namespace Centaurus.Models
 {

@@ -5,65 +5,20 @@ using System.Reflection.Emit;
 using System.Reflection;
 using System.Linq;
 
-namespace Centaurus
+namespace Centaurus.Xdr
 {
     internal class XdrSerializerContractBuilder
     {
-        public XdrSerializerContractBuilder(Type serializedType)
+        public XdrSerializerContractBuilder(XdrContractDescriptor contractDescriptor)
         {
-            SerializedType = serializedType;
-            Properties = new List<PropertyInfo>();
-            UnionVector = new List<int>();
-            UnionSwitch = GetUnionMarkup(serializedType).ToDictionary(union => union.Discriminator, union => union.ArmType);
-            DiscoverMarkup(serializedType);
+            ContractDescriptor = contractDescriptor;
         }
 
-        private readonly Type SerializedType;
-
-        private readonly List<PropertyInfo> Properties;
-
-        private readonly List<int> UnionVector;
-
-        public readonly Dictionary<int, Type> UnionSwitch;
-
-        public int AncestorUnionsCounts { get; private set; }
-
-        private void DiscoverMarkup(Type type)
-        {
-            if (type == typeof(object)) return;
-            //analyze base type before processing current
-            DiscoverMarkup(type.BaseType);
-            //discover parent union vector
-            var unions = GetUnionMarkup(type.BaseType);
-            if (unions.Count > 0)
-            {
-                var currentTypeContract = unions.FirstOrDefault(union => SerializedType == union.ArmType || SerializedType.IsSubclassOf(union.ArmType));
-                if (currentTypeContract != null)
-                {
-                    UnionVector.Add(currentTypeContract.Discriminator);
-                    AncestorUnionsCounts++;
-                    //throw new InvalidOperationException($"Failed to build union vector for {SerializedType.FullName}. Use {nameof(XdrUnionAttribute)} to define the union tree from the base class.");
-                }
-            }
-            //skip properties processing for abstract classes - they won't be used for deserialization anyway
-            if (!SerializedType.IsAbstract)
-            {
-                //retrieve all properties marked with XdrFieldAttribute and sort them accordingly to the user-defined order
-                var properties = type.GetProperties(BindingFlags.DeclaredOnly | BindingFlags.Public | BindingFlags.Instance | BindingFlags.SetProperty | BindingFlags.GetProperty)
-                    .Where(prop => prop.GetCustomAttribute<XdrFieldAttribute>() != null)
-                    .OrderBy(prop => prop.GetCustomAttribute<XdrFieldAttribute>().Order);
-                Properties.AddRange(properties);
-            }
-        }
-
-        private List<XdrUnionAttribute> GetUnionMarkup(Type type)
-        {
-            return type.GetCustomAttributes<XdrUnionAttribute>(false).ToList();
-        }
+        public readonly XdrContractDescriptor ContractDescriptor;
 
         public TypeInfo CreateDynamicSerializer()
         {
-            var typeBuilder = DynamicModule.DefineDynamicSerializer(SerializedType);
+            var typeBuilder = DynamicModule.DefineDynamicSerializer(ContractDescriptor.XdrContractType);
             typeBuilder.AddInterfaceImplementation(typeof(IXdrRuntimeContractSerializer));
             typeBuilder.DefineDefaultConstructor(MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.RTSpecialName);
 
@@ -82,7 +37,7 @@ namespace Centaurus
             BuildMethodBody(method, il =>
             {
                 //serialize union discriminators if any
-                foreach (var discriminator in UnionVector)
+                foreach (var discriminator in ContractDescriptor.UnionVector)
                 {
                     il.Emit(OpCodes.Ldarg_2);
                     il.Emit(OpCodes.Ldc_I4, discriminator);
@@ -92,14 +47,8 @@ namespace Centaurus
                 //LocalBuilder optionalFlag = null;
 
                 //serialize properties
-                foreach (var prop in Properties)
+                foreach (var propDescriptor in ContractDescriptor.Properties)
                 {
-                    if (prop.GetMethod == null) throw new InvalidOperationException($"Property {FormatPropertyName(prop)} does not have getter and cannot be serialized.");
-                    var propType = prop.PropertyType;
-
-                    var propDescriptor = new XdrPropertySerializationDescriptor(prop);
-
-
                     //handle optional serialization
                     if (propDescriptor.IsOptional)
                     {
@@ -144,29 +93,28 @@ namespace Centaurus
             });
         }
 
-
         private void EmitSerializeLoadWriter(ILGenerator il)
         {
             il.Emit(OpCodes.Ldarg_2); //load writer onto stack
         }
 
-        private void EmitSerializeGetValue(ILGenerator il, XdrPropertySerializationDescriptor propDescriptor)
+        private void EmitSerializeGetValue(ILGenerator il, IXdrPropertySerializationDescriptor propDescriptor)
         {
             il.Emit(OpCodes.Ldloc_0); //obj
             il.Emit(OpCodes.Callvirt, propDescriptor.Property.GetMethod); //retrieve value
         }
 
-        private void EmitSerializeOptionalFlag(ILGenerator il, XdrPropertySerializationDescriptor propDescriptor, bool hasValue)
+        private void EmitSerializeOptionalFlag(ILGenerator il, IXdrPropertySerializationDescriptor propDescriptor, bool hasValue)
         {
             il.Emit(OpCodes.Ldarg_2); //writer
             il.Emit(hasValue ? OpCodes.Ldc_I4_1 : OpCodes.Ldc_I4_0); // 1 or 0
             il.Emit(OpCodes.Callvirt, xdrWriterMethods[typeof(int)]); // write flag
         }
 
-        private void EmitSerializeWriteValue(ILGenerator il, XdrPropertySerializationDescriptor propDescriptor)
+        private void EmitSerializeWriteValue(ILGenerator il, IXdrPropertySerializationDescriptor propDescriptor)
         {
             if (!xdrWriterMethods.TryGetValue(propDescriptor.PrimitiveType, out MethodInfo write))
-                throw new InvalidOperationException($"Failed to locate primitive value serializer for type {propDescriptor.GenericArgument.FullName}. Check {FormatPropertyName(propDescriptor.Property)}.");
+                throw new InvalidOperationException($"Failed to locate primitive value serializer for type {propDescriptor.GenericArgument.FullName}. Check {propDescriptor.ToString()}.");
 
             //byte array is a special case
             if (propDescriptor.PrimitiveType == typeof(byte[]))
@@ -189,15 +137,8 @@ namespace Centaurus
 
             BuildMethodBody(method, il =>
             {
-                foreach (var prop in Properties)
+                foreach (var propDescriptor in ContractDescriptor.Properties)
                 {
-                    if (prop.SetMethod == null) throw new InvalidOperationException($"Property {FormatPropertyName(prop)} does not have setter and cannot be serialized.");
-                    var propType = prop.PropertyType;
-                    if (propType == typeof(object)) throw new InvalidOperationException($"Generalized object serialization not supported. Check {FormatPropertyName(prop)}.");
-
-
-                    var propDescriptor = new XdrPropertySerializationDescriptor(prop);
-
                     //handle optional serialization
                     if (propDescriptor.IsOptional)
                     {
@@ -238,12 +179,12 @@ namespace Centaurus
             il.Emit(OpCodes.Ldarg_2); //reader
         }
 
-        private void EmitDeserializeWriteValue(ILGenerator il, XdrPropertySerializationDescriptor propDescriptor)
+        private void EmitDeserializeWriteValue(ILGenerator il, IXdrPropertySerializationDescriptor propDescriptor)
         {
             var setter = propDescriptor.Property.SetMethod;
 
             if (!xdrReaderMethods.TryGetValue(propDescriptor.PrimitiveType, out MethodInfo read))
-                throw new InvalidOperationException($"Failed to locate primitive value serializer for type {propDescriptor.GenericArgument.FullName}. Check {FormatPropertyName(propDescriptor.Property)}.");
+                throw new InvalidOperationException($"Failed to locate primitive value serializer for type {propDescriptor.PrimitiveType.FullName}. Check {propDescriptor.ToString()}.");
 
             if (propDescriptor.GenericArgument != null)
             {
@@ -260,9 +201,9 @@ namespace Centaurus
             var il = method.GetILGenerator();
 
             //cast type from object
-            var local = il.DeclareLocal(SerializedType);
+            var local = il.DeclareLocal(ContractDescriptor.XdrContractType);
             il.Emit(OpCodes.Ldarg_1);
-            il.Emit(OpCodes.Isinst, SerializedType);
+            il.Emit(OpCodes.Isinst, ContractDescriptor.XdrContractType);
             il.Emit(OpCodes.Stloc, local.LocalIndex);
 
             //emit required operations
@@ -270,11 +211,6 @@ namespace Centaurus
 
             //return null
             il.Emit(OpCodes.Ret);
-        }
-
-        private string FormatPropertyName(PropertyInfo prop)
-        {
-            return $"{prop.DeclaringType.FullName}.{prop.Name}";
         }
 
         #region PRIMITIVE_SERIALIZATION_METHODS_CACHE

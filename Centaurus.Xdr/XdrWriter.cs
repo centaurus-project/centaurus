@@ -2,12 +2,11 @@
 using System.Buffers;
 using System.Buffers.Binary;
 using System.Collections;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Text;
 
-namespace Centaurus
+namespace Centaurus.Xdr
 {
 
     public class XdrWriter : IDisposable
@@ -28,7 +27,7 @@ namespace Centaurus
         /// <summary>
         /// Current writer position.
         /// </summary>
-        public int Position { get { return buffer.Position; } }
+        public int Position => buffer.Position;
 
         public void Dispose()
         {
@@ -40,7 +39,6 @@ namespace Centaurus
             }
             while (chunk != null);
         }
-
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void AllocateBuffer()
@@ -131,12 +129,32 @@ namespace Centaurus
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteUInt32Array(uint[] value)
+        {
+            WriteInt32(value.Length);
+            foreach (var item in value)
+            {
+                WriteUInt32(item);
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void WriteInt64Array(long[] value)
         {
             WriteInt32(value.Length);
             foreach (var item in value)
             {
                 WriteInt64(item);
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void WriteUInt64Array(ulong[] value)
+        {
+            WriteInt32(value.Length);
+            foreach (var item in value)
+            {
+                WriteUInt64(item);
             }
         }
 

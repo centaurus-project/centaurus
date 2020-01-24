@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace Centaurus
+namespace Centaurus.Xdr
 {
     public static class TypeExtensions
     {

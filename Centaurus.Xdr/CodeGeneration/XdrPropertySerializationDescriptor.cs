@@ -4,46 +4,63 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 
-namespace Centaurus
+namespace Centaurus.Xdr
 {
-    internal class XdrPropertySerializationDescriptor
+    public interface IXdrPropertySerializationDescriptor
+    {
+        public string FieldName { get; }
+
+        public PropertyInfo Property { get; }
+
+        public Type PropertyType { get => Property.PropertyType; }
+
+        public Type PrimitiveType { get; }
+
+        public Type GenericArgument { get; }
+
+        public bool IsOptional { get; }
+
+        public bool IsNullable { get; }
+    }
+
+    public class XdrPropertySerializationDescriptor : IXdrPropertySerializationDescriptor
     {
         public XdrPropertySerializationDescriptor(PropertyInfo prop)
         {
-            var propType = prop.PropertyType;
-            if (propType == typeof(object)) throw new InvalidOperationException($"Generalized object serialization not supported. Check {FormatPropertyName(prop)}.");
-
             Property = prop;
-            PrimitiveType = propType;
+            PrimitiveType = prop.PropertyType;
+            if (prop.GetMethod == null) throw new InvalidOperationException($"Property {FullPropertyName} does not have getter and cannot be serialized.");
+            if (prop.SetMethod == null) throw new InvalidOperationException($"Property {FullPropertyName} does not have setter and cannot be serialized.");
+            if (PrimitiveType == typeof(object)) throw new InvalidOperationException($"Generalized object serialization not supported. Check {FullPropertyName}.");
 
             //determine optional property
             IsOptional = prop.GetCustomAttribute<XdrFieldAttribute>().Optional;
 
             //if this is a primitive type, we are done
-            if (PrimitiveValueTypes.Contains(propType)) return;
+            if (PrimitiveValueTypes.Contains(PrimitiveType)) return;
 
             //check if it's a serializable contract by itself
-            if (IsXdrContractType(propType))
+            if (IsXdrContractType(PrimitiveType))
             {
+                GenericArgument = PrimitiveType;
                 PrimitiveType = typeof(object);
-                GenericArgument = propType;
                 return;
             }
 
             //handle enums
-            if (propType.IsEnum)
+            if (PrimitiveType.IsEnum)
             {
                 //verify enum underlying type
-                EnsureValidEnumType(propType);
+                EnsureValidEnumType(PrimitiveType);
                 //and treat it as int32
                 PrimitiveType = typeof(int);
                 return;
             }
 
             //handle nullable types
-            if (propType.GetGenericTypeDefinition() == typeof(Nullable<>))
+            if (PrimitiveType.GetGenericTypeDefinition() == typeof(Nullable<>))
             {
-                var valueType = propType.GetGenericArguments().SingleOrDefault();
+                var valueType = PrimitiveType.GetGenericArguments().SingleOrDefault();
                 if (IsPrimitiveValueType(valueType))
                 {
                     IsOptional = true;
@@ -54,10 +71,10 @@ namespace Centaurus
             }
 
             //handle lists serialization
-            if (propType.GetGenericTypeDefinition() == typeof(List<>))
+            if (PrimitiveType.GetGenericTypeDefinition() == typeof(List<>))
             {
-                var listGenericType = propType.GetGenericArguments().SingleOrDefault();
-                if (IsXdrContractType(listGenericType))
+                var listGenericType = PrimitiveType.GetGenericArguments().SingleOrDefault();
+                if (IsXdrContractType(listGenericType) || IsPrimitiveValueType(listGenericType))
                 {
                     PrimitiveType = typeof(List<>);
                     GenericArgument = listGenericType;
@@ -66,18 +83,23 @@ namespace Centaurus
             }
 
             //no suitable primitive serializer found
-            throw new InvalidOperationException($"Type {propType.FullName} serialization not supported. Check {prop.DeclaringType.FullName}.{prop.Name}.");
+            throw new InvalidOperationException($"{PrimitiveType.FullName} XDR serialization is not supported. Check {FullPropertyName}.");
         }
 
-        public PropertyInfo Property { get; set; }
 
-        public Type PrimitiveType { get; set; }
+        public PropertyInfo Property { get; private set; }
 
-        public Type GenericArgument { get; set; }
+        public Type PrimitiveType { get; private set; }
 
-        public bool IsOptional { get; set; }
+        public Type GenericArgument { get; private set; }
 
-        public bool IsNullable { get; set; }
+        public bool IsOptional { get; private set; }
+
+        public bool IsNullable { get; private set; }
+
+        public string FieldName => Property.Name;
+
+        public string FullPropertyName => $"{Property.DeclaringType.FullName}.{Property.Name}";
 
         private bool IsXdrContractType(Type type)
         {
@@ -96,10 +118,6 @@ namespace Centaurus
                 throw new InvalidCastException($"XDR serialization is not supported for enums with the underlying type ${underylingType.FullName}.");
         }
 
-        private string FormatPropertyName(PropertyInfo prop)
-        {
-            return $"{prop.DeclaringType.FullName}.{prop.Name}";
-        }
 
         private static readonly HashSet<Type> PrimitiveValueTypes = new HashSet<Type>() {
                 typeof(bool),
@@ -114,11 +132,7 @@ namespace Centaurus
                 typeof(int[]),
                 typeof(long[]),
                 typeof(float[]),
-                typeof(double[]),
-                typeof(List<int>),
-                typeof(List<long>),
-                typeof(List<float>),
-                typeof(List<double>),
+                typeof(double[])
             };
 
         private static readonly HashSet<Type> AllowedEnumTypes = new HashSet<Type>() {
@@ -128,5 +142,10 @@ namespace Centaurus
                 typeof(int),
                 typeof(uint)
             };
+
+        public override string ToString()
+        {
+            return FullPropertyName;
+        }
     }
 }

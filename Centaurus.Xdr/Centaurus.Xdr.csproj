@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>netcoreapp3.0</TargetFramework>
-    <RootNamespace>Centaurus</RootNamespace>
+    <RootNamespace>Centaurus.Xdr</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>

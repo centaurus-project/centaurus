@@ -1,4 +1,5 @@
 ﻿using System;
+using Centaurus.Xdr;
 
 namespace Centaurus.Models
 {
