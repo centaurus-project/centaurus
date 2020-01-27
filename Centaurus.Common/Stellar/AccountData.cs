@@ -27,5 +27,10 @@ namespace Centaurus
         {
             SequenceNumber++;
         }
+
+        public Account GetAccount()
+        {
+            return new Account(AccountId, SequenceNumber);
+        }
     }
 }

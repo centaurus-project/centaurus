@@ -35,7 +35,7 @@ namespace Centaurus.Xdr
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private ReadOnlySpan<byte> ReadAndAdvance(int bytesToRead)
+        internal ReadOnlySpan<byte> ReadAndAdvance(int bytesToRead)
         {
             if (bytesToRead + position > Length)
                 throw new FormatException($"Unexpected attempt to read {bytesToRead} bytes at position {position}. Source stream is too short.");
@@ -200,14 +200,14 @@ namespace Centaurus.Xdr
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public List<T> ReadList<T>() where T : class
+        public List<T> ReadList<T>()
         {
             var length = ReadInt32();
             var res = new List<T>(length);
             var baseType = typeof(T);
             for (var i = 0; i < length; i++)
             {
-                res.Add(XdrConverter.Deserialize(this, baseType) as T);
+                res.Add((T)XdrConverter.Deserialize(this, baseType));
             }
             return res;
         }

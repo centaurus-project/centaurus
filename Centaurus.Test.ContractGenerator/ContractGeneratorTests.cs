@@ -14,7 +14,8 @@ namespace Centaurus.Test
         [Test]
         public void JSContractGeneratorTest()
         {
-            var generator = new JavaScriptContractGenerator();            
+            //var generator = new JavaScriptContractGenerator();
+            var generator = new CSharpContractGenerator();
             generator.LoadContracts(XdrSerializationTypeMapper.DiscoverXdrContracts(typeof(PrimitiveTypes).Assembly));
             var files = generator.Generate();
             //var contract = files.First(f => f.FileName == "primitive-types-converter.js").Contents;

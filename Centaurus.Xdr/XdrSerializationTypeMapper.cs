@@ -11,7 +11,7 @@ namespace Centaurus.Xdr
     /// </summary>
     public class XdrSerializationTypeMapper
     {
-        internal static Dictionary<Type, XdrContractSerializer> Map(string assemblyPrefix = null)
+        internal static Dictionary<Type, XdrContractSerializer> Map(string assemblyPrefix = "Centaurus")
         {
             //create the type mapping for serializers
             var mapping = new Dictionary<Type, XdrContractSerializer>();

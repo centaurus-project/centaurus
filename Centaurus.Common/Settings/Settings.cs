@@ -35,6 +35,9 @@ namespace Centaurus
         [Option("horizon_url", Required = true, HelpText = "URL of Stellar horizon.")]
         public string HorizonUrl { get; set; }
 
+        [Option("connection_string", Required = true, HelpText = "Database connection string.")]
+        public string ConnectionString { get; set; }
+
         public virtual void Build()
         {
             KeyPair = KeyPair.FromSecretSeed(Secret);

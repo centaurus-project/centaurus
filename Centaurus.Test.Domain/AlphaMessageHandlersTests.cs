@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Test
 {
-    public class AlphaMessageHandlersTests
+    public class AlphaMessageHandlersTests : BaseMessageHandlerTests
     {
         [SetUp]
         public void Setup()
@@ -19,20 +19,40 @@ namespace Centaurus.Test
             MessageHandlers<AlphaWebSocketConnection>.Init();
         }
 
-        [Test]
-        public async Task HandshakeTest()
+
+
+        static object[] HandshakeTestCases =
         {
-            Global.AppState.State = ApplicationState.Ready;
+            new object[] { TestEnvironment.Client1KeyPair, ApplicationState.Rising, typeof(ConnectionCloseException) },
+            new object[] { TestEnvironment.Client1KeyPair, ApplicationState.Ready, null },
+            new object[] { TestEnvironment.Auditor1KeyPair, ApplicationState.Rising, null },
+            new object[] { TestEnvironment.Auditor1KeyPair,  ApplicationState.Ready, null }
+        };
+
+        [Test]
+        [TestCaseSource(nameof(HandshakeTestCases))]
+        public async Task HandshakeTest(KeyPair clientKeyPair, ApplicationState alphaState, Type expectedException)
+        {
+            Global.AppState.State = alphaState;
 
             var clientConnection = new AlphaWebSocketConnection(new FakeWebSocket());
 
-            var envelope = new HandshakeInit { HandshakeData = clientConnection.HandshakeData }.CreateEnvelope();
-            envelope.Sign(TestEnvironment.Client1KeyPair);
-            var isHandled = await MessageHandlers<AlphaWebSocketConnection>.HandleMessage(clientConnection, envelope);
+            var message = new HandshakeInit { HandshakeData = clientConnection.HandshakeData };
+            var envelope = message.CreateEnvelope();
+            envelope.Sign(clientKeyPair);
+            if (expectedException == null)
+            {
+                var isHandled = await MessageHandlers<AlphaWebSocketConnection>.HandleMessage(clientConnection, envelope);
 
-            Assert.IsTrue(isHandled);
-            Assert.AreEqual(clientConnection.ClientPubKey, new RawPubKey(TestEnvironment.Client1KeyPair.AccountId));
-            Assert.AreEqual(clientConnection.ConnectionState, ConnectionState.Ready);
+                Assert.IsTrue(isHandled);
+                Assert.AreEqual(clientConnection.ClientPubKey, new RawPubKey(clientKeyPair.AccountId));
+                if (clientConnection.ClientPubKey.Equals((RawPubKey)TestEnvironment.Auditor1KeyPair))
+                    Assert.AreEqual(clientConnection.ConnectionState, ConnectionState.Validated);
+                else
+                    Assert.AreEqual(clientConnection.ConnectionState, ConnectionState.Ready);
+            }
+            else
+                Assert.ThrowsAsync(expectedException, async () => await MessageHandlers<AlphaWebSocketConnection>.HandleMessage(clientConnection, envelope));
         }
 
         [Test]
@@ -76,29 +96,18 @@ namespace Centaurus.Test
         [TestCaseSource(nameof(SetApexCursorTestCases))]
         public async Task SetApexCursorTest(KeyPair clientKeyPair, ConnectionState state, Type excpectedException)
         {
-            try
+            Global.AppState.State = ApplicationState.Ready;
+
+            var clientConnection = new AlphaWebSocketConnection(new FakeWebSocket())
             {
-                Global.AppState.State = ApplicationState.Ready;
+                ClientPubKey = clientKeyPair.PublicKey,
+                ConnectionState = state
+            };
 
-                var clientConnection = new AlphaWebSocketConnection(new FakeWebSocket())
-                {
-                    ClientPubKey = clientKeyPair.PublicKey,
-                    ConnectionState = state
-                };
+            var envelope = new SetApexCursor { Apex = 1 }.CreateEnvelope();
+            envelope.Sign(clientKeyPair);
 
-                var envelope = new SetApexCursor { Apex = 1 }.CreateEnvelope();
-                envelope.Sign(clientKeyPair);
-
-                var isHandled = await MessageHandlers<AlphaWebSocketConnection>.HandleMessage(clientConnection, envelope);
-
-                Assert.IsTrue(isHandled);
-            }
-            catch (Exception exc)
-            {
-                //throw if we don't expect this type of exception
-                if (excpectedException == null || excpectedException != exc.GetType())
-                    throw;
-            }
+            await AssertMessageHandling(clientConnection, envelope, excpectedException);
         }
 
         static object[] LedgerUpdateTestCases =
@@ -112,30 +121,24 @@ namespace Centaurus.Test
         [TestCaseSource(nameof(LedgerUpdateTestCases))]
         public async Task LedgerUpdateTest(KeyPair clientKeyPair, ConnectionState state, Type excpectedException)
         {
-            try
+            Global.AppState.State = ApplicationState.Ready;
+
+            var clientConnection = new AlphaWebSocketConnection(new FakeWebSocket())
             {
-                Global.AppState.State = ApplicationState.Ready;
+                ClientPubKey = clientKeyPair.PublicKey,
+                ConnectionState = state
+            };
 
-                var clientConnection = new AlphaWebSocketConnection(new FakeWebSocket())
-                {
-                    ClientPubKey = clientKeyPair.PublicKey,
-                    ConnectionState = state
-                };
-
-                var ledgerTo = 63;
-                var envelope = new LedgerUpdateNotification { LedgerFrom = 0, LedgerTo = (uint)ledgerTo, Payments = new List<PaymentBase>() }.CreateEnvelope();
-                envelope.Sign(clientKeyPair);
-
-                var isHandled = await MessageHandlers<AlphaWebSocketConnection>.HandleMessage(clientConnection, envelope);
-
-                Assert.IsTrue(isHandled);
-            }
-            catch (Exception exc)
+            var ledgerTo = 63;
+            var envelope = new LedgerUpdateNotification
             {
-                //throw if we don't expect this type of exception
-                if (excpectedException == null || excpectedException != exc.GetType())
-                    throw;
-            }
+                LedgerFrom = Global.LedgerManager.Ledger + 1,
+                LedgerTo = (uint)ledgerTo,
+                Payments = new List<PaymentBase>()
+            }.CreateEnvelope();
+            envelope.Sign(clientKeyPair);
+
+            await AssertMessageHandling(clientConnection, envelope, excpectedException);
         }
 
         static object[] AuditorStateTestCases =
@@ -149,35 +152,25 @@ namespace Centaurus.Test
         [TestCaseSource(nameof(AuditorStateTestCases))]
         public async Task AuditorStateTest(KeyPair clientKeyPair, ConnectionState state, Type excpectedException)
         {
-            try
+            Global.AppState.State = ApplicationState.Rising;
+
+            var clientConnection = new AlphaWebSocketConnection(new FakeWebSocket())
             {
-                Global.AppState.State = ApplicationState.Rising;
+                ClientPubKey = clientKeyPair.PublicKey,
+                ConnectionState = state
+            };
 
-                var clientConnection = new AlphaWebSocketConnection(new FakeWebSocket())
-                {
-                    ClientPubKey = clientKeyPair.PublicKey,
-                    ConnectionState = state
-                };
+            var envelope = new AuditorState
+            {
+                PendingQuantums = new List<MessageEnvelope>(),
+                State = ApplicationState.Running
+            }.CreateEnvelope();
+            envelope.Sign(clientKeyPair);
 
-                var envelope = new AuditorState
-                {
-                    PendingQuantums = new List<MessageEnvelope>(),
-                    LastSnapshot = Global.SnapshotManager.LastSnapshot,
-                    State = ApplicationState.Running
-                }.CreateEnvelope();
-                envelope.Sign(clientKeyPair);
 
-                var isHandled = await MessageHandlers<AlphaWebSocketConnection>.HandleMessage(clientConnection, envelope);
-
-                Assert.IsTrue(isHandled);
+            await AssertMessageHandling(clientConnection, envelope, excpectedException);
+            if (excpectedException == null)
                 Assert.AreEqual(Global.AppState.State, ApplicationState.Running);
-            }
-            catch (Exception exc)
-            {
-                //throw if we don't expect this type of exception
-                if (excpectedException == null || excpectedException != exc.GetType())
-                    throw;
-            }
         }
 
         static object[] OrderTestCases =
@@ -190,32 +183,50 @@ namespace Centaurus.Test
         [TestCaseSource(nameof(OrderTestCases))]
         public async Task OrderTest(ConnectionState state, Type excpectedException)
         {
-            try
+            Global.AppState.State = ApplicationState.Ready;
+
+            var clientConnection = new AlphaWebSocketConnection(new FakeWebSocket())
             {
-                Global.AppState.State = ApplicationState.Ready;
+                ClientPubKey = TestEnvironment.Client1KeyPair.PublicKey,
+                ConnectionState = state
+            };
 
-                var clientConnection = new AlphaWebSocketConnection(new FakeWebSocket())
-                {
-                    ClientPubKey = TestEnvironment.Client1KeyPair.PublicKey,
-                    ConnectionState = state
-                };
-
-                var envelope = new OrderRequest
-                {
-                    Account = TestEnvironment.Client1KeyPair
-                }.CreateEnvelope();
-                envelope.Sign(TestEnvironment.Client1KeyPair);
-
-                var isHandled = await MessageHandlers<AlphaWebSocketConnection>.HandleMessage(clientConnection, envelope);
-
-                Assert.IsTrue(isHandled);
-            }
-            catch (Exception exc)
+            var envelope = new OrderRequest
             {
-                //throw if we don't expect this type of exception
-                if (excpectedException == null || excpectedException != exc.GetType())
-                    throw;
-            }
+                Account = TestEnvironment.Client1KeyPair,
+                Nonce = 1
+            }.CreateEnvelope();
+            envelope.Sign(TestEnvironment.Client1KeyPair);
+
+            await AssertMessageHandling(clientConnection, envelope, excpectedException);
+        }
+
+        static object[] AccountDataTestRequestCases =
+        {
+            new object[] { ConnectionState.Validated, typeof(InvalidStateException) },
+            new object[] { ConnectionState.Ready, null }
+        };
+
+        [Test]
+        [TestCaseSource(nameof(AccountDataTestRequestCases))]
+        public async Task AccountDataRequestTest(ConnectionState state, Type excpectedException)
+        {
+            Global.AppState.State = ApplicationState.Ready;
+
+            var clientConnection = new AlphaWebSocketConnection(new FakeWebSocket())
+            {
+                ClientPubKey = TestEnvironment.Client1KeyPair.PublicKey,
+                ConnectionState = state
+            };
+
+            var envelope = new AccountDataRequest
+            {
+                Account = TestEnvironment.Client1KeyPair,
+                Nonce = 1
+            }.CreateEnvelope();
+            envelope.Sign(TestEnvironment.Client1KeyPair);
+
+            await AssertMessageHandling(clientConnection, envelope, excpectedException);
         }
     }
 }

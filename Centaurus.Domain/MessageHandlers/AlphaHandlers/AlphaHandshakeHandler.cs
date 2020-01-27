@@ -26,22 +26,32 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
             connection.ClientPubKey = envelope.Signatures[0].Signer;
             connection.ConnectionState = ConnectionState.Validated;
 
-            var alphaStateManager = (AlphaStateManager)Global.AppState;
-            Message resultMessage;
-            //if current client is auditor, then we should send current state to it. 
-            //We set Ready state to an auditor only after the auditor sets apex cursor
             if (Global.Constellation.Auditors.Contains(connection.ClientPubKey))
-            {
-                resultMessage = alphaStateManager.GetCurrentAlphaState();
-            }
+                await HandleAuditorHandshake(connection);
+            else
+                await HandleClientHandshake(connection, envelope);
+
+        }
+
+        private async Task HandleAuditorHandshake(AlphaWebSocketConnection connection)
+        {
+            Message message;
+            if (Global.AppState.State == ApplicationState.Rising)
+                message = new AuditorStateRequest { TargetApex = await SnapshotManager.GetLastApex(), Hash = new byte[] { } };
             else
             {
-                if (Global.AppState.State != ApplicationState.Ready)
-                    throw new ConnectionCloseException(WebSocketCloseStatus.ProtocolError, "Alpha is not in Ready state.");
-                connection.ConnectionState = ConnectionState.Ready;
-                resultMessage = envelope.CreateResult(ResultStatusCodes.Success);
+                var alphaStateManager = (AlphaStateManager)Global.AppState;
+                message = alphaStateManager.GetCurrentAlphaState();
             }
-            await connection.SendMessage(resultMessage);
+            await connection.SendMessage(message);
+        }
+
+        private async Task HandleClientHandshake(AlphaWebSocketConnection connection, MessageEnvelope envelope)
+        {
+            if (Global.AppState.State != ApplicationState.Ready)
+                throw new ConnectionCloseException(WebSocketCloseStatus.ProtocolError, "Alpha is not in Ready state.");
+            connection.ConnectionState = ConnectionState.Ready;
+            await connection.SendMessage(envelope.CreateResult(ResultStatusCodes.Success));
         }
     }
 }

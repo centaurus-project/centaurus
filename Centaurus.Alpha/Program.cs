@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.IO.Abstractions;
 using System.Linq;
 using System.Threading.Tasks;
+using Centaurus.DAL.Mongo;
 using Centaurus.Domain;
 using Centaurus.Models;
 using CommandLine;
@@ -34,7 +34,7 @@ namespace Centaurus
                     var logsDirectory = Path.Combine(s.CWD, "logs");
                     LogConfigureHelper.Configure(logsDirectory, s.Silent, s.Verbose);
 
-                    ConfigureConstellation(s).Wait();
+                    ConfigureConstellation(s);
 
                     host = CreateHostBuilder(s).Build();
                     host.Run();
@@ -48,25 +48,13 @@ namespace Centaurus
                 });
         }
 
-        private static async Task ConfigureConstellation(AlphaSettings settings)
+        private static void ConfigureConstellation(AlphaSettings settings)
         {
-            Global.Init(settings, new FileSystem());
+            Global.Init(settings, new MongoStorage());
 
             Global.AppState.StateChanged += Current_StateChanged;
 
             MessageHandlers<AlphaWebSocketConnection>.Init();
-
-            var lastSnapshot = await Global.SnapshotDataProvider.GetLastSnapshot();
-
-            if (lastSnapshot == null)
-            {
-                Global.AppState.State = ApplicationState.WaitingForInit;
-            }
-            else
-            {
-                Global.Setup(lastSnapshot);
-                Global.AppState.State = ApplicationState.Rising;
-            }
         }
 
         private static async void Current_StateChanged(object sender, ApplicationState e)

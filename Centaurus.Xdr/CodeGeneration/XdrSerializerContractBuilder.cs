@@ -256,7 +256,7 @@ namespace Centaurus.Xdr
             xdrWriterMethods.Add(typeof(List<long>), writerType.GetMethod(nameof(XdrWriter.WriteInt64List)));
             xdrWriterMethods.Add(typeof(List<float>), writerType.GetMethod(nameof(XdrWriter.WriteFloatList)));
             xdrWriterMethods.Add(typeof(List<double>), writerType.GetMethod(nameof(XdrWriter.WriteDoubleList)));
-            xdrWriterMethods.Add(typeof(List<>), writerType.GetMethod(nameof(XdrWriter.WriteList)));
+            xdrWriterMethods.Add(typeof(List<>), writerType.GetMethod(nameof(XdrWriter.WriteArray)));
 
             //TODO: handle DateTime, char, byte, sbyte, nullables, and arrays of all mentioned above types
         }

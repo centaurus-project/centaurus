@@ -24,13 +24,6 @@ namespace Centaurus.ContractGenerator
             MapType(new PrimitiveTypeDescriptor(typeof(object), "Object", "Object"));
         }
 
-        protected override IEnumerable<GeneratedContractFile> GenerateContract(XdrContractDescriptor contractDescriptor)
-        {
-            var contractName = contractDescriptor.XdrContractType.Name;
-            yield return new GeneratedContractFile($"{CaseConversionUtils.ConvertPascalCaseToKebabCase(contractName)}.js", GenerateContractFile(contractDescriptor, contractName));
-            yield return new GeneratedContractFile($"{CaseConversionUtils.ConvertPascalCaseToKebabCase(contractName + "Serializer")}.js", GenerateSerializerFile(contractDescriptor, contractName));
-        }
-
         private string ProcessFieldName(string fieldName)
         {
             return CaseConversionUtils.ConvertToCamelCase(fieldName);
@@ -45,7 +38,13 @@ namespace Centaurus.ContractGenerator
 
         public override GeneratedContractsBundle Generate()
         {
-            var bundle = base.Generate();
+            var bundle = new GeneratedContractsBundle();
+            foreach (var contractDescriptor in ContractsMap.Values)
+            {
+                var contractName = contractDescriptor.XdrContractType.Name;
+                bundle.Add(new GeneratedContractFile($"{CaseConversionUtils.ConvertPascalCaseToKebabCase(contractName)}.js", GenerateContractFile(contractDescriptor, contractName)));
+                bundle.Add(new GeneratedContractFile($"{CaseConversionUtils.ConvertPascalCaseToKebabCase(contractName + "Serializer")}.js", GenerateSerializerFile(contractDescriptor, contractName)));
+            }
             var builder = new StringBuilder("import xdrConverter from '../serialization/xdr-converter'");
             var exports = new List<string>();
             foreach (var file in bundle.Files)

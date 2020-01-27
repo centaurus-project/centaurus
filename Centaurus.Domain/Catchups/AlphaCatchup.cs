@@ -13,124 +13,108 @@ namespace Centaurus.Domain
     /// <summary>
     /// This class manages auditor snapshots and quanta when Alpha is rising
     /// </summary>
-    internal static class AlphaCatchup
+    public static class AlphaCatchup
     {
         private static Logger logger = LogManager.GetCurrentClassLogger();
 
-        private static object syncRoot = new { };
+        private static SemaphoreSlim semaphoreSlim = new SemaphoreSlim(1);
+        private static Dictionary<RawPubKey, AuditorState> allAuditorStates = new Dictionary<RawPubKey, AuditorState>();
+        private static Dictionary<RawPubKey, AuditorState> validAuditorStates = new Dictionary<RawPubKey, AuditorState>();
 
-        private static Dictionary<RawPubKey, AuditorState> auditorStates = new Dictionary<RawPubKey, AuditorState>();
-
-        private static bool hasMajority = false;
-
-        public static void CatchupAuditorState(RawPubKey pubKey, AuditorState auditorState)
+        public static async Task AddAuditorState(RawPubKey pubKey, AuditorState auditorState)
         {
-            if (Global.AppState.State != ApplicationState.Rising)
-                throw new InvalidOperationException("Auditor state messages can be only handled when Alpha is in rising state");
-
-            lock (syncRoot)
+            await semaphoreSlim.WaitAsync();
+            try
             {
-                //use dictionary to prevent duplicate messages
-                auditorStates[pubKey] = auditorState;
+                if (Global.AppState.State != ApplicationState.Rising)
+                    throw new InvalidOperationException("Auditor state messages can be only handled when Alpha is in rising state");
 
-                if (!hasMajority
-                    && auditorStates.Count >= MajorityHelper.GetMajorityCount())
+                if (allAuditorStates.ContainsKey(pubKey))
+                    return;
+                allAuditorStates.Add(pubKey, auditorState);
+                if (IsStateValid(auditorState))
+                    validAuditorStates.Add(pubKey, auditorState);
+
+                int majority = MajorityHelper.GetMajorityCount(),
+                totalAuditorsCount = MajorityHelper.GetTotalAuditorsCount();
+
+                if (allAuditorStates.Count < majority)
+                    return;
+
+                var possibleConsensusCount = (totalAuditorsCount - allAuditorStates.Count) + validAuditorStates.Count;
+                if (validAuditorStates.Count >= majority)
                 {
-                    var majorityData = GetMajorityData();
-                    if (majorityData != null)
-                    {
-                        hasMajority = true;
-#if !DEBUG
-                    //Sleep for 10 seconds to make sure that all active auditors are connected
-                    Thread.Sleep(10000);
-
-#endif
-                        //reload data. Some new quanta could arrive during timeout
-                        majorityData = GetMajorityData();
-                        ApplyAuditorsData(majorityData).Wait();
-                    }
-                    else
-                    {
-                        logger.Error("Majority of auditors are connected, but there is no consensus");
-                    }
+                    await ApplyAuditorsData();
                 }
+                else if (possibleConsensusCount < majority)
+                {
+                    Global.AppState.State = ApplicationState.Failed;
+                    logger.Error("Majority of auditors are connected, but there is no consensus");
+                }
+            }
+            catch (Exception exc)
+            {
+                Global.AppState.State = ApplicationState.Failed;
+                logger.Error(exc, "Error on adding auditors state");
+            }
+            finally
+            {
+                semaphoreSlim.Release();
             }
         }
 
-        private static IEnumerable<AuditorState> GetMajorityData()
-        {
-            //group auditor states by snapshot hash
-            var groupedSnapshots = auditorStates.Values
-                //snapshot could be null if it's first auditor connection
-                .GroupBy(s => s.LastSnapshot?.ComputeHash() ?? new byte[] { }, new ByteArrayComparer());
-            var largestGroup = groupedSnapshots.OrderByDescending(g => g.Count()).First();
-            if (largestGroup.Count() >= MajorityHelper.GetMajorityCount())
-                return largestGroup;
-            return null;
-        }
-
         /// <summary>
-        /// Validates provided snapshot
+        /// Checks that all quanta has valid Alpha signature
         /// </summary>
-        /// <param name="snapshot">Majority's snapshot</param>
-        private static async Task ValidateSnapshot(Snapshot snapshot)
+        private static bool IsStateValid(AuditorState state)
         {
-            var localSnapshot = await Global.SnapshotDataProvider.GetLastSnapshot();
-            if (!ByteArrayPrimitives.Equals(snapshot.ComputeHash(), localSnapshot.ComputeHash()))
-                throw new Exception("Local snapshot doesn't equal to majority's one");
+            return state.PendingQuantums.All(q => q.Signatures.Any(s => s.Signer.Equals((RawPubKey)Global.Settings.KeyPair.PublicKey))
+                        && q.AreSignaturesValid());
         }
 
-        private static async Task ApplyAuditorsData(IEnumerable<AuditorState> largestGroup)
+        private static async Task ApplyAuditorsData()
         {
-            //if last snapshot is not null, we should aggregate all envelopes
-            var lastSnapshot = largestGroup.First().LastSnapshot;
-            if (lastSnapshot != null)
-                lastSnapshot.Confirmation = largestGroup.Select(g => g.LastSnapshot.Confirmation).ToList().AggregateEnvelops();
+            var validQuanta = await GetValidQuanta();
 
-            if (lastSnapshot == null)
-                lastSnapshot = await Global.SnapshotDataProvider.GetLastSnapshot();
-
-            //alpha could be empty
-            //await ValidateSnapshot(lastSnapshot);
-
-            var validQuanta = GetValidQuanta(lastSnapshot, largestGroup);
-
-            Global.Setup(lastSnapshot, validQuanta);
+            await ApplyQuanta(validQuanta);
 
             var alphaStateManager = (AlphaStateManager)Global.AppState;
 
             alphaStateManager.AlphaRised();
 
-            Global.QuantumHandler.Start();
-
             Notifier.NotifyAuditors(alphaStateManager.GetCurrentAlphaState());
         }
 
-        private static IEnumerable<MessageEnvelope> GetValidQuanta(Snapshot snapshot, IEnumerable<AuditorState> auditorStates)
+        private static async Task ApplyQuanta(List<MessageEnvelope> quanta)
+        { 
+            var quantaCount = quanta.Count;
+            for (var i = 0; i < quantaCount; i++)
+            {
+                var currentQuantumEnvelope = quanta[i];
+                var currentQuantum = ((Quantum)currentQuantumEnvelope.Message);
+                var quantumApex = currentQuantum.Apex;
+                await Global.QuantumHandler.HandleAsync(currentQuantumEnvelope);
+                if (quantumApex != currentQuantum.Apex)
+                    throw new Exception("Apexes are not equal for a quantum on restore.");
+            }
+        }
+
+        private static async Task<List<MessageEnvelope>> GetValidQuanta()
         {
             //group all quanta by their apex
-            var quanta = auditorStates
+            var quanta = validAuditorStates.Values
                 .SelectMany(a => a.PendingQuantums)
-                .Where(q => ((Quantum)q.Message).Apex > snapshot.Apex)
                 .GroupBy(q => ((Quantum)q.Message).Apex)
                 .OrderBy(q => q.Key);
 
             if (quanta.Count() == 0)
-                return new MessageEnvelope[] { };
+                return new List<MessageEnvelope>();
 
-            var lastQuantumApex = snapshot.Apex;
+            var lastQuantumApex = await SnapshotManager.GetLastApex();
             var validQuanta = new List<MessageEnvelope>();
 
             foreach (var currentQuantaGroup in quanta)
             {
-                //TODO: select only quanta that has a valid alpha signature
-                //TODO: validate that all grouped quanta has the same hash
-
-                //select only quanta that has alpha signature
-                var validatedQuanta = currentQuantaGroup
-                    .Where(q => q.Signatures.Any(s => s.Signer == (RawPubKey)Global.Settings.KeyPair.PublicKey)
-                        && q.AreSignaturesValid());
-
                 //check if all quanta are the same
                 if (currentQuantaGroup.GroupBy(q => q.ComputeHash()).Count() > 1)
                     throw new Exception("Alpha's private key is compromised");

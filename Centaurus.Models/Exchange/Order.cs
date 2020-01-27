@@ -16,8 +16,7 @@ namespace Centaurus.Models
         [XdrField(2)]
         public long Amount { get; set; }
 
-        [XdrField(3)]
-        public RawPubKey Pubkey { get; set; } //TODO: use account reference instead
+        public Account Account { get; set; }
 
         public Order Next { get; set; }
 

@@ -1,10 +1,10 @@
-﻿using Centaurus.Domain;
+﻿using Centaurus.DAL.Mongo;
+using Centaurus.Domain;
 using Centaurus.Models;
 using NLog;
 using stellar_dotnet_sdk;
 using System;
 using System.Collections.Generic;
-using System.IO.Abstractions;
 using System.Net.WebSockets;
 using System.Text;
 using System.Threading;
@@ -22,32 +22,41 @@ namespace Centaurus.Auditor
 
         public Startup(AuditorSettings settings)
         {
-            Global.Init(settings, new FileSystem());
+            Global.Init(settings, new MongoStorage());
+
+            Global.AppState.StateChanged += StateChanged;
+
+            MessageHandlers<AuditorWebSocketConnection>.Init();
         }
 
         public async Task Run()
         {
-            MessageHandlers<AuditorWebSocketConnection>.Init();
-
-            Global.AppState.StateChanged += StateChanged;
-
-            while (auditor == null)
+            try
             {
-                var _auditor = new AuditorWebSocketConnection(new ClientWebSocket());
-                try
-                {
-                    Subscribe(_auditor);
-                    await _auditor.EstablishConnection();
-                    auditor = _auditor;
-                }
-                catch (Exception exc)
-                {
-                    Unsubscribe(_auditor);
-                    await CloseConnection(_auditor);
 
-                    logger.Error(exc, "Unable establish connection. Retry in 5000ms");
-                    Thread.Sleep(5000);
+                while (auditor == null)
+                {
+                    var _auditor = new AuditorWebSocketConnection(new ClientWebSocket());
+                    try
+                    {
+                        Subscribe(_auditor);
+                        await _auditor.EstablishConnection();
+                        auditor = _auditor;
+                    }
+                    catch (Exception exc)
+                    {
+                        Unsubscribe(_auditor);
+                        await CloseConnection(_auditor);
+
+                        logger.Error(exc, "Unable establish connection. Retry in 5000ms");
+                        Thread.Sleep(5000);
+                    }
                 }
+            }
+            catch (Exception exc)
+            {
+                logger.Error(exc);
+                Global.AppState.State = ApplicationState.Failed;
             }
         }
 
@@ -56,7 +65,8 @@ namespace Centaurus.Auditor
             if (state == ApplicationState.Failed)
             {
                 await Abort();
-                await Global.SnapshotManager.SavePendingQuantums();
+
+                Thread.Sleep(10000);//sleep for 10 sec to make sure that pending updates are saved
 
                 //TODO: restart after some timeout
             }
@@ -111,7 +121,8 @@ namespace Centaurus.Auditor
 
         private void Ready(BaseWebSocketConnection e)
         {
-            Global.AppState.State = ApplicationState.Ready;
+            if (Global.AppState.State != ApplicationState.WaitingForInit)
+                Global.AppState.State = ApplicationState.Ready;
         }
 
         private async void Close(BaseWebSocketConnection e)

@@ -179,7 +179,7 @@ namespace Centaurus.Xdr
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteList(IList value)
+        public void WriteArray<T>(ICollection<T> value)
         {
             var total = value.Count;
             WriteInt32(total);

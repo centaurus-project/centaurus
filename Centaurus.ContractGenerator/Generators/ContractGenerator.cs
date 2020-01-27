@@ -8,17 +8,9 @@ namespace Centaurus.ContractGenerator
     public abstract class ContractGenerator
     {
         private readonly Dictionary<Type, PrimitiveTypeDescriptor> PrimitiveTypesMap = new Dictionary<Type, PrimitiveTypeDescriptor>();
-        private Dictionary<Type, XdrContractDescriptor> ContractsMap;
+        protected Dictionary<Type, XdrContractDescriptor> ContractsMap;
 
-        public virtual GeneratedContractsBundle Generate()
-        {
-            var allFiles = new GeneratedContractsBundle();
-            foreach (var contract in ContractsMap.Values)
-            {
-                allFiles.Add(GenerateContract(contract));
-            }
-            return allFiles;
-        }
+        public abstract GeneratedContractsBundle Generate();
 
         public void LoadContracts(IEnumerable<XdrContractDescriptor> contracts)
         {
@@ -76,7 +68,5 @@ namespace Centaurus.ContractGenerator
         {
             return ResolveWellKnownPrimitiveTypeDescriptor(propType).PrimitiveTypeName;
         }
-
-        protected abstract IEnumerable<GeneratedContractFile> GenerateContract(XdrContractDescriptor contractDescriptor);
     }
 }

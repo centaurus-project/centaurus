@@ -30,8 +30,8 @@ namespace Centaurus.Test
                     Pubkey = new RawPubKey() { Data = kp.PublicKey },
                     Balances = new List<Balance>()
                 };
-                acc.Balances.Add(new Balance { Amount = (long)1000 * 10_000_000 });
-                acc.Balances.Add(new Balance { Amount = (long)1000 * 10_000_000, Asset = 1 });
+                acc.Balances.Add(new Balance { Amount = (long)1000 * 10_000_000, Account = acc });
+                acc.Balances.Add(new Balance { Amount = (long)1000 * 10_000_000, Asset = 1, Account = acc });
 
                 accs.Add(acc);
             }

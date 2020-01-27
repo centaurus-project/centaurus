@@ -20,12 +20,12 @@ namespace Centaurus.Domain
         public ConstellationInitializer(IEnumerable<KeyPair> auditors, long minAccountBalance, long minAllowedLotSize, IEnumerable<AssetSettings> assets)
         {
             Auditors = auditors.Count() >= minAuditorsCount ? auditors.ToArray() : throw new Exception($"Min auditors count is {minAuditorsCount}");
-            
+
             MinAccountBalance = minAccountBalance > 0 ? minAccountBalance : throw new ArgumentException("Minimal account balance is less then 0");
 
             MinAllowedLotSize = minAllowedLotSize > 0 ? minAllowedLotSize : throw new ArgumentException("Minimal allowed lot size is less then 0");
 
-            Assets = !assets.GroupBy(a => a.ToString()).Any(g => g.Count() > 1) 
+            Assets = !assets.GroupBy(a => a.ToString()).Any(g => g.Count() > 1)
                 ? assets.Where(a => !a.IsXlm).ToArray() //skip XLM, it's supported by default
                 : throw new ArgumentException("All asset values should be unique");
         }
@@ -40,30 +40,32 @@ namespace Centaurus.Domain
             if (Global.AppState.State != ApplicationState.WaitingForInit)
                 throw new InvalidOperationException("Alpha is not in the waiting for initialization state.");
 
-            if (!await DoesAlphaAccountExist())
+            var alphaAccountData = await DoesAlphaAccountExist();
+            if (alphaAccountData == null)
                 throw new InvalidOperationException($"The vault ({Global.Settings.KeyPair.AccountId}) is not yet funded");
 
-            var ledgerId = await BuildAndConfigureVault();
+            var ledgerId = await BuildAndConfigureVault(alphaAccountData);
 
             SetIdToAssets();
-            //build genesis settings
-            var settings = new ConstellationSettings
-            {
-                Vault = Global.Settings.KeyPair.PublicKey,
-                Auditors = Auditors.Select(key => (RawPubKey)key.PublicKey).ToList(),
-                MinAccountBalance = MinAccountBalance,
-                MinAllowedLotSize = MinAllowedLotSize,
-                Assets = Assets.ToList()
-            };
+
 
             var vaultAccountInfo = await Global.StellarNetwork.Server.Accounts.Account(Global.Settings.KeyPair.AccountId);
 
-            //build genesis snapshot
-            var snapshot = await SnapshotManager.BuildGenesisSnapshot(settings, ledgerId, vaultAccountInfo.SequenceNumber);
+            var initQuantum = new ConstellationInitQuantum
+            {
+                Assets = Assets.ToList(),
+                Auditors = Auditors.Select(key => (RawPubKey)key.PublicKey).ToList(),
+                Vault = Global.Settings.KeyPair.PublicKey,
+                MinAccountBalance = MinAccountBalance,
+                MinAllowedLotSize = MinAllowedLotSize,
+                PrevHash = new byte[] { },
+                Ledger = ledgerId,
+                VaultSequence = vaultAccountInfo.SequenceNumber
+            };
 
-            Global.Setup(snapshot, new MessageEnvelope[] { });
+            var envelope = initQuantum.CreateEnvelope();
 
-            Global.QuantumHandler.Start();
+            await Global.QuantumHandler.HandleAsync(envelope);
         }
 
         private void SetIdToAssets()
@@ -79,7 +81,7 @@ namespace Centaurus.Domain
         /// Builds and configures Centaurus vault
         /// </summary>
         /// <returns>Ledger id</returns>
-        private async Task<long> BuildAndConfigureVault()
+        private async Task<long> BuildAndConfigureVault(stellar_dotnet_sdk.responses.AccountResponse vaultAccount)
         {
             var majority = MajorityHelper.GetMajorityCount(Auditors.Count());
 
@@ -88,10 +90,19 @@ namespace Centaurus.Domain
             var transactionBuilder = new Transaction.Builder(sourceAccount);
             transactionBuilder.SetFee(10_000);
 
+            var existingTrustlines = vaultAccount.Balances
+                .Where(b => b.Asset is stellar_dotnet_sdk.AssetTypeCreditAlphaNum)
+                .Select(b => b.Asset)
+                .Cast<stellar_dotnet_sdk.AssetTypeCreditAlphaNum>();
             foreach (var a in Assets)
             {
-                if (a.IsXlm) continue;
-                var asset = a.ToAsset();
+                var asset = a.ToAsset() as stellar_dotnet_sdk.AssetTypeCreditAlphaNum;
+
+                if (asset == null)//if null than asset is stellar_dotnet_sdk.AssetTypeNative
+                    throw new InvalidOperationException("Native assets are supported by default."); //better to throw exception to avoid confusions with id
+
+                if (existingTrustlines.Any(t => t.Code == asset.Code && t.Issuer == asset.Issuer))
+                    continue;
 
                 var trustOperation = new ChangeTrustOperation.Builder(asset, "922337203685.4775807");
                 transactionBuilder.AddOperation(trustOperation.Build());
@@ -104,9 +115,7 @@ namespace Centaurus.Domain
                     .SetHighThreshold(majority);
 
             foreach (var signer in Auditors)
-            {
                 optionOperationBuilder.SetSigner(Signer.Ed25519PublicKey(signer), 1);
-            }
 
             transactionBuilder.AddOperation(optionOperationBuilder.Build());
 
@@ -123,17 +132,16 @@ namespace Centaurus.Domain
             return result.Ledger.Value;
         }
 
-        private async Task<bool> DoesAlphaAccountExist()
+        private async Task<stellar_dotnet_sdk.responses.AccountResponse> DoesAlphaAccountExist()
         {
             try
             {
-                await Global.StellarNetwork.Server.Accounts.Account(Global.Settings.KeyPair.AccountId);
-                return true;
+                return await Global.StellarNetwork.Server.Accounts.Account(Global.Settings.KeyPair.AccountId);
             }
             catch (HttpResponseException exc)
             {
                 if (exc.StatusCode == 404)
-                    return false;
+                    return null;
                 throw;
             }
         }

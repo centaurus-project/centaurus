@@ -14,7 +14,7 @@ namespace Centaurus.Domain
 
         public override async Task HandleMessage(AuditorWebSocketConnection connection, MessageEnvelope envelope)
         {
-            //just send message back. The message contains handshake data
+            //send message back. The message contains handshake data
             await connection.SendMessage(envelope.Message);
         }
     }

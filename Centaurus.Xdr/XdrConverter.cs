@@ -27,16 +27,16 @@ namespace Centaurus.Xdr
         internal static void Serialize(object value, XdrWriter writer)
         {
             if (value == null)
-                throw new NullReferenceException("Failed to serialize null value. All values should be initialized before the serialization.");
+                throw new ArgumentNullException(nameof(value), "Failed to serialize null value. All values should be initialized before the serialization.");
             var serializer = LookupSerializer(value.GetType());
             serializer.DynamicSerializer.Serialize(value, writer);
         }
 
-        internal static void SerializeList(IList value, XdrWriter writer)
+        internal static void SerializeList(IEnumerable value, XdrWriter writer)
         {
             //if (value == null) throw new NullReferenceException("Failed to serialize null value. All values should be initialized before the serialization.");
             //suppose it's a List<T>
-            var genericListType = value.GetType().GetGenericArguments()[0];
+            var genericListType = value.GetType().GenericTypeArguments[0];
             if (genericListType != null)
             {
                 var baseSerializer = LookupSerializer(genericListType);

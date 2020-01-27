@@ -7,15 +7,15 @@ namespace Centaurus.Domain
 {
     public class QuantumProcessingQueue
     {
-        public QuantumProcessingQueue(ulong initApex)
+        public QuantumProcessingQueue(long initApex)
         {
             LastAddedApex = initApex;
         }
 
 
-        Dictionary<ulong, MessageEnvelope> queue = new Dictionary<ulong, MessageEnvelope>();
+        Dictionary<long, MessageEnvelope> queue = new Dictionary<long, MessageEnvelope>();
 
-        public ulong LastAddedApex { get; private set; }
+        public long LastAddedApex { get; private set; }
 
         public void Add(MessageEnvelope envelope)
         {
@@ -31,7 +31,7 @@ namespace Centaurus.Domain
             }
         }
 
-        public bool TryGet(ulong apex, out MessageEnvelope envelope)
+        public bool TryGet(long apex, out MessageEnvelope envelope)
         {
             envelope = null;
             lock (this)
@@ -46,7 +46,7 @@ namespace Centaurus.Domain
         }
 
 
-        public bool TryRemove(ulong apex, out MessageEnvelope envelope)
+        public bool TryRemove(long apex, out MessageEnvelope envelope)
         {
             envelope = null;
             lock (this)
@@ -60,7 +60,7 @@ namespace Centaurus.Domain
             return false;
         }
 
-        public bool ContainsKey(ulong apex)
+        public bool ContainsKey(long apex)
         {
             lock (this)
                 return queue.ContainsKey(apex);

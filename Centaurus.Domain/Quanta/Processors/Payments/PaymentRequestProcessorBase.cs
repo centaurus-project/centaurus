@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using Centaurus.Models;
 using stellar_dotnet_sdk;
 
@@ -9,13 +10,19 @@ namespace Centaurus.Domain
 {
     public abstract class PaymentRequestProcessorBase : ClientRequestProcessorBase
     {
-        public override ResultMessage Process(MessageEnvelope envelope)
+        public override Task<ResultMessage> Process(MessageEnvelope envelope)
         {
-            UpdateNonce(envelope);
+            var effectProcessorsContainer = new EffectProcessorsContainer(envelope, Global.AddEffects);
 
-            var payment = (envelope.Message as RequestQuantum).RequestEnvelope.Message as PaymentRequestBase;
+            UpdateNonce(effectProcessorsContainer);
 
-            AccountData vaultAccount = Global.VaultAccount;
+            var requestQuantum = (RequestQuantum)envelope.Message;
+
+            var payment = (PaymentRequestBase)requestQuantum.RequestEnvelope.Message;
+
+            AccountData vaultAccount = Global.VaultAccount; 
+            
+            effectProcessorsContainer.AddLockLiabilities(Global.AccountStorage, payment.Account, payment.Asset, payment.Amount);
 
             //if withdrawal requested or if account doesn't exist in Centaurus, we need to build transaction
             if (payment.MessageType == MessageTypes.WithdrawalRequest || Global.AccountStorage.GetAccount(payment.Destination) == null)
@@ -30,21 +37,46 @@ namespace Centaurus.Domain
                     asset,
                     payment.Amount.ToString()
                 );
-                payment.TransactionXdr = transaction.ToRawEnvelopeXdr();
-                payment.TransactionHash = transaction.Hash();
 
-                Global.WithdrawalStorage.Add(payment);
+                if (payment.TransactionHash == null)//if TransactionHash is not null than it's test
+                {
+                    var outputStream = new stellar_dotnet_sdk.xdr.XdrDataOutputStream();
+                    stellar_dotnet_sdk.xdr.Transaction.Encode(outputStream, transaction.ToXdr());
+
+                    payment.TransactionXdr = outputStream.ToArray();
+                    payment.TransactionHash = transaction.Hash();
+                }
+
+                var withdrawal = new Withdrawal
+                {
+                    Source = payment.Account,
+                    Destination = payment.Destination,
+                    Amount = payment.Amount,
+                    Asset = payment.Asset,
+                    TransactionHash = payment.TransactionHash
+                };
+
+                effectProcessorsContainer.AddWithdrawalCreate(withdrawal, Global.WithdrawalStorage);
+            }
+            else
+            { 
+                //if the current request is payment, then we can process it immediately
+                var destAccount = Global.AccountStorage.GetAccount(payment.Destination);
+                effectProcessorsContainer.AddBalanceUpdate(Global.AccountStorage, payment.Destination, payment.Asset, payment.Amount);
+
+                effectProcessorsContainer.AddUnlockLiabilities(Global.AccountStorage, payment.Account, payment.Asset, payment.Amount);
+                effectProcessorsContainer.AddBalanceUpdate(Global.AccountStorage, payment.Account, payment.Asset, -payment.Amount);
             }
 
-            var account = Global.AccountStorage.GetAccount(payment.Account);
-            var balance = account.Balances.Find(b => b.Asset == payment.Asset);
-            balance.LockLiabilities(payment.Amount);
+            effectProcessorsContainer.Commit();
 
-            //TODO: add effects
-            return envelope.CreateResult(ResultStatusCodes.Success);
+            var effects = effectProcessorsContainer.GetEffects();
+
+            var accountEffects = effects.Where(e => ByteArrayPrimitives.Equals(e.Pubkey, payment.Account)).ToList();
+            return Task.FromResult(envelope.CreateResult(ResultStatusCodes.Success, accountEffects));
         }
 
-        public override void Validate(MessageEnvelope envelope)
+        public override Task Validate(MessageEnvelope envelope)
         {
             ValidateNonce(envelope);
 
@@ -54,6 +86,12 @@ namespace Centaurus.Domain
 
             if (payment.Account == null || payment.Account.IsZero())
                 throw new InvalidOperationException("Source should be valid public key");
+
+            if (payment.Destination == null || payment.Destination.IsZero())
+                throw new InvalidOperationException("Destination should be valid public key");
+
+            if (payment.Destination.Equals(payment.Account))
+                throw new InvalidOperationException("Source and destination must be different public keys");
 
             if (payment.Amount <= 0)
                 throw new InvalidOperationException("Amount should be greater than 0");
@@ -68,6 +106,8 @@ namespace Centaurus.Domain
             var balance = account.Balances.Find(b => b.Asset == payment.Asset);
             if (balance == null || !balance.HasSufficientBalance(payment.Amount))
                 throw new InvalidOperationException("Insufficient funds");
+
+            return Task.CompletedTask;
         }
     }
 }

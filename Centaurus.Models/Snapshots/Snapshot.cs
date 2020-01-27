@@ -8,10 +8,10 @@ namespace Centaurus.Models
     public class Snapshot
     {
         [XdrField(0)]
-        public ulong Id { get; set; }
+        public long Apex { get; set; }
 
         [XdrField(1)]
-        public ulong Apex { get; set; }
+        public byte[] LastHash { get; set; }
 
         [XdrField(2)]
         public ConstellationSettings Settings { get; set; }
@@ -32,12 +32,12 @@ namespace Centaurus.Models
         /// Pending withdrawals
         /// </summary>
         [XdrField(7)]
-        public List<PaymentRequestBase> Withdrawals { get; set; }
+        public List<Withdrawal> Withdrawals { get; set; }
 
         /// <summary>
-        /// Envelope for <see cref="SnapshotQuantum"/> with aggregated auditor signatures.
+        /// Aggregated auditor signatures.
         /// </summary>
         [XdrField(8, Optional = true)]
-        public MessageEnvelope Confirmation { get; set; }
+        public List<Ed25519Signature> Signatures { get; set; }
     }
 }

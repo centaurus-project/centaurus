@@ -11,19 +11,19 @@ namespace Centaurus.Models
     {
         public override MessageTypes MessageType => MessageTypes.LedgerUpdateNotification;
 
-        public override ulong MessageId => LedgerFrom;
+        public override ulong MessageId => (ulong)LedgerFrom;
 
         /// <summary>
         /// Ledgers range start.
         /// </summary>
         [XdrField(0)]
-        public uint LedgerFrom { get; set; }
+        public long LedgerFrom { get; set; }
 
         /// <summary>
         /// Ledgers range end.
         /// </summary>
         [XdrField(1)]
-        public uint LedgerTo { get; set; }
+        public long LedgerTo { get; set; }
 
         /// <summary>
         /// List of payments witnessed by an auditor.
