@@ -86,7 +86,7 @@ namespace Centaurus.Xdr
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public bool ReadBool()
+        public bool ReadBoolean()
         {
             return ReadInt32() == 1 ? true : false;
         }
@@ -95,102 +95,6 @@ namespace Centaurus.Xdr
         public T ReadEnum<T>() where T : Enum
         {
             return (T)(object)ReadInt32();
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public int[] ReadInt32Array()
-        {
-            var length = ReadInt32();
-            var res = new int[length];
-            for (var i = 0; i < length; i++)
-            {
-                res[i] = ReadInt32();
-            }
-            return res;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public long[] ReadInt64Array()
-        {
-            var length = ReadInt32();
-            var res = new long[length];
-            for (var i = 0; i < length; i++)
-            {
-                res[i] = ReadInt64();
-            }
-            return res;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public float[] ReadFloatArray()
-        {
-            var length = ReadInt32();
-            var res = new float[length];
-            for (var i = 0; i < length; i++)
-            {
-                res[i] = ReadFloat();
-            }
-            return res;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public double[] ReadDoubleArray()
-        {
-            var length = ReadInt32();
-            var res = new double[length];
-            for (var i = 0; i < length; i++)
-            {
-                res[i] = ReadDouble();
-            }
-            return res;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public List<int> ReadInt32List()
-        {
-            var length = ReadInt32();
-            var res = new List<int>(length);
-            for (var i = 0; i < length; i++)
-            {
-                res.Add(ReadInt32());
-            }
-            return res;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public List<long> ReadInt64List()
-        {
-            var length = ReadInt32();
-            var res = new List<long>(length);
-            for (var i = 0; i < length; i++)
-            {
-                res.Add(ReadInt64());
-            }
-            return res;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public List<float> ReadFloatList()
-        {
-            var length = ReadInt32();
-            var res = new List<float>(length);
-            for (var i = 0; i < length; i++)
-            {
-                res.Add(ReadFloat());
-            }
-            return res;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public List<double> ReadDoubleList()
-        {
-            var length = ReadInt32();
-            var res = new List<double>(length);
-            for (var i = 0; i < length; i++)
-            {
-                res.Add(ReadDouble());
-            }
-            return res;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -207,7 +111,20 @@ namespace Centaurus.Xdr
             var baseType = typeof(T);
             for (var i = 0; i < length; i++)
             {
-                res.Add((T)XdrConverter.Deserialize(this, baseType));
+                res[i] = (T)XdrConverter.Deserialize(this, baseType);
+            }
+            return res;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public T[] ReadArray<T>()
+        {
+            var length = ReadInt32();
+            var res = new T[length];
+            var baseType = typeof(T);
+            for (var i = 0; i < length; i++)
+            {
+                res[i] = (T)XdrConverter.Deserialize(this, baseType);
             }
             return res;
         }
@@ -237,9 +154,9 @@ namespace Centaurus.Xdr
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public T ReadObject<T>() where T : class
+        public object ReadObject(Type targetType)
         {
-            return XdrConverter.Deserialize(this, typeof(T)) as T;
+            return XdrConverter.Deserialize(this, targetType);
         }
     }
 }

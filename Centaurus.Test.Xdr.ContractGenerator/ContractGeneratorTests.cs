@@ -1,4 +1,5 @@
 using Centaurus.ContractGenerator;
+using Centaurus.Models;
 using Centaurus.Test.Contracts;
 using Centaurus.Xdr;
 using NUnit.Framework;
@@ -14,11 +15,12 @@ namespace Centaurus.Test
         [Test]
         public void JSContractGeneratorTest()
         {
-            //var generator = new JavaScriptContractGenerator();
-            var generator = new CSharpContractGenerator();
-            generator.LoadContracts(XdrSerializationTypeMapper.DiscoverXdrContracts(typeof(PrimitiveTypes).Assembly));
+            var refType = typeof(Effect);
+            var contracts = XdrSerializationTypeMapper.DiscoverXdrContracts(refType.Assembly);
+            var generator = new JavaScriptContractGenerator();
+            generator.LoadContracts(contracts);
             var files = generator.Generate();
-            //var contract = files.First(f => f.FileName == "primitive-types-converter.js").Contents;
+            //TODO: prepare reference contracts and run validations checks once the generator is stable.
         }
     }
 }

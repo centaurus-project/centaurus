@@ -11,7 +11,7 @@ namespace Centaurus.Xdr
     /// </summary>
     public class XdrSerializationTypeMapper
     {
-        internal static Dictionary<Type, XdrContractSerializer> Map(string assemblyPrefix = "Centaurus")
+        /*internal static Dictionary<Type, XdrContractSerializer> Map(string assemblyPrefix = "Centaurus")
         {
             //create the type mapping for serializers
             var mapping = new Dictionary<Type, XdrContractSerializer>();
@@ -23,9 +23,14 @@ namespace Centaurus.Xdr
                 mapping.Add(descriptor.XdrContractType, serializer);
             }
             return mapping;
-        }
+        }*/
 
-        public static IEnumerable<XdrContractDescriptor> DiscoverXdrContracts(string assemblyPrefix = "Centaurus")
+        /*private static List<IXdrRuntimeContractSerializer> DiscoverRuntimeSerializers()
+        {
+
+        }*/
+
+        public static IEnumerable<XdrContractSerializationDescriptor> DiscoverXdrContracts(string assemblyPrefix = "Centaurus")
         { //TODO: allow binding to custom assemblies
             return AppDomain.CurrentDomain.GetAssemblies()
                 //analyze only own assemblies
@@ -34,14 +39,14 @@ namespace Centaurus.Xdr
                 .SelectMany(assembly => DiscoverXdrContracts(assembly));
         }
 
-        public static IEnumerable<XdrContractDescriptor> DiscoverXdrContracts(Assembly assembly)
+        public static IEnumerable<XdrContractSerializationDescriptor> DiscoverXdrContracts(Assembly assembly)
         {
             //discover all types in the assembly
             return assembly.GetTypes()
                 //we are looking for classes only
                 .Where(type => type.IsClass && type.GetCustomAttribute<XdrContractAttribute>() != null)
                 //wrap with XdrContractDescriptor
-                .Select(type => new XdrContractDescriptor(type));
+                .Select(type => new XdrContractSerializationDescriptor(type));
         }
     }
 }

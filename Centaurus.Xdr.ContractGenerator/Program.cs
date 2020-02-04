@@ -1,8 +1,9 @@
-﻿using Centaurus.Models;
-using Centaurus.Xdr;
+﻿using Centaurus.Xdr;
 using CommandLine;
 using System;
+using System.IO;
 using System.Linq;
+using System.Reflection;
 
 namespace Centaurus.ContractGenerator
 {
@@ -28,15 +29,41 @@ namespace Centaurus.ContractGenerator
                             case "JS":
                                 generator = new JavaScriptContractGenerator();
                                 break;
+                            case "cs":
+                            case "CS":
+                                generator = new CSharpContractGenerator(Path.GetFileNameWithoutExtension(options.AssemblyName));
+                                break;
                             default:
                                 throw new Exception($"Failed to find XDR contracts generator for lang {options.Lang}.");
                         }
-                        var contracts = XdrSerializationTypeMapper.DiscoverXdrContracts(typeof(Quantum).Assembly);
+
+                        var directoryInfo = new DirectoryInfo(options.Destination);
+                        if (!directoryInfo.Exists)
+                        {
+                            Directory.CreateDirectory(options.Destination);
+                        }
+
+                        if (options.CleanupDestinationDirectory)
+                        {
+                            foreach (var file in directoryInfo.GetFiles())
+                            {
+                                file.Delete();
+                            }
+                        }
+
+                        /*var contractsModulePath = Path.Combine(Environment.CurrentDirectory, options.AssemblyName);
+                        if (!contractsModulePath.EndsWith(".dll"))
+                        {
+                            contractsModulePath += ".dll";
+                        }*/
+                        var contractsAssembly = Assembly.LoadFrom(options.AssemblyName);
+
+                        var contracts = XdrSerializationTypeMapper.DiscoverXdrContracts(contractsAssembly);
                         generator.LoadContracts(contracts);
                         var bundle = generator.Generate();
                         bundle.Save(options.Destination);
                         WriteDelimiter();
-                        Console.WriteLine("Exported files list:");
+                        Console.WriteLine("Exported files:");
                         foreach (var file in bundle.Files)
                         {
                             Console.WriteLine("  " + file.FileName);

@@ -10,10 +10,18 @@ namespace Centaurus.Xdr
     {
         static XdrConverter()
         {
-            serializerMapping = XdrSerializationTypeMapper.Map();
+            //serializerMapping = XdrSerializationTypeMapper.Map();
         }
 
-        private static readonly Dictionary<Type, XdrContractSerializer> serializerMapping;
+        private static readonly Dictionary<Type, XdrContractSerializer> serializerMapping = new Dictionary<Type, XdrContractSerializer>();
+
+        public static void RegisterSerializer(Type serializerType)
+        {
+            var dynamicInterface = serializerType.GetInterface(typeof(IXdrRuntimeContractSerializer<>).Name);
+            if (dynamicInterface == null) return;
+            var contractType = dynamicInterface.GenericTypeArguments[0];
+            serializerMapping[contractType] = new XdrContractSerializer(serializerType);
+        }
 
         public static byte[] Serialize(object value)
         {
@@ -24,15 +32,15 @@ namespace Centaurus.Xdr
             }
         }
 
-        internal static void Serialize(object value, XdrWriter writer)
+        public static void Serialize(object value, XdrWriter writer)
         {
             if (value == null)
                 throw new ArgumentNullException(nameof(value), "Failed to serialize null value. All values should be initialized before the serialization.");
             var serializer = LookupSerializer(value.GetType());
-            serializer.DynamicSerializer.Serialize(value, writer);
+            serializer.SerializeMethod.Invoke(null, new object[] { value, writer });
         }
 
-        internal static void SerializeList(IEnumerable value, XdrWriter writer)
+        /*internal static void SerializeList(IEnumerable value, XdrWriter writer)
         {
             //if (value == null) throw new NullReferenceException("Failed to serialize null value. All values should be initialized before the serialization.");
             //suppose it's a List<T>
@@ -67,12 +75,15 @@ namespace Centaurus.Xdr
                     serializer.DynamicSerializer.Serialize(item, writer);
                 }
             }
-        }
+        }*/
 
         public static object Deserialize(XdrReader reader, Type type)
         {
             //find the corresponding serialization vector for a given type
             var serializer = LookupSerializer(type);
+
+
+
             //skip discriminators for ancestors
             if (serializer.AncestorUnionsCounts > 0)
             {
@@ -81,15 +92,14 @@ namespace Centaurus.Xdr
             //resolve unions
             while (serializer.IsUnion)
             {
-                var typeId = reader.ReadInt32();
-                if (!serializer.UnionSwitch.TryGetValue(typeId, out type))
-                    throw new InvalidOperationException($"Failed to find type mapping for union type id {typeId}.");
+                type = serializer.ResolveActualUnionTypeMethod.Invoke(null, new object[] { reader }) as Type;
                 serializer = LookupSerializer(type);
             }
+
             //create new instance of the target model
             var instance = Activator.CreateInstance(type);
             //deserialize using resolved serializer contract
-            serializer.DynamicSerializer.Deserialize(instance, reader);
+            serializer.DeserializeMethod.Invoke(null, new object[] { instance, reader });
             return instance;
         }
 

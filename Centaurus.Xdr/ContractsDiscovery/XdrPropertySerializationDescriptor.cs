@@ -6,24 +6,8 @@ using System.Text;
 
 namespace Centaurus.Xdr
 {
-    public interface IXdrPropertySerializationDescriptor
-    {
-        public string FieldName { get; }
 
-        public PropertyInfo Property { get; }
-
-        public Type PropertyType { get => Property.PropertyType; }
-
-        public Type PrimitiveType { get; }
-
-        public Type GenericArgument { get; }
-
-        public bool IsOptional { get; }
-
-        public bool IsNullable { get; }
-    }
-
-    public class XdrPropertySerializationDescriptor : IXdrPropertySerializationDescriptor
+   public class XdrPropertySerializationDescriptor
     {
         public XdrPropertySerializationDescriptor(PropertyInfo prop)
         {
@@ -86,8 +70,11 @@ namespace Centaurus.Xdr
             throw new InvalidOperationException($"{PrimitiveType.FullName} XDR serialization is not supported. Check {FullPropertyName}.");
         }
 
-
         public PropertyInfo Property { get; private set; }
+
+        public string PropertyName => Property.Name;
+
+        public Type PropertyType { get => Property.PropertyType; }
 
         public Type PrimitiveType { get; private set; }
 
@@ -97,16 +84,14 @@ namespace Centaurus.Xdr
 
         public bool IsNullable { get; private set; }
 
-        public string FieldName => Property.Name;
+        private string FullPropertyName => $"{Property.DeclaringType.FullName}.{Property.Name}";
 
-        public string FullPropertyName => $"{Property.DeclaringType.FullName}.{Property.Name}";
-
-        private bool IsXdrContractType(Type type)
+        private static bool IsXdrContractType(Type type)
         {
             return type.GetCustomAttribute<XdrContractAttribute>(true) != null;
         }
 
-        private bool IsPrimitiveValueType(Type type)
+        private static bool IsPrimitiveValueType(Type type)
         {
             return PrimitiveValueTypes.Contains(type);
         }
@@ -117,7 +102,6 @@ namespace Centaurus.Xdr
             if (!AllowedEnumTypes.Contains(underylingType))
                 throw new InvalidCastException($"XDR serialization is not supported for enums with the underlying type ${underylingType.FullName}.");
         }
-
 
         private static readonly HashSet<Type> PrimitiveValueTypes = new HashSet<Type>() {
                 typeof(bool),

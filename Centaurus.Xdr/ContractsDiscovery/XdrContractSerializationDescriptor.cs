@@ -5,18 +5,20 @@ using System.Reflection;
 
 namespace Centaurus.Xdr
 {
-    public class XdrContractDescriptor
+    public class XdrContractSerializationDescriptor
     {
-        public XdrContractDescriptor(Type xdrContractType)
+        public XdrContractSerializationDescriptor(Type xdrContractType)
         {
             XdrContractType = xdrContractType;
-            UnionSwitch = GetUnionMarkup(xdrContractType).ToDictionary(union => union.Discriminator, union => union.ArmType);
+            UnionSwitch = GetUnionMarkup(xdrContractType)
+                .OrderBy(union => union.Discriminator)
+                .ToDictionary(union => union.Discriminator, union => union.ArmType);
             DiscoverMarkup(xdrContractType);
         }
 
         public readonly Type XdrContractType;
 
-        public readonly List<IXdrPropertySerializationDescriptor> Properties = new List<IXdrPropertySerializationDescriptor>();
+        public readonly List<XdrPropertySerializationDescriptor> Properties = new List<XdrPropertySerializationDescriptor>();
 
         public readonly List<int> UnionVector = new List<int>();
 
@@ -59,6 +61,11 @@ namespace Centaurus.Xdr
         private List<XdrUnionAttribute> GetUnionMarkup(Type type)
         {
             return type.GetCustomAttributes<XdrUnionAttribute>(false).ToList();
+        }
+
+        public override string ToString()
+        {
+            return $"{XdrContractType.Name}{(UnionSwitch.Count>0?", union ":"")} {Properties.Count} props";
         }
     }
 }

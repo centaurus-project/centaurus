@@ -29,11 +29,11 @@ namespace Centaurus.ContractGenerator
             return CaseConversionUtils.ConvertToCamelCase(fieldName);
         }
 
-        private string ResolveReflectedPropTypeName(IXdrPropertySerializationDescriptor prop)
+        private string ResolveReflectedPropTypeName(XdrPropertySerializationDescriptor prop)
         {
             var typeDescriptor = GetTypeDescriptor(prop);
-            if (typeDescriptor.Subtype == null) return typeDescriptor.TargetType;
-            return $"{typeDescriptor.TargetType}<{typeDescriptor.Subtype.TargetType}>";
+            if (typeDescriptor.SubType == null) return typeDescriptor.TargetType;
+            return $"{typeDescriptor.TargetType}<{typeDescriptor.SubType.TargetType}>";
         }
 
         public override GeneratedContractsBundle Generate()
@@ -65,7 +65,7 @@ namespace Centaurus.ContractGenerator
             return bundle;
         }
 
-        private string GenerateContractFile(XdrContractDescriptor сontractDescriptor, string contractName)
+        private string GenerateContractFile(XdrContractSerializationDescriptor сontractDescriptor, string contractName)
         {
 
             var builder = new StringBuilder();
@@ -81,7 +81,7 @@ class {contractName} {{");
     /**
     * @type {{{ResolveReflectedPropTypeName(prop)}}}
     */
-    {ProcessFieldName(prop.FieldName)}");
+    {ProcessFieldName(prop.PropertyName)}");
             }
             //write tail
             builder.Append($@"
@@ -91,7 +91,7 @@ export default {contractName}");
             return builder.ToString();
         }
 
-        private string GenerateSerializerFile(XdrContractDescriptor contractDescriptor, string contractName)
+        private string GenerateSerializerFile(XdrContractSerializationDescriptor contractDescriptor, string contractName)
         {
             var builder = new StringBuilder();
             //write header
@@ -136,9 +136,9 @@ class {converClassName} {{");
             foreach (var prop in contractDescriptor.Properties)
             {
                 var propTypeDescriptor = GetTypeDescriptor(prop);
-                var typeArg = propTypeDescriptor.Subtype != null ? $", '{propTypeDescriptor.Subtype.PrimitiveTypeName}'" : null;
+                var typeArg = propTypeDescriptor.SubType != null ? $", '{propTypeDescriptor.SubType.PrimitiveTypeName}'" : null;
                 builder.Append($@"
-        writer.write{propTypeDescriptor.PrimitiveTypeName}(value.{ProcessFieldName(prop.FieldName)}{typeArg})");
+        writer.write{propTypeDescriptor.PrimitiveTypeName}(value.{ProcessFieldName(prop.PropertyName)}{typeArg})");
             }
             builder.Append(@"
     }
@@ -154,9 +154,9 @@ class {converClassName} {{");
             foreach (var prop in contractDescriptor.Properties)
             {
                 var propTypeDescriptor = GetTypeDescriptor(prop);
-                var typeArg = propTypeDescriptor.Subtype != null ? $"'{propTypeDescriptor.Subtype.PrimitiveTypeName}'" : null;
+                var typeArg = propTypeDescriptor.SubType != null ? $"'{propTypeDescriptor.SubType.PrimitiveTypeName}'" : null;
                 builder.Append($@"
-        value.{ProcessFieldName(prop.FieldName)} = reader.read{propTypeDescriptor.PrimitiveTypeName}({typeArg})");
+        value.{ProcessFieldName(prop.PropertyName)} = reader.read{propTypeDescriptor.PrimitiveTypeName}({typeArg})");
             }
             builder.Append(@"
     }

@@ -7,28 +7,25 @@ namespace Centaurus.Xdr
 {
     internal class XdrContractSerializer
     {
-        public XdrContractSerializer(XdrContractDescriptor xdrContractDescriptor)
+        public XdrContractSerializer(Type dynamicSerializerType)
         {
-            SerializedType = xdrContractDescriptor.XdrContractType;
-            var contractBuilder = new XdrSerializerContractBuilder(xdrContractDescriptor);
-            var serializerType = contractBuilder.CreateDynamicSerializer();
-            if (contractBuilder.ContractDescriptor.UnionSwitch.Count > 0)
-            {
-                IsUnion = true;
-                UnionSwitch = contractBuilder.ContractDescriptor.UnionSwitch;
-            }
-            AncestorUnionsCounts = contractBuilder.ContractDescriptor.AncestorUnionsCounts;
-            DynamicSerializer = Activator.CreateInstance(serializerType.AsType()) as IXdrRuntimeContractSerializer;
+            SerializeMethod = dynamicSerializerType.GetMethod("Serialize");
+            DeserializeMethod = dynamicSerializerType.GetMethod("Deserialize");
+            ResolveActualUnionTypeMethod = dynamicSerializerType.GetMethod("ResolveActualUnionType");
+            var ancestorsProp = dynamicSerializerType.GetField("AncestorUnionsCounts");
+            AncestorUnionsCounts = ancestorsProp == null ? 0 : (int)ancestorsProp.GetValue(Activator.CreateInstance(dynamicSerializerType));
         }
 
-        public readonly Type SerializedType;
+        public readonly MethodInfo SerializeMethod;
 
-        public readonly bool IsUnion;
+        public readonly MethodInfo DeserializeMethod;
+
+        public readonly MethodInfo ResolveActualUnionTypeMethod;
 
         public readonly int AncestorUnionsCounts;
 
-        public readonly Dictionary<int, Type> UnionSwitch;
-        
-        public readonly IXdrRuntimeContractSerializer DynamicSerializer;
+        public bool IsUnion { get { return ResolveActualUnionTypeMethod != null; } }
+
+        //public readonly Type SerializedType;
     }
 }

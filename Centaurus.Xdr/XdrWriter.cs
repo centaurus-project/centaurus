@@ -107,7 +107,7 @@ namespace Centaurus.Xdr
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteBool(bool value)
+        public void WriteBoolean(bool value)
         {
             WriteInt32(value ? 1 : 0);
         }
@@ -116,117 +116,6 @@ namespace Centaurus.Xdr
         public void WriteEnum(Enum value)
         {
             WriteInt32((int)(object)value);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteInt32Array(int[] value)
-        {
-            WriteInt32(value.Length);
-            foreach (var item in value)
-            {
-                WriteInt32(item);
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteUInt32Array(uint[] value)
-        {
-            WriteInt32(value.Length);
-            foreach (var item in value)
-            {
-                WriteUInt32(item);
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteInt64Array(long[] value)
-        {
-            WriteInt32(value.Length);
-            foreach (var item in value)
-            {
-                WriteInt64(item);
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteUInt64Array(ulong[] value)
-        {
-            WriteInt32(value.Length);
-            foreach (var item in value)
-            {
-                WriteUInt64(item);
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteFloatArray(float[] value)
-        {
-            WriteInt32(value.Length);
-            foreach (var item in value)
-            {
-                WriteFloat(item);
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteDoubleArray(double[] value)
-        {
-            WriteInt32(value.Length);
-            foreach (var item in value)
-            {
-                WriteDouble(item);
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteArray<T>(ICollection<T> value)
-        {
-            var total = value.Count;
-            WriteInt32(total);
-            if (total > 0)
-            {
-                XdrConverter.SerializeList(value, this);
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteInt32List(List<int> value)
-        {
-            WriteInt32(value.Count);
-            foreach (var item in value)
-            {
-                WriteInt32(item);
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteInt64List(List<long> value)
-        {
-            WriteInt32(value.Count);
-            foreach (var item in value)
-            {
-                WriteInt64(item);
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteFloatList(List<float> value)
-        {
-            WriteInt32(value.Count);
-            foreach (var item in value)
-            {
-                WriteFloat(item);
-            }
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteDoubleList(List<double> value)
-        {
-            WriteInt32(value.Count);
-            foreach (var item in value)
-            {
-                WriteDouble(item);
-            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -290,7 +179,7 @@ namespace Centaurus.Xdr
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteObject(object value)
+        public void WriteObject(object value, Type type)
         {
             XdrConverter.Serialize(value, this);
         }
