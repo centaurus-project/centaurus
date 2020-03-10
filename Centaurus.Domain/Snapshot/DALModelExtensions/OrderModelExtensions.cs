@@ -15,7 +15,7 @@ namespace Centaurus.Domain
                 Amount = order.Amount,
                 OrderId = unchecked((ulong)order.OrderId),
                 Price = order.Price,
-                Account = accountStorage.GetAccount(order.Pubkey)
+                Account = accountStorage.GetAccount(order.Pubkey).Account
             };
         }
     }

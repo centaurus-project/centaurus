@@ -193,7 +193,7 @@ namespace Centaurus.Domain
             {
                 var currentEffect = XdrConverter.Deserialize<Effect>(effectModels[i].RawEffect);
                 var pubKey = currentEffect.Pubkey;
-                var currentAccount = new Lazy<Account>(() => accountStorage.GetAccount(pubKey));
+                var currentAccount = new Lazy<Account>(() => accountStorage.GetAccount(pubKey).Account);
                 IEffectProcessor<Effect> processor = null;
                 switch (currentEffect)
                 {
@@ -254,7 +254,7 @@ namespace Centaurus.Domain
             return new Snapshot
             {
                 Apex = apex,
-                Accounts = accountStorage.GetAll().ToList(),
+                Accounts = accountStorage.GetAll().Select(a => a.Account).ToList(),
                 Ledger = stellarData.Ledger,
                 Orders = exchange.OrderMap.GetAllOrders().ToList(),
                 Settings = settings,

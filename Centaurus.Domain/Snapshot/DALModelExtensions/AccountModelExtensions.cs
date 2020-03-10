@@ -9,7 +9,7 @@ namespace Centaurus.Domain
 {
     public static class AccountModelExtensions
     {
-        public static Account ToAccount(this AccountModel accountModel, BalanceModel[] balances)
+        public static Account ToAccount(this DAL.Models.AccountModel accountModel, BalanceModel[] balances)
         {
             var acc = new Account
             {

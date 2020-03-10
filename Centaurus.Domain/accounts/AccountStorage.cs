@@ -10,28 +10,33 @@ namespace Centaurus.Domain
     public class AccountStorage
     {
         public AccountStorage(IEnumerable<Account> accounts)
+            :this(accounts.Select(a => new AccountWrapper(a)))
+        {
+
+        }
+        public AccountStorage(IEnumerable<AccountWrapper> accounts)
         {
             if (accounts == null)
-                accounts = new Account[] { };
+                accounts = new AccountWrapper[] { };
 
-            this.accounts = new Dictionary<RawPubKey, Account>(accounts.ToDictionary(m => m.Pubkey));
+            this.accounts = new Dictionary<RawPubKey, AccountWrapper>(accounts.ToDictionary(m => m.Account.Pubkey));
         }
 
-        Dictionary<RawPubKey, Account> accounts = new Dictionary<RawPubKey, Account>();
+        Dictionary<RawPubKey, AccountWrapper> accounts = new Dictionary<RawPubKey, AccountWrapper>();
 
         /// <summary>
         /// Retrieve account record by its public key.
         /// </summary>
         /// <param name="pubkey">Account public key</param>
         /// <returns>Account record, or null if not found</returns>
-        public Account GetAccount(RawPubKey pubkey)
+        public AccountWrapper GetAccount(RawPubKey pubkey)
         {
             if (pubkey == null)
                 throw new ArgumentNullException(nameof(pubkey));
             return accounts.GetValueOrDefault(pubkey);
         }
 
-        public Account CreateAccount(RawPubKey pubkey)
+        public AccountWrapper CreateAccount(RawPubKey pubkey)
         {
             if (pubkey == null)
                 throw new ArgumentNullException(nameof(pubkey));
@@ -39,11 +44,11 @@ namespace Centaurus.Domain
             if (accounts.ContainsKey(pubkey))
                 throw new InvalidOperationException($"Account with public key {pubkey} already exists");
 
-            var acc = new Account
+            var acc = new AccountWrapper(new Account
             {
                 Pubkey = pubkey,
                 Balances = new List<Balance>()
-            };
+            });
             accounts.Add(pubkey, acc);
 
             return acc;
@@ -61,7 +66,7 @@ namespace Centaurus.Domain
                 throw new Exception($"Unable to remove the account with public key {pubkey}");
         }
 
-        public IEnumerable<Account> GetAll()
+        public IEnumerable<AccountWrapper> GetAll()
         {
             return accounts.Values;
         }

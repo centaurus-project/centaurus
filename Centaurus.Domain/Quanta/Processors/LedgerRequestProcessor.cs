@@ -138,7 +138,7 @@ namespace Centaurus.Domain
             if (deposite.PaymentResult == PaymentResults.Failed)
                 return;
 
-            var account = Global.AccountStorage.GetAccount(deposite.Destination);
+            var account = Global.AccountStorage.GetAccount(deposite.Destination)?.Account;
             if (account == null && !balanceManager.ContainsAccount(deposite.Destination))
             {
                 effectsContainer.AddAccountCreate(Global.AccountStorage, deposite.Destination);

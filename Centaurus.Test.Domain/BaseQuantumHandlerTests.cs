@@ -23,7 +23,10 @@ namespace Centaurus.Test
             long apex = Global.QuantumStorage.CurrentApex;
 
             var client1StartBalanceAmount = (long)0;
-            var clientAccountBalance = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair).GetBalance(asset);
+
+            var account1 = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair).Account;
+
+            var clientAccountBalance = account1.GetBalance(asset);
 
             var withdrawalDest = KeyPair.Random();
             var txHash = new byte[] { };
@@ -101,8 +104,6 @@ namespace Centaurus.Test
             if (excpectedException == null)
             {
                 Assert.AreEqual(Global.LedgerManager.Ledger, ledgerNotification.LedgerTo);
-
-                var account1 = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
 
                 Assert.AreEqual(account1.GetBalance(asset).Liabilities, 0);
                 Assert.AreEqual(account1.GetBalance(asset).Amount, client1StartBalanceAmount - amount + depositeAmount); //acc balance + deposit - withdrawal
