@@ -11,10 +11,11 @@ namespace Centaurus.DAL.Models
         public byte[][] Auditors { get; set; }
 
         public long MinAccountBalance { get; set; }
-        
+
         public long MinAllowedLotSize { get; set; }
 
-        //it stores ulong
         public long Apex { get; set; }
+
+        public RequestRateLimitsModel RequestRateLimits { get; set; }
     }
 }

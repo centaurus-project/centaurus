@@ -279,7 +279,9 @@ namespace Centaurus.DAL.Mongo
                 if (ledger > 0)
                     updateCommand = update.Set(s => s.Ledger, ledger);
                 if (vaultSequence > 0)
-                    updateCommand = updateCommand.Set(s => s.VaultSequence, vaultSequence) ?? update.Set(s => s.VaultSequence, vaultSequence);
+                    updateCommand = updateCommand == null
+                        ? update.Set(s => s.VaultSequence, vaultSequence)
+                        : updateCommand.Set(s => s.VaultSequence, vaultSequence);
                 updateModel = new UpdateOneModel<ConstellationState>(filter.Empty, updateCommand);
             }
 
@@ -302,11 +304,25 @@ namespace Centaurus.DAL.Mongo
                     var pubKey = acc.PubKey;
                     var currentAccFilter = filter.Eq(a => a.PubKey, pubKey);
                     if (acc.IsInserted)
-                        updates[i] = new InsertOneModel<AccountModel>(new AccountModel { Nonce = (long)acc.Nonce, PubKey = pubKey });
+                        updates[i] = new InsertOneModel<AccountModel>(new AccountModel
+                        {
+                            Nonce = (long)acc.Nonce,
+                            PubKey = pubKey,
+                            RequestRateLimits = acc.RequestRateLimits
+                        });
                     else if (acc.IsDeleted)
                         updates[i] = new DeleteOneModel<AccountModel>(currentAccFilter);
                     else
-                        updates[i] = new UpdateOneModel<AccountModel>(currentAccFilter, update.Set(a => a.Nonce, (long)acc.Nonce));
+                    {
+                        UpdateDefinition<AccountModel> currentUpdate = null;
+                        if (acc.Nonce != 0)
+                            currentUpdate = update.Set(a => a.Nonce, (long)acc.Nonce);
+                        if (acc.RequestRateLimits != null)
+                            currentUpdate = currentUpdate == null
+                                ? update.Set(a => a.RequestRateLimits, acc.RequestRateLimits)
+                                : currentUpdate.Set(a => a.RequestRateLimits, acc.RequestRateLimits);
+                        updates[i] = new UpdateOneModel<AccountModel>(currentAccFilter, currentUpdate);
+                    }
                 }
                 return updates;
             }

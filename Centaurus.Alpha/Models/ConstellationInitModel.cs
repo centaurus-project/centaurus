@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-
-namespace Centaurus.Alpha
+﻿namespace Centaurus.Alpha
 {
     public class ConstellationInitModel
     {
@@ -14,5 +9,7 @@ namespace Centaurus.Alpha
         public long MinAllowedLotSize { get; set; }
 
         public string[] Assets { get; set; }
+
+        public RequestRateLimits RequestRateLimits { get; set; }
     }
 }

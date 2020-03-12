@@ -17,6 +17,9 @@ namespace Centaurus.Domain
                 Pubkey = new RawPubKey { Data = accountModel.PubKey }
             };
 
+            if (accountModel.RequestRateLimits != null)
+                acc.RequestRateLimits = new RequestRateLimits { HourLimit = accountModel.RequestRateLimits.HourLimit, MinuteLimit = accountModel.RequestRateLimits.MinuteLimit };
+
             acc.Balances = balances.Select(b => b.ToBalance(acc)).ToList();
             return acc;
         }

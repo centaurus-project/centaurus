@@ -43,7 +43,7 @@ namespace Centaurus
 
         public HandshakeData HandshakeData { get; }
 
-        public bool IsAuditor { get; set; }
+        public AccountWrapper Account { get; set; } 
 
         private QuantumSyncWorker quantumWorker;
 

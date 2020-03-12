@@ -19,9 +19,9 @@ namespace Centaurus.Domain
             var requestQuantum = (RequestQuantum)effectProcessorsContainer.Envelope.Message;
             var requestMessage = requestQuantum.RequestMessage;
 
-            var currentUser = Global.AccountStorage.GetAccount(requestMessage.Account);
+            var currentUser = Global.AccountStorage.GetAccount(requestMessage.Account).Account;
 
-            effectProcessorsContainer.AddNonceUpdate(currentUser.Account, requestMessage.Nonce);
+            effectProcessorsContainer.AddNonceUpdate(Global.AccountStorage, requestMessage.Account, requestMessage.Nonce, currentUser.Nonce);
         }
 
         public void ValidateNonce(MessageEnvelope envelope)

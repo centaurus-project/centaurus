@@ -211,11 +211,16 @@ namespace Centaurus.Test
                 var pubKey = acc.PubKey;
                 var currentAcc = accountsCollection.FirstOrDefault(a => ByteArrayPrimitives.Equals(a.PubKey, pubKey));
                 if (acc.IsInserted)
-                    accountsCollection.Add(new AccountModel { PubKey = pubKey, Nonce = (long)acc.Nonce });
+                    accountsCollection.Add(new AccountModel { PubKey = pubKey, Nonce = (long)acc.Nonce, RequestRateLimits = acc.RequestRateLimits });
                 else if (acc.IsDeleted)
                     accountsCollection.Remove(currentAcc);
                 else
-                    currentAcc.Nonce = (long)acc.Nonce;
+                {
+                    if (acc.Nonce != 0)
+                        currentAcc.Nonce = (long)acc.Nonce;
+                    if (acc.RequestRateLimits != null)
+                        currentAcc.RequestRateLimits = acc.RequestRateLimits;
+                }
             }
         }
 

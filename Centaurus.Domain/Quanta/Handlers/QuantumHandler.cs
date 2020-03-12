@@ -153,6 +153,8 @@ namespace Centaurus.Domain
 
                 var processor = GetProcessor(messageType);
 
+                ValidateAccountRequestRate(envelope);
+
                 await processor.Validate(envelope);
 
                 result = await processor.Process(envelope);
@@ -174,6 +176,16 @@ namespace Centaurus.Domain
                 OutgoingMessageStorage.EnqueueMessage(result);
             }
                 return result;
+        }
+
+        void ValidateAccountRequestRate(MessageEnvelope envelope)
+        {
+            var request = envelope.Message as RequestQuantum;
+            if (request == null)
+                return;
+            var account = Global.AccountStorage.GetAccount(request.RequestMessage.Account);
+            if (!account.RequestCounter.IncRequestCount(request.Timestamp, out string error))
+                throw new Exception($"Too many quanta from account {account.Account.Pubkey.ToString()}.");
         }
 
         void ProcessTransaction(MessageEnvelope envelope, ResultMessage result)

@@ -66,6 +66,8 @@ namespace Centaurus.DAL
             public byte[] PubKey { get; set; }
 
             public ulong Nonce { get; set; }
+
+            public RequestRateLimitsModel RequestRateLimits { get; set; }
         }
 
         public class Order : BaseDiffModel

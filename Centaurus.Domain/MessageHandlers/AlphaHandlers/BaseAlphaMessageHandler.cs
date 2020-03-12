@@ -30,6 +30,9 @@ namespace Centaurus.Domain
             if (IsAuditorOnly && !Global.Constellation.Auditors.Contains(connection.ClientPubKey))
                 throw new UnauthorizedException();
 
+            if (connection.Account != null && !connection.Account.RequestCounter.IncRequestCount(DateTime.Now.Ticks, out string error))
+                throw new TooManyRequests(error);
+
             await base.Validate(connection, envelope);
         }
     }

@@ -11,7 +11,7 @@ namespace Centaurus.Domain
     {
         public static ConstellationSettings ToSettings(this SettingsModel settings, List<AssetModel> assetSettings)
         { 
-            return new ConstellationSettings
+            var resultSettings = new ConstellationSettings
             {
                 Apex = settings.Apex,
                 Auditors = settings.Auditors.Select(a => (RawPubKey)a).ToList(),
@@ -20,6 +20,13 @@ namespace Centaurus.Domain
                 Vault = settings.Vault,
                 Assets = assetSettings.Select(a => a.ToAssetSettings()).ToList()
             };
+            if (settings.RequestRateLimits != null)
+                resultSettings.RequestRateLimits = new RequestRateLimits
+                {
+                    HourLimit = settings.RequestRateLimits.HourLimit,
+                    MinuteLimit = settings.RequestRateLimits.MinuteLimit
+                };
+            return resultSettings;
         }
     }
 }
