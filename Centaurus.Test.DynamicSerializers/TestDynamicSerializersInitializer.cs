@@ -10,8 +10,8 @@ namespace Centaurus.Test
     {
         public static void Init()
         {
-            var _ = new PrimitiveTypes(); //force loading assembly
-            _.Bool = true;
+            //var _ = new PrimitiveTypes(); //force loading assembly
+            //_.Bool = true;
             var allTypes = typeof(TestDynamicSerializersInitializer).Assembly.GetTypes();
             foreach (var type in allTypes)
             {

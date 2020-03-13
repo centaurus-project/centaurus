@@ -21,6 +21,7 @@ namespace Centaurus.ContractGenerator
             MapType(new PrimitiveTypeDescriptor(typeof(byte[]), "Buffer", "Variable"));
             MapType(new PrimitiveTypeDescriptor(typeof(string), "String", "String"));
             MapType(new PrimitiveTypeDescriptor(typeof(List<>), "Array", "Array"));
+            MapType(new PrimitiveTypeDescriptor(typeof(Array), "Array", "Array"));
             MapType(new PrimitiveTypeDescriptor(typeof(object), "Object", "Object"));
         }
 

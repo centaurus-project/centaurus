@@ -9,7 +9,6 @@ namespace Centaurus.Models
     {
         public static void Init()
         {
-            var _ = new Account(); //force loading assembly
             var allTypes = typeof(DynamicSerializersInitializer).Assembly.GetTypes();
             foreach (var type in allTypes)
             {
