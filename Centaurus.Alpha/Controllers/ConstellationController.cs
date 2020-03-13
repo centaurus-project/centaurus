@@ -37,6 +37,12 @@ namespace Centaurus.Alpha.Controllers
                     StellarNetwork = network,
                     Assets = assets
                 };
+                if (Global.Constellation.RequestRateLimits != null)
+                    info.RequestRateLimits = new RequestRateLimitsModel
+                    {
+                        HourLimit = Global.Constellation.RequestRateLimits.HourLimit,
+                        MinuteLimit = Global.Constellation.RequestRateLimits.MinuteLimit,
+                    };
             }
 
             return info;
@@ -50,11 +56,20 @@ namespace Centaurus.Alpha.Controllers
                 if (constellationInit == null)
                     return StatusCode(415);
 
+                RequestRateLimits requestRateLimits = null;
+                if (constellationInit.RequestRateLimits != null)
+                    requestRateLimits = new RequestRateLimits
+                    {
+                        HourLimit = constellationInit.RequestRateLimits.HourLimit,
+                        MinuteLimit = constellationInit.RequestRateLimits.MinuteLimit
+                    };
+
                 var constellationInitializer = new ConstellationInitializer(
                     constellationInit.Auditors.Select(a => KeyPair.FromAccountId(a)),
                     constellationInit.MinAccountBalance,
                     constellationInit.MinAllowedLotSize,
-                    constellationInit.Assets.Select(a => AssetSettings.FromCode(a))
+                    constellationInit.Assets.Select(a => AssetSettings.FromCode(a)),
+                    requestRateLimits
                 );
 
                 await constellationInitializer.Init();

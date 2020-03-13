@@ -1,6 +1,6 @@
 ﻿namespace Centaurus.Alpha
 {
-    public class RequestRateLimits
+    public class RequestRateLimitsModel
     {
         public int MinuteLimit { get; set; }
 

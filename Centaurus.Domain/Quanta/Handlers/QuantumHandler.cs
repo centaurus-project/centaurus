@@ -185,7 +185,7 @@ namespace Centaurus.Domain
                 return;
             var account = Global.AccountStorage.GetAccount(request.RequestMessage.Account);
             if (!account.RequestCounter.IncRequestCount(request.Timestamp, out string error))
-                throw new Exception($"Too many quanta from account {account.Account.Pubkey.ToString()}.");
+                throw new TooManyRequests($"Too many quanta from account {account.Account.Pubkey.ToString()}.");
         }
 
         void ProcessTransaction(MessageEnvelope envelope, ResultMessage result)

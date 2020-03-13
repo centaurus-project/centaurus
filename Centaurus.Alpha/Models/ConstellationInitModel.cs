@@ -10,6 +10,6 @@
 
         public string[] Assets { get; set; }
 
-        public RequestRateLimits RequestRateLimits { get; set; }
+        public RequestRateLimitsModel RequestRateLimits { get; set; }
     }
 }

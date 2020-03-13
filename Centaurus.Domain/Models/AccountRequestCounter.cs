@@ -25,29 +25,31 @@ namespace Centaurus.Domain
                 error = null;
 
                 int? hourLimit = account.RequestRateLimits?.HourLimit ?? Global.Constellation.RequestRateLimits?.HourLimit;
-                if (hourLimit.HasValue && !IncSingleCounter(hourCounter, 60 * 1000 * 60, hourLimit.Value, requestDatetime, out error))
+                var hourInTicks = (long)60 * 1000 * 60 * 10_000;
+                if (hourLimit.HasValue && !IncSingleCounter(hourCounter, hourInTicks, hourLimit.Value, requestDatetime, out error))
                     return false;
 
+                var minuteInTicks = (long)60 * 1000 * 10_000;
                 int? minuteLimit = account.RequestRateLimits?.MinuteLimit ?? Global.Constellation.RequestRateLimits?.MinuteLimit;
-                if (minuteLimit.HasValue && !IncSingleCounter(minuteCounter, 60 * 1000, minuteLimit.Value, requestDatetime, out error))
+                if (minuteLimit.HasValue && !IncSingleCounter(minuteCounter, minuteInTicks, minuteLimit.Value, requestDatetime, out error))
                     return false;
 
                 return true;
             }
         }
 
-        private bool IncSingleCounter(RequestCounter counter, int counterWindowPeriod, int maxAllowedRequestsCount, long requestDatetime, out string error)
+        private bool IncSingleCounter(RequestCounter counter, long counterWindowPeriod, int maxAllowedRequestsCount, long requestDatetime, out string error)
         {
             error = null;
             if (maxAllowedRequestsCount < 0) //if less than zero than the counter is disabled 
                 return true;
 
-            if (counter.StartedAt + counterWindowPeriod < requestDatetime) //window is expired
+            if ((counter.StartedAt + counterWindowPeriod) < requestDatetime) //window is expired
                 counter.Reset(requestDatetime);
 
             if (counter.Count + 1 > maxAllowedRequestsCount)
             {
-                error = $"Too many requests. Max allowed request count is {maxAllowedRequestsCount} per {counterWindowPeriod}ms.";
+                error = $"Too many requests. Max allowed request count is {maxAllowedRequestsCount} per {counterWindowPeriod/10_000}ms.";
                 return false;
             }
             counter.IncRequestsCount();

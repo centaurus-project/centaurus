@@ -17,32 +17,10 @@ namespace Centaurus.Test
             GlobalInitHelper.DefaultAlphaSetup();
         }
 
-        //[Test]
-        //public async Task SnapshotQuantumTest()
-        //{
-        //    var snapshot = new SnapshotQuantum();
-        //    var envelope = snapshot.CreateEnvelope();
-        //    await Global.QuantumHandler.HandleAsync(envelope);
-
-        //    //emulate quorum
-        //    var res = envelope.CreateResult(ResultStatusCodes.Success).CreateEnvelope();
-        //    res.Sign(TestEnvironment.Auditor1KeyPair);
-
-        //    Global.SnapshotManager.SetResult(res);
-
-        //    Assert.AreEqual(Global.SnapshotManager.LastSnapshot.Id, 2);
-        //}
-
-        //[Test]
-        //public async Task SnapshotFailQuantumTest()
-        //{
-        //    var snapshot = new SnapshotQuantum();
-        //    var envelope = snapshot.CreateEnvelope();
-        //    await Global.QuantumHandler.HandleAsync(envelope);
-
-        //    snapshot = new SnapshotQuantum();
-        //    envelope = snapshot.CreateEnvelope();
-        //    Assert.ThrowsAsync<InvalidOperationException>(async () => await Global.QuantumHandler.HandleAsync(envelope));
-        //}
+        static object[] AccountRequestRateLimitsCases =
+        {
+            new object[] { TestEnvironment.Client1KeyPair, null },
+            new object[] { TestEnvironment.Client2KeyPair, 10 }
+        };
     }
 }

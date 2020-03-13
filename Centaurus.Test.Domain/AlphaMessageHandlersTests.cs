@@ -228,5 +228,45 @@ namespace Centaurus.Test
 
             await AssertMessageHandling(clientConnection, envelope, excpectedException);
         }
+
+        static object[] AccountRequestRateLimitsCases =
+        {
+            new object[] { TestEnvironment.Client1KeyPair, null },
+            new object[] { TestEnvironment.Client2KeyPair, 10 }
+        };
+
+        [Test]
+        [TestCaseSource(nameof(AccountRequestRateLimitsCases))]
+        public async Task AccountRequestRateLimitTest(KeyPair clientKeyPair, int? requestLimit)
+        {
+            Global.AppState.State = ApplicationState.Ready;
+
+            var account = Global.AccountStorage.GetAccount(clientKeyPair);
+            if (requestLimit.HasValue)
+                account.Account.RequestRateLimits = new RequestRateLimits { HourLimit = requestLimit.Value, MinuteLimit = requestLimit.Value };
+
+            var clientConnection = new AlphaWebSocketConnection(new FakeWebSocket())
+            {
+                ClientPubKey = clientKeyPair,
+                ConnectionState = ConnectionState.Ready,
+                Account = account
+            };
+
+            var minuteLimit = (account.Account.RequestRateLimits ?? Global.Constellation.RequestRateLimits).MinuteLimit;
+            var minuteIterCount = minuteLimit + 1;
+            for (var i = 0; i < minuteIterCount; i++)
+            {
+                var envelope = new AccountDataRequest
+                {
+                    Account = clientKeyPair,
+                    Nonce = (ulong)(i + 1)
+                }.CreateEnvelope();
+                envelope.Sign(clientKeyPair);
+                if (i + 1 > minuteLimit)
+                    await AssertMessageHandling(clientConnection, envelope, typeof(TooManyRequests));
+                else
+                    await AssertMessageHandling(clientConnection, envelope);
+            }
+        }
     }
 }

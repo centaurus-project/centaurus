@@ -17,7 +17,7 @@ namespace Centaurus.Domain
     {
         const int minAuditorsCount = 1;
 
-        public ConstellationInitializer(IEnumerable<KeyPair> auditors, long minAccountBalance, long minAllowedLotSize, IEnumerable<AssetSettings> assets)
+        public ConstellationInitializer(IEnumerable<KeyPair> auditors, long minAccountBalance, long minAllowedLotSize, IEnumerable<AssetSettings> assets, RequestRateLimits requestRateLimits)
         {
             Auditors = auditors.Count() >= minAuditorsCount ? auditors.ToArray() : throw new Exception($"Min auditors count is {minAuditorsCount}");
 
@@ -28,12 +28,16 @@ namespace Centaurus.Domain
             Assets = !assets.GroupBy(a => a.ToString()).Any(g => g.Count() > 1)
                 ? assets.Where(a => !a.IsXlm).ToArray() //skip XLM, it's supported by default
                 : throw new ArgumentException("All asset values should be unique");
+
+            RequestRateLimits = requestRateLimits;
         }
 
         public KeyPair[] Auditors { get; }
         public long MinAccountBalance { get; }
         public long MinAllowedLotSize { get; }
         public AssetSettings[] Assets { get; }
+
+        public RequestRateLimits RequestRateLimits { get; set; }
 
         public async Task Init()
         {
@@ -60,7 +64,8 @@ namespace Centaurus.Domain
                 MinAllowedLotSize = MinAllowedLotSize,
                 PrevHash = new byte[] { },
                 Ledger = ledgerId,
-                VaultSequence = vaultAccountInfo.SequenceNumber
+                VaultSequence = vaultAccountInfo.SequenceNumber,
+                RequestRateLimits = RequestRateLimits
             };
 
             var envelope = initQuantum.CreateEnvelope();
