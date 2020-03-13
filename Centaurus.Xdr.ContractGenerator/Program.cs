@@ -23,14 +23,12 @@ namespace Centaurus.ContractGenerator
                     {
                         Console.WriteLine($"Generating {options.Lang} XDR contract files. Destination path: {options.Destination}");
                         ContractGenerator generator;
-                        switch (options.Lang)
+                        switch (options.Lang.ToLowerInvariant())
                         {
                             case "js":
-                            case "JS":
                                 generator = new JavaScriptContractGenerator();
                                 break;
                             case "cs":
-                            case "CS":
                                 generator = new CSharpContractGenerator(Path.GetFileNameWithoutExtension(options.AssemblyName));
                                 break;
                             default:
