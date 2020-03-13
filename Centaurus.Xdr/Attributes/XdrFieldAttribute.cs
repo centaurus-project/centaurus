@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Centaurus
+namespace Centaurus.Xdr
 {
     /// <summary>
     /// Marks a field as a part of XDR serialization contract.

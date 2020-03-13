@@ -1,4 +1,6 @@
-﻿namespace Centaurus.Models
+﻿using Centaurus.Xdr;
+
+namespace Centaurus.Models
 {
     public class SetApexCursor : Message
     {

@@ -1,5 +1,5 @@
-﻿using stellar_dotnet_sdk.xdr;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using Centaurus.Xdr;
 
 namespace Centaurus.Models
 {

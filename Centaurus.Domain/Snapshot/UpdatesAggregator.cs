@@ -1,6 +1,7 @@
 ﻿using Centaurus.DAL;
 using Centaurus.DAL.Models;
 using Centaurus.Models;
+using Centaurus.Xdr;
 using MongoDB.Driver;
 using System;
 using System.Collections.Generic;

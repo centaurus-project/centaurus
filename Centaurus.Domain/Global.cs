@@ -23,6 +23,8 @@ namespace Centaurus.Domain
         {
             Settings = settings ?? throw new ArgumentNullException(nameof(settings));
 
+            DynamicSerializersInitializer.Init();
+
             IsAlpha = Settings is AlphaSettings;
 
             PermanentStorage = storage;

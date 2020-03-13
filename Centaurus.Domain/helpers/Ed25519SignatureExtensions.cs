@@ -1,9 +1,9 @@
-﻿using Centaurus.Models;
+﻿using System;
+using System.Collections.Generic;
+using Centaurus.Xdr;
+using Centaurus.Models;
 using stellar_dotnet_sdk;
 using stellar_dotnet_sdk.xdr;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Centaurus.Domain
 {

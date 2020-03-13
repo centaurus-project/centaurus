@@ -2,12 +2,9 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Centaurus
+namespace Centaurus.Xdr
 {
-    public interface IXdrRuntimeContractSerializer
+    public interface IXdrRuntimeContractSerializer<T>
     {
-        public void Deserialize(object value, XdrReader reader);
-
-        public void Serialize(object value, XdrWriter writer);
     }
 }

@@ -3,6 +3,8 @@ using NUnit.Framework;
 using System.Collections.Generic;
 using System.Linq;
 using FluentAssertions;
+using Centaurus.Xdr;
+using Centaurus.Models;
 
 namespace Centaurus.Test
 {
@@ -11,6 +13,7 @@ namespace Centaurus.Test
         [SetUp]
         public void Setup()
         {
+            TestDynamicSerializersInitializer.Init();
         }
 
         [TestCaseSource(nameof(GeneratePrimitives))]

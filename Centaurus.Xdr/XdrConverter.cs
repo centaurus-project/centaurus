@@ -4,16 +4,24 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace Centaurus
+namespace Centaurus.Xdr
 {
     public static class XdrConverter
     {
         static XdrConverter()
         {
-            serializerMapping = new XdrSerializationTypeMapper().Map();
+            //serializerMapping = XdrSerializationTypeMapper.Map();
         }
 
-        private static readonly Dictionary<Type, XdrContractSerializer> serializerMapping;
+        private static readonly Dictionary<Type, XdrContractSerializer> serializerMapping = new Dictionary<Type, XdrContractSerializer>();
+
+        public static void RegisterSerializer(Type serializerType)
+        {
+            var dynamicInterface = serializerType.GetInterface(typeof(IXdrRuntimeContractSerializer<>).Name);
+            if (dynamicInterface == null) return;
+            var contractType = dynamicInterface.GenericTypeArguments[0];
+            serializerMapping[contractType] = new XdrContractSerializer(serializerType);
+        }
 
         public static byte[] Serialize(object value)
         {
@@ -24,19 +32,19 @@ namespace Centaurus
             }
         }
 
-        internal static void Serialize(object value, XdrWriter writer)
+        public static void Serialize(object value, XdrWriter writer)
         {
-            if (value == null) 
-                throw new NullReferenceException("Failed to serialize null value. All values should be initialized before the serialization.");
+            if (value == null)
+                throw new ArgumentNullException(nameof(value), "Failed to serialize null value. All values should be initialized before the serialization.");
             var serializer = LookupSerializer(value.GetType());
-            serializer.DynamicSerializer.Serialize(value, writer);
+            serializer.SerializeMethod.Invoke(null, new object[] { value, writer });
         }
 
-        internal static void SerializeList(IList value, XdrWriter writer)
+        /*internal static void SerializeList(IEnumerable value, XdrWriter writer)
         {
             //if (value == null) throw new NullReferenceException("Failed to serialize null value. All values should be initialized before the serialization.");
             //suppose it's a List<T>
-            var genericListType = value.GetType().GetGenericArguments()[0];
+            var genericListType = value.GetType().GenericTypeArguments[0];
             if (genericListType != null)
             {
                 var baseSerializer = LookupSerializer(genericListType);
@@ -61,17 +69,21 @@ namespace Centaurus
                 //otherwise we need to lookup for serialization vector each time
                 foreach (XdrContractSerializer item in value)
                 {
-                    if (value == null) throw new NullReferenceException("Failed to serialize null value. All values should be initialized before the serialization.");
+                    if (value == null) 
+                        throw new NullReferenceException("Failed to serialize null value. All values should be initialized before the serialization.");
                     var serializer = LookupSerializer(item.GetType());
                     serializer.DynamicSerializer.Serialize(item, writer);
                 }
             }
-        }
+        }*/
 
         public static object Deserialize(XdrReader reader, Type type)
         {
             //find the corresponding serialization vector for a given type
             var serializer = LookupSerializer(type);
+
+
+
             //skip discriminators for ancestors
             if (serializer.AncestorUnionsCounts > 0)
             {
@@ -80,13 +92,14 @@ namespace Centaurus
             //resolve unions
             while (serializer.IsUnion)
             {
-                type = serializer.ReadUnionType(reader);
+                type = serializer.ResolveActualUnionTypeMethod.Invoke(null, new object[] { reader }) as Type;
                 serializer = LookupSerializer(type);
             }
+
             //create new instance of the target model
             var instance = Activator.CreateInstance(type);
             //deserialize using resolved serializer contract
-            serializer.DynamicSerializer.Deserialize(instance, reader);
+            serializer.DeserializeMethod.Invoke(null, new object[] { instance, reader });
             return instance;
         }
 
