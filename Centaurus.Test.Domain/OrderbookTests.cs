@@ -154,8 +154,8 @@ namespace Centaurus.Test
         [Test]
         [Explicit]
         [Category("Performance")]
-        [TestCase(1000000)]
-        [TestCase(10000000, true)]
+        [TestCase(100000)]
+        [TestCase(1000000, true)]
         public void OrderbookPerformanceTest(int iterations, bool useNormalDistribution = false)
         {
             var rnd = new Random();

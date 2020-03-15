@@ -1,17 +1,21 @@
-using Centaurus;
 using Centaurus.Models;
-using Centaurus.Test;
-using NUnit.Framework;
-using stellar_dotnet_sdk.xdr;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
+using Centaurus.Xdr;
+using NUnit.Framework;
+using stellar_dotnet_sdk.xdr;
 
 namespace Centaurus.Test
 {
     public class MessageSerializationTests
     {
+        [SetUp]
+        public void Setup()
+        {
+            DynamicSerializersInitializer.Init();
+        }
+
         [Test]
         public void OrderSerializationTest()
         {
@@ -72,7 +76,15 @@ namespace Centaurus.Test
             Assert.AreEqual(435, fastXdrReader.ReadInt32());
             Assert.AreEqual((uint)435, fastXdrReader.ReadUInt32());
             Assert.AreEqual(43546345634657565L, fastXdrReader.ReadInt64());
-            Assert.AreEqual(new double[] { 435.15, 64656.11 }, fastXdrReader.ReadDoubleArray());
+            {
+                var length = fastXdrReader.ReadInt32();
+                var value = new double[length];
+                for (var i = 0; i < length; i++)
+                {
+                    value[i] = fastXdrReader.ReadDouble();
+                }
+                Assert.AreEqual(new double[] { 435.15, 64656.11 }, value);
+            }
             Assert.AreEqual("oiewurouqwe", fastXdrReader.ReadString());
             Assert.AreEqual(testArray, fastXdrReader.ReadVariable());
 
@@ -80,7 +92,14 @@ namespace Centaurus.Test
             var fastWriter = new XdrWriter();
             fastWriter.WriteInt32(435);
             fastWriter.WriteUInt32((uint)435);
-            fastWriter.WriteDoubleArray(new double[] { 435.15, 64656.11 });
+            {
+                var arr = new double[] { 435.15, 64656.11 };
+                fastWriter.WriteInt32(arr.Length);
+                foreach (var d in arr)
+                {
+                    fastWriter.WriteDouble(d);
+                }
+            }
             fastWriter.WriteString("oiewurouqwe");
             fastWriter.WriteVariable(testArray);
 
@@ -92,8 +111,8 @@ namespace Centaurus.Test
             Assert.AreEqual(testArray, legacyXdrReader.ReadVarOpaque(32));
         }
 
-        [TestCase(1, 10000000)]
-        [TestCase(100000, 100)]
+        [TestCase(1, 1000000)]
+        [TestCase(10000, 100)]
         [Explicit]
         [Category("Performance")]
         public void XdrOtputStreamPerformanceTest(int rounds, int iterations)

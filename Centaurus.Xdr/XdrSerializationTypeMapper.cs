@@ -4,44 +4,49 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 
-namespace Centaurus
+namespace Centaurus.Xdr
 {
     /// <summary>
-    /// Mapper used to build custom dynamic serializers for every serializable type.
+    /// Mapper used to discover and map custom dynamic serializers for each XDR contract.
     /// </summary>
-    internal class XdrSerializationTypeMapper
+    public class XdrSerializationTypeMapper
     {
-        private Dictionary<Type, XdrContractSerializer> mapping;
-
-        public Dictionary<Type, XdrContractSerializer> Map()
+        /*internal static Dictionary<Type, XdrContractSerializer> Map(string assemblyPrefix = "Centaurus")
         {
-            //create the type mapping with serializers
-            MapAllTypes();
-            //and return the result
-            return mapping;
-        }
-
-        private void MapAllTypes()
-        {
-            mapping = new Dictionary<Type, XdrContractSerializer>();
-            foreach (var type in GetModels())
+            //create the type mapping for serializers
+            var mapping = new Dictionary<Type, XdrContractSerializer>();
+            foreach (var descriptor in DiscoverXdrContracts(assemblyPrefix))
             {
                 //create serializer class instance
-                var serializer = new XdrContractSerializer(type);
+                var serializer = new XdrContractSerializer(descriptor);
                 //add mapping
-                mapping.Add(type, serializer);
+                mapping.Add(descriptor.XdrContractType, serializer);
             }
-        }
+            return mapping;
+        }*/
 
-        private IEnumerable<Type> GetModels()
+        /*private static List<IXdrRuntimeContractSerializer> DiscoverRuntimeSerializers()
+        {
+
+        }*/
+
+        public static IEnumerable<XdrContractSerializationDescriptor> DiscoverXdrContracts(string assemblyPrefix = "Centaurus")
         { //TODO: allow binding to custom assemblies
             return AppDomain.CurrentDomain.GetAssemblies()
                 //analyze only own assemblies
-                .Where(assembly => assembly.FullName.StartsWith("Centaurus"))
-                //project contained types
-                .SelectMany(assembly => assembly.GetTypes())
+                .Where(assembly => assembly.FullName.StartsWith(assemblyPrefix))
+                //discover types for each assembly that matches our criteria
+                .SelectMany(assembly => DiscoverXdrContracts(assembly));
+        }
+
+        public static IEnumerable<XdrContractSerializationDescriptor> DiscoverXdrContracts(Assembly assembly)
+        {
+            //discover all types in the assembly
+            return assembly.GetTypes()
                 //we are looking for classes only
-                .Where(type => type.IsClass && type.GetCustomAttribute<XdrContractAttribute>() != null);
+                .Where(type => type.IsClass && type.GetCustomAttribute<XdrContractAttribute>() != null)
+                //wrap with XdrContractDescriptor
+                .Select(type => new XdrContractSerializationDescriptor(type));
         }
     }
 }

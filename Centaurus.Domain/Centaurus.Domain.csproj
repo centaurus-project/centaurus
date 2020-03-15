@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netcoreapp3.0</TargetFramework>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>
@@ -14,6 +14,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Centaurus.DAL\Centaurus.DAL.csproj" />
+    <ProjectReference Include="..\Centaurus.DynamicSerializers\Centaurus.DynamicSerializers.csproj" />
     <ProjectReference Include="..\Centaurus.Models\Centaurus.Models.csproj" />
   </ItemGroup>
 

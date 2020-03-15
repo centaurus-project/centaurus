@@ -7,7 +7,7 @@ namespace Centaurus
 {
     public class TransactionBuilderOptions
     {
-        public TransactionBuilderOptions(AccountData source, int fee, string memo = null)
+        public TransactionBuilderOptions(AccountData source, uint fee, string memo = null)
         {
             if (fee <= 0)
                 throw new ArgumentNullException(nameof(fee));
@@ -19,7 +19,7 @@ namespace Centaurus
 
         public AccountData Source { get; set; }
 
-        public int Fee { get; set; }
+        public uint Fee { get; set; }
         
         public string Memo { get; set; }
     }

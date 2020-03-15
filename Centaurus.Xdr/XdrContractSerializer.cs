@@ -3,37 +3,29 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 
-namespace Centaurus
+namespace Centaurus.Xdr
 {
     internal class XdrContractSerializer
     {
-        public XdrContractSerializer(Type serializedType)
+        public XdrContractSerializer(Type dynamicSerializerType)
         {
-            SerializedType = serializedType;
-            var contractBuilder = new XdrSerializerContractBuilder(serializedType);
-            var serializerType = contractBuilder.CreateDynamicSerializer();
-            if (contractBuilder.UnionSwitch.Count > 0)
-            {
-                IsUnion = true;
-                UnionSwitch = contractBuilder.UnionSwitch;
-            }
-            AncestorUnionsCounts = contractBuilder.AncestorUnionsCounts;
-            DynamicSerializer = Activator.CreateInstance(serializerType.AsType()) as IXdrRuntimeContractSerializer;
+            SerializeMethod = dynamicSerializerType.GetMethod("Serialize");
+            DeserializeMethod = dynamicSerializerType.GetMethod("Deserialize");
+            ResolveActualUnionTypeMethod = dynamicSerializerType.GetMethod("ResolveActualUnionType");
+            var ancestorsProp = dynamicSerializerType.GetField("AncestorUnionsCounts");
+            AncestorUnionsCounts = ancestorsProp == null ? 0 : (int)ancestorsProp.GetValue(Activator.CreateInstance(dynamicSerializerType));
         }
 
-        public readonly Type SerializedType;
+        public readonly MethodInfo SerializeMethod;
 
-        public readonly bool IsUnion;
+        public readonly MethodInfo DeserializeMethod;
+
+        public readonly MethodInfo ResolveActualUnionTypeMethod;
+
         public readonly int AncestorUnionsCounts;
-        private readonly Dictionary<int, Type> UnionSwitch;
-        
-        public readonly IXdrRuntimeContractSerializer DynamicSerializer;
 
-        public Type ReadUnionType(XdrReader reader)
-        {
-            var typeId = reader.ReadInt32();
-            if (UnionSwitch.TryGetValue(typeId, out Type actualType)) return actualType;
-            throw new InvalidOperationException($"Failed to find type mapping for union type id {typeId}.");
-        }
+        public bool IsUnion { get { return ResolveActualUnionTypeMethod != null; } }
+
+        //public readonly Type SerializedType;
     }
 }
