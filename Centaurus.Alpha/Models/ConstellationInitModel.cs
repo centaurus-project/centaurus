@@ -1,4 +1,6 @@
-﻿namespace Centaurus.Alpha
+﻿using Centaurus.Models;
+
+namespace Centaurus.Alpha
 {
     public class ConstellationInitModel
     {

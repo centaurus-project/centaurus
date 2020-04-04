@@ -18,14 +18,13 @@ namespace Centaurus.Domain
                 MinAccountBalance = settings.MinAccountBalance,
                 MinAllowedLotSize = settings.MinAllowedLotSize,
                 Vault = settings.Vault,
-                Assets = assetSettings.Select(a => a.ToAssetSettings()).ToList()
-            };
-            if (settings.RequestRateLimits != null)
-                resultSettings.RequestRateLimits = new RequestRateLimits
+                Assets = assetSettings.Select(a => a.ToAssetSettings()).ToList(),
+                RequestRateLimits = new RequestRateLimits
                 {
                     HourLimit = settings.RequestRateLimits.HourLimit,
                     MinuteLimit = settings.RequestRateLimits.MinuteLimit
-                };
+                }
+            };
             return resultSettings;
         }
     }

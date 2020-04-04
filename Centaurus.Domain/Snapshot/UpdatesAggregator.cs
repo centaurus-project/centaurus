@@ -78,7 +78,7 @@ namespace Centaurus.Domain
                         case NonceUpdateEffect nonceUpdateEffect:
                             {
                                 var pubKey = nonceUpdateEffect.Pubkey.Data;
-                                EnsureAccountRowExists(accounts, pubKey);
+                                EnsureAccountRecordExists(accounts, pubKey);
                                 accounts[pubKey].Nonce = nonceUpdateEffect.Nonce;
                             }
                             break;
@@ -117,7 +117,7 @@ namespace Centaurus.Domain
                         case RequestRateLimitUpdateEffect requestRateLimitUpdateEffect:
                             {
                                 var pubKey = requestRateLimitUpdateEffect.Pubkey.Data;
-                                EnsureAccountRowExists(accounts, pubKey);
+                                EnsureAccountRecordExists(accounts, pubKey);
                                 accounts[pubKey].RequestRateLimits = new RequestRateLimitsModel
                                 {
                                     HourLimit = requestRateLimitUpdateEffect.RequestRateLimits.HourLimit,
@@ -284,7 +284,7 @@ namespace Centaurus.Domain
             return diffObject;
         }
 
-        private static void EnsureAccountRowExists(Dictionary<byte[], DiffObject.Account> accounts, byte[] pubKey)
+        private static void EnsureAccountRecordExists(Dictionary<byte[], DiffObject.Account> accounts, byte[] pubKey)
         {
             if (!accounts.ContainsKey(pubKey))
                 accounts.Add(pubKey, new DiffObject.Account { PubKey = pubKey });

@@ -24,21 +24,21 @@ namespace Centaurus.Domain
             {
                 error = null;
 
-                int? hourLimit = account.RequestRateLimits?.HourLimit ?? Global.Constellation.RequestRateLimits?.HourLimit;
+                uint? hourLimit = account.RequestRateLimits?.HourLimit ?? Global.Constellation.RequestRateLimits?.HourLimit;
                 var hourInTicks = (long)60 * 1000 * 60 * 10_000;
-                if (hourLimit.HasValue && !IncSingleCounter(hourCounter, hourInTicks, hourLimit.Value, requestDatetime, out error))
+                if (!IncSingleCounter(hourCounter, hourInTicks, hourLimit.Value, requestDatetime, out error))
                     return false;
 
                 var minuteInTicks = (long)60 * 1000 * 10_000;
-                int? minuteLimit = account.RequestRateLimits?.MinuteLimit ?? Global.Constellation.RequestRateLimits?.MinuteLimit;
-                if (minuteLimit.HasValue && !IncSingleCounter(minuteCounter, minuteInTicks, minuteLimit.Value, requestDatetime, out error))
+                uint? minuteLimit = account.RequestRateLimits?.MinuteLimit ?? Global.Constellation.RequestRateLimits?.MinuteLimit;
+                if (!IncSingleCounter(minuteCounter, minuteInTicks, minuteLimit.Value, requestDatetime, out error))
                     return false;
 
                 return true;
             }
         }
 
-        private bool IncSingleCounter(RequestCounter counter, long counterWindowPeriod, int maxAllowedRequestsCount, long requestDatetime, out string error)
+        private bool IncSingleCounter(RequestCounter counter, long counterWindowPeriod, uint maxAllowedRequestsCount, long requestDatetime, out string error)
         {
             error = null;
             if (maxAllowedRequestsCount < 0) //if less than zero than the counter is disabled 

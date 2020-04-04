@@ -6,7 +6,7 @@ namespace Centaurus.DAL.Models
 {
     public class RequestRateLimitsModel
     {
-        public int HourLimit { get; set; }
-        public int MinuteLimit { get; set; }
+        public uint HourLimit { get; set; }
+        public uint MinuteLimit { get; set; }
     }
 }

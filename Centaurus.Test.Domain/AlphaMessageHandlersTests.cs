@@ -243,7 +243,7 @@ namespace Centaurus.Test
 
             var account = Global.AccountStorage.GetAccount(clientKeyPair);
             if (requestLimit.HasValue)
-                account.Account.RequestRateLimits = new RequestRateLimits { HourLimit = requestLimit.Value, MinuteLimit = requestLimit.Value };
+                account.Account.RequestRateLimits = new RequestRateLimits { HourLimit = (uint)requestLimit.Value, MinuteLimit = (uint)requestLimit.Value };
 
             var clientConnection = new AlphaWebSocketConnection(new FakeWebSocket())
             {

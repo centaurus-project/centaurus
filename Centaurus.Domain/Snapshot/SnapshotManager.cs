@@ -46,7 +46,6 @@ namespace Centaurus.Domain
                 Vault = initQuantum.Vault,
                 VaultSequence = initQuantum.VaultSequence,
                 Ledger = initQuantum.Ledger,
-                Pubkey = envelope.Signatures.First().Signer,
                 RequestRateLimits = initQuantum.RequestRateLimits
             };
 

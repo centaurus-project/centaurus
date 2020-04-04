@@ -9,6 +9,15 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
+    public class ConstellationInitInfo
+    {
+        public KeyPair[] Auditors { get; set; }
+        public long MinAccountBalance { get; set; }
+        public long MinAllowedLotSize { get; set; }
+        public AssetSettings[] Assets { get; set; }
+        public RequestRateLimits RequestRateLimits { get; set; }
+    }
+
     /// <summary>
     /// Initializes the application. 
     /// It can only be called from the Alpha, and only when it is in the waiting for initialization state.
@@ -17,27 +26,30 @@ namespace Centaurus.Domain
     {
         const int minAuditorsCount = 1;
 
-        public ConstellationInitializer(IEnumerable<KeyPair> auditors, long minAccountBalance, long minAllowedLotSize, IEnumerable<AssetSettings> assets, RequestRateLimits requestRateLimits)
+        ConstellationInitInfo constellationInitInfo { get; }
+
+        public ConstellationInitializer(ConstellationInitInfo constellationInitInfo)
         {
-            Auditors = auditors.Count() >= minAuditorsCount ? auditors.ToArray() : throw new Exception($"Min auditors count is {minAuditorsCount}");
+            if (constellationInitInfo.Auditors == null || constellationInitInfo.Auditors.Count() < minAuditorsCount)
+                throw new ArgumentException($"Min auditors count is {minAuditorsCount}");
 
-            MinAccountBalance = minAccountBalance > 0 ? minAccountBalance : throw new ArgumentException("Minimal account balance is less then 0");
+            if (constellationInitInfo.MinAccountBalance < 1)
+                throw new ArgumentException("Minimal account balance is less then 0");
 
-            MinAllowedLotSize = minAllowedLotSize > 0 ? minAllowedLotSize : throw new ArgumentException("Minimal allowed lot size is less then 0");
+            if (constellationInitInfo.MinAllowedLotSize < 1)
+                throw new ArgumentException("Minimal allowed lot size is less then 0");
 
-            Assets = !assets.GroupBy(a => a.ToString()).Any(g => g.Count() > 1)
-                ? assets.Where(a => !a.IsXlm).ToArray() //skip XLM, it's supported by default
-                : throw new ArgumentException("All asset values should be unique");
+            if (constellationInitInfo.Assets.GroupBy(a => a.ToString()).Any(g => g.Count() > 1))
+                throw new ArgumentException("All asset values should be unique");
 
-            RequestRateLimits = requestRateLimits;
+            if (constellationInitInfo.Assets.Any(a => a.IsXlm))
+                throw new ArgumentException("Specify only custom assets. Native assets are supported by default.");
+
+            if (constellationInitInfo.RequestRateLimits == null || constellationInitInfo.RequestRateLimits.HourLimit < 1 || constellationInitInfo.RequestRateLimits.MinuteLimit < 1)
+                throw new ArgumentException("Request rate limit values should be greater than 0");
+
+            this.constellationInitInfo = constellationInitInfo;
         }
-
-        public KeyPair[] Auditors { get; }
-        public long MinAccountBalance { get; }
-        public long MinAllowedLotSize { get; }
-        public AssetSettings[] Assets { get; }
-
-        public RequestRateLimits RequestRateLimits { get; set; }
 
         public async Task Init()
         {
@@ -52,20 +64,19 @@ namespace Centaurus.Domain
 
             SetIdToAssets();
 
-
             var vaultAccountInfo = await Global.StellarNetwork.Server.Accounts.Account(Global.Settings.KeyPair.AccountId);
 
             var initQuantum = new ConstellationInitQuantum
             {
-                Assets = Assets.ToList(),
-                Auditors = Auditors.Select(key => (RawPubKey)key.PublicKey).ToList(),
+                Assets = constellationInitInfo.Assets.ToList(),
+                Auditors = constellationInitInfo.Auditors.Select(key => (RawPubKey)key.PublicKey).ToList(),
                 Vault = Global.Settings.KeyPair.PublicKey,
-                MinAccountBalance = MinAccountBalance,
-                MinAllowedLotSize = MinAllowedLotSize,
+                MinAccountBalance = constellationInitInfo.MinAccountBalance,
+                MinAllowedLotSize = constellationInitInfo.MinAllowedLotSize,
                 PrevHash = new byte[] { },
                 Ledger = ledgerId,
                 VaultSequence = vaultAccountInfo.SequenceNumber,
-                RequestRateLimits = RequestRateLimits
+                RequestRateLimits = constellationInitInfo.RequestRateLimits
             };
 
             var envelope = initQuantum.CreateEnvelope();
@@ -76,9 +87,9 @@ namespace Centaurus.Domain
         private void SetIdToAssets()
         {
             //start from 1, 0 is reserved by XLM
-            for (var i = 1; i <= Assets.Length; i++)
+            for (var i = 1; i <= constellationInitInfo.Assets.Length; i++)
             {
-                Assets[i - 1].Id = i;
+                constellationInitInfo.Assets[i - 1].Id = i;
             }
         }
 
@@ -88,7 +99,7 @@ namespace Centaurus.Domain
         /// <returns>Ledger id</returns>
         private async Task<long> BuildAndConfigureVault(stellar_dotnet_sdk.responses.AccountResponse vaultAccount)
         {
-            var majority = MajorityHelper.GetMajorityCount(Auditors.Count());
+            var majority = MajorityHelper.GetMajorityCount(constellationInitInfo.Auditors.Count());
 
             var sourceAccount = await Global.StellarNetwork.Server.Accounts.Account(Global.Settings.KeyPair.AccountId);
 
@@ -99,7 +110,7 @@ namespace Centaurus.Domain
                 .Where(b => b.Asset is stellar_dotnet_sdk.AssetTypeCreditAlphaNum)
                 .Select(b => b.Asset)
                 .Cast<stellar_dotnet_sdk.AssetTypeCreditAlphaNum>();
-            foreach (var a in Assets)
+            foreach (var a in constellationInitInfo.Assets)
             {
                 var asset = a.ToAsset() as stellar_dotnet_sdk.AssetTypeCreditAlphaNum;
 
@@ -119,7 +130,7 @@ namespace Centaurus.Domain
                     .SetMediumThreshold(majority)
                     .SetHighThreshold(majority);
 
-            foreach (var signer in Auditors)
+            foreach (var signer in constellationInitInfo.Auditors)
                 optionOperationBuilder.SetSigner(Signer.Ed25519PublicKey(signer), 1);
 
             transactionBuilder.AddOperation(optionOperationBuilder.Build());

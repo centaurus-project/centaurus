@@ -2,8 +2,8 @@
 {
     public class RequestRateLimitsModel
     {
-        public int MinuteLimit { get; set; }
+        public uint MinuteLimit { get; set; }
 
-        public int HourLimit { get; set; }
+        public uint HourLimit { get; set; }
     }
 }

@@ -7,8 +7,6 @@ namespace Centaurus.Domain
 {
     public class NonceUpdateEffectProcessor : BaseAccountEffectProcessor<NonceUpdateEffect>
     {
-        private Account account;
-
         public NonceUpdateEffectProcessor(NonceUpdateEffect effect, AccountStorage accountStorage)
             : base(effect, accountStorage)
         {

@@ -35,14 +35,9 @@ namespace Centaurus.Alpha.Controllers
                     MinAccountBalance = Global.Constellation.MinAccountBalance,
                     MinAllowedLotSize = Global.Constellation.MinAllowedLotSize,
                     StellarNetwork = network,
-                    Assets = assets
+                    Assets = assets,
+                    RequestRateLimits = Global.Constellation.RequestRateLimits
                 };
-                if (Global.Constellation.RequestRateLimits != null)
-                    info.RequestRateLimits = new RequestRateLimitsModel
-                    {
-                        HourLimit = Global.Constellation.RequestRateLimits.HourLimit,
-                        MinuteLimit = Global.Constellation.RequestRateLimits.MinuteLimit,
-                    };
             }
 
             return info;
@@ -56,20 +51,23 @@ namespace Centaurus.Alpha.Controllers
                 if (constellationInit == null)
                     return StatusCode(415);
 
-                RequestRateLimits requestRateLimits = null;
-                if (constellationInit.RequestRateLimits != null)
-                    requestRateLimits = new RequestRateLimits
-                    {
-                        HourLimit = constellationInit.RequestRateLimits.HourLimit,
-                        MinuteLimit = constellationInit.RequestRateLimits.MinuteLimit
-                    };
+                if (constellationInit.RequestRateLimits == null)
+                    throw new ArgumentNullException(nameof(constellationInit.RequestRateLimits), "RequestRateLimits parameter is required.");
+                var requestRateLimits = new RequestRateLimits
+                {
+                    HourLimit = constellationInit.RequestRateLimits.HourLimit,
+                    MinuteLimit = constellationInit.RequestRateLimits.MinuteLimit
+                };
 
                 var constellationInitializer = new ConstellationInitializer(
-                    constellationInit.Auditors.Select(a => KeyPair.FromAccountId(a)),
-                    constellationInit.MinAccountBalance,
-                    constellationInit.MinAllowedLotSize,
-                    constellationInit.Assets.Select(a => AssetSettings.FromCode(a)),
-                    requestRateLimits
+                    new ConstellationInitInfo
+                    {
+                        Auditors = constellationInit.Auditors.Select(a => KeyPair.FromAccountId(a)).ToArray(),
+                        MinAccountBalance = constellationInit.MinAccountBalance,
+                        MinAllowedLotSize = constellationInit.MinAllowedLotSize,
+                        Assets = constellationInit.Assets.Select(a => AssetSettings.FromCode(a)).ToArray(),
+                        RequestRateLimits = requestRateLimits
+                    }
                 );
 
                 await constellationInitializer.Init();

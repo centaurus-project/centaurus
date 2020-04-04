@@ -7,9 +7,9 @@ namespace Centaurus.Models
     {
 
         [XdrField(0)]
-        public int MinuteLimit { get; set; }
+        public uint MinuteLimit { get; set; }
 
         [XdrField(1)]
-        public int HourLimit { get; set; }
+        public uint HourLimit { get; set; }
     }
 }

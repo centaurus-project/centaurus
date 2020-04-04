@@ -19,7 +19,7 @@ namespace Centaurus.Alpha
 
         public Asset[] Assets { get; set; }
 
-        public RequestRateLimitsModel RequestRateLimits { get; set; }
+        public RequestRateLimits RequestRateLimits { get; set; }
 
         public class Network
         {
