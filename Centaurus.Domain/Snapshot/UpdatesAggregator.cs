@@ -78,8 +78,7 @@ namespace Centaurus.Domain
                         case NonceUpdateEffect nonceUpdateEffect:
                             {
                                 var pubKey = nonceUpdateEffect.Pubkey.Data;
-                                if (!accounts.ContainsKey(pubKey))
-                                    accounts.Add(pubKey, new DiffObject.Account { PubKey = pubKey });
+                                EnsureAccountRecordExists(accounts, pubKey);
                                 accounts[pubKey].Nonce = nonceUpdateEffect.Nonce;
                             }
                             break;
@@ -113,6 +112,17 @@ namespace Centaurus.Domain
                                 var asset = unlockLiabilitiesEffect.Asset;
                                 EnsureBalanceExists(balances, pubKey, asset);
                                 balances[pubKey][asset].Liabilities -= unlockLiabilitiesEffect.Amount;
+                            }
+                            break;
+                        case RequestRateLimitUpdateEffect requestRateLimitUpdateEffect:
+                            {
+                                var pubKey = requestRateLimitUpdateEffect.Pubkey.Data;
+                                EnsureAccountRecordExists(accounts, pubKey);
+                                accounts[pubKey].RequestRateLimits = new RequestRateLimitsModel
+                                {
+                                    HourLimit = requestRateLimitUpdateEffect.RequestRateLimits.HourLimit,
+                                    MinuteLimit = requestRateLimitUpdateEffect.RequestRateLimits.MinuteLimit
+                                };
                             }
                             break;
                         case OrderPlacedEffect orderPlacedEffect:
@@ -226,6 +236,13 @@ namespace Centaurus.Domain
                 MinAllowedLotSize = snapshot.Settings.MinAllowedLotSize,
                 Vault = snapshot.Settings.Vault.Data
             };
+            if (snapshot.Settings.RequestRateLimits != null)
+                diffObject.Settings.RequestRateLimits = new RequestRateLimitsModel
+                {
+                    HourLimit = snapshot.Settings.RequestRateLimits.HourLimit,
+                    MinuteLimit = snapshot.Settings.RequestRateLimits.MinuteLimit
+                };
+
 
             diffObject.Assets = snapshot.Settings.Assets.Select(a => new AssetModel
             {
@@ -267,7 +284,11 @@ namespace Centaurus.Domain
             return diffObject;
         }
 
-
+        private static void EnsureAccountRecordExists(Dictionary<byte[], DiffObject.Account> accounts, byte[] pubKey)
+        {
+            if (!accounts.ContainsKey(pubKey))
+                accounts.Add(pubKey, new DiffObject.Account { PubKey = pubKey });
+        }
 
         private static void EnsureBalanceRowExists(Dictionary<byte[], Dictionary<int, DiffObject.Balance>> balances, byte[] pubKey)
         {
@@ -290,13 +311,22 @@ namespace Centaurus.Domain
 
         private static SettingsModel GetConstellationSettings(ConstellationEffect constellationInit)
         {
-            return new SettingsModel
+            var settingsModel = new SettingsModel
             {
                 Auditors = constellationInit.Auditors.Select(a => a.Data).ToArray(),
                 MinAccountBalance = constellationInit.MinAccountBalance,
                 MinAllowedLotSize = constellationInit.MinAllowedLotSize,
                 Vault = constellationInit.Vault.Data
             };
+
+            if (constellationInit.RequestRateLimits != null)
+                settingsModel.RequestRateLimits = new RequestRateLimitsModel
+                {
+                    HourLimit = constellationInit.RequestRateLimits.HourLimit,
+                    MinuteLimit = constellationInit.RequestRateLimits.MinuteLimit
+                };
+
+            return settingsModel;
         }
 
         /// <summary>

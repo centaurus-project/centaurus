@@ -46,7 +46,7 @@ namespace Centaurus.Domain
                 Vault = initQuantum.Vault,
                 VaultSequence = initQuantum.VaultSequence,
                 Ledger = initQuantum.Ledger,
-                Pubkey = envelope.Signatures.First().Signer
+                RequestRateLimits = initQuantum.RequestRateLimits
             };
 
             var updates = new PendingUpdates();
@@ -194,7 +194,6 @@ namespace Centaurus.Domain
             {
                 var currentEffect = XdrConverter.Deserialize<Effect>(effectModels[i].RawEffect);
                 var pubKey = currentEffect.Pubkey;
-                var currentAccount = new Lazy<Account>(() => accountStorage.GetAccount(pubKey));
                 IEffectProcessor<Effect> processor = null;
                 switch (currentEffect)
                 {
@@ -202,7 +201,7 @@ namespace Centaurus.Domain
                         processor = new AccountCreateEffectProcessor(accountCreateEffect, accountStorage);
                         break;
                     case NonceUpdateEffect nonceUpdateEffect:
-                        processor = new NonceUpdateEffectProcessor(nonceUpdateEffect, currentAccount.Value);
+                        processor = new NonceUpdateEffectProcessor(nonceUpdateEffect, accountStorage);
                         break;
                     case BalanceCreateEffect balanceCreateEffect:
                         processor = new BalanceCreateEffectProcessor(balanceCreateEffect, accountStorage);
@@ -215,6 +214,9 @@ namespace Centaurus.Domain
                         break;
                     case UnlockLiabilitiesEffect unlockLiabilitiesEffect:
                         processor = new UnlockLiabilitiesEffectProcessor(unlockLiabilitiesEffect, accountStorage);
+                        break;
+                    case RequestRateLimitUpdateEffect requestRateLimitUpdateEffect:
+                        processor = new RequestRateLimitUpdateEffectProcessor(requestRateLimitUpdateEffect, accountStorage);
                         break;
                     case OrderPlacedEffect orderPlacedEffect:
                         {
@@ -255,7 +257,7 @@ namespace Centaurus.Domain
             return new Snapshot
             {
                 Apex = apex,
-                Accounts = accountStorage.GetAll().ToList(),
+                Accounts = accountStorage.GetAll().Select(a => a.Account).ToList(),
                 Ledger = stellarData.Ledger,
                 Orders = exchange.OrderMap.GetAllOrders().ToList(),
                 Settings = settings,

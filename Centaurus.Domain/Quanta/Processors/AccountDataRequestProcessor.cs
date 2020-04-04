@@ -23,7 +23,7 @@ namespace Centaurus.Domain
 
             var accountEffects = effectsContainer.GetEffects(requestMessage.Account).ToList();
 
-            var account = Global.AccountStorage.GetAccount(requestMessage.Account);
+            var account = Global.AccountStorage.GetAccount(requestMessage.Account).Account;
 
             var resultMessage = envelope.CreateResult<AccountDataResponse>(ResultStatusCodes.Success, accountEffects);
             resultMessage.Balances = account.Balances;

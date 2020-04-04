@@ -92,7 +92,8 @@ namespace Centaurus.Test
                 Vault = settings is AlphaSettings ? settings.KeyPair.PublicKey : ((AuditorSettings)settings).AlphaKeyPair.PublicKey,
                 VaultSequence = 1,
                 Ledger = 1,
-                PrevHash = new byte[] { }
+                PrevHash = new byte[] { },
+                RequestRateLimits = new RequestRateLimits { HourLimit = 1000, MinuteLimit = 100 }
             };
 
 
@@ -138,33 +139,6 @@ namespace Centaurus.Test
             depositeQuantum.Source.Sign(TestEnvironment.Auditor1KeyPair);
 
             Global.QuantumHandler.HandleAsync(depositeQuantum.CreateEnvelope()).Wait();
-
-            //var accountUpdates = new List<DiffObject.Account>();
-            //var balances = new List<DiffObject.Balance>();
-            //for (var i = 0; i < clients.Count; i++)
-            //{
-            //    accountUpdates.Add(new DiffObject.Account { IsInserted = true, PubKey = clients[i].PublicKey });
-            //    balances.Add(new DiffObject.Balance { IsInserted = true, PubKey = clients[i].PublicKey, Amount = 10000, AssetId = 0 });
-            //    for (var c = 0; c < assets.Count; c++)
-            //    {
-            //        balances.Add(new DiffObject.Balance { IsInserted = true, PubKey = clients[i].PublicKey, Amount = 10000, AssetId = assets[c].Id });
-            //    }
-            //}
-
-            //Global.PermanentStorage.Update(new DiffObject
-            //{
-            //    Accounts = accountUpdates,
-            //    Balances = balances,
-            //    Assets = new List<DAL.Models.AssetModel>(),
-            //    Effects = new List<DAL.Models.EffectModel>(),
-            //    Orders = new List<DiffObject.Order>(),
-            //    Quanta = new List<DAL.Models.QuantumModel>(),
-            //    Widthrawals = new List<DiffObject.Withdrawal>()
-            //}).Wait();
-
-            //var snapshot = SnapshotManager.GetSnapshot().Result;
-
-            //Global.Setup(snapshot);
         }
     }
 }

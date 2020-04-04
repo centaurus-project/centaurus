@@ -22,7 +22,10 @@ namespace Centaurus.Test
             long apex = Global.QuantumStorage.CurrentApex;
 
             var client1StartBalanceAmount = (long)0;
-            var clientAccountBalance = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair).GetBalance(asset);
+
+            var account1 = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair).Account;
+
+            var clientAccountBalance = account1.GetBalance(asset);
 
             var withdrawalDest = KeyPair.Random();
             var txHash = new byte[] { };
@@ -101,8 +104,6 @@ namespace Centaurus.Test
             {
                 Assert.AreEqual(Global.LedgerManager.Ledger, ledgerNotification.LedgerTo);
 
-                var account1 = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
-
                 Assert.AreEqual(account1.GetBalance(asset).Liabilities, 0);
                 Assert.AreEqual(account1.GetBalance(asset).Amount, client1StartBalanceAmount - amount + depositeAmount); //acc balance + deposit - withdrawal
             }
@@ -175,13 +176,52 @@ namespace Centaurus.Test
                 Assert.IsInstanceOf<AccountDataResponse>(res);
         }
 
+        [Test]
+        [TestCaseSource("AccountRequestRateLimitsCases")]
+        public async Task AccountRequestRateLimitTest(KeyPair clientKeyPair, int? requestLimit)
+        {
+            Global.AppState.State = ApplicationState.Ready;
+
+            var account = Global.AccountStorage.GetAccount(clientKeyPair);
+            if (requestLimit.HasValue)
+                account.Account.RequestRateLimits = new RequestRateLimits { HourLimit = (uint)requestLimit.Value, MinuteLimit = (uint)requestLimit.Value };
+
+            var minuteLimit = (account.Account.RequestRateLimits ?? Global.Constellation.RequestRateLimits).MinuteLimit;
+            var minuteIterCount = minuteLimit + 1;
+            for (var i = 0; i < minuteIterCount; i++)
+            {
+                var envelope = new AccountDataRequest
+                {
+                    Account = clientKeyPair,
+                    Nonce = (ulong)(i + 1)
+                }.CreateEnvelope();
+                envelope.Sign(clientKeyPair);
+                if (!Global.IsAlpha)
+                {
+                    var quantum = new RequestQuantum { Apex = Global.QuantumStorage.CurrentApex + 1, RequestEnvelope = envelope };
+                    envelope = quantum.CreateEnvelope();
+                    envelope.Sign(TestEnvironment.AlphaKeyPair);
+                }
+
+                if (i + 1 > minuteLimit)
+                    await AssertQuantumHandling(envelope, typeof(TooManyRequests));
+                else
+                    await AssertQuantumHandling(envelope, null);
+            }
+        }
+
         protected async Task<ResultMessage> AssertQuantumHandling(MessageEnvelope quantum, Type excpectedException = null)
         {
-            if (excpectedException == null)
+            try
+            {
                 return await Global.QuantumHandler.HandleAsync(quantum);
-
-            Assert.ThrowsAsync(excpectedException, async () => await Global.QuantumHandler.HandleAsync(quantum));
-            return null;
+            }
+            catch (Exception exc)
+            {
+                if (excpectedException == null || excpectedException.FullName != exc.GetType().FullName)
+                    throw;
+                return null;
+            }
         }
     }
 }

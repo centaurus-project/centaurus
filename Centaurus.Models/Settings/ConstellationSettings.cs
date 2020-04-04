@@ -24,5 +24,8 @@ namespace Centaurus.Models
 
         [XdrField(5)]
         public List<AssetSettings> Assets { get; set; }
+
+        [XdrField(6, Optional = true)]
+        public RequestRateLimits RequestRateLimits { get; set; }
     }
 }

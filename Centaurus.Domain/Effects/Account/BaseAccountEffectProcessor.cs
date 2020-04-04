@@ -24,7 +24,7 @@ namespace Centaurus.Domain
             get
             {
                 if (account == null)
-                    account = accountStorage.GetAccount(Effect.Pubkey);
+                    account = accountStorage.GetAccount(Effect.Pubkey).Account;
                 return account;
             }
         }

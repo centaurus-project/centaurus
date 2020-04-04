@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using Centaurus.Models;
 
 namespace Centaurus.Alpha
 {
@@ -14,5 +11,7 @@ namespace Centaurus.Alpha
         public long MinAllowedLotSize { get; set; }
 
         public string[] Assets { get; set; }
+
+        public RequestRateLimitsModel RequestRateLimits { get; set; }
     }
 }

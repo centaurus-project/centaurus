@@ -19,9 +19,9 @@ namespace Centaurus.Domain
             var requestQuantum = (RequestQuantum)effectProcessorsContainer.Envelope.Message;
             var requestMessage = requestQuantum.RequestMessage;
 
-            var currentUser = Global.AccountStorage.GetAccount(requestMessage.Account);
+            var currentUser = Global.AccountStorage.GetAccount(requestMessage.Account).Account;
 
-            effectProcessorsContainer.AddNonceUpdate(currentUser, requestMessage.Nonce);
+            effectProcessorsContainer.AddNonceUpdate(Global.AccountStorage, requestMessage.Account, requestMessage.Nonce, currentUser.Nonce);
         }
 
         public void ValidateNonce(MessageEnvelope envelope)
@@ -34,9 +34,9 @@ namespace Centaurus.Domain
             if (requestMessage == null)
                 throw new InvalidOperationException($"Invalid message type. {typeof(RequestQuantum).Name} should contain message of type {typeof(RequestMessage).Name}.");
 
-            var currentUser = Global.AccountStorage.GetAccount(requestMessage.Account);
+            var currentUser = Global.AccountStorage.GetAccount(requestMessage.Account).Account;
             if (currentUser == null)
-                throw new Exception($"Account with public key '{requestMessage.Account.ToString()}' is not found.");
+                throw new Exception($"Account with public key '{requestMessage.ToString()}' is not found.");
 
             if (currentUser.Nonce >= requestMessage.Nonce)
                 throw new UnauthorizedException();

@@ -199,11 +199,11 @@ namespace Centaurus.Domain
 
 
 
-        public void AddNonceUpdate(Account account, ulong newNonce)
+        public void AddNonceUpdate(AccountStorage accountStorage, RawPubKey publicKey, ulong newNonce, ulong currentNonce)
         {
             Add(new NonceUpdateEffectProcessor(
-                new NonceUpdateEffect { Nonce = newNonce, PrevNonce = account.Nonce, Pubkey = account.Pubkey, Apex = Apex },
-                account
+                new NonceUpdateEffect { Nonce = newNonce, PrevNonce = currentNonce, Pubkey = publicKey, Apex = Apex },
+                accountStorage
             ));
         }
     }

@@ -21,6 +21,7 @@ namespace Centaurus.Models
     [XdrUnion((int)EffectTypes.ConstellationUpdate, typeof(ConstellationUpdateEffect))]
     [XdrUnion((int)EffectTypes.WithdrawalCreate, typeof(WithdrawalCreateEffect))]
     [XdrUnion((int)EffectTypes.WithdrawalRemove, typeof(WithdrawalRemoveEffect))]
+    [XdrUnion((int)EffectTypes.RequestRateLimitUpdate, typeof(RequestRateLimitUpdateEffect))]
     public class Effect
     {
         public virtual EffectTypes EffectType => throw new InvalidOperationException();

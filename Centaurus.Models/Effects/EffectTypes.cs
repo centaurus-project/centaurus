@@ -16,6 +16,7 @@ namespace Centaurus.Models
         BalanceUpdate = 4,
         LockLiabilities = 5,
         UnlockLiabilities = 6,
+        RequestRateLimitUpdate = 7,
 
         OrderPlaced = 10,
         OrderRemoved = 11,

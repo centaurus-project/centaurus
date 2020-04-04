@@ -1,15 +1,11 @@
 ﻿using Centaurus.Models;
 using stellar_dotnet_sdk;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace Centaurus.Alpha
 {
     public class ConstellationInfo
     {
-        public ApplicationState State{ get; set; }
+        public ApplicationState State { get; set; }
 
         public string Vault { get; set; }
 
@@ -22,6 +18,8 @@ namespace Centaurus.Alpha
         public Network StellarNetwork { get; set; }
 
         public Asset[] Assets { get; set; }
+
+        public RequestRateLimits RequestRateLimits { get; set; }
 
         public class Network
         {

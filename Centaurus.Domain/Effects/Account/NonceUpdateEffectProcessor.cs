@@ -5,24 +5,21 @@ using System.Text;
 
 namespace Centaurus.Domain
 {
-    public class NonceUpdateEffectProcessor : EffectProcessor<NonceUpdateEffect>
+    public class NonceUpdateEffectProcessor : BaseAccountEffectProcessor<NonceUpdateEffect>
     {
-        private Account account;
-
-        public NonceUpdateEffectProcessor(NonceUpdateEffect effect, Account account)
-            : base(effect)
+        public NonceUpdateEffectProcessor(NonceUpdateEffect effect, AccountStorage accountStorage)
+            : base(effect, accountStorage)
         {
-            this.account = account;
         }
 
         public override void CommitEffect()
         {
-            account.Nonce = Effect.Nonce;
+            Account.Nonce = Effect.Nonce;
         }
 
         public override void RevertEffect()
         {
-            account.Nonce = Effect.PrevNonce;
+            Account.Nonce = Effect.PrevNonce;
         }
     }
 }
