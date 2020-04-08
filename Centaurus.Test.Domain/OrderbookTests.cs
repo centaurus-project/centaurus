@@ -53,8 +53,9 @@ namespace Centaurus.Test
                 Settings = new ConstellationSettings
                 {
                     Vault = KeyPair.Random().PublicKey,
-                    Assets = new List<AssetSettings> { new AssetSettings { Id = 1, Code = "X", Issuer = new RawPubKey() } }
-                }
+                    Assets = new List<AssetSettings> { new AssetSettings { Id = 1, Code = "X", Issuer = new RawPubKey() } },
+                    RequestRateLimits = new RequestRateLimits { HourLimit = 1000, MinuteLimit = 100 }
+                },
             });
         }
 
@@ -87,7 +88,8 @@ namespace Centaurus.Test
                 Amount = 10,
                 Asset = 1,
                 Price = 2.5,
-                Side = side
+                Side = side,
+                AccountWrapper = Global.AccountStorage.GetAccount(account1.Pubkey)
             };
 
             var order = new RequestQuantum
@@ -124,7 +126,8 @@ namespace Centaurus.Test
                 Amount = 20,
                 Asset = 1,
                 Price = 2,
-                Side = side.Inverse()
+                Side = side.Inverse(),
+                AccountWrapper = Global.AccountStorage.GetAccount(account2.Pubkey)
             };
 
             var conterOrder = new RequestQuantum
@@ -176,7 +179,8 @@ namespace Centaurus.Test
                             Amount = rnd.Next(1, 20),
                             Asset = 1,
                             Price = Math.Round(price * 10) / 10,
-                            Side = rnd.NextDouble() >= 0.5 ? OrderSides.Buy : OrderSides.Sell
+                            Side = rnd.NextDouble() >= 0.5 ? OrderSides.Buy : OrderSides.Sell,
+                            AccountWrapper = Global.AccountStorage.GetAccount(account1.Pubkey)
                         }
                     }
                 };

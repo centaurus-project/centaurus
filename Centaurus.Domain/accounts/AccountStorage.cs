@@ -9,8 +9,8 @@ namespace Centaurus.Domain
 {
     public class AccountStorage
     {
-        public AccountStorage(IEnumerable<Account> accounts)
-            :this(accounts.Select(a => new AccountWrapper(a)))
+        public AccountStorage(IEnumerable<Account> accounts, RequestRateLimits defaultRequestRateLimits)
+            : this(accounts.Select(a => new AccountWrapper(a, a.RequestRateLimits ?? defaultRequestRateLimits)))
         {
 
         }
@@ -45,10 +45,12 @@ namespace Centaurus.Domain
                 throw new InvalidOperationException($"Account with public key {pubkey} already exists");
 
             var acc = new AccountWrapper(new Account
-            {
-                Pubkey = pubkey,
-                Balances = new List<Balance>()
-            });
+                {
+                    Pubkey = pubkey,
+                    Balances = new List<Balance>()
+                },
+                Global.Constellation.RequestRateLimits
+            );
             accounts.Add(pubkey, acc);
 
             return acc;

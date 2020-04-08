@@ -231,7 +231,6 @@ namespace Centaurus.Test
 
         static object[] AccountRequestRateLimitsCases =
         {
-            new object[] { TestEnvironment.Client1KeyPair, null },
             new object[] { TestEnvironment.Client2KeyPair, 10 }
         };
 
@@ -243,8 +242,17 @@ namespace Centaurus.Test
 
             var account = Global.AccountStorage.GetAccount(clientKeyPair);
             if (requestLimit.HasValue)
-                account.Account.RequestRateLimits = new RequestRateLimits { HourLimit = (uint)requestLimit.Value, MinuteLimit = (uint)requestLimit.Value };
-
+            {
+                //TODO: replace it with quantum
+                var effect = new RequestRateLimitUpdateEffect { 
+                    Pubkey = clientKeyPair, 
+                    RequestRateLimits = new RequestRateLimits { 
+                        HourLimit = (uint)requestLimit.Value, 
+                        MinuteLimit = (uint)requestLimit.Value }
+                };
+                var effectProcessor = new RequestRateLimitUpdateEffectProcessor(effect, Global.AccountStorage, Global.Constellation.RequestRateLimits);
+                effectProcessor.CommitEffect();
+            }
             var clientConnection = new AlphaWebSocketConnection(new FakeWebSocket())
             {
                 ClientPubKey = clientKeyPair,

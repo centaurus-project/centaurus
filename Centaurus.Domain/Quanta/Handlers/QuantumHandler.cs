@@ -183,7 +183,7 @@ namespace Centaurus.Domain
             var request = envelope.Message as RequestQuantum;
             if (request == null)
                 return;
-            var account = Global.AccountStorage.GetAccount(request.RequestMessage.Account);
+            var account = request.RequestMessage.AccountWrapper;
             if (!account.RequestCounter.IncRequestCount(request.Timestamp, out string error))
                 throw new TooManyRequests($"Request limit reached for account {account.Account.Pubkey.ToString()}.");
         }

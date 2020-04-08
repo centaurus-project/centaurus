@@ -45,7 +45,7 @@ namespace Centaurus.Domain
             if (totalXlmAmountToTrade < Global.Constellation.MinAllowedLotSize) throw new BadRequestException("Lot size is smaller than the minimum allowed lot.");
 
             //fetch user's account record
-            var account = Global.AccountStorage.GetAccount(orderRequest.Account).Account;
+            var account = orderRequest.AccountWrapper.Account;
 
             //check required balances
             if (orderRequest.Side == OrderSides.Sell)

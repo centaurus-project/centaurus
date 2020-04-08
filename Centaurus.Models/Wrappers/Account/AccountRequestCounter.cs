@@ -1,9 +1,7 @@
 ﻿using Centaurus.Models;
 using System;
-using System.Collections.Generic;
-using System.Text;
 
-namespace Centaurus.Domain
+namespace Centaurus.Models
 {
     public class AccountRequestCounter
     {
@@ -11,11 +9,19 @@ namespace Centaurus.Domain
         private RequestCounter minuteCounter;
         private RequestCounter hourCounter;
 
-        public AccountRequestCounter(Account _account)
+        private RequestRateLimits requestRateLimits;
+
+        public AccountRequestCounter(Account _account, RequestRateLimits requestRateLimits)
         {
-            account = _account;
+            account = _account ?? throw new ArgumentNullException(nameof(_account));
             minuteCounter = new RequestCounter();
             hourCounter = new RequestCounter();
+            SetLimits(requestRateLimits);
+        }
+
+        public void SetLimits(RequestRateLimits requestRateLimits)
+        {
+            this.requestRateLimits = requestRateLimits ?? throw new ArgumentNullException(nameof(requestRateLimits));
         }
 
         public bool IncRequestCount(long requestDatetime, out string error)
@@ -24,14 +30,12 @@ namespace Centaurus.Domain
             {
                 error = null;
 
-                uint? hourLimit = account.RequestRateLimits?.HourLimit ?? Global.Constellation.RequestRateLimits?.HourLimit;
                 var hourInTicks = (long)60 * 1000 * 60 * 10_000;
-                if (!IncSingleCounter(hourCounter, hourInTicks, hourLimit.Value, requestDatetime, out error))
+                if (!IncSingleCounter(hourCounter, hourInTicks, requestRateLimits.HourLimit, requestDatetime, out error))
                     return false;
 
                 var minuteInTicks = (long)60 * 1000 * 10_000;
-                uint? minuteLimit = account.RequestRateLimits?.MinuteLimit ?? Global.Constellation.RequestRateLimits?.MinuteLimit;
-                if (!IncSingleCounter(minuteCounter, minuteInTicks, minuteLimit.Value, requestDatetime, out error))
+                if (!IncSingleCounter(minuteCounter, minuteInTicks, requestRateLimits.MinuteLimit, requestDatetime, out error))
                     return false;
 
                 return true;
@@ -41,9 +45,6 @@ namespace Centaurus.Domain
         private bool IncSingleCounter(RequestCounter counter, long counterWindowPeriod, uint maxAllowedRequestsCount, long requestDatetime, out string error)
         {
             error = null;
-            if (maxAllowedRequestsCount < 0) //if less than zero than the counter is disabled 
-                return true;
-
             if ((counter.StartedAt + counterWindowPeriod) < requestDatetime) //window is expired
                 counter.Reset(requestDatetime);
 

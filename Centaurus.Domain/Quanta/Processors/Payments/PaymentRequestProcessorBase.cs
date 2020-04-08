@@ -99,7 +99,7 @@ namespace Centaurus.Domain
             if (!Global.AssetIds.Contains(payment.Asset))
                 throw new InvalidOperationException($"Asset {payment.Asset} is not supported");
 
-            var account = Global.AccountStorage.GetAccount(payment.Account)?.Account;
+            var account = payment.AccountWrapper.Account;
             if (account == null)
                 throw new Exception("Quantum source has no account");
 
