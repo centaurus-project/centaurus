@@ -18,14 +18,22 @@ namespace Centaurus.Domain
             this.accountStorage = accountStorage;
         }
 
-        private Account account;
+        private AccountWrapper accountWrapper;
+        public AccountWrapper AccountWrapper
+        {
+            get
+            {
+                if (accountWrapper == null)
+                    accountWrapper = accountStorage.GetAccount(Effect.Pubkey);
+                return accountWrapper;
+            }
+        }
+
         public Account Account 
         {
             get
             {
-                if (account == null)
-                    account = accountStorage.GetAccount(Effect.Pubkey).Account;
-                return account;
+                return AccountWrapper.Account;
             }
         }
     }

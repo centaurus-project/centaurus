@@ -18,7 +18,7 @@ namespace Centaurus.Models
         {
             get
             {
-                return RequestEnvelope?.Message as RequestMessage;
+                return (RequestMessage)RequestEnvelope.Message;
             }
         }
     }

@@ -14,7 +14,7 @@ namespace Centaurus.Domain
             takerOrder = new Order()
             {
                 OrderId = OrderIdConverter.Encode(unchecked((ulong)effectsContainer.Apex), orderRequest.Asset, orderRequest.Side),
-                Account = Global.AccountStorage.GetAccount(orderRequest.Account).Account,
+                Account = orderRequest.AccountWrapper.Account,
                 Amount = orderRequest.Amount,
                 Price = orderRequest.Price
             };

@@ -66,6 +66,11 @@ namespace Centaurus.Domain
 
         protected override async Task<bool> HandleMessage(MessageEnvelope envelope)
         {
+            var clientRequest = envelope.Message as RequestQuantum;
+            if (clientRequest != null)
+            {
+                clientRequest.RequestMessage.AccountWrapper = Global.AccountStorage.GetAccount(clientRequest.RequestMessage.Account);
+            }
             return await MessageHandlers<AuditorWebSocketConnection>.HandleMessage(this, envelope);
         }
 

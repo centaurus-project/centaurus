@@ -181,7 +181,7 @@ namespace Centaurus.Domain
 
             var withdrawals = await GetWithdrawals();
 
-            var accountStorage = new AccountStorage(accounts);
+            var accountStorage = new AccountStorage(accounts, settings.RequestRateLimits);
 
             var orders = await GetOrders(accountStorage);
 
@@ -216,7 +216,7 @@ namespace Centaurus.Domain
                         processor = new UnlockLiabilitiesEffectProcessor(unlockLiabilitiesEffect, accountStorage);
                         break;
                     case RequestRateLimitUpdateEffect requestRateLimitUpdateEffect:
-                        processor = new RequestRateLimitUpdateEffectProcessor(requestRateLimitUpdateEffect, accountStorage);
+                        processor = new RequestRateLimitUpdateEffectProcessor(requestRateLimitUpdateEffect, accountStorage, Global.Constellation.RequestRateLimits);
                         break;
                     case OrderPlacedEffect orderPlacedEffect:
                         {

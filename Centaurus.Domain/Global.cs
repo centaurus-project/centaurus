@@ -68,7 +68,7 @@ namespace Centaurus.Domain
 
             VaultAccount = new AccountData(snapshot.Settings.Vault, snapshot.VaultSequence);
 
-            AccountStorage = new AccountStorage(snapshot.Accounts);
+            AccountStorage = new AccountStorage(snapshot.Accounts, Constellation.RequestRateLimits);
 
             Exchange = Exchange.RestoreExchange(snapshot.Settings.Assets, snapshot.Orders);
 
