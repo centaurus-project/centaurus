@@ -26,7 +26,17 @@ namespace Centaurus.Domain
 
         public T Effect { get; }
 
+        public bool IsProcessed { get; private set; }
+
+        protected void MarkAsProcessed()
+        {
+            if (IsProcessed)
+                throw new Exception("Effect is processed already.");
+            IsProcessed = true;
+        }
+
         public abstract void CommitEffect();
+
         public abstract void RevertEffect();
     }
 }

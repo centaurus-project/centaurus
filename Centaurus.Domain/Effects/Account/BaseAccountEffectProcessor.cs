@@ -8,33 +8,12 @@ namespace Centaurus.Domain
     public abstract class BaseAccountEffectProcessor<T>: EffectProcessor<T>
         where T: Effect
     {
-        protected AccountStorage accountStorage;
-
-        public BaseAccountEffectProcessor(T effect, AccountStorage accountStorage)
+        public BaseAccountEffectProcessor(T effect, Account account)
             :base(effect)
         {
-            if (accountStorage == null)
-                throw new ArgumentNullException(nameof(accountStorage));
-            this.accountStorage = accountStorage;
+            Account = account ?? throw new ArgumentNullException(nameof(account)); ;
         }
 
-        private AccountWrapper accountWrapper;
-        public AccountWrapper AccountWrapper
-        {
-            get
-            {
-                if (accountWrapper == null)
-                    accountWrapper = accountStorage.GetAccount(Effect.Pubkey);
-                return accountWrapper;
-            }
-        }
-
-        public Account Account 
-        {
-            get
-            {
-                return AccountWrapper.Account;
-            }
-        }
+        public Account Account { get; }
     }
 }

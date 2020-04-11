@@ -7,19 +7,21 @@ namespace Centaurus.Domain
 {
     public class BalanceUpdateEffectProcesor : BaseAccountEffectProcessor<BalanceUpdateEffect>
     {
-        public BalanceUpdateEffectProcesor(BalanceUpdateEffect effect, AccountStorage accountStorage)
-            : base(effect, accountStorage)
+        public BalanceUpdateEffectProcesor(BalanceUpdateEffect effect, Account account)
+            : base(effect, account)
         {
 
         }
         public override void CommitEffect()
         {
+            MarkAsProcessed();
             var balance = Account.GetBalance(Effect.Asset);
             balance.UpdateBalance(Effect.Amount);
         }
 
         public override void RevertEffect()
         {
+            MarkAsProcessed();
             var balance = Account.GetBalance(Effect.Asset);
             balance.UpdateBalance(-Effect.Amount);
         }

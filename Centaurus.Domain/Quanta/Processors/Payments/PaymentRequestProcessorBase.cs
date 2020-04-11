@@ -20,12 +20,15 @@ namespace Centaurus.Domain
 
             var payment = (PaymentRequestBase)requestQuantum.RequestEnvelope.Message;
 
+            var paymentAccount = payment.AccountWrapper.Account;
+
             AccountData vaultAccount = Global.VaultAccount; 
             
-            effectProcessorsContainer.AddLockLiabilities(Global.AccountStorage, payment.Account, payment.Asset, payment.Amount);
+            effectProcessorsContainer.AddLockLiabilities(paymentAccount, payment.Asset, payment.Amount);
+            var destAccount = Global.AccountStorage.GetAccount(payment.Destination);
 
             //if withdrawal requested or if account doesn't exist in Centaurus, we need to build transaction
-            if (payment.MessageType == MessageTypes.WithdrawalRequest || Global.AccountStorage.GetAccount(payment.Destination) == null)
+            if (payment.MessageType == MessageTypes.WithdrawalRequest || destAccount == null)
             {
                 Asset asset = new AssetTypeNative();
                 if (payment.Asset != 0)
@@ -61,14 +64,11 @@ namespace Centaurus.Domain
             else
             { 
                 //if the current request is payment, then we can process it immediately
-                var destAccount = Global.AccountStorage.GetAccount(payment.Destination);
-                effectProcessorsContainer.AddBalanceUpdate(Global.AccountStorage, payment.Destination, payment.Asset, payment.Amount);
+                effectProcessorsContainer.AddBalanceUpdate(destAccount.Account, payment.Asset, payment.Amount);
 
-                effectProcessorsContainer.AddUnlockLiabilities(Global.AccountStorage, payment.Account, payment.Asset, payment.Amount);
-                effectProcessorsContainer.AddBalanceUpdate(Global.AccountStorage, payment.Account, payment.Asset, -payment.Amount);
+                effectProcessorsContainer.AddUnlockLiabilities(paymentAccount, payment.Asset, payment.Amount);
+                effectProcessorsContainer.AddBalanceUpdate(paymentAccount, payment.Asset, -payment.Amount);
             }
-
-            effectProcessorsContainer.Commit();
 
             var effects = effectProcessorsContainer.GetEffects();
 

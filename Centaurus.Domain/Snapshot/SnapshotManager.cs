@@ -194,6 +194,7 @@ namespace Centaurus.Domain
             {
                 var currentEffect = XdrConverter.Deserialize<Effect>(effectModels[i].RawEffect);
                 var pubKey = currentEffect.Pubkey;
+                var account = new Lazy<AccountWrapper>(() => accountStorage.GetAccount(pubKey));
                 IEffectProcessor<Effect> processor = null;
                 switch (currentEffect)
                 {
@@ -201,22 +202,22 @@ namespace Centaurus.Domain
                         processor = new AccountCreateEffectProcessor(accountCreateEffect, accountStorage);
                         break;
                     case NonceUpdateEffect nonceUpdateEffect:
-                        processor = new NonceUpdateEffectProcessor(nonceUpdateEffect, accountStorage);
+                        processor = new NonceUpdateEffectProcessor(nonceUpdateEffect, account.Value.Account);
                         break;
                     case BalanceCreateEffect balanceCreateEffect:
-                        processor = new BalanceCreateEffectProcessor(balanceCreateEffect, accountStorage);
+                        processor = new BalanceCreateEffectProcessor(balanceCreateEffect, account.Value.Account);
                         break;
                     case BalanceUpdateEffect balanceUpdateEffect:
-                        processor = new BalanceUpdateEffectProcesor(balanceUpdateEffect, accountStorage);
+                        processor = new BalanceUpdateEffectProcesor(balanceUpdateEffect, account.Value.Account);
                         break;
                     case LockLiabilitiesEffect lockLiabilitiesEffect:
-                        processor = new LockLiabilitiesEffectProcessor(lockLiabilitiesEffect, accountStorage);
+                        processor = new LockLiabilitiesEffectProcessor(lockLiabilitiesEffect, account.Value.Account);
                         break;
                     case UnlockLiabilitiesEffect unlockLiabilitiesEffect:
-                        processor = new UnlockLiabilitiesEffectProcessor(unlockLiabilitiesEffect, accountStorage);
+                        processor = new UnlockLiabilitiesEffectProcessor(unlockLiabilitiesEffect, account.Value.Account);
                         break;
                     case RequestRateLimitUpdateEffect requestRateLimitUpdateEffect:
-                        processor = new RequestRateLimitUpdateEffectProcessor(requestRateLimitUpdateEffect, accountStorage, Global.Constellation.RequestRateLimits);
+                        processor = new RequestRateLimitUpdateEffectProcessor(requestRateLimitUpdateEffect, account.Value, settings.RequestRateLimits);
                         break;
                     case OrderPlacedEffect orderPlacedEffect:
                         {
@@ -228,7 +229,7 @@ namespace Centaurus.Domain
                     case OrderRemovedEffect orderRemovedEffect:
                         {
                             var orderBook = exchange.GetOrderbook(orderRemovedEffect.OrderId);
-                            processor = new OrderRemovedEffectProccessor(orderRemovedEffect, orderBook, accountStorage);
+                            processor = new OrderRemovedEffectProccessor(orderRemovedEffect, orderBook, account.Value.Account);
                         }
                         break;
                     case TradeEffect tradeEffect:

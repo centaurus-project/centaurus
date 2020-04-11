@@ -7,18 +7,20 @@ namespace Centaurus.Domain
 {
     public class BalanceCreateEffectProcessor : BaseAccountEffectProcessor<BalanceCreateEffect>
     {
-        public BalanceCreateEffectProcessor(BalanceCreateEffect effect, AccountStorage accountStorage)
-            : base(effect, accountStorage)
+        public BalanceCreateEffectProcessor(BalanceCreateEffect effect, Account account)
+            : base(effect, account)
         {
 
         }
         public override void CommitEffect()
         {
+            MarkAsProcessed();
             Account.CreateBalance(Effect.Asset);
         }
 
         public override void RevertEffect()
         {
+            MarkAsProcessed();
             Account.Balances.Remove(Account.GetBalance(Effect.Asset));
         }
     }

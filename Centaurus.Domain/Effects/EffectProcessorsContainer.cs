@@ -35,9 +35,11 @@ namespace Centaurus.Domain
         /// Adds effect processor to container
         /// </summary>
         /// <param name="effect"></param>
-        public void Add(IEffectProcessor<Effect> effect)
+        public void Add(IEffectProcessor<Effect> effect, bool imidiateCommit = true)
         {
             container.Add(effect);
+            if (imidiateCommit)
+                effect.CommitEffect();
         }
 
         /// <summary>
@@ -121,35 +123,35 @@ namespace Centaurus.Domain
             ));
         }
 
-        public void AddBalanceCreate(AccountStorage accountStorage, RawPubKey publicKey, int asset)
+        public void AddBalanceCreate(Account account, int asset)
         {
             Add(new BalanceCreateEffectProcessor(
-                new BalanceCreateEffect { Pubkey = publicKey, Asset = asset, Apex = Apex },
-                accountStorage
+                new BalanceCreateEffect { Pubkey = account.Pubkey, Asset = asset, Apex = Apex },
+                account
             ));
         }
 
-        public void AddBalanceUpdate(AccountStorage accountStorage, RawPubKey publicKey, int asset, long amount)
+        public void AddBalanceUpdate(Account account, int asset, long amount)
         {
             Add(new BalanceUpdateEffectProcesor(
-                new BalanceUpdateEffect { Pubkey = publicKey, Amount = amount, Asset = asset, Apex = Apex },
-                accountStorage
+                new BalanceUpdateEffect { Pubkey = account.Pubkey, Amount = amount, Asset = asset, Apex = Apex },
+                account
             ));
         }
 
-        public void AddUnlockLiabilities(AccountStorage accountStorage, RawPubKey publicKey, int asset, long amount)
+        public void AddUnlockLiabilities(Account account, int asset, long amount)
         {
             Add(new UnlockLiabilitiesEffectProcessor(
-                new UnlockLiabilitiesEffect { Amount = amount, Asset = asset, Pubkey = publicKey, Apex = Apex },
-                accountStorage
+                new UnlockLiabilitiesEffect { Amount = amount, Asset = asset, Pubkey = account.Pubkey, Apex = Apex },
+                account
             ));
         }
 
-        public void AddLockLiabilities(AccountStorage accountStorage, RawPubKey publicKey, int asset, long amount)
+        public void AddLockLiabilities(Account account, int asset, long amount)
         {
             Add(new LockLiabilitiesEffectProcessor(
-                new LockLiabilitiesEffect { Amount = amount, Asset = asset, Pubkey = publicKey, Apex = Apex },
-                accountStorage
+                new LockLiabilitiesEffect { Amount = amount, Asset = asset, Pubkey = account.Pubkey, Apex = Apex },
+                account
             ));
         }
 
@@ -188,22 +190,22 @@ namespace Centaurus.Domain
         }
 
 
-        public void AddOrderRemoved(Orderbook orderbook, AccountStorage accountStorage, Order order)
+        public void AddOrderRemoved(Orderbook orderbook, Order order)
         {
             Add(new OrderRemovedEffectProccessor(
                 new OrderRemovedEffect { Apex = Apex, OrderId = order.OrderId, Price = order.Price, Pubkey = order.Account.Pubkey },
                 orderbook,
-                accountStorage
+                order.Account
                 ));
         }
 
 
 
-        public void AddNonceUpdate(AccountStorage accountStorage, RawPubKey publicKey, ulong newNonce, ulong currentNonce)
+        public void AddNonceUpdate(Account account, ulong newNonce, ulong currentNonce)
         {
             Add(new NonceUpdateEffectProcessor(
-                new NonceUpdateEffect { Nonce = newNonce, PrevNonce = currentNonce, Pubkey = publicKey, Apex = Apex },
-                accountStorage
+                new NonceUpdateEffect { Nonce = newNonce, PrevNonce = currentNonce, Pubkey = account.Pubkey, Apex = Apex },
+                account
             ));
         }
     }
