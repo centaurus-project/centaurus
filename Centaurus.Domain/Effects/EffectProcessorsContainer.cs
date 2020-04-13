@@ -35,10 +35,10 @@ namespace Centaurus.Domain
         /// Adds effect processor to container
         /// </summary>
         /// <param name="effect"></param>
-        public void Add(IEffectProcessor<Effect> effect, bool imidiateCommit = true)
+        public void Add(IEffectProcessor<Effect> effect, bool immediateCommit = true)
         {
             container.Add(effect);
-            if (imidiateCommit)
+            if (immediateCommit)
                 effect.CommitEffect();
         }
 
