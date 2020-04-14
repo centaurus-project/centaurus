@@ -13,18 +13,20 @@ namespace Centaurus.Domain
         public OrderPlacedEffectProcessor(OrderPlacedEffect effect, Orderbook orderBook, Order order)
             :base(effect)
         {
-            this.orderBook = orderBook;
-            this.order = order;
+            this.orderBook = orderBook ?? throw new ArgumentNullException(nameof(orderBook));
+            this.order = order ?? throw new ArgumentNullException(nameof(order));
         }
 
         public override void CommitEffect()
         {
+            MarkAsProcessed();
             //add order to the orderbook
             orderBook.InsertOrder(order);
         }
 
         public override void RevertEffect()
         {
+            MarkAsProcessed();
             orderBook.RemoveOrder(Effect.OrderId);
         }
     }

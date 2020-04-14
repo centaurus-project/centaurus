@@ -21,7 +21,6 @@ namespace Centaurus.Domain
             UpdateNonce(effectsContainer);
 
             Global.Exchange.ExecuteOrder(effectsContainer);
-            effectsContainer.Commit();
 
             var accountEffects = effectsContainer.GetEffects(requestMessage.Account).ToList();
 

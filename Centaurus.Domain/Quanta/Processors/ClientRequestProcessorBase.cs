@@ -21,7 +21,7 @@ namespace Centaurus.Domain
 
             var currentUser = requestMessage.AccountWrapper.Account;
 
-            effectProcessorsContainer.AddNonceUpdate(Global.AccountStorage, requestMessage.Account, requestMessage.Nonce, currentUser.Nonce);
+            effectProcessorsContainer.AddNonceUpdate(currentUser, requestMessage.Nonce, currentUser.Nonce);
         }
 
         public void ValidateNonce(MessageEnvelope envelope)

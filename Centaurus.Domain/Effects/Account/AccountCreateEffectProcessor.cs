@@ -12,15 +12,17 @@ namespace Centaurus.Domain
         public AccountCreateEffectProcessor(AccountCreateEffect effect, AccountStorage accountStorage)
             : base(effect)
         {
-            this.accountStorage = accountStorage;
+            this.accountStorage = accountStorage ?? throw new ArgumentNullException(nameof(accountStorage));
         }
         public override void CommitEffect()
         {
+            MarkAsProcessed();
             accountStorage.CreateAccount(Effect.Pubkey);
         }
 
         public override void RevertEffect()
         {
+            MarkAsProcessed();
             accountStorage.RemoveAccount(Effect.Pubkey);
         }
     }

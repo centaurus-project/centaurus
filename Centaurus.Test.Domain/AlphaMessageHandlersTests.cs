@@ -250,7 +250,7 @@ namespace Centaurus.Test
                         HourLimit = (uint)requestLimit.Value, 
                         MinuteLimit = (uint)requestLimit.Value }
                 };
-                var effectProcessor = new RequestRateLimitUpdateEffectProcessor(effect, Global.AccountStorage, Global.Constellation.RequestRateLimits);
+                var effectProcessor = new RequestRateLimitUpdateEffectProcessor(effect, account, Global.Constellation.RequestRateLimits);
                 effectProcessor.CommitEffect();
             }
             var clientConnection = new AlphaWebSocketConnection(new FakeWebSocket())

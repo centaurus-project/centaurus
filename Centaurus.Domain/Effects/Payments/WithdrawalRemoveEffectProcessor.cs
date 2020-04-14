@@ -12,16 +12,18 @@ namespace Centaurus.Domain
         public WithdrawalRemoveEffectProcessor(WithdrawalRemoveEffect effect, WithdrawalStorage withdrawalStorage)
             : base(effect)
         {
-            this.withdrawalStorage = withdrawalStorage ?? throw new ArgumentNullException();
+            this.withdrawalStorage = withdrawalStorage ?? throw new ArgumentNullException(nameof(withdrawalStorage));
         }
 
         public override void CommitEffect()
         {
+            MarkAsProcessed();
             withdrawalStorage.Remove(Effect.Withdrawal.TransactionHash);
         }
 
         public override void RevertEffect()
         {
+            MarkAsProcessed();
             withdrawalStorage.Add(Effect.Withdrawal);
         }
     }

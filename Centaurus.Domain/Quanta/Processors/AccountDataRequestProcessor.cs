@@ -19,7 +19,6 @@ namespace Centaurus.Domain
             var effectsContainer = new EffectProcessorsContainer(envelope, Global.AddEffects);
 
             UpdateNonce(effectsContainer);
-            effectsContainer.Commit();
 
             var accountEffects = effectsContainer.GetEffects(requestMessage.Account).ToList();
 
