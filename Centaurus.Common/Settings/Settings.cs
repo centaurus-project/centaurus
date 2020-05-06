@@ -38,6 +38,9 @@ namespace Centaurus
         [Option("connection_string", Required = true, HelpText = "Database connection string.")]
         public string ConnectionString { get; set; }
 
+        [Option("extensions_config_file_path", Required = false, HelpText = "Path to extensions config file.")]
+        public string ExtensionsConfigFilePath { get; set; }
+
         public virtual void Build()
         {
             KeyPair = KeyPair.FromSecretSeed(Secret);

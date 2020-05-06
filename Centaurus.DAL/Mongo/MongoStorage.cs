@@ -202,16 +202,22 @@ namespace Centaurus.DAL.Mongo
                     if (update.StellarInfoData != null)
                         updateTasks.Add(constellationStateCollection.BulkWriteAsync(GetStellarDataUpdate(update.StellarInfoData)));
 
-                    updateTasks.Add(accountsCollection.BulkWriteAsync(GetAccountUpdates(update.Accounts)));
+                    if (update.Accounts != null && update.Accounts.Count > 0)
+                        updateTasks.Add(accountsCollection.BulkWriteAsync(GetAccountUpdates(update.Accounts)));
 
-                    updateTasks.Add(balancesCollection.BulkWriteAsync(GetBalanceUpdates(update.Balances)));
+                    if (update.Balances != null && update.Balances.Count > 0)
+                        updateTasks.Add(balancesCollection.BulkWriteAsync(GetBalanceUpdates(update.Balances)));
 
-                    updateTasks.Add(ordersCollection.BulkWriteAsync(GetOrderUpdates(update.Orders)));
+                    if (update.Orders != null && update.Orders.Count > 0)
+                        updateTasks.Add(ordersCollection.BulkWriteAsync(GetOrderUpdates(update.Orders)));
 
-                    updateTasks.Add(withdrawalsCollection.BulkWriteAsync(GetWithdrawalsUpdates(update.Widthrawals)));
+                    if (update.Widthrawals != null && update.Widthrawals.Count > 0)
+                        updateTasks.Add(withdrawalsCollection.BulkWriteAsync(GetWithdrawalsUpdates(update.Widthrawals)));
 
                     updateTasks.Add(quantaCollection.InsertManyAsync(update.Quanta));
                     updateTasks.Add(effectsCollection.InsertManyAsync(update.Effects));
+
+                    await Task.WhenAll(updateTasks);
 
                     await session.CommitTransactionAsync();
                 }

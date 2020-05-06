@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Timers;
@@ -21,6 +22,8 @@ namespace Centaurus.Domain
         /// <param name="storage">Permanent storage object</param>
         public static void Init(BaseSettings settings, BaseStorage storage)
         {
+            ExtensionsManager = new ExtensionsManager();
+
             Settings = settings ?? throw new ArgumentNullException(nameof(settings));
 
             DynamicSerializersInitializer.Init();
@@ -79,6 +82,9 @@ namespace Centaurus.Domain
             WithdrawalStorage = new WithdrawalStorage(snapshot.Withdrawals);
 
             LedgerManager = new LedgerManager(snapshot.Ledger);
+
+            ExtensionsManager = new ExtensionsManager();
+            ExtensionsManager.RegisterAllExtensions().Wait();
         }
 
         public static Exchange Exchange { get; private set; }
@@ -107,6 +113,7 @@ namespace Centaurus.Domain
         public static AuditLedgerManager AuditLedgerManager { get; private set; }
         public static AuditResultManager AuditResultManager { get; private set; }
         public static LedgerManager LedgerManager { get; private set; }
+        public static ExtensionsManager ExtensionsManager { get; private set; }
         public static StateManager AppState { get; private set; }
         public static QuantumProcessorsStorage QuantumProcessor { get; private set; }
 

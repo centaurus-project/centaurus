@@ -51,6 +51,7 @@ namespace Centaurus.Domain
         /// <param name="webSocket">New websocket connection</param>
         public static async Task OnNewConnection(WebSocket webSocket)
         {
+            Global.ExtensionsManager.BeforeNewConnection(webSocket);
             if (webSocket == null)
                 throw new ArgumentNullException(nameof(webSocket));
 
@@ -166,6 +167,7 @@ namespace Centaurus.Domain
         {
             lock (baseConnection)
             {
+                Global.ExtensionsManager.ConnectionValidated(baseConnection);
                 var connection = (AlphaWebSocketConnection)baseConnection;
                 AddConnection(connection);
             }

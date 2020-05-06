@@ -208,5 +208,13 @@ namespace Centaurus.Domain
                 account
             ));
         }
+
+        public void AddLedgerCommit(LedgerManager ledgerManager, long newLedger, long prevLedger)
+        {
+            Add(new LedgerUpdateEffectProcessor(
+                new LedgerUpdateEffect {  Apex = Apex, Ledger = newLedger, PrevLedger = prevLedger },
+                ledgerManager
+            ));
+        }
     }
 }

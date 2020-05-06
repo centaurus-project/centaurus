@@ -7,7 +7,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Centaurus.Xdr.ContractGenerator\Centaurus.Xdr.ContractGenerator.csproj" />
-    <ProjectReference Include="..\Centaurus.Test.Contracts\Centaurus.Test.Contracts.csproj"/>
+    <ProjectReference Include="..\Centaurus.Test.Contracts\Centaurus.Test.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>
