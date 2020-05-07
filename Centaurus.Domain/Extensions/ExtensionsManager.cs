@@ -59,17 +59,17 @@ namespace Centaurus.Domain
         public event EventHandler<BaseWebSocketConnection> OnConnectionValidated;
         public void ConnectionValidated(BaseWebSocketConnection args)
         {
-            OnConnectionValidated?.Invoke(this, args);
+            OnConnectionValidated?.Invoke(null, args);
         }
         public void BeforeNewConnection(WebSocket args)
         {
-            OnBeforeNewConnection?.Invoke(this, args);
+            OnBeforeNewConnection?.Invoke(null, args);
         }
 
         public event EventHandler<EnvelopeErrorEventArgs> OnHandleMessageFailed;
         public void HandleMessageFailed(EnvelopeErrorEventArgs args)
         {
-            OnHandleMessageFailed?.Invoke(this, args);
+            OnHandleMessageFailed?.Invoke(null, args);
         }
 
         public event EventHandler<EnvelopeEventArgs> OnBeforeSendMessage;
@@ -77,22 +77,22 @@ namespace Centaurus.Domain
         public event EventHandler<EnvelopeErrorEventArgs> OnSendMessageFailed;
         public void BeforeSendMessage(EnvelopeEventArgs args)
         {
-            OnBeforeSendMessage?.Invoke(this, args);
+            OnBeforeSendMessage?.Invoke(null, args);
         }
         public void AfterSendMessage(EnvelopeEventArgs args)
         {
-            OnAfterSendMessage?.Invoke(this, args);
+            OnAfterSendMessage?.Invoke(null, args);
         }
         public void SendMessageFailed(EnvelopeErrorEventArgs args)
         {
-            OnSendMessageFailed?.Invoke(this, args);
+            OnSendMessageFailed?.Invoke(null, args);
         }
 
         public event EventHandler<BaseWebSocketConnection> OnBeforeConnectionClose;
 
         public void BeforeConnectionClose(BaseWebSocketConnection args)
         {
-            OnBeforeConnectionClose?.Invoke(this, args);
+            OnBeforeConnectionClose?.Invoke(null, args);
         }
 
         public event EventHandler<NotifyEventArgs> OnBeforeNotify;
@@ -101,12 +101,12 @@ namespace Centaurus.Domain
 
         public void BeforeNotify(NotifyEventArgs args)
         {
-            OnBeforeNotify?.Invoke(this, args);
+            OnBeforeNotify?.Invoke(null, args);
         }
 
         public void BeforeNotifyAuditors(MessageEnvelope args)
         {
-            OnBeforeNotifyAuditors?.Invoke(this, args);
+            OnBeforeNotifyAuditors?.Invoke(null, args);
         }
 
         public event EventHandler<EnvelopeEventArgs> OnBeforeValidateMessage;
@@ -116,34 +116,34 @@ namespace Centaurus.Domain
 
         public void BeforeValidateMessage(EnvelopeEventArgs args)
         {
-            OnBeforeValidateMessage?.Invoke(this, args);
+            OnBeforeValidateMessage?.Invoke(null, args);
         }
 
         public void AfterValidateMessage(EnvelopeEventArgs args)
         {
-            OnAfterValidateMessage?.Invoke(this, args);
+            OnAfterValidateMessage?.Invoke(null, args);
         }
 
         public void BeforeHandleMessage(EnvelopeEventArgs args)
         {
-            OnBeforeHandleMessage?.Invoke(this, args);
+            OnBeforeHandleMessage?.Invoke(null, args);
         }
 
         public void AfterHandleMessage(EnvelopeEventArgs args)
         {
-            OnAfterHandleMessage?.Invoke(this, args);
+            OnAfterHandleMessage?.Invoke(null, args);
         }
 
         public event EventHandler<MessageEnvelope> OnBeforeQuantumHandle;
         public event EventHandler<ResultMessage> OnAfterQuantumHandle;
         public void BeforeQuantumHandle(MessageEnvelope args)
         {
-            OnBeforeQuantumHandle?.Invoke(this, args);
+            OnBeforeQuantumHandle?.Invoke(null, args);
         }
 
         public void AfterQuantumHandle(ResultMessage args)
         {
-            OnAfterQuantumHandle?.Invoke(this, args);
+            OnAfterQuantumHandle?.Invoke(null, args);
         }
     }
 }
