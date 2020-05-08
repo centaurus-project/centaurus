@@ -8,5 +8,7 @@ namespace Centaurus.Domain
     public interface IExtension
     {
         Task Init(Dictionary<string, string> settings);
+
+        Task Terminate();
     }
 }

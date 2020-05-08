@@ -10,25 +10,6 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public class EnvelopeEventArgs
-    {
-        public BaseWebSocketConnection Connection { get; set; }
-
-        public MessageEnvelope Message { get; set; }
-
-    }
-
-    public class EnvelopeErrorEventArgs : EnvelopeEventArgs
-    {
-        public Exception Exception { get; set; }
-    }
-
-    public class NotifyEventArgs
-    {
-        public RawPubKey Account { get; set; }
-        public MessageEnvelope Envelope { get; set; }
-    }
-
     public class ExtensionsManager
     {
         public async Task RegisterAllExtensions()
@@ -49,101 +30,114 @@ namespace Centaurus.Domain
 
                 extensions.Add(extension);
             }
+            IsRegistered = true;
+        }
+
+        public async Task Terminate()
+        { 
+            if (IsRegistered && !IsTerminated)
+                foreach(var extension in extensions)
+                {
+                    await extension.ExtensionInstance.Terminate();
+                }
+            IsTerminated = true;
         }
 
         private List<ExtensionItem> extensions = new List<ExtensionItem>();
+        private bool IsRegistered;
+        private bool IsTerminated;
 
         public IEnumerable<ExtensionItem> Extensions => extensions;
 
-        public event EventHandler<WebSocket> OnBeforeNewConnection;
-        public event EventHandler<BaseWebSocketConnection> OnConnectionValidated;
+
+        public event Action<WebSocket> OnBeforeNewConnection;
+        public event Action<BaseWebSocketConnection> OnConnectionValidated;
+
         public void ConnectionValidated(BaseWebSocketConnection args)
         {
-            OnConnectionValidated?.Invoke(null, args);
+            OnConnectionValidated?.Invoke(args);
         }
         public void BeforeNewConnection(WebSocket args)
         {
-            OnBeforeNewConnection?.Invoke(null, args);
+            OnBeforeNewConnection?.Invoke(args);
         }
 
-        public event EventHandler<EnvelopeErrorEventArgs> OnHandleMessageFailed;
-        public void HandleMessageFailed(EnvelopeErrorEventArgs args)
+        public event Action<BaseWebSocketConnection, MessageEnvelope, Exception> OnHandleMessageFailed;
+        public void HandleMessageFailed(BaseWebSocketConnection connection, MessageEnvelope message, Exception exception)
         {
-            OnHandleMessageFailed?.Invoke(null, args);
+            OnHandleMessageFailed?.Invoke(connection, message, exception);
         }
 
-        public event EventHandler<EnvelopeEventArgs> OnBeforeSendMessage;
-        public event EventHandler<EnvelopeEventArgs> OnAfterSendMessage;
-        public event EventHandler<EnvelopeErrorEventArgs> OnSendMessageFailed;
-        public void BeforeSendMessage(EnvelopeEventArgs args)
+        public event Action<BaseWebSocketConnection, MessageEnvelope> OnBeforeSendMessage;
+        public event Action<BaseWebSocketConnection, MessageEnvelope> OnAfterSendMessage;
+        public event Action<BaseWebSocketConnection, MessageEnvelope, Exception> OnSendMessageFailed;
+        public void BeforeSendMessage(BaseWebSocketConnection connection, MessageEnvelope message)
         {
-            OnBeforeSendMessage?.Invoke(null, args);
+            OnBeforeSendMessage?.Invoke(connection, message);
         }
-        public void AfterSendMessage(EnvelopeEventArgs args)
+        public void AfterSendMessage(BaseWebSocketConnection connection, MessageEnvelope message)
         {
-            OnAfterSendMessage?.Invoke(null, args);
+            OnAfterSendMessage?.Invoke(connection, message);
         }
-        public void SendMessageFailed(EnvelopeErrorEventArgs args)
+        public void SendMessageFailed(BaseWebSocketConnection connection, MessageEnvelope message, Exception exception)
         {
-            OnSendMessageFailed?.Invoke(null, args);
+            OnSendMessageFailed?.Invoke(connection, message, exception);
         }
 
-        public event EventHandler<BaseWebSocketConnection> OnBeforeConnectionClose;
+        public event Action<BaseWebSocketConnection> OnBeforeConnectionClose;
 
         public void BeforeConnectionClose(BaseWebSocketConnection args)
         {
-            OnBeforeConnectionClose?.Invoke(null, args);
+            OnBeforeConnectionClose?.Invoke(args);
         }
 
-        public event EventHandler<NotifyEventArgs> OnBeforeNotify;
-        public event EventHandler<MessageEnvelope> OnBeforeNotifyAuditors;
-
-
-        public void BeforeNotify(NotifyEventArgs args)
+        public event Action<RawPubKey, MessageEnvelope> OnBeforeNotify;
+        public event Action<MessageEnvelope> OnBeforeNotifyAuditors;
+        public void BeforeNotify(RawPubKey pubKey, MessageEnvelope envelope)
         {
-            OnBeforeNotify?.Invoke(null, args);
+            OnBeforeNotify?.Invoke(pubKey, envelope);
         }
 
-        public void BeforeNotifyAuditors(MessageEnvelope args)
+        public void BeforeNotifyAuditors(MessageEnvelope envelope)
         {
-            OnBeforeNotifyAuditors?.Invoke(null, args);
+            OnBeforeNotifyAuditors?.Invoke(envelope);
         }
 
-        public event EventHandler<EnvelopeEventArgs> OnBeforeValidateMessage;
-        public event EventHandler<EnvelopeEventArgs> OnAfterValidateMessage;
-        public event EventHandler<EnvelopeEventArgs> OnBeforeHandleMessage;
-        public event EventHandler<EnvelopeEventArgs> OnAfterHandleMessage;
+        public event Action<BaseWebSocketConnection, MessageEnvelope> OnBeforeValidateMessage;
+        public event Action<BaseWebSocketConnection, MessageEnvelope> OnAfterValidateMessage;
+        public event Action<BaseWebSocketConnection, MessageEnvelope> OnBeforeHandleMessage;
+        public event Action<BaseWebSocketConnection, MessageEnvelope> OnAfterHandleMessage;
 
-        public void BeforeValidateMessage(EnvelopeEventArgs args)
+        public void BeforeValidateMessage(BaseWebSocketConnection connection, MessageEnvelope message)
         {
-            OnBeforeValidateMessage?.Invoke(null, args);
+            OnBeforeValidateMessage?.Invoke(connection, message);
         }
 
-        public void AfterValidateMessage(EnvelopeEventArgs args)
+        public void AfterValidateMessage(BaseWebSocketConnection connection, MessageEnvelope message)
         {
-            OnAfterValidateMessage?.Invoke(null, args);
+            OnAfterValidateMessage?.Invoke(connection, message);
         }
 
-        public void BeforeHandleMessage(EnvelopeEventArgs args)
+        public void BeforeHandleMessage(BaseWebSocketConnection connection, MessageEnvelope message)
         {
-            OnBeforeHandleMessage?.Invoke(null, args);
+            OnBeforeHandleMessage?.Invoke(connection, message);
         }
 
-        public void AfterHandleMessage(EnvelopeEventArgs args)
+        public void AfterHandleMessage(BaseWebSocketConnection connection, MessageEnvelope message)
         {
-            OnAfterHandleMessage?.Invoke(null, args);
+            OnAfterHandleMessage?.Invoke(connection, message);
         }
 
-        public event EventHandler<MessageEnvelope> OnBeforeQuantumHandle;
-        public event EventHandler<ResultMessage> OnAfterQuantumHandle;
-        public void BeforeQuantumHandle(MessageEnvelope args)
+        public event Action<MessageEnvelope> OnBeforeQuantumHandle;
+        public event Action<ResultMessage> OnAfterQuantumHandle;
+        public void BeforeQuantumHandle(MessageEnvelope envelope)
         {
-            OnBeforeQuantumHandle?.Invoke(null, args);
+            OnBeforeQuantumHandle?.Invoke(envelope);
         }
 
-        public void AfterQuantumHandle(ResultMessage args)
+        public void AfterQuantumHandle(ResultMessage resultMessage)
         {
-            OnAfterQuantumHandle?.Invoke(null, args);
+            OnAfterQuantumHandle?.Invoke(resultMessage);
         }
     }
 }

@@ -16,7 +16,7 @@ namespace Centaurus.Domain
         /// <param name="envelope">Message to send</param>
         public static void Notify(RawPubKey account, MessageEnvelope envelope)
         {
-            Global.ExtensionsManager.BeforeNotify(new NotifyEventArgs { Account = account, Envelope = envelope });
+            Global.ExtensionsManager.BeforeNotify(account, envelope);
             if (ConnectionManager.TryGetConnection(account, out AlphaWebSocketConnection connection))
                 _ = connection.SendMessage(envelope);
         }

@@ -106,18 +106,17 @@ namespace Centaurus
         {
             try
             {
-                var messageArgs = new EnvelopeEventArgs { Connection = this, Message = envelope };
-                Global.ExtensionsManager.BeforeSendMessage(messageArgs);
+                Global.ExtensionsManager.BeforeSendMessage(this, envelope);
                 if (!envelope.IsSignedBy(Global.Settings.KeyPair.PublicKey))
                     envelope.Sign(Global.Settings.KeyPair);
 
                 var serializedData = XdrConverter.Serialize(envelope);
                 await webSocket.SendAsync(serializedData, WebSocketMessageType.Binary, true, (ct == default ? CancellationToken.None : ct));
-                Global.ExtensionsManager.AfterSendMessage(messageArgs);
+                Global.ExtensionsManager.AfterSendMessage(this, envelope);
             }
             catch(Exception exc)
             {
-                Global.ExtensionsManager.SendMessageFailed(new EnvelopeErrorEventArgs { Connection = this, Message = envelope, Exception = exc });
+                Global.ExtensionsManager.SendMessageFailed(this, envelope, exc);
                 throw;
             }
         }
@@ -142,7 +141,7 @@ namespace Centaurus
                         if (exc is ConnectionCloseException)
                             throw;
 
-                        Global.ExtensionsManager.HandleMessageFailed(new EnvelopeErrorEventArgs { Connection = this, Exception = exc, Message = envelope });
+                        Global.ExtensionsManager.HandleMessageFailed(this, envelope, exc);
 
                         var statusCode = ClientExceptionHelper.GetExceptionStatusCode(exc);
 
@@ -161,13 +160,13 @@ namespace Centaurus
             }
             catch (WebSocketException e)
             {
-                Global.ExtensionsManager.HandleMessageFailed(new EnvelopeErrorEventArgs { Connection = this, Exception = e });
+                Global.ExtensionsManager.HandleMessageFailed(this, null, e);
                 logger.Error(e);
                 await CloseConnection(WebSocketCloseStatus.InternalServerError);
             }
             catch (Exception e)
             {
-                Global.ExtensionsManager.HandleMessageFailed(new EnvelopeErrorEventArgs { Connection = this, Exception = e });
+                Global.ExtensionsManager.HandleMessageFailed(this, null, e);
                 logger.Error(e);
             }
         }
