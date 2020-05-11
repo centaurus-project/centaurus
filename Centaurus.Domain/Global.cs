@@ -84,7 +84,7 @@ namespace Centaurus.Domain
             LedgerManager = new LedgerManager(snapshot.Ledger);
 
             ExtensionsManager = new ExtensionsManager();
-            ExtensionsManager.RegisterAllExtensions().Wait();
+            ExtensionsManager.RegisterAllExtensions();
         }
 
         public static Exchange Exchange { get; private set; }

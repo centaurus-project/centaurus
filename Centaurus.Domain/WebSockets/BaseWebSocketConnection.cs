@@ -35,10 +35,12 @@ namespace Centaurus
         static Logger logger = LogManager.GetCurrentClassLogger();
 
         protected WebSocket webSocket;
-        public BaseWebSocketConnection(WebSocket webSocket)
+        public BaseWebSocketConnection(WebSocket webSocket, string ip)
         {
             this.webSocket = webSocket;
+            this.Ip = ip;
         }
+        public string Ip { get; }
 
         /// <summary>
         /// Current connection public key
@@ -114,7 +116,7 @@ namespace Centaurus
                 await webSocket.SendAsync(serializedData, WebSocketMessageType.Binary, true, (ct == default ? CancellationToken.None : ct));
                 Global.ExtensionsManager.AfterSendMessage(this, envelope);
             }
-            catch(Exception exc)
+            catch (Exception exc)
             {
                 Global.ExtensionsManager.SendMessageFailed(this, envelope, exc);
                 throw;

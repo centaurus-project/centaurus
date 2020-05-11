@@ -35,7 +35,7 @@ namespace Centaurus.Test
         {
             Global.AppState.State = alphaState;
 
-            var clientConnection = new AlphaWebSocketConnection(new FakeWebSocket());
+            var clientConnection = new AlphaWebSocketConnection(new FakeWebSocket(), "127.0.0.1");
 
             var message = new HandshakeInit { HandshakeData = clientConnection.HandshakeData };
             var envelope = message.CreateEnvelope();
@@ -60,7 +60,7 @@ namespace Centaurus.Test
         {
             Global.AppState.State = ApplicationState.Ready;
 
-            var clientConnection = new AlphaWebSocketConnection(new FakeWebSocket());
+            var clientConnection = new AlphaWebSocketConnection(new FakeWebSocket(), "127.0.0.1");
 
             var handshake = new HandshakeData();
             handshake.Randomize();
@@ -76,7 +76,7 @@ namespace Centaurus.Test
         {
             Global.AppState.State = ApplicationState.Ready;
 
-            var clientConnection = new AlphaWebSocketConnection(new FakeWebSocket());
+            var clientConnection = new AlphaWebSocketConnection(new FakeWebSocket(), "127.0.0.1");
 
             var envelope = new Heartbeat().CreateEnvelope();
             envelope.Sign(TestEnvironment.Client1KeyPair);
@@ -98,7 +98,7 @@ namespace Centaurus.Test
         {
             Global.AppState.State = ApplicationState.Ready;
 
-            var clientConnection = new AlphaWebSocketConnection(new FakeWebSocket())
+            var clientConnection = new AlphaWebSocketConnection(new FakeWebSocket(), "127.0.0.1")
             {
                 ClientPubKey = clientKeyPair.PublicKey,
                 ConnectionState = state
@@ -123,7 +123,7 @@ namespace Centaurus.Test
         {
             Global.AppState.State = ApplicationState.Ready;
 
-            var clientConnection = new AlphaWebSocketConnection(new FakeWebSocket())
+            var clientConnection = new AlphaWebSocketConnection(new FakeWebSocket(), "127.0.0.1")
             {
                 ClientPubKey = clientKeyPair.PublicKey,
                 ConnectionState = state
@@ -154,7 +154,7 @@ namespace Centaurus.Test
         {
             Global.AppState.State = ApplicationState.Rising;
 
-            var clientConnection = new AlphaWebSocketConnection(new FakeWebSocket())
+            var clientConnection = new AlphaWebSocketConnection(new FakeWebSocket(), "127.0.0.1")
             {
                 ClientPubKey = clientKeyPair.PublicKey,
                 ConnectionState = state
@@ -185,7 +185,7 @@ namespace Centaurus.Test
         {
             Global.AppState.State = ApplicationState.Ready;
 
-            var clientConnection = new AlphaWebSocketConnection(new FakeWebSocket())
+            var clientConnection = new AlphaWebSocketConnection(new FakeWebSocket(), "127.0.0.1")
             {
                 ClientPubKey = TestEnvironment.Client1KeyPair.PublicKey,
                 ConnectionState = state
@@ -213,7 +213,7 @@ namespace Centaurus.Test
         {
             Global.AppState.State = ApplicationState.Ready;
 
-            var clientConnection = new AlphaWebSocketConnection(new FakeWebSocket())
+            var clientConnection = new AlphaWebSocketConnection(new FakeWebSocket(), "127.0.0.1")
             {
                 ClientPubKey = TestEnvironment.Client1KeyPair.PublicKey,
                 ConnectionState = state
@@ -253,7 +253,7 @@ namespace Centaurus.Test
                 var effectProcessor = new RequestRateLimitUpdateEffectProcessor(effect, account, Global.Constellation.RequestRateLimits);
                 effectProcessor.CommitEffect();
             }
-            var clientConnection = new AlphaWebSocketConnection(new FakeWebSocket())
+            var clientConnection = new AlphaWebSocketConnection(new FakeWebSocket(), "127.0.0.1")
             {
                 ClientPubKey = clientKeyPair,
                 ConnectionState = ConnectionState.Ready,

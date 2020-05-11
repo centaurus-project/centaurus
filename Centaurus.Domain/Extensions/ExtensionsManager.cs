@@ -10,9 +10,9 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public class ExtensionsManager
+    public class ExtensionsManager : IDisposable
     {
-        public async Task RegisterAllExtensions()
+        public void RegisterAllExtensions()
         {
             if (string.IsNullOrWhiteSpace(Global.Settings.ExtensionsConfigFilePath))
                 return;
@@ -26,40 +26,39 @@ namespace Centaurus.Domain
             foreach (var configItem in extensionConfig.Extensions)
             {
                 var extension = ExtensionItem.Load(configItem);
-                await extension.ExtensionInstance.Init(configItem.ExtensionConfig);
+                extension.ExtensionInstance.Init(configItem.ExtensionConfig);
 
                 extensions.Add(extension);
             }
-            IsRegistered = true;
         }
 
-        public async Task Terminate()
-        { 
-            if (IsRegistered && !IsTerminated)
-                foreach(var extension in extensions)
+        public void Dispose()
+        {
+            if (!isDisposed)
+                return;
+                foreach (var extension in extensions)
                 {
-                    await extension.ExtensionInstance.Terminate();
+                    extension.ExtensionInstance.Dispose();
                 }
-            IsTerminated = true;
+            isDisposed = true;
         }
 
         private List<ExtensionItem> extensions = new List<ExtensionItem>();
-        private bool IsRegistered;
-        private bool IsTerminated;
+        private bool isDisposed;
 
         public IEnumerable<ExtensionItem> Extensions => extensions;
 
 
-        public event Action<WebSocket> OnBeforeNewConnection;
+        public event Action<WebSocket, string> OnBeforeNewConnection;
         public event Action<BaseWebSocketConnection> OnConnectionValidated;
 
         public void ConnectionValidated(BaseWebSocketConnection args)
         {
             OnConnectionValidated?.Invoke(args);
         }
-        public void BeforeNewConnection(WebSocket args)
+        public void BeforeNewConnection(WebSocket args, string ip)
         {
-            OnBeforeNewConnection?.Invoke(args);
+            OnBeforeNewConnection?.Invoke(args, ip);
         }
 
         public event Action<BaseWebSocketConnection, MessageEnvelope, Exception> OnHandleMessageFailed;

@@ -8,11 +8,12 @@ namespace Centaurus.Models
 
         BadRequest = 400,
         Unauthorized = 401,
+        Forbidden = 403,
         InvalidState = 450,
 
         InternalError = 500,
 
         SnapshotValidationFailed = 550,
-        UnexpectedMessage = 551,
+        UnexpectedMessage = 551
     }
 }

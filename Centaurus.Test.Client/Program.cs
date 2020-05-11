@@ -24,7 +24,7 @@ namespace Centaurus.Test.Client
 
                 foreach (string seed in new string[] { "SCR6C6STGV7RKURFGV7XA76WRUZYAKRYFICLWBHTI7NAW3VXVRA5T75E", "SBMZHCOQF2SANK2HSCMEZTOCJKBXV6CYRLAEE66BWSQBLKOZXLNMQN3T" })
                 {
-                    UserWebSocketConnection ws = new UserWebSocketConnection();
+                    UserWebSocketConnection ws = new UserWebSocketConnection(null);
                     ws.EstablishConnection().Wait();
                     sockets.Add(ws);
                 }
@@ -120,7 +120,7 @@ namespace Centaurus.Test.Client
 
             Global.Init(settings, new MongoStorage());
 
-            UserWebSocketConnection ws = new UserWebSocketConnection();
+            UserWebSocketConnection ws = new UserWebSocketConnection(null);
             ws.EstablishConnection().Wait();
 
             Console.WriteLine("Type 'q' to close...");

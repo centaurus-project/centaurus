@@ -5,10 +5,8 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public interface IExtension
+    public interface IExtension: IDisposable
     {
-        Task Init(Dictionary<string, string> settings);
-
-        Task Terminate();
+        void Init(Dictionary<string, string> settings);
     }
 }

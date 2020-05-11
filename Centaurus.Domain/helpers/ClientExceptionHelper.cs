@@ -9,17 +9,21 @@ namespace Centaurus.Domain
     {
         public static ResultStatusCodes GetExceptionStatusCode(Exception exception)
         {
-            var resultStatusCode = ResultStatusCodes.InternalError;
-            if (exception is InvalidStateException)
-                resultStatusCode = ResultStatusCodes.InvalidState;
-            else if (exception is UnauthorizedException)
-                resultStatusCode = ResultStatusCodes.Unauthorized;
-            else if (exception is UnexpectedMessageException)
-                resultStatusCode = ResultStatusCodes.UnexpectedMessage;
-            else if (exception is BadRequestException)
-                resultStatusCode = ResultStatusCodes.BadRequest;
-
-            return resultStatusCode;
+            switch (exception)
+            {
+                case InvalidStateException exc:
+                    return ResultStatusCodes.InvalidState;
+                case UnauthorizedException exc:
+                    return ResultStatusCodes.Unauthorized;
+                case UnexpectedMessageException exc:
+                    return ResultStatusCodes.UnexpectedMessage;
+                case BadRequestException exc:
+                    return ResultStatusCodes.BadRequest;
+                case ForbiddenException exc:
+                    return ResultStatusCodes.Forbidden;
+                default:
+                    return ResultStatusCodes.InternalError;
+            }
         }
     }
 }
