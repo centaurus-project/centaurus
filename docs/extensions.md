@@ -21,7 +21,7 @@ Extensions mechanism allows creating complex user scenarios, especially in case 
 
 - **`name`** (`string`) - This is dll name without `dll` extension. The extension engine will look for a library with this name.
 - **`isDisabled`** (`bool`) - You can disable extension by setting this property to `true`. Default value is `false`.
-- **`extensionConfig`** (`object`) - Config for the extension. This object will be deserialized as `Dictionary<string, string>` and passed to `IExtension.Init` method.
+- **`extensionConfig`** (`object`) - Config for the extension – plain string key-value pairs. This object will be deserialized as `Dictionary<string, string>` and passed to `IExtension.Init` method.
 
 ## Extension points
 
@@ -44,4 +44,3 @@ Events                   | Arguments
 `OnBeforeNotifyAuditors` | `MessageEnvelope` envelope                                                             
 `OnBeforeQuantumHandle`  | `MessageEnvelope` quantum                                                              
 `OnAfterQuantumHandle`   | `ResultMessage` resultMessage                              
-
