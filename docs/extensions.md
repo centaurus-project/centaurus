@@ -25,7 +25,7 @@ Extensions mechanism allows creating complex user scenarios, especially in case 
 
 ## Extension points
 
-All events are executed synchronously within client connection, except `OnBeforeQuantumHandle` and `OnAfterQuantumHandle`. These two events are executed synchronously for whole server.
+All events are executed synchronously within client connection (not blocking other connections or affecting quantum processing), except `OnBeforeQuantumHandle` and `OnAfterQuantumHandle` – these two events are executed synchronously in the context of the entire quantum processing pipeline.
 
 Events                   | Arguments                                                                              
 -------------------------|-----------
