@@ -35,10 +35,12 @@ namespace Centaurus
         static Logger logger = LogManager.GetCurrentClassLogger();
 
         protected WebSocket webSocket;
-        public BaseWebSocketConnection(WebSocket webSocket)
+        public BaseWebSocketConnection(WebSocket webSocket, string ip)
         {
             this.webSocket = webSocket;
+            this.Ip = ip;
         }
+        public string Ip { get; }
 
         /// <summary>
         /// Current connection public key
@@ -73,6 +75,7 @@ namespace Centaurus
                 return;
             try
             {
+                Global.ExtensionsManager.BeforeConnectionClose(this);
                 if (webSocket.State == WebSocketState.Open || webSocket.State == WebSocketState.Connecting)
                 {
                     var connectionPubKey = "no public key";
@@ -103,11 +106,21 @@ namespace Centaurus
 
         public virtual async Task SendMessage(MessageEnvelope envelope, CancellationToken ct = default)
         {
-            if (!envelope.IsSignedBy(Global.Settings.KeyPair.PublicKey))
-                envelope.Sign(Global.Settings.KeyPair);
+            try
+            {
+                Global.ExtensionsManager.BeforeSendMessage(this, envelope);
+                if (!envelope.IsSignedBy(Global.Settings.KeyPair.PublicKey))
+                    envelope.Sign(Global.Settings.KeyPair);
 
-            var serializedData = XdrConverter.Serialize(envelope);
-            await webSocket.SendAsync(serializedData, WebSocketMessageType.Binary, true, (ct == default ? CancellationToken.None : ct));
+                var serializedData = XdrConverter.Serialize(envelope);
+                await webSocket.SendAsync(serializedData, WebSocketMessageType.Binary, true, (ct == default ? CancellationToken.None : ct));
+                Global.ExtensionsManager.AfterSendMessage(this, envelope);
+            }
+            catch (Exception exc)
+            {
+                Global.ExtensionsManager.SendMessageFailed(this, envelope, exc);
+                throw;
+            }
         }
 
         public async Task Listen()
@@ -130,7 +143,9 @@ namespace Centaurus
                         if (exc is ConnectionCloseException)
                             throw;
 
-                        var statusCode = ClientExceptionHelper.GetExceptionStatusCode(exc);
+                        Global.ExtensionsManager.HandleMessageFailed(this, envelope, exc);
+
+                        var statusCode = exc.GetStatusCode();
 
                         //prevent recursive error sending
                         if (!(envelope.Message is ResultMessage))
@@ -147,11 +162,13 @@ namespace Centaurus
             }
             catch (WebSocketException e)
             {
+                Global.ExtensionsManager.HandleMessageFailed(this, null, e);
                 logger.Error(e);
                 await CloseConnection(WebSocketCloseStatus.InternalServerError);
             }
             catch (Exception e)
             {
+                Global.ExtensionsManager.HandleMessageFailed(this, null, e);
                 logger.Error(e);
             }
         }

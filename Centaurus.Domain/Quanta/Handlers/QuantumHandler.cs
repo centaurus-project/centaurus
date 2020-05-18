@@ -68,24 +68,27 @@ namespace Centaurus.Domain
         {
             var envelope = handleItem.Quantum;
             var tcs = handleItem.HandlingTaskSource;
+            ResultMessage result;
             try
-            {
-                var res = await HandleQuantum(envelope);
+            { 
+                Global.ExtensionsManager.BeforeQuantumHandle(envelope);
 
-                tcs.SetResult(res);
-
+                result = await HandleQuantum(envelope);
+                tcs.SetResult(result);
             }
             catch (Exception exc)
             {
                 logger.Error(exc);
-                Notifier.OnMessageProcessResult(new ResultMessage
+                result = new ResultMessage
                 {
-                    Status = ClientExceptionHelper.GetExceptionStatusCode(exc),
+                    Status = exc.GetStatusCode(),
                     OriginalMessage = envelope
-                });
+                };
+                Notifier.OnMessageProcessResult(result);
 
                 tcs.SetException(exc);
             }
+            Global.ExtensionsManager.AfterQuantumHandle(result);
         }
 
         MessageEnvelope GetQuantumEnvelope(MessageEnvelope envelope)
@@ -134,7 +137,7 @@ namespace Centaurus.Domain
 
             Notifier.OnMessageProcessResult(resultMessage);
 
-            logger.Trace($"Message of type {envelope.Message.ToString()} with apex {quantum.Apex} is handled.");
+            logger.Trace($"Message of type {envelope.Message} with apex {quantum.Apex} is handled.");
 
             return resultMessage;
         }
@@ -163,7 +166,7 @@ namespace Centaurus.Domain
 
                 ProcessTransaction(envelope, result);
 
-                logger.Trace($"Message of type {messageType.ToString()} with apex {((Quantum)envelope.Message).Apex} is handled.");
+                logger.Trace($"Message of type {messageType} with apex {((Quantum)envelope.Message).Apex} is handled.");
             }
             catch (Exception exc)
             {
@@ -175,7 +178,7 @@ namespace Centaurus.Domain
             {
                 OutgoingMessageStorage.EnqueueMessage(result);
             }
-                return result;
+            return result;
         }
 
         void ValidateAccountRequestRate(MessageEnvelope envelope)

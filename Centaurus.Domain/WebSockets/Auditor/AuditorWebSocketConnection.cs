@@ -19,8 +19,8 @@ namespace Centaurus.Domain
 
         CancellationTokenSource cancellationToken = new CancellationTokenSource();
 
-        public AuditorWebSocketConnection(WebSocket webSocket)
-            : base(webSocket)
+        public AuditorWebSocketConnection(WebSocket webSocket, string ip)
+            : base(webSocket, ip)
         {
             //we don't need to create and sign heartbeat message on every sending
             hearbeatMessage = new Heartbeat().CreateEnvelope();

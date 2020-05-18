@@ -82,7 +82,7 @@ namespace Centaurus.Domain
 
             alphaStateManager.AlphaRised();
 
-            Notifier.NotifyAuditors(alphaStateManager.GetCurrentAlphaState());
+            Notifier.NotifyAuditors(alphaStateManager.GetCurrentAlphaState().CreateEnvelope());
         }
 
         private static async Task ApplyQuanta(List<MessageEnvelope> quanta)

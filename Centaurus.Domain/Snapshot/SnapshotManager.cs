@@ -31,28 +31,32 @@ namespace Centaurus.Domain
         /// Makes initial save to DB
         /// </summary>
         /// <param name="envelope">Envelope that contains constellation init quantum.</param>
-        public static async Task ApplyInitUpdates(MessageEnvelope envelope)
+        public static async Task<Effect[]> ApplyInitUpdates(MessageEnvelope envelope)
         {
 
             var initQuantum = (ConstellationInitQuantum)envelope.Message;
 
-            var initEffect = new ConstellationInitEffect
-            {
-                Apex = initQuantum.Apex,
-                Assets = initQuantum.Assets,
-                Auditors = initQuantum.Auditors,
-                MinAccountBalance = initQuantum.MinAccountBalance,
-                MinAllowedLotSize = initQuantum.MinAllowedLotSize,
-                Vault = initQuantum.Vault,
-                VaultSequence = initQuantum.VaultSequence,
-                Ledger = initQuantum.Ledger,
-                RequestRateLimits = initQuantum.RequestRateLimits
+            var initEffects = new Effect[] {
+                new ConstellationInitEffect {
+                    Apex = initQuantum.Apex,
+                    Assets = initQuantum.Assets,
+                    Auditors = initQuantum.Auditors,
+                    MinAccountBalance = initQuantum.MinAccountBalance,
+                    MinAllowedLotSize = initQuantum.MinAllowedLotSize,
+                    Vault = initQuantum.Vault,
+                    VaultSequence = initQuantum.VaultSequence,
+                    Ledger = initQuantum.Ledger,
+                    RequestRateLimits = initQuantum.RequestRateLimits
+
+                }
             };
 
             var updates = new PendingUpdates();
-            updates.Add(envelope, new Effect[] { initEffect });
+            updates.Add(envelope, initEffects);
 
             await SaveSnapshotInternal(updates);
+
+            return initEffects;
         }
 
         //only one thread can save snapshots. We need make sure that previous snapshot is permanent

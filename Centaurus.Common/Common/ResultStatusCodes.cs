@@ -1,6 +1,4 @@
-﻿using System.ComponentModel;
-
-namespace Centaurus.Models
+﻿namespace Centaurus
 {
     public enum ResultStatusCodes
     {
@@ -8,11 +6,13 @@ namespace Centaurus.Models
 
         BadRequest = 400,
         Unauthorized = 401,
+        Forbidden = 403,
+        TooManyRequests = 429,
         InvalidState = 450,
 
         InternalError = 500,
 
         SnapshotValidationFailed = 550,
-        UnexpectedMessage = 551,
+        UnexpectedMessage = 551
     }
 }

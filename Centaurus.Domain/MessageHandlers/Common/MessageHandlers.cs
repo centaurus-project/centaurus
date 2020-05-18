@@ -47,8 +47,12 @@ namespace Centaurus.Domain
                 return false;
 
             var handler = handlers[envelope.Message.MessageType];
+            Global.ExtensionsManager.BeforeValidateMessage(connetction, envelope);
             await handler.Validate(connetction, envelope);
+            Global.ExtensionsManager.AfterValidateMessage(connetction, envelope);
+            Global.ExtensionsManager.BeforeHandleMessage(connetction, envelope);
             await handler.HandleMessage(connetction, envelope);
+            Global.ExtensionsManager.AfterHandleMessage(connetction, envelope);
             return true;
         }
     }

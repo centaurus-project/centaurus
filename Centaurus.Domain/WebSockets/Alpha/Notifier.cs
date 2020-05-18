@@ -13,33 +13,12 @@ namespace Centaurus.Domain
         /// Sends the message to the account
         /// </summary>
         /// <param name="account">Target account</param>
-        /// <param name="message">Message to send</param>
-        public static void Notify(RawPubKey account, Message message)
-        {
-            if (ConnectionManager.TryGetConnection(account, out AlphaWebSocketConnection connection))
-                _ = connection.SendMessage(message);
-        }
-
-        /// <summary>
-        /// Sends the message to the account
-        /// </summary>
-        /// <param name="account">Target account</param>
         /// <param name="envelope">Message to send</param>
         public static void Notify(RawPubKey account, MessageEnvelope envelope)
         {
+            Global.ExtensionsManager.BeforeNotify(account, envelope);
             if (ConnectionManager.TryGetConnection(account, out AlphaWebSocketConnection connection))
                 _ = connection.SendMessage(envelope);
-        }
-
-        /// <summary>
-        /// Sends the message to all connected auditors
-        /// </summary>
-        /// <param name="message">Message to send</param>
-        public static void NotifyAuditors(Message message)
-        {
-            var auditors = ConnectionManager.GetAuditorConnections();
-            for (var i = 0; i < auditors.Count; i++)
-                _ = auditors[i].SendMessage(message);
         }
 
         /// <summary>
@@ -48,6 +27,7 @@ namespace Centaurus.Domain
         /// <param name="envelope">Message to send</param>
         public static void NotifyAuditors(MessageEnvelope envelope)
         {
+            Global.ExtensionsManager.BeforeNotifyAuditors(envelope);
             var auditors = ConnectionManager.GetAuditorConnections();
             for (var i = 0; i < auditors.Count; i++)
                 _ = auditors[i].SendMessage(envelope);
@@ -67,11 +47,11 @@ namespace Centaurus.Domain
             //unwrap if it is RequestQuantum
             if (result.OriginalMessage.Message is RequestQuantum)
                 signatures = ((RequestQuantum)result.OriginalMessage.Message).RequestEnvelope.Signatures;
-
+            var envelope = result.CreateEnvelope();
             for (var i = 0; i < signatures.Count; i++)
             {
                 var accountToNotify = signatures[i];
-                Notify(accountToNotify.Signer, result);
+                Notify(accountToNotify.Signer, envelope);
             }
         }
     }

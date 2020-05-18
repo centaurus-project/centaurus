@@ -13,7 +13,7 @@ namespace Centaurus.Domain
 
         public async Task<ResultMessage> Process(MessageEnvelope envelope)
         {
-            await SnapshotManager.ApplyInitUpdates(envelope);
+            var initEffects = await SnapshotManager.ApplyInitUpdates(envelope);
 
             var snapshot = await SnapshotManager.GetSnapshot();
 
@@ -27,7 +27,7 @@ namespace Centaurus.Domain
                 OutgoingMessageStorage.EnqueueMessage(new SetApexCursor { Apex = 1 });
             }
 
-            return null;
+            return envelope.CreateResult(ResultStatusCodes.Success, new List<Effect>(initEffects));
         }
 
         public Task Validate(MessageEnvelope envelope)

@@ -13,12 +13,12 @@ namespace Centaurus.Domain
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public List<long> apexes = new List<long>();
+        private List<long> apexes = new List<long>();
 
-        public List<MessageEnvelope> quanta = new List<MessageEnvelope>();
+        private List<MessageEnvelope> quanta = new List<MessageEnvelope>();
 
-        public int QuantaCacheCapacity = 1_000_000;
-        int capacityThreshold = 1000;
+        private int QuantaCacheCapacity = 1_000_000;
+        private int capacityThreshold = 1000;
 
         public long CurrentApex { get; private set; }
         public byte[] LastQuantumHash { get; private set; }

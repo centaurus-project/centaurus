@@ -11,8 +11,8 @@ namespace Centaurus
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public AlphaWebSocketConnection(WebSocket webSocket)
-            : base(webSocket)
+        public AlphaWebSocketConnection(WebSocket webSocket, string ip)
+            : base(webSocket, ip)
         {
             var hd = new HandshakeData();
             hd.Randomize();
@@ -46,7 +46,6 @@ namespace Centaurus
         public AccountWrapper Account { get; set; } 
 
         private QuantumSyncWorker quantumWorker;
-
         private readonly object apexCursorSyncRoot = new { };
 
         private void ResetApexCursor(long newApexCursor)

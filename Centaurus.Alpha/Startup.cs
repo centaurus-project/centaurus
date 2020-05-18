@@ -72,7 +72,7 @@ namespace Centaurus
                     if (Global.AppState == null || ValidApplicationStates.Contains(Global.AppState.State))
                     {
                         WebSocket webSocket = await context.WebSockets.AcceptWebSocketAsync();
-                        await ConnectionManager.OnNewConnection(webSocket);
+                        await ConnectionManager.OnNewConnection(webSocket, context.Connection.RemoteIpAddress.ToString());
                     }
                     else
                     {

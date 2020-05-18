@@ -37,9 +37,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Centaurus.Test.Xdr.Contract
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Centaurus.DynamicSerializers", "Centaurus.DynamicSerializers\Centaurus.DynamicSerializers.csproj", "{148326BF-1439-4863-8F2A-3B72D5F56485}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Centaurus.Test.DynamicSerializers", "Centaurus.Test.DynamicSerializers\Centaurus.Test.DynamicSerializers.csproj", "{60177E3D-1970-40A2-8779-28F246F51955}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Centaurus.Test.DynamicSerializers", "Centaurus.Test.DynamicSerializers\Centaurus.Test.DynamicSerializers.csproj", "{60177E3D-1970-40A2-8779-28F246F51955}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Centaurus.Test.Contracts", "Centaurus.Test.Contracts\Centaurus.Test.Contracts.csproj", "{296B43F1-D12D-4D39-8A06-F6929B68D6F3}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Centaurus.Test.Contracts", "Centaurus.Test.Contracts\Centaurus.Test.Contracts.csproj", "{296B43F1-D12D-4D39-8A06-F6929B68D6F3}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

@@ -42,11 +42,20 @@ namespace Centaurus.Test
 
         private static void SetCommonSettings(BaseSettings settings, string secret)
         {
-
             settings.HorizonUrl = "https://horizon-testnet.stellar.org";
             settings.NetworkPassphrase = "Test SDF Network ; September 2015";
-            settings.Secret = secret;
             settings.CWD = "AppData";
+            settings.Secret = secret;
+        }
+
+        public static List<KeyPair> GetPredefinedClients()
+        {
+            return new List<KeyPair> { TestEnvironment.Client1KeyPair, TestEnvironment.Client2KeyPair };
+        }
+
+        public static List<KeyPair> GetPredefinedAuditors()
+        {
+            return new List<KeyPair> { TestEnvironment.Auditor1KeyPair };
         }
 
         /// <summary>
@@ -54,7 +63,7 @@ namespace Centaurus.Test
         /// </summary>
         public static void DefaultAlphaSetup()
         {
-            DefaultSetup(GetAlphaSettings());
+            Setup(GetPredefinedClients(), GetPredefinedAuditors(), GetAlphaSettings(), new MockStorage());
         }
 
         /// <summary>
@@ -62,12 +71,7 @@ namespace Centaurus.Test
         /// </summary>
         public static void DefaultAuditorSetup()
         {
-            DefaultSetup(GetAuditorSettings());
-        }
-
-        private static void DefaultSetup(BaseSettings baseSettings)
-        {
-            Setup(new List<KeyPair> { TestEnvironment.Client1KeyPair, TestEnvironment.Client2KeyPair }, new List<KeyPair> { TestEnvironment.Auditor1KeyPair }, baseSettings);
+            Setup(GetPredefinedClients(), GetPredefinedAuditors(), GetAuditorSettings(), new MockStorage());
         }
 
         /// <summary>
@@ -76,9 +80,9 @@ namespace Centaurus.Test
         /// <param name="clients">Clients to add to constellation</param>
         /// <param name="auditors">Auditors to add to constellation</param>
         /// <param name="settings">Settings that will be used to init Global</param>
-        public static void Setup(List<KeyPair> clients, List<KeyPair> auditors, BaseSettings settings)
+        public static void Setup(List<KeyPair> clients, List<KeyPair> auditors, BaseSettings settings, BaseStorage storage)
         {
-            Global.Init(settings, new MockStorage());
+            Global.Init(settings, storage);
 
             var assets = new List<AssetSettings> { new AssetSettings { Id = 1, Code = "X", Issuer = KeyPair.Random() } };
 

@@ -26,18 +26,5 @@ namespace Centaurus.Domain
             MarkAsProcessed();
             ledgerManager.SetLedger(Effect.PrevLedger);
         }
-
-        public static LedgerUpdateEffectProcessor GetProcessor(long apex, long ledger, LedgerManager ledgerManager)
-        {
-            return GetProcessor(
-                new LedgerUpdateEffect { Apex = apex, Ledger = ledger, PrevLedger = ledgerManager.Ledger },
-                ledgerManager
-            );
-        }
-
-        public static LedgerUpdateEffectProcessor GetProcessor(LedgerUpdateEffect effect, LedgerManager ledgerManager)
-        {
-            return new LedgerUpdateEffectProcessor(effect, ledgerManager);
-        }
     }
 }

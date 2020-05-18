@@ -194,6 +194,7 @@ minimal attack surface.
 - [Quantum structure](docs/quantum-flow.md)
 - [Snapshots](docs/snapshots.md)
 - [Administration](docs/administration.md)
+- [Extensions](docs/extensions.md)
 
 ---
 

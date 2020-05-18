@@ -19,7 +19,7 @@ namespace Centaurus.Domain
 
             var effectsContainer = new EffectProcessorsContainer(envelope, Global.AddEffects);
 
-            effectsContainer.Add(LedgerUpdateEffectProcessor.GetProcessor(ledgerQuantum.Apex, ledgerNotification.LedgerTo, Global.LedgerManager));
+            effectsContainer.AddLedgerCommit(Global.LedgerManager, ledgerNotification.LedgerTo, Global.LedgerManager.Ledger);
 
             for (var i = 0; i < ledgerNotification.Payments.Count; i++)
             {
@@ -38,7 +38,7 @@ namespace Centaurus.Domain
                 }
             }
 
-            return Task.FromResult(envelope.CreateResult(ResultStatusCodes.Success));
+            return Task.FromResult(envelope.CreateResult(ResultStatusCodes.Success, effectsContainer.GetEffects().ToList()));
         }
 
         public Task Validate(MessageEnvelope envelope)

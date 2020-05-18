@@ -25,7 +25,7 @@ namespace Centaurus.Test
         {
             Global.AppState.State = ApplicationState.Running;
 
-            var clientConnection = new AuditorWebSocketConnection(new FakeWebSocket());
+            var clientConnection = new AuditorWebSocketConnection(new FakeWebSocket(), null);
 
             var hd = new HandshakeData();
             hd.Randomize();
@@ -45,7 +45,7 @@ namespace Centaurus.Test
         {
             Global.AppState.State = ApplicationState.Running;
 
-            var clientConnection = new AuditorWebSocketConnection(new FakeWebSocket());
+            var clientConnection = new AuditorWebSocketConnection(new FakeWebSocket(), null);
 
             var envelope = new AlphaState
             {
@@ -71,7 +71,7 @@ namespace Centaurus.Test
         {
             Global.AppState.State = ApplicationState.Ready;
 
-            var clientConnection = new AuditorWebSocketConnection(new FakeWebSocket()) { ConnectionState = state };
+            var clientConnection = new AuditorWebSocketConnection(new FakeWebSocket(), null) { ConnectionState = state };
 
             var ledgerNotification = new LedgerUpdateNotification
             {
@@ -103,7 +103,7 @@ namespace Centaurus.Test
         {
             Global.AppState.State = ApplicationState.Ready;
 
-            var clientConnection = new AuditorWebSocketConnection(new FakeWebSocket()) { ConnectionState = state };
+            var clientConnection = new AuditorWebSocketConnection(new FakeWebSocket(), null) { ConnectionState = state };
 
             var orderEnvelope = new OrderRequest
             {
@@ -135,7 +135,7 @@ namespace Centaurus.Test
         {
             Global.AppState.State = ApplicationState.Ready;
 
-            var clientConnection = new AuditorWebSocketConnection(new FakeWebSocket()) { ConnectionState = state };
+            var clientConnection = new AuditorWebSocketConnection(new FakeWebSocket(), null) { ConnectionState = state };
             var orderEnvelope = new QuantaBatch
             {
                 Quanta = new List<MessageEnvelope>()

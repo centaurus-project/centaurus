@@ -1,6 +1,8 @@
 ﻿using Centaurus.Domain;
 using Centaurus.Models;
+using System;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 
 namespace Centaurus.Domain
 {
@@ -16,6 +18,8 @@ namespace Centaurus.Domain
 
         public static void EnqueueMessage(Message message)
         {
+            if (message == null)
+                throw new ArgumentNullException(nameof(message));
             outgoingMessages.Enqueue(message);
         }
 

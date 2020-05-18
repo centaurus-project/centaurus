@@ -17,8 +17,8 @@ namespace Centaurus.Test.Client
 {
     public class UserWebSocketConnection : BaseWebSocketConnection
     {
-        public UserWebSocketConnection()
-        : base(new ClientWebSocket())
+        public UserWebSocketConnection(string ip)
+        : base(new ClientWebSocket(), ip)
         {
             //we don't need to create and sign heartbeat message on every sending
             hearbeatMessage = new Heartbeat().CreateEnvelope();
