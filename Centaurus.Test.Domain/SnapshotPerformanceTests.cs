@@ -21,9 +21,7 @@ namespace Centaurus.Test
         {
             var settings = new AlphaSettings 
             { 
-                    HorizonUrl = "https://horizon-testnet.stellar.org", 
-                    NetworkPassphrase = "Test SDF Network ; September 2015",
-                    CWD = "AppData"
+                CWD = "AppData"
             };
             Global.Init(settings, new MongoStorage());
         }

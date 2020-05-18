@@ -6,5 +6,6 @@ namespace Centaurus
 {
     public class ForbiddenException: BaseClientException
     {
+        public override ResultStatusCodes StatusCode => ResultStatusCodes.Forbidden;
     }
 }

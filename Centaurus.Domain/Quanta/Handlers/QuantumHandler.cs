@@ -81,7 +81,7 @@ namespace Centaurus.Domain
                 logger.Error(exc);
                 result = new ResultMessage
                 {
-                    Status = ClientExceptionHelper.GetExceptionStatusCode(exc),
+                    Status = exc.GetStatusCode(),
                     OriginalMessage = envelope
                 };
                 Notifier.OnMessageProcessResult(result);

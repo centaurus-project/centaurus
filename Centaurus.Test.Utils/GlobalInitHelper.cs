@@ -40,12 +40,12 @@ namespace Centaurus.Test
             return settings;
         }
 
-        public static void SetCommonSettings(BaseSettings settings, string secret)
+        private static void SetCommonSettings(BaseSettings settings, string secret)
         {
-            settings.HorizonUrl = settings.HorizonUrl ?? "https://horizon-testnet.stellar.org";
-            settings.NetworkPassphrase = settings.NetworkPassphrase ?? "Test SDF Network ; September 2015";
-            settings.Secret = settings.Secret ?? secret;
-            settings.CWD = settings.CWD ?? "AppData";
+            settings.HorizonUrl = "https://horizon-testnet.stellar.org";
+            settings.NetworkPassphrase = "Test SDF Network ; September 2015";
+            settings.CWD = "AppData";
+            settings.Secret = secret;
         }
 
         public static List<KeyPair> GetPredefinedClients()

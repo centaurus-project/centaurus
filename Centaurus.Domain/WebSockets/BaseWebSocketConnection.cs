@@ -145,7 +145,7 @@ namespace Centaurus
 
                         Global.ExtensionsManager.HandleMessageFailed(this, envelope, exc);
 
-                        var statusCode = ClientExceptionHelper.GetExceptionStatusCode(exc);
+                        var statusCode = exc.GetStatusCode();
 
                         //prevent recursive error sending
                         if (!(envelope.Message is ResultMessage))

@@ -10,5 +10,7 @@ namespace Centaurus
             : base($"Connection is in state {currentState}. Valid state(s) for the message of type '{messageType}' is(are) {string.Join(',', validStates)}")
         {
         }
+
+        public override ResultStatusCodes StatusCode => ResultStatusCodes.InvalidState;
     }
 }

@@ -4,7 +4,7 @@ using System.Text;
 
 namespace Centaurus
 {
-    public class BaseClientException: Exception
+    public abstract class BaseClientException: Exception
     {
         public BaseClientException()
         {
@@ -16,5 +16,7 @@ namespace Centaurus
         {
 
         }
+
+        public abstract ResultStatusCodes StatusCode { get; }
     }
 }

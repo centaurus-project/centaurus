@@ -6,5 +6,6 @@ namespace Centaurus
 {
     public class UnauthorizedException : BaseClientException
     {
+        public override ResultStatusCodes StatusCode => ResultStatusCodes.Unauthorized;
     }
 }
