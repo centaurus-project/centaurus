@@ -27,4 +27,8 @@
     <ProjectReference Include="..\Centaurus.Common\Centaurus.Common.csproj" />
   </ItemGroup>
 
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+    <Exec Command="dotnet run -c $(ConfigurationName) -p ..\Centaurus.Xdr.ContractGenerator -- -c -l cs -d ..\Centaurus.DynamicSerializers\Serializers -a $(OutDir)Centaurus.Models.dll" />
+  </Target>
+
 </Project>

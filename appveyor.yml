@@ -1,0 +1,27 @@
+before_build:
+  - cmd: dotnet restore 
+build_script:
+  - cmd: dotnet build 
+test_script:
+  - cmd: dotnet test 
+test: on
+os: Visual Studio 2019
+deploy:
+  release: Centaurus $(APPVEYOR_REPO_TAG_NAME)
+  provider: GitHub
+  auth_token:
+    secure: VgtP6jKIZM4Rx5hfJJmT60600yFUf0rjMaGCaIsKxx4s5WPQ/AjyDOxq27MNNdF1
+  artifact: /.*\.zip/
+  tag: $(APPVEYOR_REPO_TAG_NAME)
+  on:
+    APPVEYOR_REPO_TAG: true
+before_deploy:
+  - ps: dotnet build -c Release
+  - ps: dotnet publish Centaurus.Alpha -r win-x64 -c Release /p:PublishSingleFile=true -o Release/win-x64 /p:DebugType=None
+  - ps: dotnet publish Centaurus.Auditor -r win-x64 -c Release /p:PublishSingleFile=true -o Release/win-x64 /p:DebugType=None
+  - ps: dotnet publish Centaurus.Alpha -r linux-x64 -c Release /p:PublishSingleFile=true -o Release/linux-x64 /p:DebugType=None
+  - ps: dotnet publish Centaurus.Auditor -r linux-x64 -c Release /p:PublishSingleFile=true -o Release/linux-x64 /p:DebugType=None
+  - ps: dotnet publish Centaurus.Alpha -r osx-x64 -c Release /p:PublishSingleFile=true -o Release/osx-x64 /p:DebugType=None
+  - ps: dotnet publish Centaurus.Auditor -r osx-x64 -c Release /p:PublishSingleFile=true -o Release/osx-x64 /p:DebugType=None
+  - ps: cd Release
+  - ps: (Get-ChildItem -Directory) | Foreach-Object { $currentZip = "$_.zip"; 7z a $currentZip "$_"; Push-AppveyorArtifact $currentZip }

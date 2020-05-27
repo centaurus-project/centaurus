@@ -14,8 +14,4 @@
     <ProjectReference Include="..\Centaurus.Xdr\Centaurus.Xdr.csproj" />
   </ItemGroup>
 
-  <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
-    <Exec Command="dotnet run -c $(ConfigurationName) -p ..\Centaurus.Xdr.ContractGenerator -- -c -l cs -d $(ProjectDir)Serializers -a ..\Centaurus.Models\$(OutDir)Centaurus.Models.dll" />
-  </Target>
-
 </Project>

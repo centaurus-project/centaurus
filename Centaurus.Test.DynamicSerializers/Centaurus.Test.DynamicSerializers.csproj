@@ -4,7 +4,7 @@
     <TargetFramework>netcoreapp3.1</TargetFramework>
     <RootNamespace>Centaurus.Test</RootNamespace>
   </PropertyGroup>
-
+  
   <ItemGroup>
     <ProjectReference Include="..\Centaurus.Xdr.ContractGenerator\Centaurus.Xdr.ContractGenerator.csproj" />
     <ProjectReference Include="..\Centaurus.Test.Contracts\Centaurus.Test.Contracts.csproj" />
@@ -13,9 +13,5 @@
   <ItemGroup>
     <Folder Include="Serializers\" />
   </ItemGroup>
-
-  <Target Name="GenerateSerializers" BeforeTargets="PreBuildEvent">
-    <Exec Command="dotnet run -c $(ConfigurationName) -p $(SolutionDir)Centaurus.Xdr.ContractGenerator -- -c -l cs -d $(ProjectDir)Serializers -a $(SolutionDir)Centaurus.Test.Contracts\$(OutDir)Centaurus.Test.Contracts.dll" WorkingDirectory="$(TargetDir)" />
-  </Target>
 
 </Project>
