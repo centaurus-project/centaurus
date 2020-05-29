@@ -18,7 +18,7 @@ namespace Centaurus.Domain
             Ledger = ledger;
 
             //only auditors listen to the ledger
-            if (!Global.IsAlpha && !EnvironmentHelper.IsTest)
+            if (!Global.IsAlpha && !EnvironmentHelper.IsTestEnvironment)
             {
                 var ledgerCursor = (Global.StellarNetwork.Server.Ledgers.Ledger(Ledger).Result).PagingToken;
 
