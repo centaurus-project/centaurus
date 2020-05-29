@@ -13,6 +13,6 @@ namespace Centaurus
             Environment.SetEnvironmentVariable(EnvironmentHelper.IsTestEnvVarName, value.ToString());
         }
 
-        public static bool IsTest => bool.TryParse(Environment.GetEnvironmentVariable(IsTestEnvVarName), out bool isTest) && isTest;
+        public static bool IsTestEnvironment => bool.TryParse(Environment.GetEnvironmentVariable(IsTestEnvVarName), out bool isTest) && isTest;
     }
 }
