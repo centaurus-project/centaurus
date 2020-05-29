@@ -10,7 +10,7 @@ deploy:
   release: Centaurus $(APPVEYOR_REPO_TAG_NAME)
   provider: GitHub
   auth_token:
-    secure: VgtP6jKIZM4Rx5hfJJmT60600yFUf0rjMaGCaIsKxx4s5WPQ/AjyDOxq27MNNdF1
+    secure: jnMwGuWtmzFm6Zz0hL+TNL3cU/LlIdzklvxGExt6hBiiZZKu6rWjERl1KWqfU8z8
   artifact: /.*\.zip/
   tag: $(APPVEYOR_REPO_TAG_NAME)
   on:
@@ -25,3 +25,7 @@ before_deploy:
   - ps: dotnet publish Centaurus.Auditor -r osx-x64 -c Release /p:PublishSingleFile=true -o Release/osx-x64 /p:DebugType=None
   - ps: cd Release
   - ps: (Get-ChildItem -Directory) | Foreach-Object { $currentZip = "$_.zip"; 7z a $currentZip "$_"; Push-AppveyorArtifact $currentZip }
+  - ps: cd..
+after_deploy:
+  - ps: Import-Module ".\release-notes-helper.ps1"
+  - ps: Update-ReleaseNotes "$env:APPVEYOR_REPO_TAG_NAME" "CHANGELOG.md" "$env:APPVEYOR_REPO_NAME" "$env:GITHUB_TOKEN"
