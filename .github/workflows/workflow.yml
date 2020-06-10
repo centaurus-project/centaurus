@@ -1,0 +1,97 @@
+name: .NET Core
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: windows-2019
+    steps:
+    - uses: actions/checkout@v2
+    - name: Setup .NET Core
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: 3.1.101
+    - name: Install dependencies
+      run: dotnet restore
+    - name: Build
+      run: dotnet build --no-restore
+    - name: Test
+      run: dotnet test --no-restore --verbosity normal
+  release:
+    env:
+      BRANCH: master
+    runs-on: windows-latest
+    defaults:
+      run: 
+        shell: bash
+    if: contains(github.ref, 'refs/tags/r')
+    needs: build
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        ref: ${{ env.BRANCH }}
+    - name: Get version
+      run: | 
+        V=${GITHUB_REF//refs\/tags\/r/}
+        echo "::set-env name=VERSION::$V"
+        echo "::set-env name=VERSION_WITH_SUFFIX::v$V"
+    - run: echo ${{env.VERSION_WITH_SUFFIX}}
+    - name: Update changelog
+      uses: thomaseizinger/keep-a-changelog-new-release@master
+      with:
+        version: ${{ env.VERSION_WITH_SUFFIX }}
+    - name: Set projects version 
+      uses: hawthorne-abendsen/dotnet-version-tool@master
+      with:
+        version: ${{ env.VERSION }}
+    - name: Get changelog entry
+      id: changelog_reader
+      uses: mindsers/changelog-reader-action@v1.1.0
+      with:
+        version: ${{ env.VERSION_WITH_SUFFIX }}
+        path: ./CHANGELOG.md
+    - name: Remove trigger tag
+      run: git push --delete origin "r$VERSION"
+    - name: Setup .NET Core
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: 3.1.101
+    - name: Install dependencies
+      run: dotnet restore
+    - name: Build release
+      shell: powershell
+      run: |
+        dotnet build -c Release
+        dotnet publish Centaurus.Alpha -r win-x64 -c Release /p:PublishSingleFile=true -o Release/win-x64 /p:DebugType=None
+        dotnet publish Centaurus.Auditor -r win-x64 -c Release /p:PublishSingleFile=true -o Release/win-x64 /p:DebugType=None
+        dotnet publish Centaurus.Alpha -r linux-x64 -c Release /p:PublishSingleFile=true -o Release/linux-x64 /p:DebugType=None
+        dotnet publish Centaurus.Auditor -r linux-x64 -c Release /p:PublishSingleFile=true -o Release/linux-x64 /p:DebugType=None
+        dotnet publish Centaurus.Alpha -r osx-x64 -c Release /p:PublishSingleFile=true -o Release/osx-x64 /p:DebugType=None
+        dotnet publish Centaurus.Auditor -r osx-x64 -c Release /p:PublishSingleFile=true -o Release/osx-x64 /p:DebugType=None
+    - name: Release
+      shell: powershell
+      run: |
+        cd Release
+        $folderlist = Get-ChildItem -Directory
+        $assets = ""
+        $desc = "${{ steps.changelog_reader.outputs.log_entry }}"
+        if ($desc) {
+          $desc = "-m ""$desc"""
+        }
+        Foreach ($Folder in $folderlist) {
+          $currentZipFileName = "$Folder.zip"
+          $assets = $assets + ("-a ""$currentZipFileName"" ")
+          Compress-Archive -Path "$Folder/*" "$currentZipFileName"
+        }
+        $command = "hub release create $assets -m ""Release ${{env.VERSION_WITH_SUFFIX}}"" $desc ""${{env.VERSION_WITH_SUFFIX}}"""
+        iex $command
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - uses: oleksiyrudenko/gha-git-credentials@v1
+      with:
+        token: '${{ secrets.GITHUB_TOKEN }}'
+    - name: Amend last commit
+      run: | 
+        git commit --amend --no-edit -a
+        GIT_EDITOR=true git rebase -X theirs
+        git push origin ${{env.BRANCH}}

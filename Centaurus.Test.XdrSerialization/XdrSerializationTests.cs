@@ -13,6 +13,7 @@ namespace Centaurus.Test
         [SetUp]
         public void Setup()
         {
+            EnvironmentHelper.SetTestEnvironmentVariable();
             TestDynamicSerializersInitializer.Init();
         }
 

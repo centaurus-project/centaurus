@@ -19,6 +19,7 @@ namespace Centaurus.Test
         [SetUp]
         public void Setup()
         {
+            EnvironmentHelper.SetTestEnvironmentVariable();
             var settings = new AlphaSettings 
             { 
                 CWD = "AppData"
