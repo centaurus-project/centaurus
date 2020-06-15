@@ -54,7 +54,7 @@ namespace Centaurus
             while (i < args.Length)
             {
                 var currentArg = args[i];
-                if (!IsArgumentName(currentArg))
+                if (!IsArgumentName(currentArg) && i != 0) //first arg is verb (alpha or auditor)
                     throw new Exception("Invalid arguments format");
 
                 //trim dash after check

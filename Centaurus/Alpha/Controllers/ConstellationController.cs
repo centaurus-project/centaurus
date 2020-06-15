@@ -6,7 +6,7 @@ using Centaurus.Models;
 using Microsoft.AspNetCore.Mvc;
 using stellar_dotnet_sdk;
 
-namespace Centaurus.Alpha.Controllers
+namespace Centaurus.Controllers
 {
     [Route("api/[controller]")]
     public class ConstellationController : Controller

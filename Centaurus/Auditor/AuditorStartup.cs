@@ -5,14 +5,15 @@ using NLog;
 using stellar_dotnet_sdk;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Net.WebSockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Centaurus.Auditor
+namespace Centaurus
 {
-    public class Startup
+    public class AuditorStartup: IStartup<AuditorSettings>
     {
         private AuditorWebSocketConnection auditor;
 
@@ -20,20 +21,21 @@ namespace Centaurus.Auditor
 
         private Logger logger = LogManager.GetCurrentClassLogger();
 
-        public Startup(AuditorSettings settings)
+        public void Run(AuditorSettings settings)
         {
             Global.Init(settings, new MongoStorage());
 
             Global.AppState.StateChanged += StateChanged;
 
             MessageHandlers<AuditorWebSocketConnection>.Init();
+
+            _ = InternalRun();
         }
 
-        public async Task Run()
+        private async Task InternalRun()
         {
             try
             {
-
                 while (auditor == null)
                 {
                     var _auditor = new AuditorWebSocketConnection(new ClientWebSocket(), null);
@@ -60,11 +62,11 @@ namespace Centaurus.Auditor
             }
         }
 
-        private async void StateChanged(object sender, ApplicationState state)
+        private void StateChanged(object sender, ApplicationState state)
         {
             if (state == ApplicationState.Failed)
             {
-                await Abort();
+                Shutdown();
 
                 Thread.Sleep(10000);//sleep for 10 sec to make sure that pending updates are saved
 
@@ -72,11 +74,11 @@ namespace Centaurus.Auditor
             }
         }
 
-        public async Task Abort()
+        public void Shutdown()
         {
             isAborted = true;
             Unsubscribe(auditor);
-            await CloseConnection(auditor);
+            CloseConnection(auditor).Wait();
         }
 
         private void Subscribe(AuditorWebSocketConnection _auditor)
@@ -131,7 +133,7 @@ namespace Centaurus.Auditor
             Unsubscribe(auditor);
             await CloseConnection(auditor);
             if (!isAborted)
-                _ = Run();
+                _ = InternalRun();
         }
     }
 }
