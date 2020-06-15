@@ -2,20 +2,22 @@
 
   <PropertyGroup>
     <TargetFramework>netcoreapp3.1</TargetFramework>
+    <AssemblyVersion>0.1.21</AssemblyVersion>
+    <FileVersion>0.1.21</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="Catchups\AuditorCatchup.cs" />
+    <Compile Remove="Catchups\AuditorCatchup.cs"/>
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="NLog" Version="4.6.7" />
+    <PackageReference Include="NLog" Version="4.6.7"/>
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Centaurus.DAL\Centaurus.DAL.csproj" />
-    <ProjectReference Include="..\Centaurus.DynamicSerializers\Centaurus.DynamicSerializers.csproj" />
-    <ProjectReference Include="..\Centaurus.Models\Centaurus.Models.csproj" />
+    <ProjectReference Include="..\Centaurus.DAL\Centaurus.DAL.csproj"/>
+    <ProjectReference Include="..\Centaurus.DynamicSerializers\Centaurus.DynamicSerializers.csproj"/>
+    <ProjectReference Include="..\Centaurus.Models\Centaurus.Models.csproj"/>
   </ItemGroup>
 
 </Project>

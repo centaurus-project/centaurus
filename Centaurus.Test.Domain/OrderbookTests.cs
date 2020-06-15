@@ -19,6 +19,7 @@ namespace Centaurus.Test
         [SetUp]
         public void Setup()
         {
+            EnvironmentHelper.SetTestEnvironmentVariable();
             var settings = new AlphaSettings { 
                 HorizonUrl = "https://horizon-testnet.stellar.org", 
                 NetworkPassphrase = "Test SDF Network ; September 2015",

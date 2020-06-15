@@ -15,6 +15,7 @@ namespace Centaurus.Test
         [SetUp]
         public void Setup()
         {
+            EnvironmentHelper.SetTestEnvironmentVariable();
             GlobalInitHelper.DefaultAlphaSetup();
             MessageHandlers<AlphaWebSocketConnection>.Init();
         }
