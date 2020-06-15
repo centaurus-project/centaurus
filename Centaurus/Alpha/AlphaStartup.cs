@@ -29,7 +29,7 @@ namespace Centaurus
             ConfigureConstellation(settings);
 
             host = CreateHostBuilder(settings).Build();
-            host.Run();
+            _ = host.RunAsync();
         }
 
         public void Shutdown()
