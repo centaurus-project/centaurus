@@ -20,10 +20,7 @@ namespace Centaurus
                 .WithParsed<AuditorSettings>(s => ConfigureAndRun(s))
                 .WithNotParsed(e =>
                 {
-                    LogConfigureHelper.Configure("logs");
-                    logger.Error(e);
-
-                    Console.WriteLine("Press Enter to exit");
+                    Console.WriteLine("Press Enter to quit");
                     Console.ReadLine();
                 });
         }
