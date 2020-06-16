@@ -4,7 +4,6 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
--   GitHub Actions as a CI system
--   Removed unnecessary projects and solutions
--   Test fixes
--   Changelog added
+-   Implemented Continuous Integration and automatic release system based on Github Actions.
+-   Removed unnecessary projects and solutions.
+-   Added changelog file for release notes.
