@@ -29,7 +29,7 @@ namespace Centaurus
             where T : BaseSettings
         {
             var isAlpha = settings is AlphaSettings;
-            Console.Title = isAlpha ? "Alpha" : $"Auditor";
+            Console.Title = isAlpha ? "CentaurusAlpha" : "CentaurusAuditor";
 
             settings.Build();
 

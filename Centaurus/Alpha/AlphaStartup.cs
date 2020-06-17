@@ -127,8 +127,6 @@ namespace Centaurus
                     app.UseHsts();
                 }
 
-                app.UseStaticFiles();
-
                 app.UseWebSockets();
 
                 app.Use(async (context, next) =>
