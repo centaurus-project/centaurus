@@ -25,6 +25,8 @@ namespace Centaurus
         {
             var type = typeof(T);
             var definedArgs = new List<OptionAlias>();
+            if (TryGetVerb<T>(out OptionAlias alias))
+                definedArgs.Add(alias);
             foreach (var prop in type.GetProperties().Where(prop => prop.IsDefined(typeof(OptionAttribute), false)))
             {
                 var option = (OptionAttribute)prop.GetCustomAttributes(typeof(OptionAttribute), false).First();
@@ -32,6 +34,19 @@ namespace Centaurus
             }
 
             return definedArgs;
+        }
+
+        static bool TryGetVerb<T>(out OptionAlias alias)
+        {
+            alias = default;
+            var type = typeof(T);
+            if (type.IsDefined(typeof(VerbAttribute), false))
+            {
+                var verb = (VerbAttribute)type.GetCustomAttributes(typeof(VerbAttribute), true).First();
+                alias = new OptionAlias(verb.Name, "", true);
+                return true;
+            }
+            return false;
         }
 
         static Dictionary<OptionAlias, string> GetEnvironmentValues(List<OptionAlias> options)
@@ -54,7 +69,7 @@ namespace Centaurus
             while (i < args.Length)
             {
                 var currentArg = args[i];
-                if (!IsArgumentName(currentArg))
+                if (!IsArgumentName(currentArg) && i != 0) // first arg should be verb (alpha or auditor)
                     throw new Exception("Invalid arguments format");
 
                 //trim dash after check
@@ -63,7 +78,7 @@ namespace Centaurus
                 var currentOption = options.FirstOrDefault(x => x.LongName == currentArg || x.ShortName == currentArg);
                 //create new option if not found
                 if (currentOption.Equals(default(OptionAlias)))
-                    currentOption = new OptionAlias(currentArg, "");
+                    currentOption = new OptionAlias(currentArg, "", i == 0); // first arg should be verb
 
                 string currentArgValue = null;
                 //check if next argument exists
@@ -141,7 +156,7 @@ namespace Centaurus
             merged = OverrideValues(merged, passedArgsDict);
 
             return merged
-                .SelectMany(a => new string[] { "--" + a.Key.LongName, a.Value })
+                .SelectMany(a => new string[] { a.Key.FullArgumentName, a.Value })
                 .Where(a => a != null)
                 .ToArray();
         }
@@ -155,14 +170,16 @@ namespace Centaurus
 
         struct OptionAlias
         {
-            public OptionAlias(string longName, string shortName)
+            public OptionAlias(string longName, string shortName, bool isVerb = false)
             {
                 LongName = longName;
                 ShortName = shortName;
+                IsVerb = isVerb;
             }
 
             public string LongName { get; }
             public string ShortName { get; }
+            public bool IsVerb { get; }
 
             public string EnvironmentLongName
             {
@@ -187,7 +204,15 @@ namespace Centaurus
 
             public override string ToString()
             {
-                return $"Short: {ShortName}, Long: {LongName}, Env: {EnvironmentLongName}";
+                return $"Short: {ShortName}, Long: {LongName}, Env: {EnvironmentLongName}, IsVerb: {IsVerb}";
+            }
+
+            public string FullArgumentName
+            {
+                get
+                {
+                    return IsVerb ? LongName : $"--{LongName}";
+                }
             }
         }
     }

@@ -1,4 +1,4 @@
-﻿namespace Centaurus.Alpha
+﻿namespace Centaurus
 {
     public class RequestRateLimitsModel
     {

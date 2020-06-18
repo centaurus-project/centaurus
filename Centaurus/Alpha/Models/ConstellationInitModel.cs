@@ -1,6 +1,6 @@
 ﻿using Centaurus.Models;
 
-namespace Centaurus.Alpha
+namespace Centaurus
 {
     public class ConstellationInitModel
     {

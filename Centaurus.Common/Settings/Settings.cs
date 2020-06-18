@@ -47,6 +47,7 @@ namespace Centaurus
         }
     }
 
+    [Verb("auditor", HelpText = "Launch Centaurus in auditor mode.")]
     public class AuditorSettings : BaseSettings
     {
         [Option("alpha_address", Required = true, HelpText = "URL of Alpha server.")]
@@ -67,6 +68,7 @@ namespace Centaurus
         }
     }
 
+    [Verb("alpha", HelpText = "Launch Centaurus in alpha mode.")]
     public class AlphaSettings : BaseSettings
     {
         [Option("alpha_url", Required = true, HelpText = "The url the alpha will listen on.")]

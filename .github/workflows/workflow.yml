@@ -62,12 +62,9 @@ jobs:
       shell: powershell
       run: |
         dotnet build -c Release
-        dotnet publish Centaurus.Alpha -r win-x64 -c Release /p:PublishSingleFile=true -o Release/win-x64 /p:DebugType=None
-        dotnet publish Centaurus.Auditor -r win-x64 -c Release /p:PublishSingleFile=true -o Release/win-x64 /p:DebugType=None
-        dotnet publish Centaurus.Alpha -r linux-x64 -c Release /p:PublishSingleFile=true -o Release/linux-x64 /p:DebugType=None
-        dotnet publish Centaurus.Auditor -r linux-x64 -c Release /p:PublishSingleFile=true -o Release/linux-x64 /p:DebugType=None
-        dotnet publish Centaurus.Alpha -r osx-x64 -c Release /p:PublishSingleFile=true -o Release/osx-x64 /p:DebugType=None
-        dotnet publish Centaurus.Auditor -r osx-x64 -c Release /p:PublishSingleFile=true -o Release/osx-x64 /p:DebugType=None
+        dotnet publish Centaurus -r win-x64 -c Release /p:PublishSingleFile=true -o Release/win-x64 /p:DebugType=None
+        dotnet publish Centaurus -r linux-x64 -c Release /p:PublishSingleFile=true -o Release/linux-x64 /p:DebugType=None
+        dotnet publish Centaurus -r osx-x64 -c Release /p:PublishSingleFile=true -o Release/osx-x64 /p:DebugType=None
     - name: Release
       shell: powershell
       run: |

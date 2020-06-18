@@ -1,7 +1,7 @@
 ﻿using Centaurus.Models;
 using stellar_dotnet_sdk;
 
-namespace Centaurus.Alpha
+namespace Centaurus
 {
     public class ConstellationInfo
     {
