@@ -100,10 +100,12 @@ namespace Centaurus.Test
                 RequestRateLimits = new RequestRateLimits { HourLimit = 1000, MinuteLimit = 100 }
             };
 
-
-            var alphaKeyPair = KeyPair.FromSecretSeed(TestEnvironment.AlphaKeyPair.SecretSeed);
             var envelope = initQuantum.CreateEnvelope();
-            envelope.Sign(alphaKeyPair);
+            if (!Global.IsAlpha)
+            {
+                var alphaKeyPair = KeyPair.FromSecretSeed(TestEnvironment.AlphaKeyPair.SecretSeed);
+                envelope.Sign(alphaKeyPair);
+            }
 
             Global.QuantumHandler.HandleAsync(envelope).Wait();
 

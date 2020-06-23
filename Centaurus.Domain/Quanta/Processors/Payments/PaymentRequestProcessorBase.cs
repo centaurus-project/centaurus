@@ -10,11 +10,9 @@ namespace Centaurus.Domain
 {
     public abstract class PaymentRequestProcessorBase : ClientRequestProcessorBase
     {
-        public override Task<ResultMessage> Process(MessageEnvelope envelope)
+        public override Task<ResultMessage> Process(MessageEnvelope envelope, EffectProcessorsContainer effectsContainer)
         {
-            var effectProcessorsContainer = new EffectProcessorsContainer(envelope, Global.AddEffects);
-
-            UpdateNonce(effectProcessorsContainer);
+            UpdateNonce(effectsContainer);
 
             var requestQuantum = (RequestQuantum)envelope.Message;
 
@@ -22,9 +20,9 @@ namespace Centaurus.Domain
 
             var paymentAccount = payment.AccountWrapper.Account;
 
-            AccountData vaultAccount = Global.VaultAccount; 
-            
-            effectProcessorsContainer.AddLockLiabilities(paymentAccount, payment.Asset, payment.Amount);
+            AccountData vaultAccount = Global.VaultAccount;
+
+            effectsContainer.AddLockLiabilities(paymentAccount, payment.Asset, payment.Amount);
             var destAccount = Global.AccountStorage.GetAccount(payment.Destination);
 
             //if withdrawal requested or if account doesn't exist in Centaurus, we need to build transaction
@@ -59,18 +57,18 @@ namespace Centaurus.Domain
                     TransactionHash = payment.TransactionHash
                 };
 
-                effectProcessorsContainer.AddWithdrawalCreate(withdrawal, Global.WithdrawalStorage);
+                effectsContainer.AddWithdrawalCreate(withdrawal, Global.WithdrawalStorage);
             }
             else
-            { 
+            {
                 //if the current request is payment, then we can process it immediately
-                effectProcessorsContainer.AddBalanceUpdate(destAccount.Account, payment.Asset, payment.Amount);
+                effectsContainer.AddBalanceUpdate(destAccount.Account, payment.Asset, payment.Amount);
 
-                effectProcessorsContainer.AddUnlockLiabilities(paymentAccount, payment.Asset, payment.Amount);
-                effectProcessorsContainer.AddBalanceUpdate(paymentAccount, payment.Asset, -payment.Amount);
+                effectsContainer.AddUnlockLiabilities(paymentAccount, payment.Asset, payment.Amount);
+                effectsContainer.AddBalanceUpdate(paymentAccount, payment.Asset, -payment.Amount);
             }
 
-            var effects = effectProcessorsContainer.GetEffects();
+            var effects = effectsContainer.GetEffects();
 
             var accountEffects = effects.Where(e => ByteArrayPrimitives.Equals(e.Pubkey, payment.Account)).ToList();
             return Task.FromResult(envelope.CreateResult(ResultStatusCodes.Success, accountEffects));

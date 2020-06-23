@@ -11,12 +11,10 @@ namespace Centaurus.Domain
     {
         public override MessageTypes SupportedMessageType => MessageTypes.OrderRequest;
 
-        public override Task<ResultMessage> Process(MessageEnvelope envelope)
+        public override Task<ResultMessage> Process(MessageEnvelope envelope, EffectProcessorsContainer effectsContainer)
         {
             var quantum = (RequestQuantum)envelope.Message;
             var requestMessage = quantum.RequestMessage;
-
-            var effectsContainer = new EffectProcessorsContainer(envelope, Global.AddEffects);
 
             UpdateNonce(effectsContainer);
 

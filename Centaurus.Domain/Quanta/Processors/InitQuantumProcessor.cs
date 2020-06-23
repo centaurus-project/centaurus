@@ -11,7 +11,7 @@ namespace Centaurus.Domain
     {
         public MessageTypes SupportedMessageType => MessageTypes.ConstellationInitQuantum;
 
-        public async Task<ResultMessage> Process(MessageEnvelope envelope)
+        public async Task<ResultMessage> Process(MessageEnvelope envelope, EffectProcessorsContainer effectProcessorsContainer)
         {
             var initEffects = await SnapshotManager.ApplyInitUpdates(envelope);
 

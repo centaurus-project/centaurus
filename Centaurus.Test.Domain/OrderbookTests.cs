@@ -102,7 +102,7 @@ namespace Centaurus.Test
                 }
             };
 
-            var orderEffectsContainer = new EffectProcessorsContainer(order.CreateEnvelope());
+            var orderEffectsContainer = new EffectProcessorsContainer(order.CreateEnvelope(), (env, effs) => { });
             Global.Exchange.ExecuteOrder(orderEffectsContainer);
             var effects = orderEffectsContainer.GetEffects();
             Assert.AreEqual(effects.Length, 2);
@@ -139,7 +139,7 @@ namespace Centaurus.Test
                 }
             };
 
-            var conterOrderEffectsContainer = new EffectProcessorsContainer(conterOrder.CreateEnvelope());
+            var conterOrderEffectsContainer = new EffectProcessorsContainer(conterOrder.CreateEnvelope(), (env, effs) => { });
             Global.Exchange.ExecuteOrder(conterOrderEffectsContainer);
             if (orderRequest2.Side == OrderSides.Sell)
             {
@@ -184,7 +184,7 @@ namespace Centaurus.Test
                     }
                 };
 
-                var conterOrderEffectsContainer = new EffectProcessorsContainer(trade.CreateEnvelope());
+                var conterOrderEffectsContainer = new EffectProcessorsContainer(trade.CreateEnvelope(), (env, effs) => { });
                 testTradeResults.Add(trade, conterOrderEffectsContainer);
             }
 

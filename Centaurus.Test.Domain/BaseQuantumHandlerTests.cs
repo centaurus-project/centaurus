@@ -4,6 +4,8 @@ using NUnit.Framework;
 using stellar_dotnet_sdk;
 using System;
 using System.Collections.Generic;
+using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Centaurus.Test
@@ -19,6 +21,8 @@ namespace Centaurus.Test
         [TestCase(3, 63, 100, 0, null)]
         public async Task LedgerQuantumTest(int ledgerFrom, int ledgerTo, int amount, int asset, Type excpectedException)
         {
+            Global.AppState.State = ApplicationState.Ready;
+
             long apex = Global.QuantumStorage.CurrentApex;
 
             var client1StartBalanceAmount = (long)0;
@@ -58,12 +62,15 @@ namespace Centaurus.Test
                     AccountWrapper = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair)
                 };
 
-                Message quantum = withdrawal;
+                MessageEnvelope quantum = withdrawal.CreateEnvelope();
+                quantum.Sign(TestEnvironment.Client1KeyPair);
                 if (!Global.IsAlpha)
-                    quantum = new RequestQuantum { Apex = ++apex, RequestEnvelope = withdrawal.CreateEnvelope(), Timestamp = DateTime.UtcNow.Ticks };
-
+                {
+                    quantum = new RequestQuantum { Apex = ++apex, RequestEnvelope = quantum, Timestamp = DateTime.UtcNow.Ticks }.CreateEnvelope();
+                    quantum.Sign(TestEnvironment.AlphaKeyPair);
+                }
                 //create withdrawal
-                await Global.QuantumHandler.HandleAsync(quantum.CreateEnvelope());
+                await Global.QuantumHandler.HandleAsync(quantum);
             }
 
             var depositeAmount = new Random().Next(10, 1000);
@@ -94,13 +101,17 @@ namespace Centaurus.Test
             var ledgerNotificationEnvelope = ledgerNotification.CreateEnvelope();
             ledgerNotificationEnvelope.Sign(TestEnvironment.Auditor1KeyPair);
 
-            var ledgerCommit = new LedgerCommitQuantum
+            var ledgerCommitEnv = new LedgerCommitQuantum
             {
                 Source = ledgerNotificationEnvelope,
                 Apex = ++apex
-            };
+            }.CreateEnvelope();
+            if (!Global.IsAlpha)
+            {
+                ledgerCommitEnv.Sign(TestEnvironment.AlphaKeyPair);
+            }
 
-            await AssertQuantumHandling(ledgerCommit.CreateEnvelope(), excpectedException);
+            await AssertQuantumHandling(ledgerCommitEnv, excpectedException);
             if (excpectedException == null)
             {
                 Assert.AreEqual(Global.LedgerManager.Ledger, ledgerNotification.LedgerTo);
@@ -131,11 +142,13 @@ namespace Centaurus.Test
             };
 
             var envelope = order.CreateEnvelope();
+            envelope.Sign(TestEnvironment.Client1KeyPair);
 
             if (!Global.IsAlpha)
             {
                 var quantum = new RequestQuantum { Apex = Global.QuantumStorage.CurrentApex + 1, RequestEnvelope = envelope };
                 envelope = quantum.CreateEnvelope();
+                envelope.Sign(TestEnvironment.AlphaKeyPair);
             }
 
             await AssertQuantumHandling(envelope, excpectedException);
@@ -157,6 +170,8 @@ namespace Centaurus.Test
         [TestCase(1, null)]
         public async Task AccountDataRequestTest(int nonce, Type excpectedException)
         {
+            Global.AppState.State = ApplicationState.Ready;
+
             var order = new AccountDataRequest
             {
                 Account = TestEnvironment.Client1KeyPair,
@@ -218,7 +233,18 @@ namespace Centaurus.Test
         {
             try
             {
-                return await Global.QuantumHandler.HandleAsync(quantum);
+                var result = await Global.QuantumHandler.HandleAsync(quantum);
+
+                var globalType = typeof(Global);
+                var applyUpdatesMethod = globalType.GetMethod("ApplyUpdates", BindingFlags.NonPublic | BindingFlags.Static);
+
+                await (Task)applyUpdatesMethod.Invoke(null, null);
+
+                //check that processed quanta is saved to the storage
+                var lastApex = await Global.PermanentStorage.GetLastApex();
+                Assert.AreEqual(Global.QuantumStorage.CurrentApex, lastApex);
+
+                return result;
             }
             catch (Exception exc)
             {

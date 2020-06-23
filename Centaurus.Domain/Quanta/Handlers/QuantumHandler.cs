@@ -70,7 +70,7 @@ namespace Centaurus.Domain
             var tcs = handleItem.HandlingTaskSource;
             ResultMessage result;
             try
-            { 
+            {
                 Global.ExtensionsManager.BeforeQuantumHandle(envelope);
 
                 result = await HandleQuantum(envelope);
@@ -131,9 +131,13 @@ namespace Centaurus.Domain
             //we need to sign the quantum here to prevent multiple signatures that can occur if we sign it when sending
             quantumEnvelope.Sign(Global.Settings.KeyPair);
 
-            var resultMessage = await processor.Process(quantumEnvelope);
+            var effectsContainer = GetEffectProcessorsContainer(quantumEnvelope);
+
+            var resultMessage = await processor.Process(quantumEnvelope, effectsContainer);
 
             quantum.IsProcessed = true;
+
+            SaveEffects(effectsContainer);
 
             Notifier.OnMessageProcessResult(resultMessage);
 
@@ -160,11 +164,15 @@ namespace Centaurus.Domain
 
                 await processor.Validate(envelope);
 
-                result = await processor.Process(envelope);
+                var effectsContainer = GetEffectProcessorsContainer(envelope);
+
+                result = await processor.Process(envelope, effectsContainer);
 
                 Global.QuantumStorage.AddQuantum(envelope);
 
                 ProcessTransaction(envelope, result);
+
+                SaveEffects(effectsContainer);
 
                 logger.Trace($"Message of type {messageType} with apex {((Quantum)envelope.Message).Apex} is handled.");
             }
@@ -179,6 +187,18 @@ namespace Centaurus.Domain
                 OutgoingMessageStorage.EnqueueMessage(result);
             }
             return result;
+        }
+
+        EffectProcessorsContainer GetEffectProcessorsContainer(MessageEnvelope envelope)
+        {
+            return new EffectProcessorsContainer(envelope, Global.AddEffects);
+        }
+
+        void SaveEffects(EffectProcessorsContainer effectsContainer)
+        {
+            //we must ignore init quantum because it will be saved immidiatly
+            if (effectsContainer.Apex > 1)
+                effectsContainer.SaveEffects();
         }
 
         void ValidateAccountRequestRate(MessageEnvelope envelope)
