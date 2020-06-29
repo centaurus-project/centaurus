@@ -12,14 +12,12 @@ namespace Centaurus.Domain
     {
         public MessageTypes SupportedMessageType => MessageTypes.LedgerCommitQuantum;
 
-        public Task<ResultMessage> Process(MessageEnvelope envelope)
+        public Task<ResultMessage> Process(MessageEnvelope envelope, EffectProcessorsContainer effectsContainer)
         {
             var ledgerQuantum = (LedgerCommitQuantum)envelope.Message;
             var ledgerNotification = (LedgerUpdateNotification)ledgerQuantum.Source.Message;
 
-            var effectsContainer = new EffectProcessorsContainer(envelope, Global.AddEffects);
-
-            effectsContainer.AddLedgerCommit(Global.LedgerManager, ledgerNotification.LedgerTo, Global.LedgerManager.Ledger);
+            effectsContainer.AddLedgerUpdate(Global.LedgerManager, ledgerNotification.LedgerTo, Global.LedgerManager.Ledger);
 
             for (var i = 0; i < ledgerNotification.Payments.Count; i++)
             {

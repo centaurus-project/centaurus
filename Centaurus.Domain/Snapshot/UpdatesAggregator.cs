@@ -49,7 +49,7 @@ namespace Centaurus.Domain
                 //update current apex
                 stellarData.CurrentApex = quantumMessage.Apex;
 
-                var quatumEffects = update[i].Effects;
+                var quatumEffects = currentUpdateItem.Effects;
                 var quatumEffectsLength = quatumEffects.Length;
                 for (var c = 0; c < quatumEffectsLength; c++)
                 {

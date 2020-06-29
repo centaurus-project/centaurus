@@ -88,7 +88,7 @@ namespace Centaurus.Domain
                 var updateItems = updates.GetAll();
                 if (updateItems.Count > 0)
                 {
-                    var aggregatedUpdates = await UpdatesAggregator.Aggregate(updates.GetAll());
+                    var aggregatedUpdates = await UpdatesAggregator.Aggregate(updateItems);
                     await Global.PermanentStorage.Update(aggregatedUpdates);
                 }
             }

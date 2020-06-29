@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using System.Timers;
 using Centaurus.DAL;
 using Centaurus.DAL.Mongo;
@@ -45,7 +46,7 @@ namespace Centaurus.Domain
             {
                 var snapshot = SnapshotManager.GetSnapshot(lastApex).Result;
                 Setup(snapshot);
-                if (IsAlpha) 
+                if (IsAlpha)
                     AppState.State = ApplicationState.Rising;//Alpha should ensure that it has all quanta from auditors
                 else
                     AppState.State = ApplicationState.Running;
@@ -58,7 +59,10 @@ namespace Centaurus.Domain
 
             QuantumHandler = new QuantumHandler(QuantumStorage.CurrentApex);
 
-            InitTimers();
+            pendingUpdates = new PendingUpdates();
+
+            if (!EnvironmentHelper.IsTest)
+                InitTimers();
         }
 
         public static void Setup(Snapshot snapshot)
@@ -124,11 +128,11 @@ namespace Centaurus.Domain
 
         public static HashSet<int> AssetIds { get; private set; }
 
-        private static PendingUpdates pendingUpdates = new PendingUpdates();
+        private static PendingUpdates pendingUpdates;
 
         public static void AddEffects(MessageEnvelope quantum, Effect[] effects)
         {
-            pendingUpdates?.Add(quantum, effects);
+            pendingUpdates.Add(quantum, effects);
         }
 
         static void InitTimers()
@@ -152,8 +156,8 @@ namespace Centaurus.Domain
         {
             snapshotIsInProgress = false;
 
-            snapshotTimoutTimer.Stop();
-            snapshotRunTimer.Start();
+            snapshotTimoutTimer?.Stop();
+            snapshotRunTimer?.Start();
         }
 
         private static void OnSnapshotFailed(string reason)
@@ -174,13 +178,18 @@ namespace Centaurus.Domain
             while (snapshotIsInProgress)
                 System.Threading.Thread.Sleep(100);
 
+            snapshotIsInProgress = true;
+
+            _ = ApplyUpdates();
+
+            snapshotTimoutTimer.Start();
+        }
+
+        private static async Task ApplyUpdates()
+        {
             var updates = pendingUpdates;
             pendingUpdates = new PendingUpdates();
-            _ = SnapshotManager.ApplyUpdates(updates);
-
-#if !DEBUG
-            snapshotTimoutTimer.Start();
-#endif
+            await SnapshotManager.ApplyUpdates(updates);
         }
 
         private static Timer snapshotTimoutTimer;
