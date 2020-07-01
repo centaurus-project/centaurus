@@ -55,7 +55,7 @@ namespace Centaurus.Domain
                 {
                     var effect = quatumEffects[c];
 
-                    effects.Add(EffectModelExtensions.FromEffect(effect, c));
+                    effects.Add(effect.FromEffect(c));
 
                     switch (effect)
                     {

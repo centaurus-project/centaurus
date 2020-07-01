@@ -3,7 +3,7 @@ using Centaurus.Xdr;
 
 namespace Centaurus.Models
 {
-    public abstract class PaymentRequestBase : RequestMessage, ITransactionContainer
+    public abstract class PaymentRequestBase : NonceRequestMessage, ITransactionContainer
     {
         [XdrField(0)]
         public int Asset { get; set; }

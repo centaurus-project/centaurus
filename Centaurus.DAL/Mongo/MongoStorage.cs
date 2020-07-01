@@ -1,4 +1,5 @@
 ﻿using Centaurus.DAL.Models;
+using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
 using MongoDB.Bson.Serialization.Conventions;
 using MongoDB.Bson.Serialization.Options;
@@ -29,9 +30,15 @@ namespace Centaurus.DAL.Mongo
 
         private async Task CreateIndexes()
         {
-            await accountsCollection.Indexes.CreateOneAsync(
+            await Task.WhenAll(
+            accountsCollection.Indexes.CreateOneAsync(
                  new CreateIndexModel<AccountModel>(Builders<AccountModel>.IndexKeys.Ascending(a => a.PubKey),
                  new CreateIndexOptions { Unique = true, Background = true })
+            ),
+            effectsCollection.Indexes.CreateOneAsync(
+                 new CreateIndexModel<EffectModel>(Builders<EffectModel>.IndexKeys.Ascending(a => a.Id),
+                 new CreateIndexOptions { Unique = true, Background = true })
+            )
             );
         }
 
@@ -52,7 +59,7 @@ namespace Centaurus.DAL.Mongo
             constellationStateCollection = database.GetCollection<ConstellationState>("constellationState");
             withdrawalsCollection = database.GetCollection<WithdrawalModel>("withdrawals");
 
-            effectsCollection = database.GetCollection<EffectModel>("effects");
+            effectsCollection = database.GetCollection<EffectModel>("effects", new MongoCollectionSettings { AssignIdOnInsert = false });
 
             settingsCollection = database.GetCollection<SettingsModel>("constellationSettings");
 
@@ -180,6 +187,73 @@ namespace Centaurus.DAL.Mongo
                    .FirstOrDefaultAsync();
 
             return quanta?.Apex ?? -1;
+        }
+
+        public override async Task<CursorResult<EffectModel>> LoadEffects(EffectsPagingToken effectsPagingToken, byte[] account)
+        {
+            IFindFluent<EffectModel, EffectModel> query;
+            if (account != null)
+                query = effectsCollection
+                    .Find(e => e.Account == account);
+            else
+                query = effectsCollection
+                    .Find(FilterDefinition<EffectModel>.Empty);
+
+            if (effectsPagingToken != null)
+            {
+                var objectId = new ObjectId(effectsPagingToken.Id);
+                if (effectsPagingToken.IsPrev ^ effectsPagingToken.IsDesc)
+                    query = effectsCollection
+                        .Find(Builders<EffectModel>.Filter.Lt("Id", objectId));
+                else
+                    query = effectsCollection
+                        .Find(Builders<EffectModel>.Filter.Gt("Id", objectId));
+            }
+
+            if (effectsPagingToken.IsDesc)
+                query = query
+                    .SortByDescending(e => e.Id);
+
+            var totalCount = await query.CountDocumentsAsync();
+            var hasMore = totalCount > effectsPagingToken.Limit;
+
+            query = query
+                .Limit(effectsPagingToken.Limit);
+
+            var effects = await query
+                .ToListAsync();
+
+            EffectsPagingToken prev = null,
+                next = null;
+
+            if (effects.Count > 0)
+            {
+                if (effectsPagingToken.Id.Any(x => x != 0))
+                    prev = new EffectsPagingToken
+                    {
+                        Id = effects.First().Id,
+                        IsDesc = effectsPagingToken.IsDesc,
+                        IsPrev = true,
+                        Limit = effectsPagingToken.Limit
+                    };
+
+                if (hasMore)
+                    next = new EffectsPagingToken
+                    {
+                        Id = effects.Last().Id,
+                        IsDesc = effectsPagingToken.IsDesc,
+                        IsPrev = true,
+                        Limit = effectsPagingToken.Limit
+                    };
+            }
+
+            return new CursorResult<EffectModel>
+            {
+                Items = effects,
+                CurrentToken = effectsPagingToken.ToBase64(),
+                PrevToken = prev.ToBase64(),
+                NextToken = next.ToBase64()
+            };
         }
 
         #region Updates

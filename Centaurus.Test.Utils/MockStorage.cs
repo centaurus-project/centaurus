@@ -286,5 +286,10 @@ namespace Centaurus.Test
                 }
             }
         }
+
+        public override Task<CursorResult<EffectModel>> LoadEffects(EffectsPagingToken effectsPagingToken, byte[] account)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

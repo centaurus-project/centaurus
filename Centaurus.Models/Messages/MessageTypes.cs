@@ -44,6 +44,10 @@ namespace Centaurus.Models
         /// </summary>
         LedgerCommitQuantum = 49,
         /// <summary>
+        /// A client requested account's effects.
+        /// </summary>
+        EffectsRequest = 50,
+        /// <summary>
         /// Initiate connection handshake.
         /// </summary>
         HandshakeInit = 100,
@@ -67,6 +71,10 @@ namespace Centaurus.Models
         /// Account data request result.
         /// </summary>
         AccountDataResponse = 150,
+        /// <summary>
+        /// Account's effects request result.
+        /// </summary>
+        EffectsResponse = 151,
         /// <summary>
         /// Contains data for init. It will be created by alpha on init.
         /// </summary>

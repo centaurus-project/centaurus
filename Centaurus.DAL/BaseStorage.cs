@@ -52,6 +52,8 @@ namespace Centaurus.DAL
 
         public abstract Task<List<EffectModel>> LoadEffectsAboveApex(long apex);
 
+        public abstract Task<CursorResult<EffectModel>> LoadEffects(EffectsPagingToken effectsPagingToken, byte[] account);
+
         public abstract Task<List<AccountModel>> LoadAccounts();
 
         public abstract Task<List<BalanceModel>> LoadBalances();

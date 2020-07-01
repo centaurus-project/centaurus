@@ -22,6 +22,8 @@ namespace Centaurus.Models
     [XdrUnion((int)MessageTypes.ConstellationInitQuantum, typeof(ConstellationInitQuantum))]
     [XdrUnion((int)MessageTypes.ConstellationUpgradeQuantum, typeof(ConstellationUpgradeQuantum))]
     [XdrUnion((int)MessageTypes.QuantaBatch, typeof(QuantaBatch))]
+    [XdrUnion((int)MessageTypes.EffectsRequest, typeof(EffectsRequest))]
+    [XdrUnion((int)MessageTypes.EffectsResponse, typeof(EffectsResponse))]
     public abstract class Message 
     {
         public abstract MessageTypes MessageType { get; }
