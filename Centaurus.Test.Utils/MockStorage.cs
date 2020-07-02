@@ -36,7 +36,7 @@ namespace Centaurus.Test
 
         public override Task<long> GetLastApex()
         {
-            var res = quantaCollection.FirstOrDefault()?.Apex ?? -1;
+            var res = quantaCollection.LastOrDefault()?.Apex ?? -1;
             return Task.FromResult(res);
         }
 

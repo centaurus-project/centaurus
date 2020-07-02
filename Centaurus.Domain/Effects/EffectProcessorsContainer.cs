@@ -10,19 +10,13 @@ namespace Centaurus.Domain
     {
         List<IEffectProcessor<Effect>> container = new List<IEffectProcessor<Effect>>();
 
-        public EffectProcessorsContainer(MessageEnvelope quantum)
+        public EffectProcessorsContainer(MessageEnvelope quantum, Action<MessageEnvelope, Effect[]> saveEffectsFn)
         {
             Envelope = quantum ?? throw new ArgumentNullException(nameof(quantum));
+            this.saveEffectsFn = saveEffectsFn ?? throw new ArgumentNullException(nameof(saveEffectsFn));
         }
 
-        public EffectProcessorsContainer(MessageEnvelope quantum, Action<MessageEnvelope, Effect[]> saveEffectsFn)
-            : this(quantum)
-        {
-            this.saveEffectsFn = saveEffectsFn;
-        }
-
-        private Action<MessageEnvelope, Effect[]> saveEffectsFn;
-
+        private readonly Action<MessageEnvelope, Effect[]> saveEffectsFn;
         public MessageEnvelope Envelope { get; }
 
         public Quantum Quantum => (Quantum)Envelope.Message;
@@ -68,9 +62,9 @@ namespace Centaurus.Domain
         }
 
         /// <summary>
-        /// Iterates over the effect processors and commits each. Also adds the quantum and effects to PendingUpdates if it's presented
+        /// Iterates over the effect processors and commits each.
         /// </summary>
-        public void Commit()
+        public void CommitAll()
         {
             var effectsLength = container.Count;
             for (var i = 0; i < effectsLength; i++)
@@ -78,7 +72,14 @@ namespace Centaurus.Domain
                 var currentEffect = container[i];
                 currentEffect.CommitEffect();
             }
-            saveEffectsFn?.Invoke(Envelope, GetEffects());
+        }
+
+        /// <summary>
+        /// Sends envelope and all effects to specified callback
+        /// </summary>
+        public void SaveEffects()
+        {
+            saveEffectsFn.Invoke(Envelope, GetEffects());
         }
 
         /// <summary>
@@ -209,7 +210,7 @@ namespace Centaurus.Domain
             ));
         }
 
-        public void AddLedgerCommit(LedgerManager ledgerManager, long newLedger, long prevLedger)
+        public void AddLedgerUpdate(LedgerManager ledgerManager, long newLedger, long prevLedger)
         {
             Add(new LedgerUpdateEffectProcessor(
                 new LedgerUpdateEffect {  Apex = Apex, Ledger = newLedger, PrevLedger = prevLedger },

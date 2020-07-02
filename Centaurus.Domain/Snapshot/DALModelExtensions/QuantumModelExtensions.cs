@@ -17,7 +17,12 @@ namespace Centaurus.Domain
             byte[] account = null;
             var quantumMessage = (Quantum)quantum.Message;
             if (quantumMessage is RequestQuantum)
-                account = ((RequestQuantum)quantumMessage).RequestEnvelope.Signatures.First().Signer.Data;
+            {
+                var request = ((RequestQuantum)quantumMessage).RequestEnvelope;
+                if (request.Signatures.Count < 1)
+                    throw new Exception("A quantum lack signatures.");
+                account = request.Signatures.First().Signer.Data;
+            }
             return new QuantumModel
             {
                 Apex = quantumMessage.Apex,

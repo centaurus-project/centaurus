@@ -20,6 +20,7 @@ namespace Centaurus.Domain
         /// Execute quantum request and generate response message.
         /// </summary>
         /// <param name="envelope">Quantum request</param>
-        public Task<ResultMessage> Process(MessageEnvelope envelope);
+        /// <param name="effectProcessorsContainer">Current context effects processor container</param>
+        public Task<ResultMessage> Process(MessageEnvelope envelope, EffectProcessorsContainer effectProcessorsContainer);
     }
 }

@@ -10,7 +10,7 @@ namespace Centaurus.Domain
     {
         public abstract MessageTypes SupportedMessageType { get; }
 
-        public abstract Task<ResultMessage> Process(MessageEnvelope envelope);
+        public abstract Task<ResultMessage> Process(MessageEnvelope envelope, EffectProcessorsContainer effectsContainer);
 
         public abstract Task Validate(MessageEnvelope envelope);
 
