@@ -191,28 +191,29 @@ namespace Centaurus.DAL.Mongo
 
         public override async Task<CursorResult<EffectModel>> LoadEffects(EffectsPagingToken effectsPagingToken, byte[] account)
         {
+            if (effectsPagingToken == null)
+                throw new ArgumentNullException(nameof(effectsPagingToken));
+
             IFindFluent<EffectModel, EffectModel> query;
-            if (account != null)
+            if (account != null) //specified account's effects
                 query = effectsCollection
                     .Find(e => e.Account == account);
-            else
+            else //load all effects
                 query = effectsCollection
                     .Find(FilterDefinition<EffectModel>.Empty);
 
-            if (effectsPagingToken != null)
-            {
-                var objectId = new ObjectId(effectsPagingToken.Id);
-                if (effectsPagingToken.IsPrev ^ effectsPagingToken.IsDesc)
-                    query = effectsCollection
-                        .Find(Builders<EffectModel>.Filter.Lt("Id", objectId));
-                else
-                    query = effectsCollection
-                        .Find(Builders<EffectModel>.Filter.Gt("Id", objectId));
-            }
 
             if (effectsPagingToken.IsDesc)
                 query = query
-                    .SortByDescending(e => e.Id);
+                .SortByDescending(e => e.Id);
+
+            var objectId = new ObjectId(effectsPagingToken.Id);
+            if (effectsPagingToken.IsPrev ^ effectsPagingToken.IsDesc)
+                query = effectsCollection
+                    .Find(Builders<EffectModel>.Filter.Lt("Id", objectId));
+            else
+                query = effectsCollection
+                    .Find(Builders<EffectModel>.Filter.Gt("Id", objectId));
 
             var totalCount = await query.CountDocumentsAsync();
             var hasMore = totalCount > effectsPagingToken.Limit;

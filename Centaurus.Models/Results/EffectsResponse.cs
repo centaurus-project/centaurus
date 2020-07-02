@@ -9,6 +9,8 @@ namespace Centaurus.Models
     {
         public override MessageTypes MessageType => MessageTypes.EffectsResponse;
 
+        public override ulong MessageId => CurrentToken.GetInt64HashCode();
+
         [XdrField(0)]
         public List<Effect> Items { get; set; }
 

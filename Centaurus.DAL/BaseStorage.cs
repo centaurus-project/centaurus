@@ -52,6 +52,12 @@ namespace Centaurus.DAL
 
         public abstract Task<List<EffectModel>> LoadEffectsAboveApex(long apex);
 
+        /// <summary>
+        /// Fetches effects
+        /// </summary>
+        /// <param name="effectsPagingToken">Token that contains all info about the request</param>
+        /// <param name="account">Account for which effects will be loaded. If it's null then all effects will be loaded.</param>
+        /// <returns></returns>
         public abstract Task<CursorResult<EffectModel>> LoadEffects(EffectsPagingToken effectsPagingToken, byte[] account);
 
         public abstract Task<List<AccountModel>> LoadAccounts();

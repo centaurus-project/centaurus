@@ -74,6 +74,13 @@ namespace Centaurus.Domain
             }
         }
 
+        public async Task<EffectsResponse> LoadEffects(string pagingToken, byte[] account)
+        {
+            var token = EffectsPagingToken.FromBase64(pagingToken);
+            var effects = await Global.PermanentStorage.LoadEffects(token, account);
+            return effects.ToEffectResponse();
+        }
+
         private Action onSnapshotSuccess;
         private Action<string> onSnapshotFailed;
 
@@ -284,15 +291,6 @@ namespace Centaurus.Domain
                 return -1;
 
             return minApex - 1; //we can revert effect for that apex, so the minimal apex is first effect apex - 1
-        }
-
-        public static async Task<EffectsResponse> LoadEffects(string pagingToken, byte[] account)
-        {
-            if (account == null)
-                throw new ArgumentNullException(nameof(account));
-            var token = EffectsPagingToken.FromBase64(pagingToken);
-            var effects = await Global.PermanentStorage.LoadEffects(token, account);
-            return effects.ToEffectResponse();
         }
 
         private static async Task<Exchange> GetRestoredExchange(List<Order> orders)

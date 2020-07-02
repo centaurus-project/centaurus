@@ -21,7 +21,7 @@ namespace Centaurus.Domain
                 try
                 {
                     var request = messageEnvelope.Message as EffectsRequest;
-                    var effectsResponse = await SnapshotManager.LoadEffects(request.PagingToken, request.Account.Data);
+                    var effectsResponse = await Global.SnapshotManager.LoadEffects(request.PagingToken, request.Account.Data);
                     effectsResponse.OriginalMessage = messageEnvelope;
                     effectsResponse.Effects = new List<Effect>();
                     effectsResponse.Status = ResultStatusCodes.Success;
