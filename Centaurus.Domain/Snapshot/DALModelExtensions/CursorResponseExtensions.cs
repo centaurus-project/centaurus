@@ -12,9 +12,18 @@ namespace Centaurus.Domain
     {
         public static EffectsResponse ToEffectResponse(this CursorResult<EffectModel> effects)
         {
+            var parsedEffects = new List<Effect>();
+            foreach (var e in effects.Items)
+            {
+                var effect = XdrConverter.Deserialize<Effect>(e.RawEffect);
+                if (e.Account != null)
+                    effect.Pubkey = e.Account;
+                parsedEffects.Add(effect);
+            }
+
             return new EffectsResponse
             {
-                Items = effects.Items.Select(e => XdrConverter.Deserialize<Effect>(e.RawEffect)).ToList(),
+                Items = parsedEffects,
                 CurrentToken = effects.CurrentToken,
                 NextToken = effects.NextToken,
                 PrevToken = effects.PrevToken

@@ -14,7 +14,7 @@ namespace Centaurus.Domain
         {
             return new EffectModel
             {
-                Index = index,
+                Id = BitConverter.GetBytes(effect.Apex).Concat(BitConverter.GetBytes(index)).ToArray(),
                 Apex = effect.Apex,
                 Account = effect.Pubkey?.Data,
                 EffectType = (int)effect.EffectType,

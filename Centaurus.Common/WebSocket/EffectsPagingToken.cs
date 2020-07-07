@@ -13,17 +13,12 @@ namespace Centaurus
         /// <summary>
         /// Storage effect id. First 8 bytes is Apex, and next 4 bytes is effect index.
         /// </summary>
-        public byte[] Id { get; set; } = new byte[12];
+        public byte[] Id { get; set; }
 
         /// <summary>
         /// The sorting field. If the value is true, then we need to do a reverse sorting.
         /// </summary>
         public bool IsDesc { get; set; }
-
-        /// <summary>
-        /// If the value is false we will take n (limit) items after the specified id, otherwise previus n items.
-        /// </summary>
-        public bool IsPrev { get; set; }
 
         /// <summary>
         /// Limit per page
@@ -32,9 +27,8 @@ namespace Centaurus
 
         public byte[] ToByteArray()
         {
-            return Id
+            return (Id ?? new byte[12])
                 .Concat(BitConverter.GetBytes(IsDesc))
-                .Concat(BitConverter.GetBytes(IsPrev))
                 .Concat(BitConverter.GetBytes(Limit))
                 .ToArray();
         }
@@ -49,15 +43,14 @@ namespace Centaurus
             if (rawPagingToken == null)
                 return new EffectsPagingToken();
 
-            if (rawPagingToken.Length != 16)
-                throw new ArgumentException("Must be a valid 16 byte array.", nameof(rawPagingToken));
+            if (rawPagingToken.Length != 15)
+                throw new ArgumentException("Must be a valid 15 byte array.", nameof(rawPagingToken));
 
             return new EffectsPagingToken
             {
                 Id = rawPagingToken.Take(12).ToArray(),
                 IsDesc = BitConverter.ToBoolean(rawPagingToken, 12),
-                IsPrev = BitConverter.ToBoolean(rawPagingToken, 13),
-                Limit = BitConverter.ToInt16(rawPagingToken, 14)
+                Limit = BitConverter.ToInt16(rawPagingToken, 13)
             };
         }
 

@@ -14,10 +14,15 @@ namespace Centaurus.DAL.Models
 
         public int EffectType { get; set; }
 
-        public int Index { get; set; }
-
         public byte[] RawEffect { get; set; }
 
         public DateTime Timestamp { get; set; }
+
+        public override string ToString()
+        {
+            return $"{{ apex: {(Id == null ? 0 : BitConverter.ToInt64(Id, 0))}, " +
+                $"index: {((Id == null ? 0 : BitConverter.ToInt32(Id, 8)))}, " +
+                $"effectType: {EffectType} }}";
+        }
     }
 }

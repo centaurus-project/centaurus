@@ -205,48 +205,36 @@ namespace Centaurus.DAL.Mongo
 
             if (effectsPagingToken.IsDesc)
                 query = query
-                .SortByDescending(e => e.Id);
+                    .SortByDescending(e => e.Id);
 
-            var objectId = new ObjectId(effectsPagingToken.Id);
-            if (effectsPagingToken.IsPrev ^ effectsPagingToken.IsDesc)
-                query = effectsCollection
-                    .Find(Builders<EffectModel>.Filter.Lt("Id", objectId));
-            else
-                query = effectsCollection
-                    .Find(Builders<EffectModel>.Filter.Gt("Id", objectId));
 
-            var totalCount = await query.CountDocumentsAsync();
-            var hasMore = totalCount > effectsPagingToken.Limit;
-
-            query = query
-                .Limit(effectsPagingToken.Limit);
+            if (effectsPagingToken.Id.Any(x => x != 0))
+            {
+                var objectId = new ObjectId(effectsPagingToken.Id);
+                if (effectsPagingToken.IsDesc)
+                    query = effectsCollection
+                        .Find(Builders<EffectModel>.Filter.Lt("Id", objectId));
+                else
+                    query = effectsCollection
+                        .Find(Builders<EffectModel>.Filter.Gt("Id", objectId));
+            }
 
             var effects = await query
+                .Limit(effectsPagingToken.Limit)
                 .ToListAsync();
 
-            EffectsPagingToken prev = null,
-                next = null;
-
-            if (effects.Count > 0)
-            {
-                if (effectsPagingToken.Id.Any(x => x != 0))
-                    prev = new EffectsPagingToken
-                    {
-                        Id = effects.First().Id,
-                        IsDesc = effectsPagingToken.IsDesc,
-                        IsPrev = true,
-                        Limit = effectsPagingToken.Limit
-                    };
-
-                if (hasMore)
-                    next = new EffectsPagingToken
-                    {
-                        Id = effects.Last().Id,
-                        IsDesc = effectsPagingToken.IsDesc,
-                        IsPrev = true,
-                        Limit = effectsPagingToken.Limit
-                    };
-            }
+            EffectsPagingToken prev = new EffectsPagingToken
+                {
+                    Id = effects.FirstOrDefault()?.Id,
+                    IsDesc = !effectsPagingToken.IsDesc,
+                    Limit = effectsPagingToken.Limit
+                },
+                next = new EffectsPagingToken
+                {
+                    Id = effects.LastOrDefault()?.Id,
+                    IsDesc = effectsPagingToken.IsDesc,
+                    Limit = effectsPagingToken.Limit
+                };
 
             return new CursorResult<EffectModel>
             {

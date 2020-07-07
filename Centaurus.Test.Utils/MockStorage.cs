@@ -294,61 +294,48 @@ namespace Centaurus.Test
                 throw new ArgumentNullException(nameof(effectsPagingToken));
 
             IEnumerable<EffectModel> query;
-            if (account != null)
+            if (account != null) //specified account's effects
                 query = effectsCollection
                     .Where(e => ByteArrayPrimitives.Equals(e.Account, account));
-            else
+            else //load all effects
                 query = effectsCollection;
 
             if (effectsPagingToken.IsDesc)
                 query = query.Reverse();
 
-            if (effectsPagingToken.IsPrev ^ effectsPagingToken.IsDesc)
-                query = query
-                    .Where(e => ((IStructuralComparable)e.Id).CompareTo(effectsPagingToken.Id, Comparer<byte>.Default) < 0);
-            else
-                query = query
-                    .Where(e => ((IStructuralComparable)e.Id).CompareTo(effectsPagingToken.Id, Comparer<byte>.Default) > 0);
-
-            var totalCount = query.Count();
-            var hasMore = totalCount > effectsPagingToken.Limit;
-
-            query = query
-                .Take(effectsPagingToken.Limit);
+            if (effectsPagingToken.Id.Any(x => x != 0))
+            {
+                if (effectsPagingToken.IsDesc)
+                    query = query
+                        .Where(e => ((IStructuralComparable)e.Id).CompareTo(effectsPagingToken.Id, Comparer<byte>.Default) < 0);
+                else
+                    query = query
+                        .Where(e => ((IStructuralComparable)e.Id).CompareTo(effectsPagingToken.Id, Comparer<byte>.Default) > 0);
+            }
 
             var effects = query
+                .Take(effectsPagingToken.Limit)
                 .ToList();
 
-            EffectsPagingToken prev = null,
-                next = null;
-
-            if (effects.Count > 0)
-            {
-                if (effectsPagingToken.Id.Any(x => x != 0))
-                    prev = new EffectsPagingToken
-                    {
-                        Id = effects.First().Id,
-                        IsDesc = effectsPagingToken.IsDesc,
-                        IsPrev = true,
-                        Limit = effectsPagingToken.Limit
-                    };
-
-                if (hasMore)
-                    next = new EffectsPagingToken
-                    {
-                        Id = effects.Last().Id,
-                        IsDesc = effectsPagingToken.IsDesc,
-                        IsPrev = true,
-                        Limit = effectsPagingToken.Limit
-                    };
-            }
+            EffectsPagingToken prev = new EffectsPagingToken
+                {
+                    Id = effects.FirstOrDefault()?.Id,
+                    IsDesc = !effectsPagingToken.IsDesc,
+                    Limit = effectsPagingToken.Limit
+                },
+                next = new EffectsPagingToken
+                {
+                    Id = effects.LastOrDefault()?.Id,
+                    IsDesc = effectsPagingToken.IsDesc,
+                    Limit = effectsPagingToken.Limit
+                };
 
             var result = new CursorResult<EffectModel>
             {
                 Items = effects,
                 CurrentToken = effectsPagingToken.ToBase64(),
-                PrevToken = prev?.ToBase64(),
-                NextToken = next?.ToBase64()
+                PrevToken = prev.ToBase64(),
+                NextToken = next.ToBase64()
             };
             return Task.FromResult(result);
         }
