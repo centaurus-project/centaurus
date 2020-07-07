@@ -144,29 +144,5 @@ namespace Centaurus.Test
 
             await AssertMessageHandling(clientConnection, orderEnvelope, excpectedException);
         }
-
-        static object[] EffectsRequestTestCases =
-        {
-            new object[] { TestEnvironment.Client1KeyPair, TestEnvironment.AlphaKeyPair, ConnectionState.Validated, typeof(InvalidStateException) },
-            new object[] { TestEnvironment.Client1KeyPair, TestEnvironment.Client2KeyPair, ConnectionState.Ready, typeof(UnauthorizedException) },
-            new object[] { TestEnvironment.Client1KeyPair, TestEnvironment.AlphaKeyPair, ConnectionState.Ready, null }
-        };
-
-        [Test]
-        [TestCaseSource(nameof(EffectsRequestTestCases))]
-        public async Task EffectsRequestTest(KeyPair client, KeyPair alphaSigner, ConnectionState state, Type excpectedException)
-        {
-            Global.AppState.State = ApplicationState.Ready;
-
-            var account = Global.AccountStorage.GetAccount(client);
-
-            var clientConnection = new AuditorWebSocketConnection(new FakeWebSocket(), null) { ConnectionState = state };
-
-            var envelope = new EffectsRequest { Account = client, AccountWrapper = account }.CreateEnvelope();
-            envelope.Sign(client);
-            envelope.Sign(alphaSigner);
-
-            await AssertMessageHandling(clientConnection, envelope, excpectedException);
-        }
     }
 }
