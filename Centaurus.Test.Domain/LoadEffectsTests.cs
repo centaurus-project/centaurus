@@ -32,12 +32,10 @@ namespace Centaurus.Test
         [TestCaseSource(nameof(EffectsLoadTestCases))]
         public async Task LoadEffectsTest(KeyPair accountKey, bool isDesc)
         {
+            var allLimit = 1000;
+            var allEffectsResult = await LoadAllEffects(null, isDesc, allLimit, accountKey);
 
-            var allEffectsPagingToken = new EffectsPagingToken { Id = new byte[12], Limit = 1000, IsDesc = isDesc }.ToBase64();
-            var allEffectsResult = await LoadAllEffects(allEffectsPagingToken, accountKey);
-
-            var opositeOrderedPagingToken = new EffectsPagingToken { Id = new byte[12], Limit = 1000, IsDesc = !isDesc }.ToBase64();
-            var opositeOrderedResult = await LoadAllEffects(opositeOrderedPagingToken, accountKey);
+            var opositeOrderedResult = await LoadAllEffects(null, !isDesc, allLimit, accountKey);
 
             //check ordering
             for (int i = 0, opI = allEffectsResult.Count - 1; i < allEffectsResult.Count; i++, opI--)
@@ -49,18 +47,16 @@ namespace Centaurus.Test
             }
 
             //check fetching
-            var fetchToken = new EffectsPagingToken { Id = new byte[12], Limit = 1, IsDesc = isDesc }.ToBase64();
-            await TestFetching(allEffectsResult, fetchToken, accountKey);
+            var limit = 1;
+            await TestFetching(allEffectsResult, new byte[12].ToHex(), isDesc, limit, accountKey);
 
             //check reverse fetching
-            var reverseToken = EffectsPagingToken.FromBase64(fetchToken);
-            reverseToken.IsDesc = !reverseToken.IsDesc;
-            await TestFetching(allEffectsResult, reverseToken.ToBase64(), accountKey, true);
+            await TestFetching(allEffectsResult, new byte[12].ToHex(), !isDesc, limit, accountKey, true);
         }
 
-        private async Task<List<Effect>> LoadAllEffects(string pagingToken, KeyPair keyPair)
+        private async Task<List<Effect>> LoadAllEffects(string cursor, bool isDesc, int limit, KeyPair keyPair)
         {
-            var response = (await Global.SnapshotManager.LoadEffects(pagingToken, null)).Items;
+            var response = (await Global.SnapshotManager.LoadEffects(cursor, isDesc, limit, null)).Items;
             if (keyPair == null)
                 return response;
             return response
@@ -68,19 +64,19 @@ namespace Centaurus.Test
                 .ToList();
         }
 
-        private async Task TestFetching(List<Effect> allEffects, string pagingToken, KeyPair account, bool isReverseDirection = false)
+        private async Task TestFetching(List<Effect> allEffects, string cursor, bool isDesc, int limit, KeyPair account, bool isReverseDirection = false)
         {
-            var nextToken = pagingToken;
+            var nextCursor = cursor;
             var increment = isReverseDirection ? -1 : 1;
             var index = isReverseDirection ? allEffects.Count - 1 : 0;
             var totalCount = 0;
-            while (nextToken != null)
+            while (nextCursor != null)
             {
-                var currentEffectsResult = await Global.SnapshotManager.LoadEffects(nextToken, account?.PublicKey);
+                var currentEffectsResult = await Global.SnapshotManager.LoadEffects(nextCursor, isDesc, limit, account?.PublicKey);
                 if (totalCount == allEffects.Count)
                 {
                     Assert.AreEqual(0, currentEffectsResult.Items.Count, "Some extra effects were loaded.");
-                    nextToken = null;
+                    nextCursor = null;
                 }
                 else
                 {
@@ -89,7 +85,7 @@ namespace Centaurus.Test
                     Assert.AreEqual(true, areEqual, "Effects are not equal.");
                     index += increment;
                     totalCount++;
-                    nextToken = currentEffectsResult.NextToken;
+                    nextCursor = currentEffectsResult.NextToken;
                 }
             }
             Assert.AreEqual(allEffects.Count, totalCount, "Effects total count are not equal.");

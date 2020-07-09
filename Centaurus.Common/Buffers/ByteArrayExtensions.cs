@@ -21,6 +21,8 @@ namespace Centaurus
 
         public static string ToHex(this byte[] bytes)
         {
+            if (bytes == null)
+                return null;
             var result = new char[bytes.Length * 2];
             for (int i = 0; i < bytes.Length; i++)
             {

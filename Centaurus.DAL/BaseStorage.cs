@@ -55,10 +55,12 @@ namespace Centaurus.DAL
         /// <summary>
         /// Fetches effects
         /// </summary>
-        /// <param name="effectsPagingToken">Token that contains all info about the request</param>
+        /// <param name="cursor">Hex formatted effect id.</param>
+        /// <param name="isDesc">Is reverse ordering.</param>
+        /// <param name="limit">Item per request.</param>
         /// <param name="account">Account for which effects will be loaded. If it's null then all effects will be loaded.</param>
         /// <returns></returns>
-        public abstract Task<CursorResult<EffectModel>> LoadEffects(EffectsPagingToken effectsPagingToken, byte[] account);
+        public abstract Task<List<EffectModel>> LoadEffects(byte[] cursor, bool isDesc, int limit, byte[] account);
 
         public abstract Task<List<AccountModel>> LoadAccounts();
 

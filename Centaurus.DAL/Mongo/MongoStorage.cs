@@ -189,11 +189,8 @@ namespace Centaurus.DAL.Mongo
             return quanta?.Apex ?? -1;
         }
 
-        public override async Task<CursorResult<EffectModel>> LoadEffects(EffectsPagingToken effectsPagingToken, byte[] account)
+        public override async Task<List<EffectModel>> LoadEffects(byte[] cursor, bool isDesc, int limit, byte[] account)
         {
-            if (effectsPagingToken == null)
-                throw new ArgumentNullException(nameof(effectsPagingToken));
-
             IFindFluent<EffectModel, EffectModel> query;
             if (account != null) //specified account's effects
                 query = effectsCollection
@@ -203,15 +200,15 @@ namespace Centaurus.DAL.Mongo
                     .Find(FilterDefinition<EffectModel>.Empty);
 
 
-            if (effectsPagingToken.IsDesc)
+            if (isDesc)
                 query = query
                     .SortByDescending(e => e.Id);
 
 
-            if (effectsPagingToken.Id.Any(x => x != 0))
+            if (cursor != null && cursor.Any(x => x != 0))
             {
-                var objectId = new ObjectId(effectsPagingToken.Id);
-                if (effectsPagingToken.IsDesc)
+                var objectId = new ObjectId(cursor);
+                if (isDesc)
                     query = effectsCollection
                         .Find(Builders<EffectModel>.Filter.Lt("Id", objectId));
                 else
@@ -220,29 +217,10 @@ namespace Centaurus.DAL.Mongo
             }
 
             var effects = await query
-                .Limit(effectsPagingToken.Limit)
+                .Limit(limit)
                 .ToListAsync();
 
-            EffectsPagingToken prev = new EffectsPagingToken
-                {
-                    Id = effects.FirstOrDefault()?.Id,
-                    IsDesc = !effectsPagingToken.IsDesc,
-                    Limit = effectsPagingToken.Limit
-                },
-                next = new EffectsPagingToken
-                {
-                    Id = effects.LastOrDefault()?.Id,
-                    IsDesc = effectsPagingToken.IsDesc,
-                    Limit = effectsPagingToken.Limit
-                };
-
-            return new CursorResult<EffectModel>
-            {
-                Items = effects,
-                CurrentToken = effectsPagingToken.ToBase64(),
-                PrevToken = prev.ToBase64(),
-                NextToken = next.ToBase64()
-            };
+            return effects;
         }
 
         #region Updates

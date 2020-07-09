@@ -9,9 +9,19 @@ namespace Centaurus.Models
     {
         public override MessageTypes MessageType => MessageTypes.EffectsRequest;
 
-        public override ulong MessageId => PagingToken.GetInt64HashCode();
+        public const string Desc = "DESC";
+
+        public const string Asc = "ASC";
 
         [XdrField(0)]
-        public string PagingToken { get; set; }
+        public string Cursor { get; set; }
+
+        [XdrField(1)]
+        public string Order { get; set; }
+
+        [XdrField(2)]
+        public int Limit { get; set; }
+
+        public bool IsDesc => Order.Equals(Desc, StringComparison.OrdinalIgnoreCase);
     }
 }

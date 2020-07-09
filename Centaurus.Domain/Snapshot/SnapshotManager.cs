@@ -74,11 +74,20 @@ namespace Centaurus.Domain
             }
         }
 
-        public async Task<EffectsResponse> LoadEffects(string pagingToken, byte[] account)
+        public async Task<EffectsResponse> LoadEffects(string rawCursor, bool isDesc, int limit, byte[] account)
         {
-            var token = EffectsPagingToken.FromBase64(pagingToken);
-            var effects = await Global.PermanentStorage.LoadEffects(token, account);
-            return effects.ToEffectResponse();
+            var cursor = ByteArrayExtensions.FromHexString(rawCursor);
+            if (cursor != null && cursor.Length != 12)
+                throw new ArgumentException("Cursor is invalid.");
+            var effectModels = await Global.PermanentStorage.LoadEffects(cursor, isDesc, limit, account);
+            return new EffectsResponse
+            {
+                CurrentToken = rawCursor,
+                Order = isDesc ? EffectsRequest.Desc : EffectsRequest.Asc,
+                Items = effectModels.Select(e => e.ToEffect()).ToList(),
+                NextToken = (effectModels.LastOrDefault()?.Id).ToHex(),
+                PrevToken = (effectModels.FirstOrDefault()?.Id).ToHex()
+            };
         }
 
         private Action onSnapshotSuccess;

@@ -22,5 +22,13 @@ namespace Centaurus.Domain
                 Timestamp = DateTime.UtcNow
             };
         }
+
+        public static Effect ToEffect(this EffectModel effectModel)
+        {
+            var effect = XdrConverter.Deserialize<Effect>(effectModel.RawEffect);
+            if (effectModel.Account != null)
+                effect.Pubkey = effectModel.Account;
+            return effect;
+        }
     }
 }
