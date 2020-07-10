@@ -185,7 +185,6 @@ namespace Centaurus.DAL.Mongo
 
         public override async Task<List<EffectModel>> LoadEffects(byte[] cursor, bool isDesc, int limit, byte[] account)
         {
-            Debugger.Launch();
             if (account == null)
                 throw new ArgumentNullException(nameof(account));
             IFindFluent<EffectModel, EffectModel> query = effectsCollection
