@@ -1,4 +1,5 @@
 ﻿using Centaurus.DAL.Models;
+using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
 using MongoDB.Bson.Serialization.Conventions;
 using MongoDB.Bson.Serialization.Options;
@@ -52,7 +53,7 @@ namespace Centaurus.DAL.Mongo
             constellationStateCollection = database.GetCollection<ConstellationState>("constellationState");
             withdrawalsCollection = database.GetCollection<WithdrawalModel>("withdrawals");
 
-            effectsCollection = database.GetCollection<EffectModel>("effects");
+            effectsCollection = database.GetCollection<EffectModel>("effects", new MongoCollectionSettings { AssignIdOnInsert = false });
 
             settingsCollection = database.GetCollection<SettingsModel>("constellationSettings");
 
@@ -180,6 +181,35 @@ namespace Centaurus.DAL.Mongo
                    .FirstOrDefaultAsync();
 
             return quanta?.Apex ?? -1;
+        }
+
+        public override async Task<List<EffectModel>> LoadEffects(byte[] cursor, bool isDesc, int limit, byte[] account)
+        {
+            if (account == null)
+                throw new ArgumentNullException(nameof(account));
+            IFindFluent<EffectModel, EffectModel> query = effectsCollection
+                    .Find(Builders<EffectModel>.Filter.Eq(e => e.Account, account));
+
+            if (isDesc)
+                query = query
+                    .SortByDescending(e => e.Id);
+
+
+            if (cursor != null && cursor.Any(x => x != 0))
+            {
+                if (isDesc)
+                    query = effectsCollection
+                        .Find(Builders<EffectModel>.Filter.Lt(e => e.Id, cursor));
+                else
+                    query = effectsCollection
+                        .Find(Builders<EffectModel>.Filter.Gt(e => e.Id, cursor));
+            }
+
+            var effects = await query
+                .Limit(limit)
+                .ToListAsync();
+
+            return effects;
         }
 
         #region Updates

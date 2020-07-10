@@ -2,6 +2,7 @@
 using stellar_dotnet_sdk;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace Centaurus.Domain
@@ -26,6 +27,17 @@ namespace Centaurus.Domain
                 Signature = rawSignature,
                 Signer = keyPair.PublicKey
             };
+        }
+
+        public static byte[] FromHexString(string hexString)
+        {
+            if (string.IsNullOrWhiteSpace(hexString))
+                return null;
+            int NumberChars = hexString.Length;
+            byte[] bytes = new byte[NumberChars / 2];
+            for (int i = 0; i < NumberChars; i += 2)
+                bytes[i / 2] = Convert.ToByte(hexString.Substring(i, 2), 16);
+            return bytes;
         }
     }
 }

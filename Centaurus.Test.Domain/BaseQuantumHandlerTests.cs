@@ -235,10 +235,7 @@ namespace Centaurus.Test
             {
                 var result = await Global.QuantumHandler.HandleAsync(quantum);
 
-                var globalType = typeof(Global);
-                var applyUpdatesMethod = globalType.GetMethod("ApplyUpdates", BindingFlags.NonPublic | BindingFlags.Static);
-
-                await (Task)applyUpdatesMethod.Invoke(null, null);
+                await SnapshotHelper.ApplyUpdates();
 
                 //check that processed quanta is saved to the storage
                 var lastApex = await Global.PermanentStorage.GetLastApex();

@@ -4,7 +4,7 @@ using System.Text;
 
 namespace Centaurus.Models
 {
-    public class AccountDataRequest : RequestMessage
+    public class AccountDataRequest : NonceRequestMessage
     {
         public override MessageTypes MessageType => MessageTypes.AccountDataRequest;
     }

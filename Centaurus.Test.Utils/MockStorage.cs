@@ -3,6 +3,7 @@ using Centaurus.DAL.Models;
 using Centaurus.Domain;
 using Centaurus.Models;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -285,6 +286,33 @@ namespace Centaurus.Test
                     currentOrder.Amount += amount;
                 }
             }
+        }
+
+        public override Task<List<EffectModel>> LoadEffects(byte[] cursor, bool isDesc, int limit, byte[] account)
+        {
+            if (account == null)
+                throw new ArgumentNullException(nameof(account));
+            IEnumerable<EffectModel> query = effectsCollection
+                    .Where(e => ByteArrayPrimitives.Equals(e.Account, account));
+
+            if (isDesc)
+                query = query.Reverse();
+
+            if (cursor != null && cursor.Any(x => x != 0))
+            {
+                if (isDesc)
+                    query = query
+                        .Where(e => ((IStructuralComparable)e.Id).CompareTo(cursor, Comparer<byte>.Default) < 0);
+                else
+                    query = query
+                        .Where(e => ((IStructuralComparable)e.Id).CompareTo(cursor, Comparer<byte>.Default) > 0);
+            }
+
+            var effects = query
+                .Take(limit)
+                .ToList();
+
+            return Task.FromResult(effects);
         }
     }
 }

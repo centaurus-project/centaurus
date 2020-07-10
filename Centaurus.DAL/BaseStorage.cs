@@ -52,6 +52,15 @@ namespace Centaurus.DAL
 
         public abstract Task<List<EffectModel>> LoadEffectsAboveApex(long apex);
 
+        /// <summary>
+        /// Fetches effects
+        /// </summary>
+        /// <param name="cursor">Effect id.</param>
+        /// <param name="isDesc">Is reverse ordering.</param>
+        /// <param name="limit">Item per request.</param>
+        /// <returns></returns>
+        public abstract Task<List<EffectModel>> LoadEffects(byte[] cursor, bool isDesc, int limit, byte[] account);
+
         public abstract Task<List<AccountModel>> LoadAccounts();
 
         public abstract Task<List<BalanceModel>> LoadBalances();

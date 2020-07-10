@@ -145,6 +145,10 @@ namespace Centaurus.Test
             depositeQuantum.Source.Sign(TestEnvironment.Auditor1KeyPair);
 
             Global.QuantumHandler.HandleAsync(depositeQuantum.CreateEnvelope()).Wait();
+
+
+            //save all effects
+            SnapshotHelper.ApplyUpdates().Wait();
         }
     }
 }

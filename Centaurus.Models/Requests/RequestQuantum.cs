@@ -14,11 +14,11 @@ namespace Centaurus.Models
         [XdrField(0)]
         public MessageEnvelope RequestEnvelope { get; set; }
 
-        public RequestMessage RequestMessage
+        public NonceRequestMessage RequestMessage
         {
             get
             {
-                return (RequestMessage)RequestEnvelope.Message;
+                return (NonceRequestMessage)RequestEnvelope.Message;
             }
         }
     }

@@ -17,7 +17,7 @@ namespace Centaurus.Domain
             {
                 var quantumRequest = Quantum as RequestQuantum;
                 if (quantumRequest == null) throw new Exception("Quantum is not a request");
-                return (quantumRequest.RequestEnvelope.Message as RequestMessage).Account;
+                return (quantumRequest.RequestEnvelope.Message as NonceRequestMessage).Account;
             }
         }
     }

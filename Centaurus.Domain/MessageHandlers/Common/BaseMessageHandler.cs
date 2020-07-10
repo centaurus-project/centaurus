@@ -34,7 +34,6 @@ namespace Centaurus.Domain
                     connection.ConnectionState.ToString(),
                     ValidConnectionStates.Select(s => s.ToString()).ToArray());
 
-            //do we need to check all signatures or only the first?
             if(!envelope.AreSignaturesValid())
                 throw new UnauthorizedException();
 

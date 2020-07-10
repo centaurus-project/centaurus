@@ -67,9 +67,9 @@ namespace Centaurus
 
         protected override async Task<bool> HandleMessage(MessageEnvelope envelope)
         {
-            if (Account != null && envelope.Message is RequestMessage) //if Account prop is not null than it's client connection and it's already validated
+            if (Account != null && envelope.Message is NonceRequestMessage) //if Account prop is not null than it's client connection and it's already validated
             {
-                ((RequestMessage)envelope.Message).AccountWrapper = Account;
+                ((NonceRequestMessage)envelope.Message).AccountWrapper = Account;
             }
 
             var isHandled = await MessageHandlers<AlphaWebSocketConnection>.HandleMessage(this, envelope);

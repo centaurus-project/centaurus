@@ -4,7 +4,7 @@ using Centaurus.Xdr;
 
 namespace Centaurus.Models
 {
-    public class OrderRequest : RequestMessage
+    public class OrderRequest : NonceRequestMessage
     {
         public override MessageTypes MessageType => MessageTypes.OrderRequest;
         

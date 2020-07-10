@@ -277,5 +277,34 @@ namespace Centaurus.Test
                     await AssertMessageHandling(clientConnection, envelope);
             }
         }
+
+
+
+        static object[] EffectsRequestTestCases =
+        {
+            new object[] { TestEnvironment.Client1KeyPair, ConnectionState.Validated, typeof(InvalidStateException) },
+            new object[] { TestEnvironment.Client1KeyPair, ConnectionState.Ready, null }
+        };
+
+        [Test]
+        [TestCaseSource(nameof(EffectsRequestTestCases))]
+        public async Task EffectsRequestTest(KeyPair client, ConnectionState state, Type excpectedException)
+        {
+            Global.AppState.State = ApplicationState.Ready;
+
+            var account = Global.AccountStorage.GetAccount(client);
+
+            var clientConnection = new AlphaWebSocketConnection(new FakeWebSocket(), "127.0.0.1")
+            {
+                ClientPubKey = client,
+                ConnectionState = state,
+                Account = account
+            };
+
+            var envelope = new EffectsRequest { Account = client, AccountWrapper = account }.CreateEnvelope();
+            envelope.Sign(client);
+
+            await AssertMessageHandling(clientConnection, envelope, excpectedException);
+        }
     }
 }
