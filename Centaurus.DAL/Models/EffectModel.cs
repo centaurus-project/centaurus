@@ -20,9 +20,9 @@ namespace Centaurus.DAL.Models
 
         public override string ToString()
         {
-            return $"{{ apex: {(Id == null ? 0 : BitConverter.ToInt64(Id, 0))}, " +
-                $"index: {((Id == null ? 0 : BitConverter.ToInt32(Id, 8)))}, " +
-                $"effectType: {EffectType} }}";
+            if (Id == null) 
+                return null;
+            return $"{{Effect apex: {BitConverter.ToInt64(Id, 0)}, index: {BitConverter.ToInt32(Id, 8)}, effectType: {EffectType} }}";
         }
     }
 }

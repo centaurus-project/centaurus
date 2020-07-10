@@ -13,15 +13,18 @@ namespace Centaurus.Models
         public List<Effect> Items { get; set; }
 
         [XdrField(1)]
-        public string CurrentToken { get; set; }
+        public string CurrentPagingToken { get; set; }
 
         [XdrField(2)]
-        public string PrevToken { get; set; }
+        public string NextPageToken { get; set; }
 
         [XdrField(3)]
-        public string NextToken { get; set; }
+        public string PrevPageToken { get; set; }
 
         [XdrField(2)]
         public string Order { get; set; }
+
+        [XdrField(3)]
+        public int Limit { get; set; }
     }
 }

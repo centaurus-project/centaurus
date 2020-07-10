@@ -30,15 +30,9 @@ namespace Centaurus.DAL.Mongo
 
         private async Task CreateIndexes()
         {
-            await Task.WhenAll(
-            accountsCollection.Indexes.CreateOneAsync(
+            await accountsCollection.Indexes.CreateOneAsync(
                  new CreateIndexModel<AccountModel>(Builders<AccountModel>.IndexKeys.Ascending(a => a.PubKey),
                  new CreateIndexOptions { Unique = true, Background = true })
-            ),
-            effectsCollection.Indexes.CreateOneAsync(
-                 new CreateIndexModel<EffectModel>(Builders<EffectModel>.IndexKeys.Ascending(a => a.Id),
-                 new CreateIndexOptions { Unique = true, Background = true })
-            )
             );
         }
 
@@ -191,14 +185,10 @@ namespace Centaurus.DAL.Mongo
 
         public override async Task<List<EffectModel>> LoadEffects(byte[] cursor, bool isDesc, int limit, byte[] account)
         {
-            IFindFluent<EffectModel, EffectModel> query;
-            if (account != null) //specified account's effects
-                query = effectsCollection
-                    .Find(e => e.Account == account);
-            else //load all effects
-                query = effectsCollection
+            if (account == null)
+                throw new ArgumentNullException(nameof(account));
+            IFindFluent<EffectModel, EffectModel> query = effectsCollection
                     .Find(FilterDefinition<EffectModel>.Empty);
-
 
             if (isDesc)
                 query = query

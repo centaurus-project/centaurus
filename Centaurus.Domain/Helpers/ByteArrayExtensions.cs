@@ -33,10 +33,11 @@ namespace Centaurus.Domain
         {
             if (string.IsNullOrWhiteSpace(hexString))
                 return null;
-            return Enumerable.Range(0, hexString.Length)
-                      .Where(x => x % 2 == 0)
-                      .Select(x => Convert.ToByte(hexString.Substring(x, 2), 16))
-                      .ToArray();
+            int NumberChars = hexString.Length;
+            byte[] bytes = new byte[NumberChars / 2];
+            for (int i = 0; i < NumberChars; i += 2)
+                bytes[i / 2] = Convert.ToByte(hexString.Substring(i, 2), 16);
+            return bytes;
         }
     }
 }

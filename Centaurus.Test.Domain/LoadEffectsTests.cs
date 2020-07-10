@@ -22,8 +22,6 @@ namespace Centaurus.Test
 
         static object[] EffectsLoadTestCases = new object[]
         {
-            new object[] { null, false },
-            new object[] { null, true },
             new object[] { TestEnvironment.Client1KeyPair, false },
             new object[] { TestEnvironment.Client2KeyPair, true }
         };
@@ -33,9 +31,9 @@ namespace Centaurus.Test
         public async Task LoadEffectsTest(KeyPair accountKey, bool isDesc)
         {
             var allLimit = 1000;
-            var allEffectsResult = await LoadAllEffects(null, isDesc, allLimit, accountKey);
+            var allEffectsResult = (await Global.SnapshotManager.LoadEffects(null, isDesc, allLimit, accountKey.PublicKey)).Items;
 
-            var opositeOrderedResult = await LoadAllEffects(null, !isDesc, allLimit, accountKey);
+            var opositeOrderedResult = (await Global.SnapshotManager.LoadEffects(null, !isDesc, allLimit, accountKey.PublicKey)).Items;
 
             //check ordering
             for (int i = 0, opI = allEffectsResult.Count - 1; i < allEffectsResult.Count; i++, opI--)
@@ -52,16 +50,6 @@ namespace Centaurus.Test
 
             //check reverse fetching
             await TestFetching(allEffectsResult, new byte[12].ToHex(), !isDesc, limit, accountKey, true);
-        }
-
-        private async Task<List<Effect>> LoadAllEffects(string cursor, bool isDesc, int limit, KeyPair keyPair)
-        {
-            var response = (await Global.SnapshotManager.LoadEffects(cursor, isDesc, limit, null)).Items;
-            if (keyPair == null)
-                return response;
-            return response
-                .Where(e => ByteArrayPrimitives.Equals(e.Pubkey?.Data, keyPair?.PublicKey))
-                .ToList();
         }
 
         private async Task TestFetching(List<Effect> allEffects, string cursor, bool isDesc, int limit, KeyPair account, bool isReverseDirection = false)
@@ -85,7 +73,7 @@ namespace Centaurus.Test
                     Assert.AreEqual(true, areEqual, "Effects are not equal.");
                     index += increment;
                     totalCount++;
-                    nextCursor = currentEffectsResult.NextToken;
+                    nextCursor = currentEffectsResult.NextPageToken;
                 }
             }
             Assert.AreEqual(allEffects.Count, totalCount, "Effects total count are not equal.");

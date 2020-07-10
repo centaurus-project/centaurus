@@ -76,17 +76,21 @@ namespace Centaurus.Domain
 
         public async Task<EffectsResponse> LoadEffects(string rawCursor, bool isDesc, int limit, byte[] account)
         {
+            if (account == null)
+                throw new ArgumentNullException(nameof(account));
+
             var cursor = ByteArrayExtensions.FromHexString(rawCursor);
             if (cursor != null && cursor.Length != 12)
                 throw new ArgumentException("Cursor is invalid.");
             var effectModels = await Global.PermanentStorage.LoadEffects(cursor, isDesc, limit, account);
             return new EffectsResponse
             {
-                CurrentToken = rawCursor,
+                CurrentPagingToken = rawCursor,
                 Order = isDesc ? EffectsRequest.Desc : EffectsRequest.Asc,
                 Items = effectModels.Select(e => e.ToEffect()).ToList(),
-                NextToken = (effectModels.LastOrDefault()?.Id).ToHex(),
-                PrevToken = (effectModels.FirstOrDefault()?.Id).ToHex()
+                NextPageToken = (effectModels.LastOrDefault()?.Id).ToHex(),
+                PrevPageToken = (effectModels.FirstOrDefault()?.Id).ToHex(),
+                Limit = limit
             };
         }
 

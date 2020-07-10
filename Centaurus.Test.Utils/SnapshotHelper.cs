@@ -9,11 +9,16 @@ namespace Centaurus.Test
 {
     public static class SnapshotHelper
     {
-        public static async Task ApplyUpdates()
+        static MethodInfo applyUpdatesMethod;
+
+        static SnapshotHelper()
         {
             var globalType = typeof(Global);
-            var applyUpdatesMethod = globalType.GetMethod("ApplyUpdates", BindingFlags.NonPublic | BindingFlags.Static);
+            applyUpdatesMethod = globalType.GetMethod("ApplyUpdates", BindingFlags.NonPublic | BindingFlags.Static);
+        }
 
+        public static async Task ApplyUpdates()
+        {
             await (Task)applyUpdatesMethod.Invoke(null, null);
         }
     }

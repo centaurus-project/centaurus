@@ -290,12 +290,10 @@ namespace Centaurus.Test
 
         public override Task<List<EffectModel>> LoadEffects(byte[] cursor, bool isDesc, int limit, byte[] account)
         {
-            IEnumerable<EffectModel> query;
-            if (account != null) //specified account's effects
-                query = effectsCollection
+            if (account == null)
+                throw new ArgumentNullException(nameof(account));
+            IEnumerable<EffectModel> query = effectsCollection
                     .Where(e => ByteArrayPrimitives.Equals(e.Account, account));
-            else //load all effects
-                query = effectsCollection;
 
             if (isDesc)
                 query = query.Reverse();
