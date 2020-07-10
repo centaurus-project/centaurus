@@ -185,10 +185,11 @@ namespace Centaurus.DAL.Mongo
 
         public override async Task<List<EffectModel>> LoadEffects(byte[] cursor, bool isDesc, int limit, byte[] account)
         {
+            Debugger.Launch();
             if (account == null)
                 throw new ArgumentNullException(nameof(account));
             IFindFluent<EffectModel, EffectModel> query = effectsCollection
-                    .Find(FilterDefinition<EffectModel>.Empty);
+                    .Find(Builders<EffectModel>.Filter.Eq(e => e.Account, account));
 
             if (isDesc)
                 query = query
@@ -197,13 +198,12 @@ namespace Centaurus.DAL.Mongo
 
             if (cursor != null && cursor.Any(x => x != 0))
             {
-                var objectId = new ObjectId(cursor);
                 if (isDesc)
                     query = effectsCollection
-                        .Find(Builders<EffectModel>.Filter.Lt("Id", objectId));
+                        .Find(Builders<EffectModel>.Filter.Lt(e => e.Id, cursor));
                 else
                     query = effectsCollection
-                        .Find(Builders<EffectModel>.Filter.Gt("Id", objectId));
+                        .Find(Builders<EffectModel>.Filter.Gt(e => e.Id, cursor));
             }
 
             var effects = await query
