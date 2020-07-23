@@ -19,6 +19,6 @@ namespace Centaurus.Models
         [XdrField(2)]
         public List<Effect> Effects { get; set; }
 
-        public override ulong MessageId => OriginalMessage.Message.MessageId;
+        public override long MessageId => OriginalMessage.Message.MessageId;
     }
 }

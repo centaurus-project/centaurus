@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="stellar-dotnet-sdk" Version="3.0.13" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Centaurus.DynamicSerializers\Centaurus.DynamicSerializers.csproj" />
+    <ProjectReference Include="..\..\Centaurus.Models.Extensions\Centaurus.Models.Extensions.csproj" />
+    <ProjectReference Include="..\..\Centaurus.Models\Centaurus.Models.csproj" />
+  </ItemGroup>
+
+</Project>

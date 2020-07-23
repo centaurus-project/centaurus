@@ -6,12 +6,9 @@ namespace Centaurus.Models
 {
     public abstract class NonceRequestMessage: RequestMessage
     {
-        public override ulong MessageId => Nonce;
-
         /// <summary>
         /// Account nonce.
         /// </summary>
-        [XdrField(0)]
-        public ulong Nonce { get; set; }
+        public long Nonce { get { return RequestId; } set { RequestId = value; } }
     }
 }

@@ -174,7 +174,7 @@ namespace Centaurus.Test
                         Message = new OrderRequest
                         {
                             Account = account1.Pubkey,
-                            Nonce = (ulong)i,
+                            Nonce = i,
                             Amount = rnd.Next(1, 20),
                             Asset = 1,
                             Price = Math.Round(price * 10) / 10,

@@ -56,7 +56,7 @@ namespace Centaurus.Test
                     Destination = withdrawalDest.PublicKey,
                     Amount = amount,
                     Asset = asset,
-                    Nonce = (ulong)DateTime.UtcNow.Ticks,
+                    Nonce = DateTime.UtcNow.Ticks,
                     TransactionHash = txHash,
                     TransactionXdr = txXdr,
                     AccountWrapper = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair)
@@ -133,7 +133,7 @@ namespace Centaurus.Test
             var order = new OrderRequest
             {
                 Account = TestEnvironment.Client1KeyPair,
-                Nonce = (ulong)nonce,
+                Nonce = nonce,
                 Amount = amount,
                 Asset = asset,
                 Price = 100,
@@ -175,7 +175,7 @@ namespace Centaurus.Test
             var order = new AccountDataRequest
             {
                 Account = TestEnvironment.Client1KeyPair,
-                Nonce = (ulong)nonce,
+                Nonce = nonce,
                 AccountWrapper = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair)
             };
 
@@ -211,7 +211,7 @@ namespace Centaurus.Test
                 var envelope = new AccountDataRequest
                 {
                     Account = clientKeyPair,
-                    Nonce = (ulong)(i + 1),
+                    Nonce = i + 1,
                     AccountWrapper = Global.AccountStorage.GetAccount(clientKeyPair)
                 }.CreateEnvelope();
                 envelope.Sign(clientKeyPair);

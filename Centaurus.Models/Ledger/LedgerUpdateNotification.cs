@@ -11,7 +11,7 @@ namespace Centaurus.Models
     {
         public override MessageTypes MessageType => MessageTypes.LedgerUpdateNotification;
 
-        public override ulong MessageId => (ulong)LedgerFrom;
+        public override long MessageId => LedgerFrom;
 
         /// <summary>
         /// Ledgers range start.

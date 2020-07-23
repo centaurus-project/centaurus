@@ -6,7 +6,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 
-namespace Centaurus.Domain
+namespace Centaurus
 {
     public static class MessageEnvelopeExtenstions
     {

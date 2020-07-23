@@ -28,6 +28,6 @@ namespace Centaurus.Models
     {
         public abstract MessageTypes MessageType { get; }
 
-        public virtual ulong MessageId { get { return 0; } }
+        public virtual long MessageId { get { return 0; } }
     }
 }

@@ -5,9 +5,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace Centaurus.Domain
+namespace Centaurus
 {
-    public static class ByteArrayExtensions
+    public static class ByteArraySignatureExtensions
     {
 
         /// <summary>
@@ -16,28 +16,14 @@ namespace Centaurus.Domain
         /// <param name="binaryData">Data to sign</param>
         /// <param name="keyPair">KeyPair to sign the data. If null, Global.Settings.KeyPair will be used.</param>
         /// <returns></returns>
-        public static Ed25519Signature Sign(this byte[] binaryData, KeyPair keyPair = null)
+        public static Ed25519Signature Sign(this byte[] binaryData, KeyPair keyPair)
         {
-            if (keyPair == null)
-                keyPair = Global.Settings.KeyPair;
-
             var rawSignature = keyPair.Sign(binaryData);
             return new Ed25519Signature()
             {
                 Signature = rawSignature,
                 Signer = keyPair.PublicKey
             };
-        }
-
-        public static byte[] FromHexString(string hexString)
-        {
-            if (string.IsNullOrWhiteSpace(hexString))
-                return null;
-            int NumberChars = hexString.Length;
-            byte[] bytes = new byte[NumberChars / 2];
-            for (int i = 0; i < NumberChars; i += 2)
-                bytes[i / 2] = Convert.ToByte(hexString.Substring(i, 2), 16);
-            return bytes;
         }
     }
 }

@@ -202,7 +202,7 @@ namespace Centaurus.Domain
 
 
 
-        public void AddNonceUpdate(Account account, ulong newNonce, ulong currentNonce)
+        public void AddNonceUpdate(Account account, long newNonce, long currentNonce)
         {
             Add(new NonceUpdateEffectProcessor(
                 new NonceUpdateEffect { Nonce = newNonce, PrevNonce = currentNonce, Pubkey = account.Pubkey, Apex = Apex },

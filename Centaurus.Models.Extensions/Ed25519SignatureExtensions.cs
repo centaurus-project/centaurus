@@ -5,7 +5,7 @@ using Centaurus.Models;
 using stellar_dotnet_sdk;
 using stellar_dotnet_sdk.xdr;
 
-namespace Centaurus.Domain
+namespace Centaurus
 {
     public static class Ed25519SignatureExtensions
     {

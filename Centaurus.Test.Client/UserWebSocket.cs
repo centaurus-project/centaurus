@@ -64,7 +64,7 @@ namespace Centaurus.Test.Client
 
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public ConcurrentDictionary<ulong, TaskCompletionSource<MessageEnvelope>> Requests { get; } = new ConcurrentDictionary<ulong, TaskCompletionSource<MessageEnvelope>>();
+        public ConcurrentDictionary<long, TaskCompletionSource<MessageEnvelope>> Requests { get; } = new ConcurrentDictionary<long, TaskCompletionSource<MessageEnvelope>>();
 
         protected override async Task<bool> HandleMessage(MessageEnvelope envelope)
         {
@@ -104,7 +104,7 @@ namespace Centaurus.Test.Client
                 {
                     Asset = 1,
                     Amount = amount,
-                    Nonce = (ulong)DateTime.Now.Ticks,
+                    Nonce = DateTime.Now.Ticks,
                     Account = new RawPubKey() { Data = Global.Settings.KeyPair.PublicKey },
                     Price = price,
                     Side = (OrderSides)side

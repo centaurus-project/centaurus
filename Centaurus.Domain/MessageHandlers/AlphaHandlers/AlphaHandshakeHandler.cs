@@ -51,6 +51,8 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
             if (Global.AppState.State != ApplicationState.Ready)
                 throw new ConnectionCloseException(WebSocketCloseStatus.ProtocolError, "Alpha is not in Ready state.");
             connection.Account = Global.AccountStorage.GetAccount(connection.ClientPubKey);
+            if (connection.Account == null)
+                throw new ConnectionCloseException(WebSocketCloseStatus.Empty, "Account is not registered.");
             connection.ConnectionState = ConnectionState.Ready;
             await connection.SendMessage(envelope.CreateResult(ResultStatusCodes.Success));
         }

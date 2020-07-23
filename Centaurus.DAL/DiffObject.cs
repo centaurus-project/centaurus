@@ -65,7 +65,7 @@ namespace Centaurus.DAL
         {
             public byte[] PubKey { get; set; }
 
-            public ulong Nonce { get; set; }
+            public long Nonce { get; set; }
 
             public RequestRateLimitsModel RequestRateLimits { get; set; }
         }

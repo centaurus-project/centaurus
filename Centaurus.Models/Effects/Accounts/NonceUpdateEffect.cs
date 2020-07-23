@@ -11,9 +11,9 @@ namespace Centaurus.Models
         public override EffectTypes EffectType => EffectTypes.NonceUpdate;
         
         [XdrField(0)]
-        public ulong Nonce { get; set; }
+        public long Nonce { get; set; }
 
         [XdrField(1)]
-        public ulong PrevNonce { get; set; }
+        public long PrevNonce { get; set; }
     }
 }

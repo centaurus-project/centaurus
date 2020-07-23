@@ -8,17 +8,19 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="Catchups\AuditorCatchup.cs"/>
+    <Compile Remove="Catchups\AuditorCatchup.cs" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="NLog" Version="4.6.7"/>
+    <PackageReference Include="NLog" Version="4.6.7" />
+    <PackageReference Include="System.Data.HashFunction.FarmHash" Version="2.0.0" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Centaurus.DAL\Centaurus.DAL.csproj"/>
-    <ProjectReference Include="..\Centaurus.DynamicSerializers\Centaurus.DynamicSerializers.csproj"/>
-    <ProjectReference Include="..\Centaurus.Models\Centaurus.Models.csproj"/>
+    <ProjectReference Include="..\Centaurus.DAL\Centaurus.DAL.csproj" />
+    <ProjectReference Include="..\Centaurus.DynamicSerializers\Centaurus.DynamicSerializers.csproj" />
+    <ProjectReference Include="..\Centaurus.Models.Extensions\Centaurus.Models.Extensions.csproj" />
+    <ProjectReference Include="..\Centaurus.Models\Centaurus.Models.csproj" />
   </ItemGroup>
 
 </Project>

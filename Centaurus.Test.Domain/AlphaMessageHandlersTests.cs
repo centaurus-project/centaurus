@@ -268,7 +268,7 @@ namespace Centaurus.Test
                 var envelope = new AccountDataRequest
                 {
                     Account = clientKeyPair,
-                    Nonce = (ulong)(i + 1)
+                    Nonce = i + 1
                 }.CreateEnvelope();
                 envelope.Sign(clientKeyPair);
                 if (i + 1 > minuteLimit)

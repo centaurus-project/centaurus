@@ -38,7 +38,7 @@ namespace Centaurus.Domain
             if (currentUser == null)
                 throw new Exception($"Account with public key '{requestMessage.ToString()}' is not found.");
 
-            if (currentUser.Nonce >= requestMessage.Nonce)
+            if (requestMessage.Nonce < 1 || currentUser.Nonce >= requestMessage.Nonce)
                 throw new UnauthorizedException();
         }
     }
