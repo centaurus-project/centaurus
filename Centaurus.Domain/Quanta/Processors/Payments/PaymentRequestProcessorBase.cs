@@ -42,7 +42,7 @@ namespace Centaurus.Domain
                 if (payment.TransactionHash == null)//if TransactionHash is not null than it's test
                 {
                     var outputStream = new stellar_dotnet_sdk.xdr.XdrDataOutputStream();
-                    stellar_dotnet_sdk.xdr.Transaction.Encode(outputStream, transaction.ToXdr());
+                    stellar_dotnet_sdk.xdr.Transaction.Encode(outputStream, transaction.ToXdrV1());
 
                     payment.TransactionXdr = outputStream.ToArray();
                     payment.TransactionHash = transaction.Hash();

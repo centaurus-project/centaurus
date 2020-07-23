@@ -42,7 +42,7 @@ namespace Centaurus
 
         public static Transaction BuildTransaction(TransactionBuilderOptions options, params Operation[] operations)
         {
-            var builder = new Transaction.Builder(options.Source);
+            var builder = new TransactionBuilder(options.Source);
             builder.SetFee(options.Fee);
             if (!string.IsNullOrWhiteSpace(options.Memo))
                 builder.AddMemo(Memo.Text(options.Memo));

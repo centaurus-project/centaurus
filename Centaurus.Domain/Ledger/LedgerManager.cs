@@ -71,7 +71,7 @@ namespace Centaurus.Domain
             //TODO: add only success or if transaction hash is in pending withdrawals
             for (var i = 0; i < transaction.Operations.Length; i++)
             {
-                if (PaymentsHelper.FromOperationResponse(transaction.Operations[i].ToOperationBody(), source, res, transaction.Hash(), out PaymentBase payment))
+                if (PaymentsHelper.FromOperationResponse(transaction.Operations[i].ToOperationBody(), source.SigningKey, res, transaction.Hash(), out PaymentBase payment))
                     ledgerPayments.Add(payment);
             }
         }

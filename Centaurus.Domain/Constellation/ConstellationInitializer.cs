@@ -103,7 +103,7 @@ namespace Centaurus.Domain
 
             var sourceAccount = await Global.StellarNetwork.Server.Accounts.Account(Global.Settings.KeyPair.AccountId);
 
-            var transactionBuilder = new Transaction.Builder(sourceAccount);
+            var transactionBuilder = new TransactionBuilder(sourceAccount);
             transactionBuilder.SetFee(10_000);
 
             var existingTrustlines = vaultAccount.Balances

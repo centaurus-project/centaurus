@@ -37,7 +37,7 @@ namespace Centaurus.Domain
                         return result;
 
                     var amount = operation.PaymentOp.Amount.InnerValue;
-                    var destKeypair = stellar_dotnet_sdk.KeyPair.FromXdrPublicKey(operation.PaymentOp.Destination.InnerValue);
+                    var destKeypair = stellar_dotnet_sdk.KeyPair.FromPublicKey(operation.PaymentOp.Destination.Ed25519.InnerValue);
                     if (Global.Constellation.Vault.Equals((RawPubKey)destKeypair.PublicKey))
                         payment = new Deposit
                         {
