@@ -37,7 +37,7 @@ namespace Centaurus.Test
             {
                 client1StartBalanceAmount = clientAccountBalance.Amount;
 
-                var transactionBuilder = new Transaction.Builder(Global.VaultAccount.GetAccount());
+                var transactionBuilder = new TransactionBuilder(Global.VaultAccount.GetAccount());
                 transactionBuilder.AddOperation(
                     new PaymentOperation.Builder(
                         withdrawalDest,
