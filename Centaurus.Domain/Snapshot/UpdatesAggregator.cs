@@ -46,8 +46,6 @@ namespace Centaurus.Domain
 
                 quanta.Add(QuantumModelExtensions.FromQuantum(currentUpdateItem.Quantum));
                 var quantumMessage = (Quantum)currentUpdateItem.Quantum.Message;
-                //update current apex
-                stellarData.CurrentApex = quantumMessage.Apex;
 
                 var quatumEffects = currentUpdateItem.Effects;
                 var quatumEffectsLength = quatumEffects.Length;
@@ -191,7 +189,7 @@ namespace Centaurus.Domain
                 Assets = assets,
                 Orders = orders.Values.ToList(),
                 Settings = constellationSettings,
-                StellarInfoData = stellarData,
+                StellarInfoData = (stellarData.Ledger == 0 && stellarData.VaultSequence == 0) ? null : stellarData, //ignore if no changes
                 Widthrawals = withdrawals
             };
         }
@@ -272,7 +270,6 @@ namespace Centaurus.Domain
             diffObject.StellarInfoData = new DiffObject.ConstellationState
             {
                 IsInserted = true,
-                CurrentApex = apex,
                 Ledger = snapshot.Ledger,
                 VaultSequence = snapshot.VaultSequence
             };

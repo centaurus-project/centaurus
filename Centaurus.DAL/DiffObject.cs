@@ -84,14 +84,13 @@ namespace Centaurus.DAL
         {
             public long Ledger { get; set; }
             public long VaultSequence { get; set; }
-            public long CurrentApex { get; set; }
         }
         public class Withdrawal : BaseDiffModel
         {
             public long Apex { get; set; }
 
             public byte[] RawWithdrawal { get; set; }
-            
+
             public byte[] TransactionHash { get; set; }
         }
 

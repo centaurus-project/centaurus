@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Centaurus.Models;
 using Centaurus.Xdr;
+using System.Diagnostics;
 
 namespace Centaurus.Domain
 {
@@ -64,8 +65,11 @@ namespace Centaurus.Domain
         {
             try
             {
+                var traceId = DateTime.UtcNow.Ticks;
+                logger.Trace($"SaveSnapshotInternal started. Updates count: {updates.GetAll().Count}. Traceid: {traceId}");
                 await SaveSnapshotInternal(updates);
                 onSnapshotSuccess();
+                logger.Trace($"SaveSnapshotInternal finished. Traceid: {traceId}");
             }
             catch (Exception exc)
             {
@@ -144,6 +148,12 @@ namespace Centaurus.Domain
         public static async Task<long> GetLastApex()
         {
             return await Global.PermanentStorage.GetLastApex();
+        }
+
+        public static async Task<MessageEnvelope> GetQuantum(long apex)
+        {
+            var quantumModel = await Global.PermanentStorage.LoadQuantum(apex);
+            return XdrConverter.Deserialize<MessageEnvelope>(quantumModel.RawQuantum);
         }
 
         /// <summary>

@@ -79,6 +79,12 @@ namespace Centaurus.Domain
         {
             try
             {
+                if (Global.AppState.State == ApplicationState.Failed)
+                {
+                    listener.Shutdown();
+                    return;
+                }
+
                 if (ledgerResponse.Sequence == currentLedgerSequence)
                 {
                     logger.Trace("Already handled ledger arrived");

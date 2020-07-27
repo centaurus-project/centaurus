@@ -66,12 +66,19 @@ namespace Centaurus.Domain
 
         protected override async Task<bool> HandleMessage(MessageEnvelope envelope)
         {
-            var clientRequest = envelope.Message as RequestQuantum;
-            if (clientRequest != null)
+            TryAssignAccountWrapper(envelope);
+            return await MessageHandlers<AuditorWebSocketConnection>.HandleMessage(this, envelope);
+        }
+
+        private void TryAssignAccountWrapper(MessageEnvelope envelope)
+        {
+            if (envelope.Message is QuantaBatch)
+                ((QuantaBatch)envelope.Message).Quanta.ForEach(e => TryAssignAccountWrapper(e));
+            else if (envelope.Message is RequestQuantum)
             {
+                var clientRequest = ((RequestQuantum)envelope.Message);
                 clientRequest.RequestMessage.AccountWrapper = Global.AccountStorage.GetAccount(clientRequest.RequestMessage.Account);
             }
-            return await MessageHandlers<AuditorWebSocketConnection>.HandleMessage(this, envelope);
         }
 
         private async Task ProcessOutgoingMessageQueue()

@@ -298,7 +298,6 @@ namespace Centaurus.DAL.Mongo
 
             var ledger = constellationState.Ledger;
             var vaultSequence = constellationState.VaultSequence;
-            var apex = constellationState.CurrentApex;
 
             WriteModel<ConstellationState> updateModel = null;
             if (constellationState.IsInserted)

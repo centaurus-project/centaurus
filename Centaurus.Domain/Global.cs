@@ -44,6 +44,9 @@ namespace Centaurus.Domain
             var lastApex = SnapshotManager.GetLastApex().Result;
             if (lastApex >= 0)
             {
+                var lastQuantum = SnapshotManager.GetQuantum(lastApex).Result;
+                lastHash = lastQuantum.Message.ComputeHash();
+                logger.Trace($"Last hash is {Convert.ToBase64String(lastHash)}");
                 var snapshot = SnapshotManager.GetSnapshot(lastApex).Result;
                 Setup(snapshot);
                 if (IsAlpha)
@@ -152,37 +155,50 @@ namespace Centaurus.Domain
 
         private static bool snapshotIsInProgress = false;
 
+        private static object timerSyncRoot = new { };
+
         private static void OnSnapshotSuccess()
         {
-            snapshotIsInProgress = false;
+            lock (timerSyncRoot)
+            {
+                snapshotIsInProgress = false;
 
-            snapshotTimoutTimer?.Stop();
-            snapshotRunTimer?.Start();
+                snapshotTimoutTimer?.Stop();
+                snapshotRunTimer?.Start();
+            }
         }
 
         private static void OnSnapshotFailed(string reason)
         {
-            logger.Error($"Snapshot failed. {reason}");
-            AppState.State = ApplicationState.Failed;
+            lock (timerSyncRoot)
+            {
+                snapshotIsInProgress = false;
+
+                snapshotTimoutTimer?.Stop();
+                snapshotRunTimer?.Stop();
+
+                logger.Error($"Snapshot failed. {reason}");
+                AppState.State = ApplicationState.Failed;
+            }
         }
 
         private static void SnapshotTimer_Elapsed(object sender, ElapsedEventArgs e)
         {
-            if (AppState.State != ApplicationState.Ready)
+            lock (timerSyncRoot)
             {
-                snapshotRunTimer.Start();
-                return;
+                if (AppState.State != ApplicationState.Ready)
+                {
+                    if (!snapshotIsInProgress)
+                        snapshotRunTimer.Start();
+                    return;
+                }
+
+                snapshotIsInProgress = true;
+
+                _ = ApplyUpdates();
+
+                snapshotTimoutTimer?.Start();
             }
-
-            //check if snapshot process is running
-            while (snapshotIsInProgress)
-                System.Threading.Thread.Sleep(100);
-
-            snapshotIsInProgress = true;
-
-            _ = ApplyUpdates();
-
-            snapshotTimoutTimer.Start();
         }
 
         private static async Task ApplyUpdates()
