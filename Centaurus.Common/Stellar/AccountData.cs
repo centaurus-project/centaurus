@@ -13,7 +13,6 @@ namespace Centaurus
             if (sequenceNumber < 1)
                 throw new ArgumentNullException(nameof(sequenceNumber));
             SequenceNumber = sequenceNumber;
-            MuxedAccount = new MuxedAccountMed25519(KeyPair, 0);
         }
 
         public string AccountId => KeyPair.AccountId;
@@ -24,7 +23,13 @@ namespace Centaurus
 
         public long IncrementedSequenceNumber => SequenceNumber + 1;
 
-        public IAccountId MuxedAccount { get; }
+        public IAccountId MuxedAccount
+        {
+            get
+            {
+                return KeyPair;
+            }
+        }
 
         public void IncrementSequenceNumber()
         {

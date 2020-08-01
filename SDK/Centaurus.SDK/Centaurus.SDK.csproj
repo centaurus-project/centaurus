@@ -1,11 +1,11 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netcoreapp3.1</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="stellar-dotnet-sdk" Version="3.0.13" />
+    <PackageReference Include="stellar-dotnet-sdk" Version="5.0.0" />
   </ItemGroup>
 
   <ItemGroup>

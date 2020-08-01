@@ -65,11 +65,8 @@ namespace Centaurus.Domain
         {
             try
             {
-                var traceId = DateTime.UtcNow.Ticks;
-                logger.Trace($"SaveSnapshotInternal started. Updates count: {updates.GetAll().Count}. Traceid: {traceId}");
                 await SaveSnapshotInternal(updates);
                 onSnapshotSuccess();
-                logger.Trace($"SaveSnapshotInternal finished. Traceid: {traceId}");
             }
             catch (Exception exc)
             {

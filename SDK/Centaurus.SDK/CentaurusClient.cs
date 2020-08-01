@@ -1,8 +1,11 @@
 ﻿using Centaurus.Models;
+using Centaurus.SDK.Models;
 using Centaurus.Xdr;
 using stellar_dotnet_sdk;
 using System;
 using System.Collections.Concurrent;
+using System.Linq;
+using System.Net;
 using System.Net.WebSockets;
 using System.Text;
 using System.Threading;
@@ -22,13 +25,14 @@ namespace Centaurus.SDK
         private CentaurusConnection connection;
         private Uri alphaWebSocketAddress;
         private KeyPair keyPair;
-
+        //private ConstellationInfo constellationInfo;
         private TaskCompletionSource<bool> handshakeResult = new TaskCompletionSource<bool>();
 
-        public CentaurusClient(Uri alphaWebSocketAddress, KeyPair keyPair)
+        public CentaurusClient(Uri alphaWebSocketAddress, KeyPair keyPair/*, ConstellationInfo constellationInfo*/)
         {
             this.alphaWebSocketAddress = alphaWebSocketAddress ?? throw new ArgumentNullException(nameof(alphaWebSocketAddress));
             this.keyPair = keyPair ?? throw new ArgumentNullException(nameof(keyPair));
+            //this.constellationInfo = constellationInfo ?? throw new ArgumentNullException(nameof(constellationInfo));
         }
 
         public async Task Connect()
@@ -36,18 +40,23 @@ namespace Centaurus.SDK
             try
             {
                 await connectionSemaphore.WaitAsync();
+
                 connection = new CentaurusConnection(alphaWebSocketAddress, keyPair);
                 SubscribeToEvents(connection);
                 await connection.EstablishConnection();
 
-                await handshakeResult.Task;
+                var connectionStartedAt = DateTime.UtcNow;
+                while (!handshakeResult.Task.IsCompleted
+                    && DateTime.UtcNow - connectionStartedAt < new TimeSpan(0, 0, 5))
+                    await Task.Delay(100);
 
-                if (handshakeResult.Task.Result == false)
+                if (!handshakeResult.Task.IsCompleted || handshakeResult.Task.Result == false)
                     throw new Exception("Login failed.");
             }
             catch
             {
                 UnsubscribeFromEvents(connection);
+                connection.CloseConnection();
                 throw;
             }
             finally
@@ -77,9 +86,23 @@ namespace Centaurus.SDK
 
         public event Action<Exception> OnException;
 
-        public event Action OnConnected;
-
         public event Action<WebSocketCloseStatus> OnClosed;
+
+        public async Task<AccountDataModel> GetAccountData()
+        {
+            var data = await connection.SendMessage(new AccountDataRequest().CreateEnvelope());
+            var rawMessage = (AccountDataResponse)data.Message;
+            return new AccountDataModel
+            {
+                Balances = rawMessage.Balances.Select(x => new BalanceModel { Amount = x.Amount, Asset = x.Asset, Liabilities = x.Liabilities }).ToList()
+            };
+        }
+
+        public async Task<AccountDataModel> MakePayment(KeyPair destination, long amount, int asset)
+        {
+            var data = await connection.SendMessage(new PaymentRequest { Destination = destination, Asset = asset, Amount = amount }.CreateEnvelope());
+            return await GetAccountData();
+        }
 
         private void SubscribeToEvents(CentaurusConnection connection)
         {
@@ -109,6 +132,7 @@ namespace Centaurus.SDK
                     if (result.Status != ResultStatusCodes.Success)
                         throw new Exception();
                     handshakeResult.SetResult(true);
+                    isConnected = true;
                 }
                 catch
                 {
@@ -119,9 +143,13 @@ namespace Centaurus.SDK
             return false;
         }
 
+        private bool isConnected = false;
+
         private void Connection_OnMessage(MessageEnvelope envelope)
         {
-            if (HandleHandshake(envelope))
+            if (!isConnected)
+                HandleHandshake(envelope);
+            else
                 OnMessage?.Invoke(envelope);
         }
 
@@ -158,6 +186,9 @@ namespace Centaurus.SDK
 
             public async Task EstablishConnection()
             {
+                var payload = DateTime.UtcNow.Ticks;
+                var signature = Convert.ToBase64String(BitConverter.GetBytes(payload).Sign(clientKeyPair).Signature);
+                webSocket.Options.SetRequestHeader("Authorization", $"ed25519 {clientKeyPair.AccountId}.{payload}.{signature}");
                 await webSocket.ConnectAsync(websocketAddress, CancellationToken.None);
                 _ = Listen();
             }
@@ -225,6 +256,14 @@ namespace Centaurus.SDK
                 request.RequestId = request is NonceRequestMessage ? currentTicks : -currentTicks;
             }
 
+            private void AssignAccountId(MessageEnvelope envelope)
+            {
+                var request = envelope.Message as RequestMessage;
+                if (request == null || request.Account != null)
+                    return;
+                request.Account = clientKeyPair;
+            }
+
             private TaskCompletionSource<MessageEnvelope> RegisterRequest(MessageEnvelope envelope)
             {
                 lock (Requests)
@@ -242,7 +281,10 @@ namespace Centaurus.SDK
                 if (resultMessage != null)
                     lock (Requests)
                     {
-                        if (Requests.TryRemove(resultMessage.OriginalMessage.Message.MessageId, out var task))
+                        var messageId = resultMessage.OriginalMessage.Message is RequestQuantum ? 
+                            ((RequestQuantum)resultMessage.OriginalMessage.Message).RequestMessage.MessageId : 
+                            resultMessage.OriginalMessage.Message.MessageId;
+                        if (Requests.TryRemove(messageId, out var task))
                         {
                             if (resultMessage.Status == ResultStatusCodes.Success)
                                 task.SetResult(envelope);
@@ -257,6 +299,7 @@ namespace Centaurus.SDK
             public async Task<MessageEnvelope> SendMessage(MessageEnvelope envelope, CancellationToken ct = default)
             {
                 AssignRequestId(envelope);
+                AssignAccountId(envelope);
                 if (!envelope.IsSignedBy(clientKeyPair))
                     envelope.Sign(clientKeyPair);
 
@@ -267,7 +310,7 @@ namespace Centaurus.SDK
                     heartbeatTimer.Reset();
 
                 if (envelope != hearbeatMessage
-                    && envelope.Message.MessageId > 0)
+                    && envelope.Message.MessageId != default)
                 {
                     //return response task
                     var response = RegisterRequest(envelope);
