@@ -68,25 +68,27 @@ namespace Centaurus.Domain
         {
             var envelope = handleItem.Quantum;
             var tcs = handleItem.HandlingTaskSource;
-            ResultMessage result;
+            ResultMessage result = null;
             try
             {
                 Global.ExtensionsManager.BeforeQuantumHandle(envelope);
 
                 result = await HandleQuantum(envelope);
+                if (result.Status != ResultStatusCodes.Success)
+                    throw new Exception();
                 tcs.SetResult(result);
             }
             catch (Exception exc)
             {
-                logger.Error(exc);
-                result = new ResultMessage
-                {
-                    Status = exc.GetStatusCode(),
-                    OriginalMessage = envelope
-                };
+                if (result == null)
+                    result = new ResultMessage
+                    {
+                        Status = exc.GetStatusCode(),
+                        OriginalMessage = envelope
+                    };
                 Notifier.OnMessageProcessResult(result);
-
                 tcs.SetException(exc);
+                throw;
             }
             Global.ExtensionsManager.AfterQuantumHandle(result);
         }
@@ -148,44 +150,33 @@ namespace Centaurus.Domain
 
         async Task<ResultMessage> AuditorHandleQuantum(MessageEnvelope envelope)
         {
-            ResultMessage result = null;
-            try
-            {
-                var quantum = (Quantum)envelope.Message;
+            var quantum = (Quantum)envelope.Message;
 
-                if (quantum.Apex != Global.QuantumStorage.CurrentApex + 1)
-                    throw new Exception($"Current quantum apex is {quantum.Apex} but {Global.QuantumStorage.CurrentApex + 1} was expected.");
+            if (quantum.Apex != Global.QuantumStorage.CurrentApex + 1)
+                throw new Exception($"Current quantum apex is {quantum.Apex} but {Global.QuantumStorage.CurrentApex + 1} was expected.");
 
-                var messageType = GetMessageType(envelope);
+            var messageType = GetMessageType(envelope);
 
-                var processor = GetProcessor(messageType);
+            var processor = GetProcessor(messageType);
 
-                ValidateAccountRequestRate(envelope);
+            ValidateAccountRequestRate(envelope);
 
-                await processor.Validate(envelope);
+            await processor.Validate(envelope);
 
-                var effectsContainer = GetEffectProcessorsContainer(envelope);
+            var effectsContainer = GetEffectProcessorsContainer(envelope);
 
-                result = await processor.Process(envelope, effectsContainer);
+            var result = await processor.Process(envelope, effectsContainer);
 
-                Global.QuantumStorage.AddQuantum(envelope);
+            Global.QuantumStorage.AddQuantum(envelope);
 
-                ProcessTransaction(envelope, result);
+            ProcessTransaction(envelope, result, effectsContainer);
 
-                SaveEffects(effectsContainer);
+            SaveEffects(effectsContainer);
 
-                logger.Trace($"Message of type {messageType} with apex {((Quantum)envelope.Message).Apex} is handled.");
-            }
-            catch (Exception exc)
-            {
-                logger.Error(exc);
-                result = envelope.CreateResult(ResultStatusCodes.InternalError);
-                throw;
-            }
-            finally
-            {
-                OutgoingMessageStorage.EnqueueMessage(result);
-            }
+            logger.Trace($"Message of type {messageType} with apex {((Quantum)envelope.Message).Apex} is handled.");
+
+            OutgoingMessageStorage.EnqueueMessage(result);
+
             return result;
         }
 
@@ -211,25 +202,29 @@ namespace Centaurus.Domain
                 throw new TooManyRequests($"Request limit reached for account {account.Account.Pubkey.ToString()}.");
         }
 
-        void ProcessTransaction(MessageEnvelope envelope, ResultMessage result)
+        void ProcessTransaction(MessageEnvelope envelope, ResultMessage result, EffectProcessorsContainer effectsContainer)
         {
             var quantum = envelope.Message;
             if (quantum is RequestQuantum)//unwrap if needed
                 quantum = ((RequestQuantum)quantum).RequestMessage;
-            if (quantum is ITransactionContainer)
+            if (!(quantum is ITransactionContainer))
+                return;
+            var transaction = ((ITransactionContainer)quantum).GetTransaction();
+            if (transaction is null)
+                return;
+            var txHash = transaction.Hash();
+            var effect = new TransactionSignedEffect()
             {
-                var transaction = ((ITransactionContainer)quantum).GetTransaction();
-                var txHash = transaction.Hash();
-                result.Effects.Add(new TransactionSignedEffect()
+                TransactionHash = txHash,
+                Signature = new Ed25519Signature()
                 {
-                    TransactionHash = txHash,
-                    Signature = new Ed25519Signature()
-                    {
-                        Signature = Global.Settings.KeyPair.Sign(txHash),
-                        Signer = new RawPubKey { Data = Global.Settings.KeyPair.PublicKey }
-                    }
-                });
-            }
+                    Signature = Global.Settings.KeyPair.Sign(txHash),
+                    Signer = new RawPubKey { Data = Global.Settings.KeyPair.PublicKey }
+                }
+            };
+            //TODO: add effects container reference to result message
+            effectsContainer.Add(new TransactionSignedEffectProcessor(effect));
+            result.Effects.Add(effect);
         }
 
         /// <summary>
