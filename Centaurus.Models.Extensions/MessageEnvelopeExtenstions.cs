@@ -137,10 +137,11 @@ namespace Centaurus
         {
             if (envelope == null)
                 throw new ArgumentNullException(nameof(envelope));
+            var messageType = envelope.Message.MessageType;
             if (envelope.Message is RequestQuantum)
-                envelope = ((RequestQuantum)envelope.Message).RequestEnvelope;
-            var message = envelope.Message;
-            switch (message.MessageType)
+                messageType = ((RequestQuantum)envelope.Message).RequestEnvelope.Message.MessageType;
+            
+            switch (messageType)
             {
                 case MessageTypes.AccountDataRequest:
                     return CreateResult<AccountDataResponse>(envelope, status, effects);

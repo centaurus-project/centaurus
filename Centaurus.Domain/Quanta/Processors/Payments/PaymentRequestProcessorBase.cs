@@ -28,28 +28,9 @@ namespace Centaurus.Domain
             //if withdrawal requested or if account doesn't exist in Centaurus, we need to build transaction
             if (payment.MessageType == MessageTypes.WithdrawalRequest || destAccount == null)
             {
-                Asset asset = new AssetTypeNative();
-                if (payment.Asset != 0)
-                    asset = Global.Constellation.Assets.Find(a => a.Id == payment.Asset).ToAsset();
-
-                var transaction = TransactionHelper.BuildPaymentTransaction(
-                    new TransactionBuilderOptions(vaultAccount, 10_000/*TODO: move fee to settings*/, payment.Memo),
-                    new KeyPair(payment.Destination.ToArray()),
-                    asset,
-                    payment.Amount.ToString()
-                );
-
-                if (payment.TransactionHash == null)//if TransactionHash is not null than it's test
-                {
-                    var outputStream = new stellar_dotnet_sdk.xdr.XdrDataOutputStream();
-                    stellar_dotnet_sdk.xdr.Transaction.Encode(outputStream, transaction.ToXdrV1());
-
-                    payment.TransactionXdr = outputStream.ToArray();
-                    payment.TransactionHash = transaction.Hash();
-                }
-
                 var withdrawal = new Withdrawal
                 {
+                    Apex = requestQuantum.Apex,
                     Source = payment.Account,
                     Destination = payment.Destination,
                     Amount = payment.Amount,
@@ -58,6 +39,7 @@ namespace Centaurus.Domain
                 };
 
                 effectsContainer.AddWithdrawalCreate(withdrawal, Global.WithdrawalStorage);
+                effectsContainer.AddVaultAccountSequenceUpdate(Global.VaultAccount, Global.VaultAccount.SequenceNumber + 1, Global.VaultAccount.SequenceNumber);
             }
             else
             {
@@ -88,7 +70,7 @@ namespace Centaurus.Domain
             if (payment.Destination == null || payment.Destination.IsZero())
                 throw new InvalidOperationException("Destination should be valid public key");
 
-            if (payment.Destination.Equals(payment.Account))
+            if (payment.Destination.Equals(payment.Account) && !(payment is WithdrawalRequest))
                 throw new InvalidOperationException("Source and destination must be different public keys");
 
             if (payment.Amount <= 0)
@@ -104,6 +86,14 @@ namespace Centaurus.Domain
             var balance = account.Balances.Find(b => b.Asset == payment.Asset);
             if (balance == null || !balance.HasSufficientBalance(payment.Amount))
                 throw new InvalidOperationException("Insufficient funds");
+
+            if (payment.MessageType == MessageTypes.WithdrawalRequest)
+            {
+                var tx = payment.GenerateTransaction();
+                if (!Global.IsAlpha && !ByteArrayPrimitives.Equals(payment.TransactionHash, tx.Hash()))
+                    throw new Exception("Transaction hashes are not equal.");
+                payment.AssignTransactionXdr(tx);
+            }
 
             return Task.CompletedTask;
         }

@@ -93,8 +93,19 @@ namespace Centaurus.Domain
                 var currentQuantumEnvelope = quanta[i];
                 var currentQuantum = ((Quantum)currentQuantumEnvelope.Message);
                 var quantumApex = currentQuantum.Apex;
-                await Global.QuantumHandler.HandleAsync(currentQuantumEnvelope);
-                if (quantumApex != currentQuantum.Apex)
+
+                //try to unwrap for Alpha
+                if (currentQuantum is RequestQuantum)
+                {
+                    currentQuantumEnvelope = ((RequestQuantum)currentQuantum).RequestEnvelope;
+                    var requestMessage = (RequestMessage)currentQuantumEnvelope.Message;
+                    requestMessage.AccountWrapper = Global.AccountStorage.GetAccount(requestMessage.Account);
+                }
+
+                var resultMessage = await Global.QuantumHandler.HandleAsync(currentQuantumEnvelope);
+                var processedQuantum = (Quantum)resultMessage.OriginalMessage.Message;
+                //TODO: check if we need some extra checks here
+                if (!ByteArrayPrimitives.Equals(currentQuantum.ComputeHash(), processedQuantum.ComputeHash()))
                     throw new Exception("Apexes are not equal for a quantum on restore.");
             }
         }

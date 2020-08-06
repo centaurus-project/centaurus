@@ -116,6 +116,17 @@ namespace Centaurus.Domain
             Add(new WithdrawalRemoveEffectProcessor(effect, withdrawalStorage));
         }
 
+        public void AddVaultAccountSequenceUpdate(AccountData vaultAccount, long sequence, long prevSequence)
+        {
+            var effect = new VaultSequenceUpdateEffect
+            {
+                Apex = Apex,
+                Sequence = sequence,
+                PrevSequence = prevSequence
+            };
+            Add(new VaultSequenceUpdateEffectProcessor(effect, vaultAccount));
+        }
+
         public void AddAccountCreate(AccountStorage accountStorage, RawPubKey publicKey)
         {
             Add(new AccountCreateEffectProcessor(

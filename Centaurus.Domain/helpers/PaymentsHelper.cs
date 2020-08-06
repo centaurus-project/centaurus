@@ -2,6 +2,7 @@
 using stellar_dotnet_sdk.xdr;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
 using static stellar_dotnet_sdk.xdr.OperationType;
 
@@ -35,7 +36,6 @@ namespace Centaurus.Domain
                 case OperationTypeEnum.PAYMENT:
                     if (!TryGetAsset(operation.PaymentOp.Asset, out asset))
                         return result;
-
                     var amount = operation.PaymentOp.Amount.InnerValue;
                     var destKeypair = stellar_dotnet_sdk.KeyPair.FromPublicKey(operation.PaymentOp.Destination.Ed25519.InnerValue);
                     if (Global.Constellation.Vault.Equals((RawPubKey)destKeypair.PublicKey))
@@ -75,6 +75,22 @@ namespace Centaurus.Domain
                     break;
             }
             return result;
+        }
+
+        public static stellar_dotnet_sdk.Transaction GenerateTransaction(this PaymentRequestBase withdrawalRequest)
+        {
+            stellar_dotnet_sdk.Asset asset = new stellar_dotnet_sdk.AssetTypeNative();
+            if (withdrawalRequest.Asset != 0)
+                asset = Global.Constellation.Assets.Find(a => a.Id == withdrawalRequest.Asset).ToAsset();
+
+            var transaction = TransactionHelper.BuildPaymentTransaction(
+                new TransactionBuilderOptions(Global.VaultAccount.GetAccount(), 10_000/*TODO: move fee to settings*/, withdrawalRequest.Memo),
+                new stellar_dotnet_sdk.KeyPair(withdrawalRequest.Destination.ToArray()),
+                asset,
+                withdrawalRequest.Amount
+            );
+
+            return transaction;
         }
     }
 }

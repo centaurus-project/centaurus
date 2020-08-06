@@ -32,18 +32,29 @@ namespace Centaurus.Domain
                 return;
             }
 
-            if (confirmation.Message is ITransactionContainer)
-                await SubmitTransaction(confirmation);
+            if (TryGetITransactionContainer(confirmation, out var transactionContainer))
+                await SubmitTransaction(confirmation, transactionContainer);
 
             ProccessResult(confirmation);
         }
 
-        private async Task SubmitTransaction(MessageEnvelope confirmation)
+        private bool TryGetITransactionContainer(MessageEnvelope confirmation, out ITransactionContainer transactionContainer)
+        {
+            transactionContainer = null;
+            var originalMessage = ((ResultMessage)confirmation.Message).OriginalMessage.Message;
+            if (originalMessage is ITransactionContainer)
+                transactionContainer = (ITransactionContainer)confirmation.Message;
+            else if (originalMessage is RequestQuantum && ((RequestQuantum)originalMessage).RequestMessage is ITransactionContainer)
+                transactionContainer = (ITransactionContainer)((RequestQuantum)originalMessage).RequestMessage;
+            return transactionContainer != null;
+        }
+
+        private async Task SubmitTransaction(MessageEnvelope confirmation, ITransactionContainer transactionContainer)
         {
             try
             {
                 //we have consensus
-                var tx = ((ITransactionContainer)confirmation.Message).GetTransaction();
+                var tx = transactionContainer.DeserializeTransaction();
 
                 int majority = MajorityHelper.GetMajorityCount();
 
@@ -62,7 +73,7 @@ namespace Centaurus.Domain
                     tx.Signatures.Add(signature);
                 }
 
-                if (tx.Signatures.Count <= majority)
+                if (tx.Signatures.Count < majority)
                     throw new InvalidOperationException("Not enough signatures to match the threshold.");
                 var result = await Global.StellarNetwork.Server.SubmitTransaction(tx);
                 //TODO: cleanup this mess

@@ -37,19 +37,6 @@ namespace Centaurus.Test
             {
                 client1StartBalanceAmount = clientAccountBalance.Amount;
 
-                var transactionBuilder = new TransactionBuilder(Global.VaultAccount.GetAccount());
-                transactionBuilder.AddOperation(
-                    new PaymentOperation.Builder(
-                        withdrawalDest,
-                        new AssetTypeNative(),
-                        amount.ToString()
-                ).Build());
-                var transaction = transactionBuilder.Build();
-
-                var txXdr = transaction.ToRawEnvelopeXdr();
-
-                txHash = txXdr.ComputeHash();
-
                 var withdrawal = new WithdrawalRequest
                 {
                     Account = TestEnvironment.Client1KeyPair,
@@ -57,10 +44,11 @@ namespace Centaurus.Test
                     Amount = amount,
                     Asset = asset,
                     Nonce = DateTime.UtcNow.Ticks,
-                    TransactionHash = txHash,
-                    TransactionXdr = txXdr,
                     AccountWrapper = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair)
                 };
+
+                withdrawal.AssignTransactionXdr(withdrawal.GenerateTransaction());
+                txHash = withdrawal.TransactionHash;
 
                 MessageEnvelope quantum = withdrawal.CreateEnvelope();
                 quantum.Sign(TestEnvironment.Client1KeyPair);

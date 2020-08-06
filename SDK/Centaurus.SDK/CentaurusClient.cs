@@ -1,12 +1,14 @@
 ﻿using Centaurus.Models;
 using Centaurus.SDK.Models;
 using Centaurus.Xdr;
+using NSec.Cryptography;
 using stellar_dotnet_sdk;
 using System;
 using System.Collections.Concurrent;
 using System.Linq;
 using System.Net;
 using System.Net.WebSockets;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -98,10 +100,15 @@ namespace Centaurus.SDK
             };
         }
 
-        public async Task<AccountDataModel> MakePayment(KeyPair destination, long amount, int asset)
+        public async Task MakePayment(KeyPair destination, long amount, int asset)
         {
-            var data = await connection.SendMessage(new PaymentRequest { Destination = destination, Asset = asset, Amount = amount }.CreateEnvelope());
-            return await GetAccountData();
+            var paymentMessage = destination.AccountId == keyPair.AccountId ? (PaymentRequestBase)new WithdrawalRequest() : new PaymentRequest();
+            paymentMessage.Amount = amount;
+            paymentMessage.Asset = asset;
+            paymentMessage.Destination = destination;
+
+            var data = await connection.SendMessage(paymentMessage.CreateEnvelope());
+
         }
 
         private void SubscribeToEvents(CentaurusConnection connection)
@@ -281,8 +288,8 @@ namespace Centaurus.SDK
                 if (resultMessage != null)
                     lock (Requests)
                     {
-                        var messageId = resultMessage.OriginalMessage.Message is RequestQuantum ? 
-                            ((RequestQuantum)resultMessage.OriginalMessage.Message).RequestMessage.MessageId : 
+                        var messageId = resultMessage.OriginalMessage.Message is RequestQuantum ?
+                            ((RequestQuantum)resultMessage.OriginalMessage.Message).RequestMessage.MessageId :
                             resultMessage.OriginalMessage.Message.MessageId;
                         if (Requests.TryRemove(messageId, out var task))
                         {

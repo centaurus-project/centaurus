@@ -58,8 +58,7 @@ namespace Centaurus.Domain
             catch (Exception exc)
             {
                 logger.Error(exc);
-                if (!Global.IsAlpha) //auditor should fail on quantum processing handling
-                    Global.AppState.State = ApplicationState.Failed;
+                Global.AppState.State = ApplicationState.Failed;
                 throw;
             }
         }
@@ -81,14 +80,11 @@ namespace Centaurus.Domain
             catch (Exception exc)
             {
                 if (result == null)
-                    result = new ResultMessage
-                    {
-                        Status = exc.GetStatusCode(),
-                        OriginalMessage = envelope
-                    };
+                    result = envelope.CreateResult(exc.GetStatusCode());
                 Notifier.OnMessageProcessResult(result);
                 tcs.SetException(exc);
-                throw;
+                if (!Global.IsAlpha) //auditor should fail on quantum processing handling
+                    throw;
             }
             Global.ExtensionsManager.AfterQuantumHandle(result);
         }
@@ -209,11 +205,11 @@ namespace Centaurus.Domain
                 quantum = ((RequestQuantum)quantum).RequestMessage;
             if (!(quantum is ITransactionContainer))
                 return;
-            var transaction = ((ITransactionContainer)quantum).GetTransaction();
-            if (transaction is null)
+            var transactionContainer = (ITransactionContainer)quantum;
+            if (!transactionContainer.HasTransaction())
                 return;
-            var txHash = transaction.Hash();
-            var effect = new TransactionSignedEffect()
+            var txHash = transactionContainer.TransactionHash;
+            var effect = new TransactionSignedEffect
             {
                 TransactionHash = txHash,
                 Signature = new Ed25519Signature()
@@ -223,7 +219,7 @@ namespace Centaurus.Domain
                 }
             };
             //TODO: add effects container reference to result message
-            effectsContainer.Add(new TransactionSignedEffectProcessor(effect));
+            //TODO: discuss if we need to store TransactionSignedEffect to DB
             result.Effects.Add(effect);
         }
 

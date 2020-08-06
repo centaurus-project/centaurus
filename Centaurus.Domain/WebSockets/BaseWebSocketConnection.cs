@@ -149,7 +149,7 @@ namespace Centaurus
 
                         //prevent recursive error sending
                         if (!(envelope.Message is ResultMessage))
-                            _ = SendMessage(new ResultMessage { Status = statusCode, OriginalMessage = envelope });
+                            _ = SendMessage(envelope.CreateResult(statusCode));
                         if (statusCode == ResultStatusCodes.InternalError || !Global.IsAlpha)
                             logger.Error(exc);
                     }

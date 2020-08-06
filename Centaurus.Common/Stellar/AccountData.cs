@@ -5,7 +5,7 @@ using System.Text;
 
 namespace Centaurus
 {
-    public class AccountData : ITransactionBuilderAccount
+    public class AccountData
     {
         public AccountData(KeyPair keyPair, long sequenceNumber)
         {
@@ -21,19 +21,9 @@ namespace Centaurus
 
         public long SequenceNumber { get; private set; }
 
-        public long IncrementedSequenceNumber => SequenceNumber + 1;
-
-        public IAccountId MuxedAccount
+        public void SetSequence(long sequence)
         {
-            get
-            {
-                return KeyPair;
-            }
-        }
-
-        public void IncrementSequenceNumber()
-        {
-            SequenceNumber++;
+            SequenceNumber = sequence;
         }
 
         public Account GetAccount()

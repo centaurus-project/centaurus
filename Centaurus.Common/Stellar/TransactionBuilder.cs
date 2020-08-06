@@ -7,7 +7,7 @@ namespace Centaurus
 {
     public class TransactionBuilderOptions
     {
-        public TransactionBuilderOptions(AccountData source, uint fee, string memo = null)
+        public TransactionBuilderOptions(Account source, uint fee, string memo = null)
         {
             if (fee <= 0)
                 throw new ArgumentNullException(nameof(fee));
@@ -17,7 +17,7 @@ namespace Centaurus
             Memo = memo;
         }
 
-        public AccountData Source { get; set; }
+        public Account Source { get; set; }
 
         public uint Fee { get; set; }
         
@@ -26,9 +26,9 @@ namespace Centaurus
 
     public static class TransactionHelper
     {
-        public static Transaction BuildPaymentTransaction(TransactionBuilderOptions options, KeyPair destination, Asset asset, string amount)
+        public static Transaction BuildPaymentTransaction(TransactionBuilderOptions options, KeyPair destination, Asset asset, long amount)
         {
-            var paymentOperation = new PaymentOperation.Builder(destination, asset, amount).Build();
+            var paymentOperation = new PaymentOperation.Builder(destination, asset, Amount.FromXdr(amount)).Build();
 
             return BuildTransaction(options, paymentOperation);
         }
