@@ -33,7 +33,7 @@ namespace Centaurus.Domain
             }
 
             if (TryGetITransactionContainer(confirmation, out var transactionContainer))
-                await SubmitTransaction(confirmation, transactionContainer);
+                SubmitTransaction(confirmation, transactionContainer);
 
             ProccessResult(confirmation);
         }
@@ -49,7 +49,7 @@ namespace Centaurus.Domain
             return transactionContainer != null;
         }
 
-        private async Task SubmitTransaction(MessageEnvelope confirmation, ITransactionContainer transactionContainer)
+        private void SubmitTransaction(MessageEnvelope confirmation, ITransactionContainer transactionContainer)
         {
             try
             {
@@ -75,10 +75,7 @@ namespace Centaurus.Domain
 
                 if (tx.Signatures.Count < majority)
                     throw new InvalidOperationException("Not enough signatures to match the threshold.");
-                var result = await Global.StellarNetwork.Server.SubmitTransaction(tx);
-                //TODO: cleanup this mess
-                if (!result.IsSuccess())
-                    throw new Exception("Failed to submit transaction. Result is: " + result.ResultXdr);
+                Global.WithdrawalStorage.Submit(tx.Hash(), tx);
             }
             catch (Exception e)
             {

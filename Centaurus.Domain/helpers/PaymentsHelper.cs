@@ -79,12 +79,23 @@ namespace Centaurus.Domain
 
         public static stellar_dotnet_sdk.Transaction GenerateTransaction(this PaymentRequestBase withdrawalRequest)
         {
+            return withdrawalRequest.GenerateTransaction(Global.Constellation.Assets, Global.VaultAccount.GetAccount());
+        }
+
+        public static stellar_dotnet_sdk.Transaction GenerateTransaction(this PaymentRequestBase withdrawalRequest, List<AssetSettings> assets, stellar_dotnet_sdk.Account account)
+        {
+            if (withdrawalRequest == null)
+                throw new ArgumentNullException(nameof(withdrawalRequest));
+            if (assets == null)
+                throw new ArgumentNullException(nameof(assets));
+            if (account == null)
+                throw new ArgumentNullException(nameof(account));
             stellar_dotnet_sdk.Asset asset = new stellar_dotnet_sdk.AssetTypeNative();
             if (withdrawalRequest.Asset != 0)
-                asset = Global.Constellation.Assets.Find(a => a.Id == withdrawalRequest.Asset).ToAsset();
+                asset = assets.Find(a => a.Id == withdrawalRequest.Asset).ToAsset();
 
             var transaction = TransactionHelper.BuildPaymentTransaction(
-                new TransactionBuilderOptions(Global.VaultAccount.GetAccount(), 10_000/*TODO: move fee to settings*/, withdrawalRequest.Memo),
+                new TransactionBuilderOptions(account, 10_000/*TODO: move fee to settings*/, withdrawalRequest.Memo),
                 new stellar_dotnet_sdk.KeyPair(withdrawalRequest.Destination.ToArray()),
                 asset,
                 withdrawalRequest.Amount

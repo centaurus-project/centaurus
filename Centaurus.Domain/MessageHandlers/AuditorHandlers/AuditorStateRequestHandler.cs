@@ -26,8 +26,6 @@ namespace Centaurus.Domain
             var hasDataForApex = stateRequestMessage.TargetApex >= await SnapshotManager.GetMinRevertApex();
             if (hasDataForApex)
                 state.PendingQuantums = await SnapshotManager.GetQuantaAboveApex(stateRequestMessage.TargetApex);
-            else
-                throw new Exception("Alpha has newer data than the auditor");
             _ = connection.SendMessage(state);
         }
     }

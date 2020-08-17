@@ -218,7 +218,7 @@ namespace Centaurus.Domain
 
             var exchange = await GetRestoredExchange(orders);
 
-            var withdrawalsStorage = new WithdrawalStorage(withdrawals);
+            var withdrawalsStorage = new WithdrawalStorage(withdrawals, false);
 
             var effectModels = await Global.PermanentStorage.LoadEffectsAboveApex(apex);
             for (var i = effectModels.Count - 1; i >= 0; i--)

@@ -1,7 +1,10 @@
 ﻿using stellar_dotnet_sdk;
+using stellar_dotnet_sdk.requests;
+using stellar_dotnet_sdk.responses;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace Centaurus
 {
@@ -55,6 +58,30 @@ namespace Centaurus
             var transaction = builder.Build();
 
             return transaction;
+        }
+
+        /// <summary>
+        /// Returns tx by hash or null if not found
+        /// </summary>
+        /// <param name="transactionHash"></param>
+        /// <returns></returns>
+        public static async Task<TransactionResponse> GetTransaction(this Server server, byte[] transactionHash)
+        {
+            if (server == null)
+                throw new ArgumentNullException(nameof(server));
+            if (transactionHash == null || transactionHash.Length == 0)
+                throw new ArgumentNullException(nameof(transactionHash));
+            try
+            {
+                var transactionResponse = await server.Transactions.Transaction(transactionHash.ToHex().ToLower());
+                return transactionResponse;
+            }
+            catch (HttpResponseException exc)
+            {
+                if (exc.StatusCode != 404)
+                    throw;
+                return null;
+            }
         }
     }
 }

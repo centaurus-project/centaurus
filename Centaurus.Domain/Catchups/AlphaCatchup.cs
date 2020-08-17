@@ -4,6 +4,7 @@ using NLog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -78,6 +79,8 @@ namespace Centaurus.Domain
 
             await ApplyQuanta(validQuanta);
 
+            await SyncVaultSequence();
+
             var alphaStateManager = (AlphaStateManager)Global.AppState;
 
             alphaStateManager.AlphaRised();
@@ -85,14 +88,46 @@ namespace Centaurus.Domain
             Notifier.NotifyAuditors(alphaStateManager.GetCurrentAlphaState().CreateEnvelope());
         }
 
+        //TODO: write test for this method
+        private static async Task SyncVaultSequence()
+        {
+            stellar_dotnet_sdk.responses.AccountResponse vaultAccount;
+            if (!EnvironmentHelper.IsTest)
+            {
+                await Task.Delay(10_000); //wait for possible transaction handling by network before fetching vault account sequence
+                vaultAccount = (await StellarAccountHelper.GetVaultStellarAccount());
+            }
+            else
+                vaultAccount = new stellar_dotnet_sdk.responses.AccountResponse(Global.VaultAccount.AccountId, Global.VaultAccount.SequenceNumber - 1);
+
+            if (vaultAccount.SequenceNumber == Global.VaultAccount.SequenceNumber)
+                return;
+
+            var vaultSequenceResetQuantum = new VaultSequenceResetQuantum { VaultSequence = vaultAccount.SequenceNumber };
+
+            var withdrawals = Global.WithdrawalStorage.GetAll().ToList();
+            foreach (var withdrawal in withdrawals)
+            {
+                var tx = await Global.StellarNetwork.Server.GetTransaction(withdrawal.TransactionHash);
+                if (tx == null) //if tx is not found, assume that all next txs were not submitted too
+                    break;
+                vaultSequenceResetQuantum.LastSubmittedWithdrawalApex = withdrawal.Apex;
+            }
+
+            var envelope = vaultSequenceResetQuantum.CreateEnvelope();
+            envelope.Sign(Global.Settings.KeyPair);
+            var resultMessage = await Global.QuantumHandler.HandleAsync(envelope);
+            if (resultMessage.Status != ResultStatusCodes.Success)
+                throw new Exception($"Unable to handle vault sequence reset quantum. Error code: {resultMessage.Status}");
+        }
+
         private static async Task ApplyQuanta(List<MessageEnvelope> quanta)
-        { 
+        {
             var quantaCount = quanta.Count;
             for (var i = 0; i < quantaCount; i++)
             {
                 var currentQuantumEnvelope = quanta[i];
                 var currentQuantum = ((Quantum)currentQuantumEnvelope.Message);
-                var quantumApex = currentQuantum.Apex;
 
                 //try to unwrap for Alpha
                 if (currentQuantum is RequestQuantum)

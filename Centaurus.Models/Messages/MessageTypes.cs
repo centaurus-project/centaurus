@@ -48,6 +48,10 @@ namespace Centaurus.Models
         /// </summary>
         EffectsRequest = 50,
         /// <summary>
+        /// Vault sequence reset quantum. Alpha creates this quantum to sync the vault account in-memory sequence with network sequence, and cancel withdrawals that weren't submitted
+        /// </summary>
+        VaultSequenceResetQuantum = 51,
+        /// <summary>
         /// Initiate connection handshake.
         /// </summary>
         HandshakeInit = 100,

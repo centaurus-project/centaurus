@@ -17,6 +17,7 @@ namespace Centaurus.Models
     [XdrUnion((int)MessageTypes.LedgerUpdateNotification, typeof(LedgerUpdateNotification))]
     [XdrUnion((int)MessageTypes.AuditorState, typeof(AuditorState))]
     [XdrUnion((int)MessageTypes.SetApexCursor, typeof(SetApexCursor))]
+    [XdrUnion((int)MessageTypes.VaultSequenceResetQuantum, typeof(VaultSequenceResetQuantum))]
     [XdrUnion((int)MessageTypes.AlphaState, typeof(AlphaState))]
     [XdrUnion((int)MessageTypes.AuditorStateRequest, typeof(AuditorStateRequest))]
     [XdrUnion((int)MessageTypes.ConstellationInitQuantum, typeof(ConstellationInitQuantum))]

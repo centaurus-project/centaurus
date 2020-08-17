@@ -64,7 +64,7 @@ namespace Centaurus.Domain
 
             SetIdToAssets();
 
-            var vaultAccountInfo = await Global.StellarNetwork.Server.Accounts.Account(Global.Settings.KeyPair.AccountId);
+            var vaultAccountInfo = await StellarAccountHelper.GetVaultStellarAccount();
 
             var initQuantum = new ConstellationInitQuantum
             {
@@ -101,7 +101,7 @@ namespace Centaurus.Domain
         {
             var majority = MajorityHelper.GetMajorityCount(constellationInitInfo.Auditors.Count());
 
-            var sourceAccount = await Global.StellarNetwork.Server.Accounts.Account(Global.Settings.KeyPair.AccountId);
+            var sourceAccount = await StellarAccountHelper.GetVaultStellarAccount();
 
             var transactionBuilder = new TransactionBuilder(sourceAccount);
             transactionBuilder.SetFee(10_000);
@@ -152,7 +152,7 @@ namespace Centaurus.Domain
         {
             try
             {
-                return await Global.StellarNetwork.Server.Accounts.Account(Global.Settings.KeyPair.AccountId);
+                return await StellarAccountHelper.GetVaultStellarAccount();
             }
             catch (HttpResponseException exc)
             {

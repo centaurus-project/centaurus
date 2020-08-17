@@ -70,8 +70,6 @@ namespace Centaurus.Domain
 
         public static void Setup(Snapshot snapshot)
         {
-            //TODO: dispose objects if not null
-
             SnapshotManager = new SnapshotManager(OnSnapshotSuccess, OnSnapshotFailed);
 
             Constellation = snapshot.Settings;
@@ -82,15 +80,15 @@ namespace Centaurus.Domain
 
             Exchange = Exchange.RestoreExchange(snapshot.Settings.Assets, snapshot.Orders);
 
-            AuditLedgerManager = new AuditLedgerManager();
+            AuditLedgerManager?.Dispose(); AuditLedgerManager = new AuditLedgerManager();
 
-            AuditResultManager = new AuditResultManager();
+            AuditResultManager?.Dispose(); AuditResultManager = new AuditResultManager();
 
-            WithdrawalStorage = new WithdrawalStorage(snapshot.Withdrawals);
+            WithdrawalStorage?.Dispose(); WithdrawalStorage = new WithdrawalStorage(snapshot.Withdrawals, (!EnvironmentHelper.IsTest && IsAlpha));
 
-            LedgerManager = new LedgerManager(snapshot.Ledger);
+            LedgerManager?.Dispose(); LedgerManager = new LedgerManager(snapshot.Ledger);
 
-            ExtensionsManager = new ExtensionsManager();
+            ExtensionsManager?.Dispose(); ExtensionsManager = new ExtensionsManager();
             ExtensionsManager.RegisterAllExtensions();
         }
 

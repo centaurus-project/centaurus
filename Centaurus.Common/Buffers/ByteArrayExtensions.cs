@@ -11,7 +11,7 @@ namespace Centaurus
     {
         static ByteArrayExtensions()
         {
-            _HexLookup32 = Enumerable.Range(0, 255).Select(i =>
+            _HexLookup32 = Enumerable.Range(0, 256).Select(i =>
             {
                 var s = i.ToString("X2");
                 return ((uint)s[0]) + ((uint)s[1] << 16);
