@@ -87,7 +87,7 @@ namespace Centaurus.Domain
             if (balance == null || !balance.HasSufficientBalance(payment.Amount))
                 throw new InvalidOperationException("Insufficient funds");
 
-            if (payment.MessageType == MessageTypes.WithdrawalRequest)
+            if (payment.MessageType == MessageTypes.WithdrawalRequest || Global.AccountStorage.GetAccount(payment.Destination) == null)
             {
                 var tx = payment.GenerateTransaction();
                 if (!Global.IsAlpha && !ByteArrayPrimitives.Equals(payment.TransactionHash, tx.Hash()))

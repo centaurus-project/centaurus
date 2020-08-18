@@ -170,7 +170,7 @@ namespace Centaurus.Domain
                         case WithdrawalRemoveEffect withdrawalEffect:
                             withdrawals.Add(new DiffObject.Withdrawal
                             {
-                                Apex = withdrawalEffect.Apex,
+                                Apex = withdrawalEffect.Withdrawal.Apex, //TODO: review withdrawal storing model
                                 IsDeleted = true
                             });
                             break;

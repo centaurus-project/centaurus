@@ -21,7 +21,9 @@ namespace Centaurus.Domain
             var withdrawals = Global.WithdrawalStorage.GetAll().ToList();
             foreach (var withdrawal in withdrawals)
             {
+                var withdrawalSourceAccount = Global.AccountStorage.GetAccount(withdrawal.Source);
                 effectProcessorsContainer.AddWithdrawalRemove(withdrawal, Global.WithdrawalStorage);
+                effectProcessorsContainer.AddUnlockLiabilities(withdrawalSourceAccount.Account, withdrawal.Asset, withdrawal.Amount);
             }
             return Task.FromResult(envelope.CreateResult(ResultStatusCodes.Success, effectProcessorsContainer.GetEffects().ToList()));
         }

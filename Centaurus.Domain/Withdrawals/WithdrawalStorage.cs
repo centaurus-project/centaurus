@@ -5,6 +5,7 @@ using stellar_dotnet_sdk.responses;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -95,7 +96,7 @@ namespace Centaurus.Domain
 
         private async void SubmitTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
-            if (Global.AppState.State == ApplicationState.Running
+            if (Global.AppState.State == ApplicationState.Ready
                 && !(await TrySubmit()))
                 return; //errors occurred
             submitTimer.Start();
