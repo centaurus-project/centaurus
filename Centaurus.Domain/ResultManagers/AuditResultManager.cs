@@ -86,11 +86,12 @@ namespace Centaurus.Domain
 
         private void ProccessResult(MessageEnvelope confirmation)
         {
+            var originalEnvelope = ((ResultMessage)confirmation.Message).OriginalMessage;
             NonceRequestMessage requestMessage = null;
-            if (confirmation.Message is NonceRequestMessage)
-                requestMessage = (NonceRequestMessage)confirmation.Message;
-            else if (confirmation.Message is RequestQuantum)
-                requestMessage = ((RequestQuantum)confirmation.Message).RequestEnvelope.Message as NonceRequestMessage;
+            if (originalEnvelope.Message is NonceRequestMessage)
+                requestMessage = (NonceRequestMessage)originalEnvelope.Message;
+            else if (originalEnvelope.Message is RequestQuantum)
+                requestMessage = ((RequestQuantum)originalEnvelope.Message).RequestEnvelope.Message as NonceRequestMessage;
 
             if (requestMessage != null)
                 Notifier.Notify(requestMessage.Account, confirmation);

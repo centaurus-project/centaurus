@@ -31,7 +31,7 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
 
         private string StringifyResult(AlphaWebSocketConnection connection, ResultMessage resultMessage)
         {
-            return $"Result message from auditor {connection.ClientPubKey.ToString()}: {{ " +
+            return $"Result message from auditor {connection.ClientPubKey}: {{ " +
                 $"Status: {resultMessage.Status}, " +
                 $"SourceMessageType: {resultMessage.OriginalMessage.Message.MessageType}" +
                 $"}}";
