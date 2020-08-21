@@ -67,14 +67,15 @@ namespace Centaurus.Domain
         private void AddVaultPayments(ref List<PaymentBase> ledgerPayments, Transaction transaction, bool isSuccess)
         {
             var res = isSuccess ? PaymentResults.Success : PaymentResults.Failed;
-            var source = transaction.SourceAccount;
             //TODO: add only success or if transaction hash is in pending withdrawals
             for (var i = 0; i < transaction.Operations.Length; i++)
             {
-                if (PaymentsHelper.FromOperationResponse(transaction.Operations[i].ToOperationBody(), source.SigningKey, res, transaction.Hash(), out PaymentBase payment))
+                var source = transaction.Operations[i].SourceAccount?.SigningKey ?? transaction.SourceAccount.SigningKey;
+                if (PaymentsHelper.FromOperationResponse(transaction.Operations[i].ToOperationBody(), source, res, transaction.Hash(), out PaymentBase payment))
                     ledgerPayments.Add(payment);
             }
         }
+
         private void ProcessLedgerPayments(object sender, LedgerResponse ledgerResponse)
         {
             try

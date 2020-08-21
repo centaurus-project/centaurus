@@ -46,7 +46,7 @@ namespace Centaurus.Domain
                 transactionContainer = (ITransactionContainer)confirmation.Message;
             else if (originalMessage is RequestQuantum && ((RequestQuantum)originalMessage).RequestMessage is ITransactionContainer)
                 transactionContainer = (ITransactionContainer)((RequestQuantum)originalMessage).RequestMessage;
-            return transactionContainer != null;
+            return transactionContainer != null && transactionContainer.HasTransaction();
         }
 
         private void SubmitTransaction(MessageEnvelope confirmation, ITransactionContainer transactionContainer)
