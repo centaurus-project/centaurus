@@ -10,7 +10,10 @@ namespace Centaurus.Domain
     public static class SettingsModelExtensions
     {
         public static ConstellationSettings ToSettings(this SettingsModel settings, List<AssetModel> assetSettings)
-        { 
+        {
+            var assets = new List<AssetSettings>();
+            assets.Add(new AssetSettings());//add XLM
+            assets.AddRange(assetSettings.Select(a => a.ToAssetSettings()));
             var resultSettings = new ConstellationSettings
             {
                 Apex = settings.Apex,
@@ -18,7 +21,7 @@ namespace Centaurus.Domain
                 MinAccountBalance = settings.MinAccountBalance,
                 MinAllowedLotSize = settings.MinAllowedLotSize,
                 Vault = settings.Vault,
-                Assets = assetSettings.Select(a => a.ToAssetSettings()).ToList(),
+                Assets = assets,
                 RequestRateLimits = new RequestRateLimits
                 {
                     HourLimit = settings.RequestRateLimits.HourLimit,

@@ -15,18 +15,5 @@ namespace Centaurus.Domain
                 throw new ArgumentNullException(nameof(keyPair));
             return await Global.StellarNetwork.Server.Accounts.Account(keyPair.AccountId);
         }
-
-        public static async Task<AccountResponse> GetVaultStellarAccount()
-        {
-            return await Global.VaultAccount.GetStellarAccount();
-        }
-
-
-        public static async Task<AccountResponse> GetStellarAccount(this AccountData accountData)
-        {
-            if (accountData == null)
-                throw new ArgumentNullException(nameof(accountData));
-            return await accountData.KeyPair.GetStellarAccount();
-        }
     }
 }

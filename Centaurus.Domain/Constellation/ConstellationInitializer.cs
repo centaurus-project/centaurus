@@ -64,8 +64,6 @@ namespace Centaurus.Domain
 
             SetIdToAssets();
 
-            var vaultAccountInfo = await StellarAccountHelper.GetStellarAccount(Global.Settings.KeyPair);
-
             var initQuantum = new ConstellationInitQuantum
             {
                 Assets = constellationInitInfo.Assets.ToList(),
@@ -75,7 +73,6 @@ namespace Centaurus.Domain
                 MinAllowedLotSize = constellationInitInfo.MinAllowedLotSize,
                 PrevHash = new byte[] { },
                 Ledger = ledgerId,
-                VaultSequence = vaultAccountInfo.SequenceNumber,
                 RequestRateLimits = constellationInitInfo.RequestRateLimits
             };
 

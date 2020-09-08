@@ -3,9 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace Centaurus.Models
+namespace Centaurus
 {
-
     public enum EffectTypes
     {
         Undefined = 0,
@@ -31,7 +30,6 @@ namespace Centaurus.Models
         ConstellationUpdate = 32,
 
         LedgerUpdate = 51,
-        VaultSequenceUpdate = 52,
 
         TransactionSigned = 100
     }

@@ -1,32 +1,27 @@
-﻿using System;
+﻿using Centaurus.Models;
+using System;
 using System.Collections.Generic;
 using System.Text;
-using System.Threading.Tasks;
-using Centaurus.Models;
 
 namespace Centaurus.Domain
 {
-    public abstract class ClientRequestProcessorBase : IQuantumRequestProcessor
+    public static class ClientRequestProcessingHelper
     {
-        public abstract MessageTypes SupportedMessageType { get; }
-
-        public abstract Task<ResultMessage> Process(MessageEnvelope envelope, EffectProcessorsContainer effectsContainer);
-
-        public abstract Task Validate(MessageEnvelope envelope);
-
-        public void UpdateNonce(EffectProcessorsContainer effectProcessorsContainer)
+        public static void UpdateNonce<T>(this T context)
+            where T : ProcessorContext
         {
-            var requestQuantum = (RequestQuantum)effectProcessorsContainer.Envelope.Message;
+            var requestQuantum = (RequestQuantum)context.Envelope.Message;
             var requestMessage = requestQuantum.RequestMessage;
 
             var currentUser = requestMessage.AccountWrapper.Account;
 
-            effectProcessorsContainer.AddNonceUpdate(currentUser, requestMessage.Nonce, currentUser.Nonce);
+            context.EffectProcessors.AddNonceUpdate(currentUser, requestMessage.Nonce, currentUser.Nonce);
         }
 
-        public void ValidateNonce(MessageEnvelope envelope)
+        public static void ValidateNonce<T>(this T context)
+            where T : ProcessorContext
         {
-            var requestQuantum = envelope.Message as RequestQuantum;
+            var requestQuantum = context.Envelope.Message as RequestQuantum;
             if (requestQuantum == null)
                 throw new InvalidOperationException($"Invalid message type. Client quantum message should be of type {typeof(RequestQuantum).Name}.");
 

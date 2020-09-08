@@ -45,7 +45,6 @@ namespace Centaurus.Domain
                     MinAccountBalance = initQuantum.MinAccountBalance,
                     MinAllowedLotSize = initQuantum.MinAllowedLotSize,
                     Vault = initQuantum.Vault,
-                    VaultSequence = initQuantum.VaultSequence,
                     Ledger = initQuantum.Ledger,
                     RequestRateLimits = initQuantum.RequestRateLimits
 
@@ -210,9 +209,9 @@ namespace Centaurus.Domain
 
             var accounts = await GetAccounts();
 
-            var withdrawals = await GetWithdrawals();
-
             var accountStorage = new AccountStorage(accounts, settings.RequestRateLimits);
+
+            var withdrawals = await GetWithdrawals(accountStorage);
 
             var orders = await GetOrders(accountStorage);
 
@@ -271,12 +270,14 @@ namespace Centaurus.Domain
                         break;
                     case WithdrawalCreateEffect withdrawalCreate:
                         {
-                            processor = new WithdrawalCreateEffectProcessor(withdrawalCreate, withdrawalsStorage);
+                            var withdrawal = withdrawalsStorage.GetWithdrawal(withdrawalCreate.Apex);
+                            processor = new WithdrawalCreateEffectProcessor(withdrawalCreate, withdrawal, withdrawalsStorage);
                         }
                         break;
                     case WithdrawalRemoveEffect withdrawalRemove:
                         {
-                            processor = new WithdrawalRemoveEffectProcessor(withdrawalRemove, withdrawalsStorage);
+                            var withdrawal = withdrawalsStorage.GetWithdrawal(withdrawalRemove.Apex);
+                            processor = new WithdrawalRemoveEffectProcessor(withdrawalRemove, withdrawal, withdrawalsStorage);
                         }
                         break;
                     default:
@@ -293,7 +294,6 @@ namespace Centaurus.Domain
                 Ledger = stellarData.Ledger,
                 Orders = exchange.OrderMap.GetAllOrders().ToList(),
                 Settings = settings,
-                VaultSequence = stellarData.VaultSequence,
                 Withdrawals = withdrawals,
                 LastHash = lastQuantum.Message.ComputeHash()
             };
@@ -342,11 +342,19 @@ namespace Centaurus.Domain
             return accounts;
         }
 
-        private static async Task<List<Withdrawal>> GetWithdrawals()
+        private static async Task<List<Withdrawal>> GetWithdrawals(AccountStorage accountStorage)
         {
-            var withdrawalModels = await Global.PermanentStorage.LoadWithdrawals();
+            var withdrawalQuanta = await Global.PermanentStorage.LoadWithdrawals();
+            var withdrawals = withdrawalQuanta
+                .Select(w =>
+                {
+                    var withdrawalQuantum = XdrConverter.Deserialize<MessageEnvelope>(w.RawQuantum);
+                    var withdrawalRequest = ((WithdrawalRequest)((RequestQuantum)withdrawalQuantum.Message).RequestMessage);
+                    var withdrawal = withdrawalRequest.GetWithdrawal(w.Apex, accountStorage.GetAccount(w.Account));
+                    return withdrawal;
+                });
 
-            return withdrawalModels.Select(w => XdrConverter.Deserialize<Withdrawal>(w.RawWithdrawal)).ToList();
+            return withdrawals.ToList();
         }
 
         private static async Task<List<Order>> GetOrders(AccountStorage accountStorage)

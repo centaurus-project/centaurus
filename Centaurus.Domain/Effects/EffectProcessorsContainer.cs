@@ -99,10 +99,9 @@ namespace Centaurus.Domain
             var effect = new WithdrawalCreateEffect
             {
                 Apex = Apex,
-                Pubkey = withdrawal.Source,
-                Withdrawal = withdrawal
+                Pubkey = withdrawal.Source.Account.Pubkey
             };
-            Add(new WithdrawalCreateEffectProcessor(effect, withdrawalStorage));
+            Add(new WithdrawalCreateEffectProcessor(effect, withdrawal, withdrawalStorage));
         }
 
         public void AddWithdrawalRemove(Withdrawal withdrawal, WithdrawalStorage withdrawalStorage)
@@ -110,21 +109,9 @@ namespace Centaurus.Domain
             var effect = new WithdrawalRemoveEffect
             {
                 Apex = Apex,
-                Withdrawal = withdrawal,
-                Pubkey = withdrawal.Source
+                Pubkey = withdrawal.Source.Account.Pubkey
             };
-            Add(new WithdrawalRemoveEffectProcessor(effect, withdrawalStorage));
-        }
-
-        public void AddVaultAccountSequenceUpdate(AccountData vaultAccount, long sequence, long prevSequence)
-        {
-            var effect = new VaultSequenceUpdateEffect
-            {
-                Apex = Apex,
-                Sequence = sequence,
-                PrevSequence = prevSequence
-            };
-            Add(new VaultSequenceUpdateEffectProcessor(effect, vaultAccount));
+            Add(new WithdrawalRemoveEffectProcessor(effect, withdrawal, withdrawalStorage));
         }
 
         public void AddAccountCreate(AccountStorage accountStorage, RawPubKey publicKey)

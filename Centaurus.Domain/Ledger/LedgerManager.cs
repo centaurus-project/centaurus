@@ -67,12 +67,16 @@ namespace Centaurus.Domain
         private void AddVaultPayments(ref List<PaymentBase> ledgerPayments, Transaction transaction, bool isSuccess)
         {
             var res = isSuccess ? PaymentResults.Success : PaymentResults.Failed;
+            var txHash = transaction.Hash();
             //TODO: add only success or if transaction hash is in pending withdrawals
             for (var i = 0; i < transaction.Operations.Length; i++)
             {
                 var source = transaction.Operations[i].SourceAccount?.SigningKey ?? transaction.SourceAccount.SigningKey;
-                if (PaymentsHelper.FromOperationResponse(transaction.Operations[i].ToOperationBody(), source, res, transaction.Hash(), out PaymentBase payment))
-                    ledgerPayments.Add(payment);
+                if (PaymentsHelper.FromOperationResponse(transaction.Operations[i].ToOperationBody(), source, res, txHash, out PaymentBase payment))
+                {
+                    if (!(payment is Models.Withdrawal && ledgerPayments.Any(p => ByteArrayPrimitives.Equals(p.TransactionHash, txHash))))
+                        ledgerPayments.Add(payment);
+                }
             }
         }
 
@@ -101,9 +105,11 @@ namespace Centaurus.Domain
                 //TODO: try several time to load resources before throw exception
                 var result = Global.StellarNetwork.Server.Transactions
                     .ForAccount(Global.Constellation.Vault.ToString())
+                    .IncludeFailed(true)
                     .Cursor(pagingToken)
                     .Limit(200)
-                    .Execute().Result;
+                    .Execute()
+                    .Result;
 
                 var payments = new List<PaymentBase>();
                 while (result.Records.Count > 0)

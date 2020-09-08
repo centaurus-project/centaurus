@@ -9,7 +9,6 @@ namespace Centaurus.DAL.Models
     /// </summary>
     public class ConstellationState
     {
-        public long VaultSequence { get; set; }
         public long Ledger { get; set; }
     }
 }

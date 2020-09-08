@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using Centaurus.Xdr;
 
 namespace Centaurus.Models
@@ -10,19 +11,10 @@ namespace Centaurus.Models
     {
         public abstract PaymentTypes Type { get; }
 
-        [XdrField(0)]
+        [XdrField(1)]
         public PaymentResults PaymentResult { get; set; }
 
-        [XdrField(1)]
-        public int Asset { get; set; }
-
         [XdrField(2)]
-        public long Amount { get; set; }
-
-        [XdrField(3)]
-        public RawPubKey Destination { get; set; }
-
-        [XdrField(4)]
         public byte[] TransactionHash { get; set; }
     }
 }

@@ -6,6 +6,30 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
+    public interface IQuantumRequestProcessor<T>
+        where T: ProcessorContext
+    {
+        public MessageTypes SupportedMessageType { get; }
+
+        /// <summary>
+        /// Validate quantum request preconditions.
+        /// </summary>
+        /// <param name="context">Request context</param>
+        public Task Validate(T context);
+
+        /// <summary>
+        /// Execute quantum request and generate response message.
+        /// </summary>
+        /// <param name="context">Request context</param>
+        public Task<ResultMessage> Process(T context);
+
+        /// <summary>
+        /// Generates context for the processor.
+        /// </summary>
+        /// <param name="context">Request context</param>
+        public T GetContext(EffectProcessorsContainer container);
+    }
+
     public interface IQuantumRequestProcessor
     {
         public MessageTypes SupportedMessageType { get; }
@@ -13,14 +37,19 @@ namespace Centaurus.Domain
         /// <summary>
         /// Validate quantum request preconditions.
         /// </summary>
-        /// <param name="envelope">Quantum request</param>
-        public Task Validate(MessageEnvelope envelope);
+        /// <param name="context">Request context</param>
+        public Task Validate(object context);
 
         /// <summary>
         /// Execute quantum request and generate response message.
         /// </summary>
-        /// <param name="envelope">Quantum request</param>
-        /// <param name="effectProcessorsContainer">Current context effects processor container</param>
-        public Task<ResultMessage> Process(MessageEnvelope envelope, EffectProcessorsContainer effectProcessorsContainer);
+        /// <param name="context">Request context</param>
+        public Task<ResultMessage> Process(object context);
+
+        /// <summary>
+        /// Generates context for the processor.
+        /// </summary>
+        /// <param name="context">Request context</param>
+        public object GetContext(EffectProcessorsContainer container);
     }
 }

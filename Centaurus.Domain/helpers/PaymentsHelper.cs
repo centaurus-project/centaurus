@@ -26,7 +26,7 @@ namespace Centaurus.Domain
             return true;
         }
 
-        public static bool FromOperationResponse(Operation.OperationBody operation, stellar_dotnet_sdk.KeyPair source, PaymentResults pResult, byte[] transactionHash, out PaymentBase payment)
+        public static bool FromOperationResponse(stellar_dotnet_sdk.xdr.Operation.OperationBody operation, stellar_dotnet_sdk.KeyPair source, Models.PaymentResults pResult, byte[] transactionHash, out PaymentBase payment)
         {
             payment = null;
             int asset;
@@ -51,13 +51,13 @@ namespace Centaurus.Domain
                         var withdrawal = Global.WithdrawalStorage.GetWithdrawal(transactionHash);
                         if (withdrawal == null)
                             throw new Exception("Unable to find withdrawal by hash.");
-                        if (withdrawal.Asset != asset)
-                            throw new Exception("Assets are not equal.");
-                        if (withdrawal.Amount != amount)
-                            throw new Exception("Amounts are not equal.");
-                        if (ByteArrayPrimitives.Equals(withdrawal.Destination, destKeypair))
-                            throw new Exception("Destinations are not equal.");
-                        payment = withdrawal;
+                        //if (withdrawal.Asset != asset)
+                        //    throw new Exception("Assets are not equal.");
+                        //if (withdrawal.Amount != amount)
+                        //    throw new Exception("Amounts are not equal.");
+                        //if (ByteArrayPrimitives.Equals(withdrawal.Destination, destKeypair))
+                        //    throw new Exception("Destinations are not equal.");
+                        payment = new Models.Withdrawal { TransactionHash = transactionHash  };
                     }
                     if (payment != null)
                     {
@@ -75,33 +75,6 @@ namespace Centaurus.Domain
                     break;
             }
             return result;
-        }
-
-        public static stellar_dotnet_sdk.Transaction GenerateTransaction(this PaymentRequestBase withdrawalRequest)
-        {
-            return withdrawalRequest.GenerateTransaction(Global.Constellation.Assets, Global.VaultAccount.GetAccount());
-        }
-
-        public static stellar_dotnet_sdk.Transaction GenerateTransaction(this PaymentRequestBase withdrawalRequest, List<AssetSettings> assets, stellar_dotnet_sdk.Account account)
-        {
-            if (withdrawalRequest == null)
-                throw new ArgumentNullException(nameof(withdrawalRequest));
-            if (assets == null)
-                throw new ArgumentNullException(nameof(assets));
-            if (account == null)
-                throw new ArgumentNullException(nameof(account));
-            stellar_dotnet_sdk.Asset asset = new stellar_dotnet_sdk.AssetTypeNative();
-            if (withdrawalRequest.Asset != 0)
-                asset = assets.Find(a => a.Id == withdrawalRequest.Asset).ToAsset();
-
-            var transaction = TransactionHelper.BuildPaymentTransaction(
-                new TransactionBuilderOptions(account, 10_000/*TODO: move fee to settings*/, withdrawalRequest.Memo),
-                new stellar_dotnet_sdk.KeyPair(withdrawalRequest.Destination.ToArray()),
-                asset,
-                withdrawalRequest.Amount
-            );
-
-            return transaction;
         }
     }
 }

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -8,16 +9,16 @@ using stellar_dotnet_sdk;
 
 namespace Centaurus.Domain
 {
-    public class LedgerRequestProcessor : IQuantumRequestProcessor
+    public class LedgerCommitProcessor : QuantumRequestProcessor<LedgerCommitProcessorContext>
     {
-        public MessageTypes SupportedMessageType => MessageTypes.LedgerCommitQuantum;
+        public override MessageTypes SupportedMessageType => MessageTypes.LedgerCommitQuantum;
 
-        public Task<ResultMessage> Process(MessageEnvelope envelope, EffectProcessorsContainer effectsContainer)
+        public override Task<ResultMessage> Process(LedgerCommitProcessorContext context)
         {
-            var ledgerQuantum = (LedgerCommitQuantum)envelope.Message;
+            var ledgerQuantum = (LedgerCommitQuantum)context.Envelope.Message;
             var ledgerNotification = (LedgerUpdateNotification)ledgerQuantum.Source.Message;
 
-            effectsContainer.AddLedgerUpdate(Global.LedgerManager, ledgerNotification.LedgerTo, Global.LedgerManager.Ledger);
+            context.EffectProcessors.AddLedgerUpdate(Global.LedgerManager, ledgerNotification.LedgerTo, Global.LedgerManager.Ledger);
 
             for (var i = 0; i < ledgerNotification.Payments.Count; i++)
             {
@@ -26,23 +27,23 @@ namespace Centaurus.Domain
                 switch (payment.Type)
                 {
                     case PaymentTypes.Deposit:
-                        ProcessDeposite(payment as Deposit, effectsContainer);
+                        ProcessDeposite(payment as Deposit, context);
                         break;
                     case PaymentTypes.Withdrawal:
-                        ProcessWithdrawal(payment as Withdrawal, effectsContainer);
+                        ProcessWithdrawal(payment as Models.Withdrawal, context);
                         break;
                     default:
                         throw new InvalidOperationException("Unsupported payment type");
                 }
             }
 
-            return Task.FromResult(envelope.CreateResult(ResultStatusCodes.Success, effectsContainer.GetEffects().ToList()));
+            return Task.FromResult(context.Envelope.CreateResult(ResultStatusCodes.Success, context.EffectProcessors.GetEffects().ToList()));
         }
 
-        public Task Validate(MessageEnvelope envelope)
+        public override Task Validate(LedgerCommitProcessorContext context)
         {
             //TODO: validate type automatically based on the SupportedMessageType
-            var ledgerQuantum = envelope.Message as LedgerCommitQuantum
+            var ledgerQuantum = context.Envelope.Message as LedgerCommitQuantum
                 ?? throw new ArgumentException($"Unexpected message type. Only messages of type {typeof(LedgerCommitQuantum).FullName} are supported.");
 
             var ledgerSourceEnvelope = ledgerQuantum.Source;
@@ -64,7 +65,7 @@ namespace Centaurus.Domain
                         ValidateDeposite(payment as Deposit);
                         break;
                     case PaymentTypes.Withdrawal:
-                        ValidateWithdrawal(payment as Withdrawal);
+                        ValidateWithdrawal(payment as Models.Withdrawal, context);
                         break;
                     default:
                         throw new InvalidOperationException("Unsupported payment type: " + payment.Type.ToString());
@@ -98,7 +99,7 @@ namespace Centaurus.Domain
         /// <summary>
         /// Creates balance and account if needed, updates balance
         /// </summary>
-        private void ProcessDeposite(Deposit deposite, EffectProcessorsContainer effectsContainer)
+        private void ProcessDeposite(Deposit deposite, LedgerCommitProcessorContext context)
         {
             if (deposite.PaymentResult == PaymentResults.Failed)
                 return;
@@ -106,46 +107,49 @@ namespace Centaurus.Domain
             var account = Global.AccountStorage.GetAccount(deposite.Destination)?.Account;
             if (account == null)
             {
-                effectsContainer.AddAccountCreate(Global.AccountStorage, deposite.Destination);
+                context.EffectProcessors.AddAccountCreate(Global.AccountStorage, deposite.Destination);
                 account = Global.AccountStorage.GetAccount(deposite.Destination).Account;
             }
 
             if (!account.HasBalance(deposite.Asset))
             {
-                effectsContainer.AddBalanceCreate(account, deposite.Asset);
+                context.EffectProcessors.AddBalanceCreate(account, deposite.Asset);
             }
 
-            effectsContainer.AddBalanceUpdate(account, deposite.Asset, deposite.Amount);
+            context.EffectProcessors.AddBalanceUpdate(account, deposite.Asset, deposite.Amount);
         }
 
-        private void ValidateWithdrawal(Withdrawal withdrawal)
+        private void ValidateWithdrawal(Models.Withdrawal withdrawalModel, LedgerCommitProcessorContext context)
         {
+            if (withdrawalModel == null)
+                throw new ArgumentNullException(nameof(withdrawalModel));
+
+            var withdrawal = Global.WithdrawalStorage.GetWithdrawal(withdrawalModel.TransactionHash);
             if (withdrawal == null)
-                throw new ArgumentNullException(nameof(withdrawal));
-
-            if (withdrawal.Source == null || withdrawal.Source.IsZero())
-                throw new InvalidOperationException("Source should be valid public key");
-
-            if (withdrawal.Amount <= 0)
-                throw new InvalidOperationException("Amount should be greater than 0");
+                throw new InvalidOperationException($"Withdrawal with hash '{withdrawalModel.TransactionHash.ToHex().ToLower()}' is not found.");
+            context.Withdrawals.Add(withdrawalModel, withdrawal);
         }
 
-        private void ProcessWithdrawal(Withdrawal withdrawal, EffectProcessorsContainer effectsContainer)
+        private void ProcessWithdrawal(Models.Withdrawal withdrawalModel, LedgerCommitProcessorContext context)
         {
-            var account = Global.AccountStorage.GetAccount(withdrawal.Source);
-            if (account == null)
-                throw new Exception("Source account doesn't exist");
-
-
-            effectsContainer.AddUnlockLiabilities(account.Account, withdrawal.Asset, withdrawal.Amount);
-            if (withdrawal.PaymentResult == PaymentResults.Success)
-                effectsContainer.AddBalanceUpdate(account.Account, withdrawal.Asset, -withdrawal.Amount);
-            else
-            { 
+            var withdrawal = context.Withdrawals[withdrawalModel];
+            var isSuccess = withdrawalModel.PaymentResult == PaymentResults.Success;
+            foreach (var withdrawalItem in withdrawal.Withdrawals)
+            {
+                context.EffectProcessors.AddUnlockLiabilities(withdrawal.Source.Account, withdrawalItem.Asset, withdrawalItem.Amount);
+                if (isSuccess)
+                    context.EffectProcessors.AddBalanceUpdate(withdrawal.Source.Account, withdrawalItem.Asset, -withdrawalItem.Amount);
+            }
+            if (!isSuccess)
+            {
                 //TODO: we need to notify client that something went wrong
             }
+            context.EffectProcessors.AddWithdrawalRemove(withdrawal, Global.WithdrawalStorage);
+        }
 
-            effectsContainer.AddWithdrawalRemove(withdrawal, Global.WithdrawalStorage);
+        public override LedgerCommitProcessorContext GetContext(EffectProcessorsContainer container)
+        {
+            return new LedgerCommitProcessorContext(container);
         }
     }
 }

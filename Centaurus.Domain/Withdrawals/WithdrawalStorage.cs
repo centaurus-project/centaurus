@@ -2,6 +2,7 @@
 using NLog;
 using stellar_dotnet_sdk;
 using stellar_dotnet_sdk.responses;
+using stellar_dotnet_sdk.xdr;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -17,7 +18,7 @@ namespace Centaurus.Domain
     {
         public WithdrawalStorage(IEnumerable<Withdrawal> payments, bool startSubmitTimer = true)
         {
-            withdrawals = new Dictionary<byte[], WithdrawalWrapper>(new HashComparer());
+            withdrawals = new Dictionary<byte[], Withdrawal>(new HashComparer());
 
             if (payments == null)
                 return;
@@ -33,7 +34,7 @@ namespace Centaurus.Domain
                 throw new ArgumentNullException(nameof(payment));
 
             lock (withdrawals)
-                if (!withdrawals.TryAdd(payment.TransactionHash, new WithdrawalWrapper(payment)))
+                if (!withdrawals.TryAdd(payment.Hash, payment))
                     throw new Exception("Payment with specified transaction hash already exists");
         }
 
@@ -47,25 +48,20 @@ namespace Centaurus.Domain
                     throw new Exception("Withdrawal with specified hash is not found");
         }
 
-        public Withdrawal GetWithdrawal(byte[] transactionHash)
-        {
-            return GetWithdrawalWrapper(transactionHash)?.Withdrawal;
-        }
-
         public IEnumerable<Withdrawal> GetAll()
         {
             lock (withdrawals)
-                return withdrawals.Values.Select(w => w.Withdrawal);
+                return withdrawals.Values.Select(w => w);
         }
 
-        public void Submit(byte[] txHash, Transaction tx)
+        public void AssignSignatures(byte[] txHash, List<DecoratedSignature> signatures)
         {
             lock (withdrawals)
             {
-                var withdrawal = GetWithdrawalWrapper(txHash);
-                if (withdrawal.Tx != null)
+                var withdrawal = GetWithdrawal(txHash);
+                if (withdrawal.Signatures != null)
                     throw new Exception("Transaction already assigned.");
-                withdrawal.Tx = tx;
+                withdrawal.Signatures = signatures;
             }
         }
 
@@ -81,7 +77,7 @@ namespace Centaurus.Domain
 
         #region private members
 
-        private Dictionary<byte[], WithdrawalWrapper> withdrawals;
+        private Dictionary<byte[], Withdrawal> withdrawals;
         private System.Timers.Timer submitTimer;
         private static Logger logger = LogManager.GetCurrentClassLogger();
 
@@ -94,15 +90,22 @@ namespace Centaurus.Domain
             submitTimer.Start();
         }
 
-        private async void SubmitTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
+        private void SubmitTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
-            if (Global.AppState.State == ApplicationState.Ready
-                && !(await TrySubmit()))
-                return; //errors occurred
-            submitTimer.Start();
+            try
+            {
+                if (Global.AppState.State == ApplicationState.Ready)
+                    Cleanup();
+                submitTimer.Start();
+            }
+            catch (Exception exc)
+            {
+                logger.Error(exc);
+                Global.AppState.State = ApplicationState.Failed;
+            }
         }
 
-        private WithdrawalWrapper GetWithdrawalWrapper(byte[] transactionHash)
+        public Withdrawal GetWithdrawal(byte[] transactionHash)
         {
             if (transactionHash == null)
                 throw new ArgumentNullException(nameof(transactionHash));
@@ -111,47 +114,22 @@ namespace Centaurus.Domain
                 return withdrawals.GetValueOrDefault(transactionHash);
         }
 
-        private async Task<bool> TrySubmit()
+        public Withdrawal GetWithdrawal(long apex)
         {
-            var tasks = new List<Task<SubmitTransactionResponse>>();
+            if (apex == default)
+                throw new ArgumentNullException(nameof(apex));
+
             lock (withdrawals)
-            {
-                foreach (var withdrawal in withdrawals.Values)
-                {
-                    if (withdrawal.Tx == null) //no transaction is not signed by auditors yet
-                        break;
-                    if (withdrawal.IsSubmitted) //transaction is submitted but not removed yet
-                        continue;
-                    withdrawal.IsSubmitted = true;
-                    tasks.Add(Global.StellarNetwork.Server.SubmitTransaction(withdrawal.Tx));
-                }
-            }
-            var result = await Task.WhenAll(tasks);
-            var failedTxs = result
-                .Where(r => r.Ledger == null)
-                .Select(t => t.EnvelopeXdr)
-                .ToArray();
-            if (failedTxs.Count() > 0) //no ledger- no sequence update, need to restart to reset the vault account sequence
-            {
-                logger.Error($"Failed to submit next withdrawals : {string.Join(",\n", $"\"{failedTxs}\"")}");
-                Global.AppState.State = ApplicationState.Failed;
-                return false;
-            }
-            return true;
+                return withdrawals.Values.FirstOrDefault(w => w.Apex == apex);
         }
 
-        class WithdrawalWrapper
+        private void Cleanup()
         {
-            public WithdrawalWrapper(Withdrawal withdrawal)
+            lock (withdrawals)
             {
-                Withdrawal = withdrawal;
+                var currentTimeSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+                var expiredTransactions = withdrawals.Where(w => w.Value.IsExpired(currentTimeSeconds)).Select(w => w.Key);
             }
-
-            public Withdrawal Withdrawal { get; }
-
-            public Transaction Tx { get; set; }
-
-            public bool IsSubmitted { get; set; }
         }
 
         #endregion

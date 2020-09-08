@@ -79,7 +79,7 @@ namespace Centaurus.DAL
         /// <returns></returns>
         public abstract Task<List<AssetModel>> LoadAssets(long apex);
 
-        public abstract Task<List<WithdrawalModel>> LoadWithdrawals();
+        public abstract Task<List<QuantumModel>> LoadWithdrawals();
 
         public abstract Task<List<OrderModel>> LoadOrders();
 

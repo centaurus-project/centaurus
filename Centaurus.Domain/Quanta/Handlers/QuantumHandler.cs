@@ -113,7 +113,7 @@ namespace Centaurus.Domain
 
         async Task<ResultMessage> AlphaHandleQuantum(MessageEnvelope envelope)
         {
-            var processor = GetProcessor(envelope.Message.MessageType);
+            var processor = GetProcessorItem(envelope.Message.MessageType);
 
             var quantumEnvelope = GetQuantumEnvelope(envelope);
 
@@ -121,7 +121,11 @@ namespace Centaurus.Domain
 
             quantum.IsProcessed = false;
 
-            await processor.Validate(quantumEnvelope);
+            var effectsContainer = GetEffectProcessorsContainer(quantumEnvelope);
+
+            var context = processor.GetContext(effectsContainer);
+
+            await processor.Validate(context);
 
             //we must add it before processing, otherwise the quantum that we are processing here will be different from the quantum that will come to the auditor
             Global.QuantumStorage.AddQuantum(quantumEnvelope);
@@ -129,9 +133,7 @@ namespace Centaurus.Domain
             //we need to sign the quantum here to prevent multiple signatures that can occur if we sign it when sending
             quantumEnvelope.Sign(Global.Settings.KeyPair);
 
-            var effectsContainer = GetEffectProcessorsContainer(quantumEnvelope);
-
-            var resultMessage = await processor.Process(quantumEnvelope, effectsContainer);
+            var resultMessage = await processor.Process(context);
 
             quantum.IsProcessed = true;
 
@@ -153,19 +155,21 @@ namespace Centaurus.Domain
 
             var messageType = GetMessageType(envelope);
 
-            var processor = GetProcessor(messageType);
+            var processor = GetProcessorItem(messageType);
 
             ValidateAccountRequestRate(envelope);
 
-            await processor.Validate(envelope);
-
             var effectsContainer = GetEffectProcessorsContainer(envelope);
 
-            var result = await processor.Process(envelope, effectsContainer);
+            var context = processor.GetContext(effectsContainer);
+
+            await processor.Validate(context);
+
+            var result = await processor.Process(context);
 
             Global.QuantumStorage.AddQuantum(envelope);
 
-            ProcessTransaction(envelope, result, effectsContainer);
+            ProcessTransaction(context, result);
 
             SaveEffects(effectsContainer);
 
@@ -198,37 +202,31 @@ namespace Centaurus.Domain
                 throw new TooManyRequests($"Request limit reached for account {account.Account.Pubkey.ToString()}.");
         }
 
-        void ProcessTransaction(MessageEnvelope envelope, ResultMessage result, EffectProcessorsContainer effectsContainer)
+        void ProcessTransaction(object context, ResultMessage result)
         {
-            var quantum = envelope.Message;
-            if (quantum is RequestQuantum)//unwrap if needed
-                quantum = ((RequestQuantum)quantum).RequestMessage;
-            if (!(quantum is ITransactionContainer))
+            var transactionContext = context as TransactionProcessorContext;
+            if (transactionContext == null)
                 return;
-            var transactionContainer = (ITransactionContainer)quantum;
-            if (!transactionContainer.HasTransaction())
-                return;
-            var txHash = transactionContainer.TransactionHash;
             var effect = new TransactionSignedEffect
             {
-                TransactionHash = txHash,
+                TransactionHash = transactionContext.TransactionHash,
                 Signature = new Ed25519Signature()
                 {
-                    Signature = Global.Settings.KeyPair.Sign(txHash),
+                    Signature = Global.Settings.KeyPair.Sign(transactionContext.TransactionHash),
                     Signer = new RawPubKey { Data = Global.Settings.KeyPair.PublicKey }
                 }
             };
             //TODO: add effects container reference to result message
-            //TODO: discuss if we need to store TransactionSignedEffect to DB
+            //TODO: discuss if we need to save TransactionSignedEffect to DB
             result.Effects.Add(effect);
         }
 
         /// <summary>
         /// Looks for a processor for the specified message type
         /// </summary>
-        IQuantumRequestProcessor GetProcessor(MessageTypes messageType)
+        IQuantumRequestProcessor GetProcessorItem(MessageTypes messageType)
         {
-            if (!Global.QuantumProcessor.TryGetValue(messageType, out IQuantumRequestProcessor processor))
+            if (!Global.QuantumProcessor.TryGetValue(messageType, out var processor))
                 //TODO: do not fail here - return unsupported error message;
                 throw new InvalidOperationException($"Quantum {messageType} is not supported.");
             return processor;

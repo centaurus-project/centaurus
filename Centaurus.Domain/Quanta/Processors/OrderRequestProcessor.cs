@@ -7,30 +7,30 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public class OrderRequestProcessor : ClientRequestProcessorBase
+    public class OrderRequestProcessor : QuantumRequestProcessor
     {
         public override MessageTypes SupportedMessageType => MessageTypes.OrderRequest;
 
-        public override Task<ResultMessage> Process(MessageEnvelope envelope, EffectProcessorsContainer effectsContainer)
+        public override Task<ResultMessage> Process(ProcessorContext context)
         {
-            var quantum = (RequestQuantum)envelope.Message;
+            var quantum = (RequestQuantum)context.Envelope.Message;
             var requestMessage = quantum.RequestMessage;
 
-            UpdateNonce(effectsContainer);
+            context.UpdateNonce();
 
-            Global.Exchange.ExecuteOrder(effectsContainer);
+            Global.Exchange.ExecuteOrder(context.EffectProcessors);
 
-            var accountEffects = effectsContainer.GetEffects(requestMessage.Account).ToList();
+            var accountEffects = context.EffectProcessors.GetEffects(requestMessage.Account).ToList();
 
-            return Task.FromResult(envelope.CreateResult(ResultStatusCodes.Success, accountEffects));
+            return Task.FromResult(context.Envelope.CreateResult(ResultStatusCodes.Success, accountEffects));
         }
 
         //TODO: replace all system exceptions that occur on validation with our client exceptions
-        public override Task Validate(MessageEnvelope envelope)
+        public override Task Validate(ProcessorContext context)
         {
-            ValidateNonce(envelope);
+            context.ValidateNonce();
 
-            var quantum = envelope.Message as RequestQuantum;
+            var quantum = context.Envelope.Message as RequestQuantum;
             var orderRequest = (OrderRequest)quantum.RequestEnvelope.Message;
 
             if (orderRequest.Asset <= 0) throw new InvalidOperationException("Invalid asset for the orderbook: " + orderRequest.Asset);

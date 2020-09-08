@@ -11,7 +11,6 @@ namespace Centaurus.DAL
         public List<EffectModel> Effects { get; set; }
         public List<QuantumModel> Quanta { get; set; }
         public List<Order> Orders { get; set; }
-        public List<Withdrawal> Widthrawals { get; set; }
         public SettingsModel Settings { get; set; }
         public List<AssetModel> Assets { get; set; }
 
@@ -83,15 +82,6 @@ namespace Centaurus.DAL
         public class ConstellationState : BaseDiffModel
         {
             public long Ledger { get; set; }
-            public long VaultSequence { get; set; }
-        }
-        public class Withdrawal : BaseDiffModel
-        {
-            public long Apex { get; set; }
-
-            public byte[] RawWithdrawal { get; set; }
-
-            public byte[] TransactionHash { get; set; }
         }
 
         #endregion

@@ -94,7 +94,6 @@ namespace Centaurus.Test
                 MinAccountBalance = 1,
                 MinAllowedLotSize = 1,
                 Vault = settings is AlphaSettings ? settings.KeyPair.PublicKey : ((AuditorSettings)settings).AlphaKeyPair.PublicKey,
-                VaultSequence = 1,
                 Ledger = 1,
                 PrevHash = new byte[] { },
                 RequestRateLimits = new RequestRateLimits { HourLimit = 1000, MinuteLimit = 100 }

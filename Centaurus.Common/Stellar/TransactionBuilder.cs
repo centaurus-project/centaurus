@@ -73,7 +73,7 @@ namespace Centaurus
                 throw new ArgumentNullException(nameof(transactionHash));
             try
             {
-                var transactionResponse = await server.Transactions.Transaction(transactionHash.ToHex().ToLower());
+                var transactionResponse = await server.Transactions.IncludeFailed(true).Transaction(transactionHash.ToHex().ToLower());
                 return transactionResponse;
             }
             catch (HttpResponseException exc)

@@ -17,6 +17,16 @@ namespace Centaurus.Domain
         static Logger logger = LogManager.GetCurrentClassLogger();
 
         /// <summary>
+        /// Min withdrawal amount in stroops
+        /// </summary>
+        public const long MinWithdrawalAmount = 1000;
+
+        /// <summary>
+        /// Delay in seconds
+        /// </summary>
+        public const int MaxTxSubmitDelay = 5 * 60; //5 minutes
+
+        /// <summary>
         /// Initializes Global object
         /// </summary>
         /// <param name="settings">Application config</param>
@@ -74,8 +84,6 @@ namespace Centaurus.Domain
 
             Constellation = snapshot.Settings;
 
-            VaultAccount = new AccountData(snapshot.Settings.Vault, snapshot.VaultSequence);
-
             AccountStorage = new AccountStorage(snapshot.Accounts, Constellation.RequestRateLimits);
 
             Exchange = Exchange.RestoreExchange(snapshot.Settings.Assets, snapshot.Orders);
@@ -111,7 +119,6 @@ namespace Centaurus.Domain
             }
         }
         public static QuantumStorage QuantumStorage { get; private set; }
-        public static AccountData VaultAccount { get; private set; }
         public static AccountStorage AccountStorage { get; private set; }
         public static WithdrawalStorage WithdrawalStorage { get; private set; }
         public static QuantumHandler QuantumHandler { get; private set; }

@@ -8,7 +8,5 @@ namespace Centaurus.Models
     public interface ITransactionContainer
     {
         public byte[] TransactionXdr { get; set; }
-
-        public byte[] TransactionHash { get; set; }
     }
 }

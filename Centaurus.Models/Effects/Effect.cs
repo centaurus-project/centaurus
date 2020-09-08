@@ -16,7 +16,6 @@ namespace Centaurus.Models
     [XdrUnion((int)EffectTypes.Trade, typeof(TradeEffect))]
     [XdrUnion((int)EffectTypes.TransactionSigned, typeof(TransactionSignedEffect))]
     [XdrUnion((int)EffectTypes.LedgerUpdate, typeof(LedgerUpdateEffect))]
-    [XdrUnion((int)EffectTypes.VaultSequenceUpdate, typeof(VaultSequenceUpdateEffect))]
     [XdrUnion((int)EffectTypes.ConstellationInit, typeof(ConstellationInitEffect))]
     [XdrUnion((int)EffectTypes.ConstellationUpdate, typeof(ConstellationUpdateEffect))]
     [XdrUnion((int)EffectTypes.WithdrawalCreate, typeof(WithdrawalCreateEffect))]

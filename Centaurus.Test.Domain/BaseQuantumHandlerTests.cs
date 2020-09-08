@@ -2,8 +2,10 @@
 using Centaurus.Models;
 using NUnit.Framework;
 using stellar_dotnet_sdk;
+using stellar_dotnet_sdk.xdr;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -17,8 +19,8 @@ namespace Centaurus.Test
         [TestCase(1, 0, 0, 0, typeof(InvalidOperationException))]
         [TestCase(3, 0, 0, 0, typeof(InvalidOperationException))]
         [TestCase(3, 63, 0, 0, typeof(InvalidOperationException))]
-        [TestCase(3, 63, 100, 10, typeof(InvalidOperationException))]
-        [TestCase(3, 63, 100, 0, null)]
+        [TestCase(3, 63, 1000, 10, typeof(InvalidOperationException))]
+        [TestCase(3, 63, 1000, 0, null)]
         public async Task LedgerQuantumTest(int ledgerFrom, int ledgerTo, int amount, int asset, Type excpectedException)
         {
             Global.AppState.State = ApplicationState.Ready;
@@ -37,18 +39,32 @@ namespace Centaurus.Test
             {
                 client1StartBalanceAmount = clientAccountBalance.Amount;
 
+
+                Global.Constellation.TryFindAssetSettings(asset, out var assetSettings);
+
+                var account = new stellar_dotnet_sdk.Account(TestEnvironment.Client1KeyPair.AccountId, 1);
+                var txBuilder = new TransactionBuilder(account);
+                txBuilder.SetFee(10_000);
+                txBuilder.AddTimeBounds(new stellar_dotnet_sdk.TimeBounds(DateTimeOffset.UtcNow, new TimeSpan(0, 5, 0)));
+                txBuilder.AddOperation(
+                    new PaymentOperation.Builder(withdrawalDest, assetSettings.ToAsset(), Amount.FromXdr(amount).ToString())
+                        .SetSourceAccount((KeyPair)Global.Constellation.Vault)
+                        .Build()
+                    );
+                var tx = txBuilder.Build();
+                txHash = tx.Hash();
+
+                var txV1 = tx.ToXdrV1();
+                var txStream = new XdrDataOutputStream();
+                stellar_dotnet_sdk.xdr.Transaction.Encode(txStream, txV1);
+
                 var withdrawal = new WithdrawalRequest
                 {
                     Account = TestEnvironment.Client1KeyPair,
-                    Destination = withdrawalDest.PublicKey,
-                    Amount = amount,
-                    Asset = asset,
+                    TransactionXdr = txStream.ToArray(),
                     Nonce = DateTime.UtcNow.Ticks,
                     AccountWrapper = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair)
                 };
-
-                withdrawal.AssignTransactionXdr(withdrawal.GenerateTransaction());
-                txHash = withdrawal.TransactionHash;
 
                 MessageEnvelope quantum = withdrawal.CreateEnvelope();
                 quantum.Sign(TestEnvironment.Client1KeyPair);
@@ -75,12 +91,8 @@ namespace Centaurus.Test
                             Destination = TestEnvironment.Client1KeyPair,
                             Asset = asset
                         },
-                        new Withdrawal
+                        new Models.Withdrawal
                         {
-                            Amount = amount,
-                            Destination = withdrawalDest,
-                            Source = TestEnvironment.Client1KeyPair,
-                            Asset = asset,
                             TransactionHash = txHash,
                             PaymentResult = PaymentResults.Success
                         }

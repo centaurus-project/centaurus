@@ -31,7 +31,6 @@ namespace Centaurus.Domain
             var balances = new Dictionary<byte[], Dictionary<int, DiffObject.Balance>>(new ByteArrayComparer());
 
             var orders = new Dictionary<ulong, DiffObject.Order>();
-            var withdrawals = new List<DiffObject.Withdrawal>();
 
             var assets = new List<AssetModel>();
 
@@ -59,7 +58,7 @@ namespace Centaurus.Domain
                     {
                         case ConstellationInitEffect constellationInit:
                             constellationSettings = GetConstellationSettings(constellationInit);
-                            stellarData = GetStellarData(constellationInit.Ledger, constellationInit.VaultSequence);
+                            stellarData = GetStellarData(constellationInit.Ledger);
                             stellarData.IsInserted = true;
                             assets = GetAssets(constellationInit, null);
                             break;
@@ -155,25 +154,6 @@ namespace Centaurus.Domain
                         case LedgerUpdateEffect ledgerUpdateEffect:
                             stellarData.Ledger = ledgerUpdateEffect.Ledger;
                             break;
-                        case VaultSequenceUpdateEffect vaultSequenceUpdateEffect:
-                            stellarData.VaultSequence = vaultSequenceUpdateEffect.Sequence;
-                            break;
-                        case WithdrawalCreateEffect withdrawalEffect:
-                            withdrawals.Add(new DiffObject.Withdrawal
-                            {
-                                Apex = withdrawalEffect.Apex,
-                                TransactionHash = withdrawalEffect.Withdrawal.TransactionHash,
-                                RawWithdrawal = XdrConverter.Serialize(withdrawalEffect.Withdrawal),
-                                IsInserted = true
-                            });
-                            break;
-                        case WithdrawalRemoveEffect withdrawalEffect:
-                            withdrawals.Add(new DiffObject.Withdrawal
-                            {
-                                Apex = withdrawalEffect.Withdrawal.Apex, //TODO: review withdrawal storing model
-                                IsDeleted = true
-                            });
-                            break;
                         default:
                             break;
                     }
@@ -189,8 +169,7 @@ namespace Centaurus.Domain
                 Assets = assets,
                 Orders = orders.Values.ToList(),
                 Settings = constellationSettings,
-                StellarInfoData = (stellarData.Ledger == 0 && stellarData.VaultSequence == 0) ? null : stellarData, //ignore if no changes
-                Widthrawals = withdrawals
+                StellarInfoData = stellarData.Ledger == 0 ? null : stellarData //ignore if no changes
             };
         }
 
@@ -259,19 +238,10 @@ namespace Centaurus.Domain
                 Pubkey = o.Account.Pubkey.Data
             }).ToList();
 
-            diffObject.Widthrawals = snapshot.Withdrawals.Select(w => new DiffObject.Withdrawal
-            {
-                IsInserted = true,
-                Apex = apex,
-                RawWithdrawal = XdrConverter.Serialize(w),
-                TransactionHash = w.TransactionHash
-            }).ToList();
-
             diffObject.StellarInfoData = new DiffObject.ConstellationState
             {
                 IsInserted = true,
-                Ledger = snapshot.Ledger,
-                VaultSequence = snapshot.VaultSequence
+                Ledger = snapshot.Ledger
             };
 
             diffObject.Quanta = new List<QuantumModel>();
@@ -301,9 +271,9 @@ namespace Centaurus.Domain
                 balances[pubKey].Add(asset, new DiffObject.Balance { AssetId = asset, PubKey = pubKey });
         }
 
-        private static DiffObject.ConstellationState GetStellarData(long ledger, long vaultSequence)
+        private static DiffObject.ConstellationState GetStellarData(long ledger)
         {
-            return new DiffObject.ConstellationState { Ledger = ledger, VaultSequence = vaultSequence };
+            return new DiffObject.ConstellationState { Ledger = ledger };
         }
 
         private static SettingsModel GetConstellationSettings(ConstellationEffect constellationInit)

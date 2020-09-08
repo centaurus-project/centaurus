@@ -20,9 +20,10 @@ namespace Centaurus.Domain
             var _processors = new Dictionary<MessageTypes, IQuantumRequestProcessor>();
             foreach (var processorType in discoveredRequestProcessors)
             {
-                var instance = Activator.CreateInstance(processorType) as IQuantumRequestProcessor;
+                var instance = (IQuantumRequestProcessor)Activator.CreateInstance(processorType);
                 if (_processors.ContainsKey(instance.SupportedMessageType))
                     throw new Exception($"Processor for message type {instance.SupportedMessageType} is already registered");
+
                 _processors.Add(instance.SupportedMessageType, instance);
             }
             processors = _processors.ToImmutableDictionary();

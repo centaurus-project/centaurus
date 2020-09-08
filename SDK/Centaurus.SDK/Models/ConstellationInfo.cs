@@ -1,4 +1,5 @@
 ﻿using Centaurus.Models;
+using Newtonsoft.Json;
 using stellar_dotnet_sdk;
 using System;
 using System.Collections.Generic;
@@ -8,6 +9,8 @@ namespace Centaurus.SDK.Models
 {
     public class ConstellationInfo
     {
+        public string RawObject { get; set; }
+
         public ApplicationStateModel State { get; set; }
 
         public string Vault { get; set; }

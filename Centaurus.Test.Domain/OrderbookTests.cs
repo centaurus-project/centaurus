@@ -50,7 +50,6 @@ namespace Centaurus.Test
                 Apex = 0,
                 Ledger = 1,
                 Orders = new List<Order>(),
-                VaultSequence = 1,
                 Settings = new ConstellationSettings
                 {
                     Vault = KeyPair.Random().PublicKey,

@@ -1,4 +1,5 @@
 ﻿using Centaurus.Models;
+using stellar_dotnet_sdk.xdr;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -32,29 +33,27 @@ namespace Centaurus.Domain
                 return;
             }
 
-            if (TryGetITransactionContainer(confirmation, out var transactionContainer))
-                SubmitTransaction(confirmation, transactionContainer);
+            if (TryGetWithdrawal(confirmation, out var withdrawal))
+                SubmitTransaction(confirmation, withdrawal);
 
             ProccessResult(confirmation);
         }
 
-        private bool TryGetITransactionContainer(MessageEnvelope confirmation, out ITransactionContainer transactionContainer)
+        private bool TryGetWithdrawal(MessageEnvelope confirmation, out WithdrawalRequest withdrawal)
         {
-            transactionContainer = null;
+            withdrawal = null;
             var originalMessage = ((ResultMessage)confirmation.Message).OriginalMessage.Message;
-            if (originalMessage is ITransactionContainer)
-                transactionContainer = (ITransactionContainer)confirmation.Message;
-            else if (originalMessage is RequestQuantum && ((RequestQuantum)originalMessage).RequestMessage is ITransactionContainer)
-                transactionContainer = (ITransactionContainer)((RequestQuantum)originalMessage).RequestMessage;
-            return transactionContainer != null && transactionContainer.HasTransaction();
+            if (originalMessage is RequestQuantum && ((RequestQuantum)originalMessage).RequestMessage is WithdrawalRequest)
+                withdrawal = (WithdrawalRequest)((RequestQuantum)originalMessage).RequestMessage;
+            return withdrawal != null;
         }
 
-        private void SubmitTransaction(MessageEnvelope confirmation, ITransactionContainer transactionContainer)
+        private void SubmitTransaction(MessageEnvelope confirmation, WithdrawalRequest withdrawal)
         {
             try
             {
                 //we have consensus
-                var tx = transactionContainer.DeserializeTransaction();
+                var tx = withdrawal.DeserializeTransaction();
 
                 int majority = MajorityHelper.GetMajorityCount();
 
@@ -64,18 +63,18 @@ namespace Centaurus.Domain
                     .Where(e => e is TransactionSignedEffect)
                     .Cast<TransactionSignedEffect>()
                     .ToArray();
-
+                var signatures = new List<DecoratedSignature>();
                 for (var i = 0; i < transactionEffects.Length && tx.Signatures.Count <= majority; i++)
                 {
                     var effect = transactionEffects[i];
                     var signature = effect.Signature.ToDecoratedSignature();
                     //TODO: verify the signature here and check that it is unique
-                    tx.Signatures.Add(signature);
+                    signatures.Add(signature);
                 }
 
                 if (tx.Signatures.Count < majority)
                     throw new InvalidOperationException("Not enough signatures to match the threshold.");
-                Global.WithdrawalStorage.Submit(tx.Hash(), tx);
+                Global.WithdrawalStorage.AssignSignatures(tx.Hash(), signatures);
             }
             catch (Exception e)
             {
