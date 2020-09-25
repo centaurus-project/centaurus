@@ -9,6 +9,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\Centaurus.Common\Centaurus.Common.csproj" />
     <ProjectReference Include="..\..\Centaurus.DynamicSerializers\Centaurus.DynamicSerializers.csproj" />
     <ProjectReference Include="..\..\Centaurus.Models.Extensions\Centaurus.Models.Extensions.csproj" />
     <ProjectReference Include="..\..\Centaurus.Models\Centaurus.Models.csproj" />

@@ -38,6 +38,11 @@ namespace Centaurus.SDK.Models
             public string Passphrase { get; set; }
 
             public string Horizon { get; set; }
+
+            public Server GetServer()
+            {
+                return new Server(Horizon);
+            }
         }
 
         public class Asset
@@ -57,6 +62,10 @@ namespace Centaurus.SDK.Models
                     Issuer = assetSettings.IsXlm ? null : ((KeyPair)assetSettings.Issuer).AccountId
                 };
             }
+
+            public string DisplayName => Issuer == null ? "XLM" : $"{Code}:{Issuer}";
+
+            public stellar_dotnet_sdk.Asset StellarAsset => Issuer == null ? new AssetTypeNative() : stellar_dotnet_sdk.Asset.CreateNonNativeAsset(Code, Issuer);
         }
 
         public enum ApplicationStateModel

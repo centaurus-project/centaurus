@@ -7,7 +7,8 @@ namespace Centaurus.SDK
 {
     public class RequestException: Exception
     {
-        public RequestException(MessageEnvelope envelope)
+        public RequestException(MessageEnvelope envelope, string message = null)
+            :base(message)
         {
             Envelope = envelope;
         }

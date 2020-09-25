@@ -10,10 +10,10 @@ namespace Centaurus.Models
         [XdrField(0)]
         public Message Message { get; set; }
 
-        //TODO: do not serialize hashes
-        //public byte[] Hash { get; set; }
-
         [XdrField(1)]
         public List<Ed25519Signature> Signatures { get; set; }
+
+        [XdrField(2, Optional = true)]
+        public List<SideEffect> SideEffects { get; set; }
     }
 }

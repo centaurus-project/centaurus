@@ -151,7 +151,10 @@ namespace Centaurus.Domain
                     if (!storage.ContainsKey(envelopeHash))//first result with such hash
                         storage[envelopeHash] = envelope;
                     else
-                        storage[envelopeHash].AggregateEnvelopUnsafe(envelope);//we can use AggregateEnvelopUnsafe, we compute hash for every envelope above
+                    {
+                        var resultStorageEnvelope = storage[envelopeHash];
+                        resultStorageEnvelope.AggregateEnvelopUnsafe(envelope);//we can use AggregateEnvelopUnsafe, we compute hash for every envelope above
+                    }
                     majorityResult = CheckMajority(out consensus);
                     if (majorityResult != MajorityResults.Unknown)
                         AlreadyHasResult = true;

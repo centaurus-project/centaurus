@@ -85,6 +85,14 @@ namespace Centaurus
                     envelope.Signatures.Add(signature);
                 }
             }
+            if ((envelope.SideEffects != null) != (anotherEnvelope.SideEffects != null))
+            {
+                throw new Exception("Side effects conflict");
+            }
+            if (envelope.SideEffects != null)
+            {
+                envelope.SideEffects.AddRange(anotherEnvelope.SideEffects);
+            }
         }
 
         /// <summary>

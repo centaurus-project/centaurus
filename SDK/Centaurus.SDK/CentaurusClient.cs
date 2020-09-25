@@ -3,6 +3,7 @@ using Centaurus.SDK.Models;
 using Centaurus.Xdr;
 using NSec.Cryptography;
 using stellar_dotnet_sdk;
+using stellar_dotnet_sdk.xdr;
 using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
@@ -19,11 +20,11 @@ namespace Centaurus.SDK
     public class CentaurusClient: IDisposable
     {
 
-        public CentaurusClient(Uri alphaWebSocketAddress, KeyPair keyPair/*, ConstellationInfo constellationInfo*/)
+        public CentaurusClient(Uri alphaWebSocketAddress, KeyPair keyPair, ConstellationInfo constellationInfo)
         {
             this.alphaWebSocketAddress = alphaWebSocketAddress ?? throw new ArgumentNullException(nameof(alphaWebSocketAddress));
             this.keyPair = keyPair ?? throw new ArgumentNullException(nameof(keyPair));
-            //this.constellationInfo = constellationInfo ?? throw new ArgumentNullException(nameof(constellationInfo));
+            this.constellation = constellationInfo ?? throw new ArgumentNullException(nameof(constellationInfo));
         }
 
         public async Task Connect()
@@ -32,7 +33,7 @@ namespace Centaurus.SDK
             {
                 await connectionSemaphore.WaitAsync();
 
-                connection = new CentaurusConnection(alphaWebSocketAddress, keyPair);
+                connection = new CentaurusConnection(alphaWebSocketAddress, keyPair, constellation);
                 SubscribeToEvents(connection);
                 await connection.EstablishConnection();
 
@@ -91,13 +92,31 @@ namespace Centaurus.SDK
             };
         }
 
-        public async Task<MessageEnvelope> MakePayment(KeyPair destination, long amount, int asset)
+        public async Task<MessageEnvelope> Withdrawal(KeyPair destination, string amount, ConstellationInfo.Asset asset)
         {
-            var paymentMessage = destination.AccountId == keyPair.AccountId ? (PaymentRequestBase)new WithdrawalRequest() : new PaymentRequest();
-            paymentMessage.Amount = amount;
-            paymentMessage.Asset = asset;
-            paymentMessage.Destination = destination;
+            var paymentMessage = new WithdrawalRequest();
+            var tx = await TransactionHelper.GetPaymentTx(keyPair, constellation, destination, amount, asset);
 
+            paymentMessage.TransactionXdr = tx.ToArray();
+
+            var result = await connection.SendMessage(paymentMessage.CreateEnvelope());
+
+            Network.Use(new Network(constellation.StellarNetwork.Passphrase));
+            tx.Sign(keyPair);
+            foreach (var signature in result.SideEffects.Where(e => e.EffectType == SideEffectTypes.TransactionSigned).OfType<TransactionSignedEffect>())
+            {
+                tx.Signatures.Add(signature.Signature.ToDecoratedSignature());
+            }
+
+            await tx.Submit(constellation);
+            return result;
+        }
+
+
+
+        public async Task<MessageEnvelope> MakePayment(KeyPair destination, long amount, ConstellationInfo.Asset asset)
+        {
+            var paymentMessage = new PaymentRequest { Amount = amount, Destination = destination, Asset = asset.Id };
             var result = await connection.SendMessage(paymentMessage.CreateEnvelope());
             return result;
         }
@@ -120,7 +139,7 @@ namespace Centaurus.SDK
         private CentaurusConnection connection;
         private Uri alphaWebSocketAddress;
         private KeyPair keyPair;
-        //private ConstellationInfo constellationInfo;
+        private ConstellationInfo constellation;
         private TaskCompletionSource<bool> handshakeResult = new TaskCompletionSource<bool>();
 
         private void SubscribeToEvents(CentaurusConnection connection)
@@ -197,10 +216,11 @@ namespace Centaurus.SDK
 
         private class CentaurusConnection : IDisposable
         {
-            public CentaurusConnection(Uri _websocketAddress, KeyPair _clientKeyPair)
+            public CentaurusConnection(Uri _websocketAddress, KeyPair _clientKeyPair, ConstellationInfo _constellationInfo)
             {
                 clientKeyPair = _clientKeyPair ?? throw new ArgumentNullException(nameof(_clientKeyPair));
                 websocketAddress = new Uri(_websocketAddress ?? throw new ArgumentNullException(nameof(_websocketAddress)), "centaurus");
+                constellationInfo = _constellationInfo ?? throw new ArgumentNullException(nameof(_constellationInfo));
 
                 //we don't need to create and sign heartbeat message on every sending
                 hearbeatMessage = new Heartbeat().CreateEnvelope();
@@ -258,7 +278,7 @@ namespace Centaurus.SDK
                 if (!envelope.IsSignedBy(clientKeyPair))
                     envelope.Sign(clientKeyPair);
 
-                TaskCompletionSource<MessageEnvelope> resultTask = null;
+                CentaurusResponse resultTask = null;
                 if (envelope != hearbeatMessage
                     && envelope.Message.MessageId != default)
                 {
@@ -282,7 +302,7 @@ namespace Centaurus.SDK
                     resultTask.SetException(exc);
                 }
 
-                return await (resultTask?.Task ?? Task.FromResult<MessageEnvelope>(null));
+                return await (resultTask?.ResponseTask ?? Task.FromResult<MessageEnvelope>(null));
             }
 
             public void Dispose()
@@ -306,6 +326,7 @@ namespace Centaurus.SDK
 
             private KeyPair clientKeyPair;
             private Uri websocketAddress;
+            private ConstellationInfo constellationInfo;
             private MessageEnvelope hearbeatMessage;
 
             private void HeartbeatTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
@@ -332,12 +353,13 @@ namespace Centaurus.SDK
                 request.Account = clientKeyPair;
             }
 
-            private TaskCompletionSource<MessageEnvelope> RegisterRequest(MessageEnvelope envelope)
+            private CentaurusResponse RegisterRequest(MessageEnvelope envelope)
             {
                 lock (Requests)
                 {
-                    var response = new TaskCompletionSource<MessageEnvelope>(new { createdAt = DateTime.UtcNow.Ticks });
-                    if (!Requests.TryAdd(envelope.Message.MessageId, response))
+                    var messageId = envelope.Message.MessageId;
+                    var response = messageId >= 0 ? new CentaurusQuantumResponse(constellationInfo): new CentaurusResponse(constellationInfo);
+                    if (!Requests.TryAdd(messageId, response))
                         throw new Exception("Unable to add request to pending requests.");
                     return response;
                 }
@@ -346,20 +368,19 @@ namespace Centaurus.SDK
             private bool TryResolveRequest(MessageEnvelope envelope)
             {
                 var resultMessage = envelope.Message as ResultMessage;
-                Debug.WriteLine($"{envelope.Message.MessageType} was received.");
+
                 if (resultMessage != null)
+                {
                     lock (Requests)
                     {
                         var messageId = resultMessage.OriginalMessage.Message is RequestQuantum ?
                             ((RequestQuantum)resultMessage.OriginalMessage.Message).RequestMessage.MessageId :
                             resultMessage.OriginalMessage.Message.MessageId;
-                        if (Requests.TryRemove(messageId, out var task))
+                        if (Requests.TryGetValue(messageId, out var task))
                         {
-                            if (resultMessage.Status == ResultStatusCodes.Success)
-                                task.SetResult(envelope);
-                            else
-                                task.SetException(new RequestException(envelope));
-
+                            task.AssignResponse(envelope);
+                            if (task.IsCompleted)
+                                Requests.TryRemove(messageId, out _);
                             Debug.WriteLine($"{envelope.Message.MessageType} result was set.");
                             return true;
                         }
@@ -368,6 +389,7 @@ namespace Centaurus.SDK
                             Debug.WriteLine($"Unable set result for msg with id {messageId}.");
                         }
                     }
+                }
                 return false;
             }
 
@@ -415,7 +437,7 @@ namespace Centaurus.SDK
                 }
             }
 
-            private ConcurrentDictionary<long, TaskCompletionSource<MessageEnvelope>> Requests { get; } = new ConcurrentDictionary<long, TaskCompletionSource<MessageEnvelope>>();
+            private ConcurrentDictionary<long, CentaurusResponse> Requests { get; } = new ConcurrentDictionary<long, CentaurusResponse>();
 
             private void HandleMessage(MessageEnvelope envelope)
             {

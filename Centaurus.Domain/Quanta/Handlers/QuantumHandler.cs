@@ -169,13 +169,17 @@ namespace Centaurus.Domain
 
             Global.QuantumStorage.AddQuantum(envelope);
 
-            ProcessTransaction(context, result);
+            var sideEffects = new List<SideEffect>();
+
+            ProcessTransaction(context, ref sideEffects);
 
             SaveEffects(effectsContainer);
 
             logger.Trace($"Message of type {messageType} with apex {((Quantum)envelope.Message).Apex} is handled.");
 
-            OutgoingMessageStorage.EnqueueMessage(result);
+            var resultEnvelope = result.CreateEnvelope(sideEffects);
+
+            OutgoingMessageStorage.EnqueueMessage(resultEnvelope);
 
             return result;
         }
@@ -202,12 +206,12 @@ namespace Centaurus.Domain
                 throw new TooManyRequests($"Request limit reached for account {account.Account.Pubkey.ToString()}.");
         }
 
-        void ProcessTransaction(object context, ResultMessage result)
+        void ProcessTransaction(object context, ref List<SideEffect> sideEffects)
         {
-            var transactionContext = context as TransactionProcessorContext;
+            var transactionContext = context as ITransactionProcessorContext;
             if (transactionContext == null)
                 return;
-            var effect = new TransactionSignedEffect
+            sideEffects.Add(new TransactionSignedEffect
             {
                 TransactionHash = transactionContext.TransactionHash,
                 Signature = new Ed25519Signature()
@@ -215,10 +219,7 @@ namespace Centaurus.Domain
                     Signature = Global.Settings.KeyPair.Sign(transactionContext.TransactionHash),
                     Signer = new RawPubKey { Data = Global.Settings.KeyPair.PublicKey }
                 }
-            };
-            //TODO: add effects container reference to result message
-            //TODO: discuss if we need to save TransactionSignedEffect to DB
-            result.Effects.Add(effect);
+            });
         }
 
         /// <summary>

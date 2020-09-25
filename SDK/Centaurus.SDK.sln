@@ -5,8 +5,6 @@ VisualStudioVersion = 16.0.30011.22
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Centaurus.SDK", "Centaurus.SDK\Centaurus.SDK.csproj", "{86A8B7AE-0F8B-4862-A3F9-4A67FC3F2A10}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Centaurus.Test.Common", "..\Centaurus.Test.Common\Centaurus.Test.Common.csproj", "{3DA5EE97-FD48-4B0F-8366-5DFC77506C78}"
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Centaurus", "Centaurus", "{203C6B89-6D59-4C42-8625-988774BE8563}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Centaurus.Models", "..\Centaurus.Models\Centaurus.Models.csproj", "{423FEC37-A386-494C-AD67-6B966A215AD4}"
@@ -16,6 +14,8 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Centaurus.Xdr", "..\Centaurus.Xdr\Centaurus.Xdr.csproj", "{EDBD6440-267A-41BA-9E3F-99402A1B5FA4}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Centaurus.Models.Extensions", "..\Centaurus.Models.Extensions\Centaurus.Models.Extensions.csproj", "{4B8325F8-A627-4C22-8CAB-09583937ED28}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Centaurus.Common", "..\Centaurus.Common\Centaurus.Common.csproj", "{740EF3D9-EBC5-41C0-BF40-14B61E9C617D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -27,10 +27,6 @@ Global
 		{86A8B7AE-0F8B-4862-A3F9-4A67FC3F2A10}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{86A8B7AE-0F8B-4862-A3F9-4A67FC3F2A10}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{86A8B7AE-0F8B-4862-A3F9-4A67FC3F2A10}.Release|Any CPU.Build.0 = Release|Any CPU
-		{3DA5EE97-FD48-4B0F-8366-5DFC77506C78}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{3DA5EE97-FD48-4B0F-8366-5DFC77506C78}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{3DA5EE97-FD48-4B0F-8366-5DFC77506C78}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{3DA5EE97-FD48-4B0F-8366-5DFC77506C78}.Release|Any CPU.Build.0 = Release|Any CPU
 		{423FEC37-A386-494C-AD67-6B966A215AD4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{423FEC37-A386-494C-AD67-6B966A215AD4}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{423FEC37-A386-494C-AD67-6B966A215AD4}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -47,16 +43,20 @@ Global
 		{4B8325F8-A627-4C22-8CAB-09583937ED28}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4B8325F8-A627-4C22-8CAB-09583937ED28}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4B8325F8-A627-4C22-8CAB-09583937ED28}.Release|Any CPU.Build.0 = Release|Any CPU
+		{740EF3D9-EBC5-41C0-BF40-14B61E9C617D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{740EF3D9-EBC5-41C0-BF40-14B61E9C617D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{740EF3D9-EBC5-41C0-BF40-14B61E9C617D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{740EF3D9-EBC5-41C0-BF40-14B61E9C617D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
-		{3DA5EE97-FD48-4B0F-8366-5DFC77506C78} = {203C6B89-6D59-4C42-8625-988774BE8563}
 		{423FEC37-A386-494C-AD67-6B966A215AD4} = {203C6B89-6D59-4C42-8625-988774BE8563}
 		{B15ECCC1-EFCC-4FD0-A2C5-82FAA6E9EE1A} = {203C6B89-6D59-4C42-8625-988774BE8563}
 		{EDBD6440-267A-41BA-9E3F-99402A1B5FA4} = {203C6B89-6D59-4C42-8625-988774BE8563}
 		{4B8325F8-A627-4C22-8CAB-09583937ED28} = {203C6B89-6D59-4C42-8625-988774BE8563}
+		{740EF3D9-EBC5-41C0-BF40-14B61E9C617D} = {203C6B89-6D59-4C42-8625-988774BE8563}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {DB22A0E4-E30A-47A2-ADBA-CD159022B4D0}

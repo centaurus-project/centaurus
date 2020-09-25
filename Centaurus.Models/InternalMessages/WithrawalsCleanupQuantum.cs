@@ -5,11 +5,11 @@ using System.Text;
 
 namespace Centaurus.Models
 {
-    public class WithrawalsCleanupQuantum : Message
+    public class WithrawalsCleanupQuantum : Quantum
     {
         public override MessageTypes MessageType => MessageTypes.WithrawalsCleanup;
 
         [XdrField(0)]
-        public List<byte[]> ExpiredWithdrawals { get; set; }
+        public byte[] ExpiredWithdrawal { get; set; }
     }
 }

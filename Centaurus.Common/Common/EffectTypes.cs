@@ -29,8 +29,6 @@ namespace Centaurus
         ConstellationInit = 31,
         ConstellationUpdate = 32,
 
-        LedgerUpdate = 51,
-
-        TransactionSigned = 100
+        LedgerUpdate = 51
     }
 }

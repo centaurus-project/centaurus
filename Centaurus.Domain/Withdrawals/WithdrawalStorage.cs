@@ -28,14 +28,17 @@ namespace Centaurus.Domain
                 InitTimer();
         }
 
-        public void Add(Withdrawal payment)
+        public void Add(Withdrawal withdrawal)
         {
-            if (payment == null)
-                throw new ArgumentNullException(nameof(payment));
+            if (withdrawal == null)
+                throw new ArgumentNullException(nameof(withdrawal));
 
             lock (withdrawals)
-                if (!withdrawals.TryAdd(payment.Hash, payment))
+            {
+                if (!withdrawals.TryAdd(withdrawal.Hash, withdrawal))
                     throw new Exception("Payment with specified transaction hash already exists");
+                withdrawal.Source.HasPendingWithdrawal = true;
+            }
         }
 
         public void Remove(byte[] transactionHash)
@@ -44,8 +47,11 @@ namespace Centaurus.Domain
                 throw new ArgumentNullException(nameof(transactionHash));
 
             lock (withdrawals)
-                if (!withdrawals.Remove(transactionHash))
+            {
+                if (!withdrawals.Remove(transactionHash, out var withdrawal))
                     throw new Exception("Withdrawal with specified hash is not found");
+                withdrawal.Source.HasPendingWithdrawal = false;
+            }
         }
 
         public IEnumerable<Withdrawal> GetAll()
@@ -54,15 +60,22 @@ namespace Centaurus.Domain
                 return withdrawals.Values.Select(w => w);
         }
 
-        public void AssignSignatures(byte[] txHash, List<DecoratedSignature> signatures)
+        public Withdrawal GetWithdrawal(byte[] transactionHash)
         {
+            if (transactionHash == null)
+                throw new ArgumentNullException(nameof(transactionHash));
+
             lock (withdrawals)
-            {
-                var withdrawal = GetWithdrawal(txHash);
-                if (withdrawal.Signatures != null)
-                    throw new Exception("Transaction already assigned.");
-                withdrawal.Signatures = signatures;
-            }
+                return withdrawals.GetValueOrDefault(transactionHash);
+        }
+
+        public Withdrawal GetWithdrawal(long apex)
+        {
+            if (apex == default)
+                throw new ArgumentNullException(nameof(apex));
+
+            lock (withdrawals)
+                return withdrawals.Values.FirstOrDefault(w => w.Apex == apex);
         }
 
         public void Dispose()
@@ -105,31 +118,16 @@ namespace Centaurus.Domain
             }
         }
 
-        public Withdrawal GetWithdrawal(byte[] transactionHash)
-        {
-            if (transactionHash == null)
-                throw new ArgumentNullException(nameof(transactionHash));
-
-            lock (withdrawals)
-                return withdrawals.GetValueOrDefault(transactionHash);
-        }
-
-        public Withdrawal GetWithdrawal(long apex)
-        {
-            if (apex == default)
-                throw new ArgumentNullException(nameof(apex));
-
-            lock (withdrawals)
-                return withdrawals.Values.FirstOrDefault(w => w.Apex == apex);
-        }
-
         private void Cleanup()
         {
+            byte[][] expiredTransactions = null;
             lock (withdrawals)
             {
                 var currentTimeSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-                var expiredTransactions = withdrawals.Where(w => w.Value.IsExpired(currentTimeSeconds)).Select(w => w.Key);
+                expiredTransactions = withdrawals.Where(w => w.Value.IsExpired(currentTimeSeconds)).Select(w => w.Key).ToArray();
             }
+            foreach (var expiredTransaction in expiredTransactions)
+                _ = Global.QuantumHandler.HandleAsync(new WithrawalsCleanupQuantum { ExpiredWithdrawal = expiredTransaction }.CreateEnvelope());
         }
 
         #endregion

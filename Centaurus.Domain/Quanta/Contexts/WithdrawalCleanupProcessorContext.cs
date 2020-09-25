@@ -1,18 +1,14 @@
-﻿using Centaurus.Models;
-using stellar_dotnet_sdk;
-using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using System.Collections.Generic;
 
 namespace Centaurus.Domain
 {
-    public class WithdrawalCleanupProcessorContext : TransactionProcessorContext
+    public class WithdrawalCleanupProcessorContext : ProcessorContext
     {
         public WithdrawalCleanupProcessorContext(EffectProcessorsContainer effectProcessorsContainer)
             : base(effectProcessorsContainer)
         {
         }
 
-        public List<Withdrawal> Withdrawals { get; set; } = new List<Withdrawal>();
+        public Withdrawal Withdrawal { get; set; }
     }
 }

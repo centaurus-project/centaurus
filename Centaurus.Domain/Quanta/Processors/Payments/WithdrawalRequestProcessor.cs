@@ -17,28 +17,21 @@ namespace Centaurus.Domain
         {
             context.UpdateNonce();
 
-            var requestQuantum = (RequestQuantum)context.Envelope.Message;
-
-            var payment = (PaymentRequestBase)requestQuantum.RequestEnvelope.Message;
-
-            var paymentAccount = payment.AccountWrapper.Account;
-
             var withdrawal = new Withdrawal
             {
-                Apex = requestQuantum.Apex,
+                Envelope = context.Envelope,
                 Hash = context.TransactionHash,
-                Source = payment.AccountWrapper,
                 Withdrawals = context.WithdrawalItems,
                 MaxTime = context.Transaction.TimeBounds.MaxTime
             };
             context.EffectProcessors.AddWithdrawalCreate(withdrawal, Global.WithdrawalStorage);
 
             foreach (var withdrawalItem in context.WithdrawalItems)
-                context.EffectProcessors.AddLockLiabilities(paymentAccount, withdrawalItem.Asset, withdrawalItem.Amount);
+                context.EffectProcessors.AddLockLiabilities(context.WithdrawalRequest.AccountWrapper.Account, withdrawalItem.Asset, withdrawalItem.Amount);
 
             var effects = context.EffectProcessors.GetEffects();
 
-            var accountEffects = effects.Where(e => ByteArrayPrimitives.Equals(e.Pubkey.Data, payment.Account.Data)).ToList();
+            var accountEffects = effects.Where(e => ByteArrayPrimitives.Equals(e.Pubkey.Data, context.WithdrawalRequest.Account.Data)).ToList();
             return Task.FromResult(context.Envelope.CreateResult(ResultStatusCodes.Success, accountEffects));
         }
 
@@ -52,62 +45,35 @@ namespace Centaurus.Domain
 
         private void ValidateWithdrawal(WithdrawalProcessorContext context)
         {
-            var payment = (context.Envelope.Message as RequestQuantum).RequestEnvelope.Message as PaymentRequestBase;
-            if (payment == null)
-                throw new InvalidOperationException("The quantum must be an instance of PaymentRequestBase");
+            if (context.Request.RequestMessage.AccountWrapper.HasPendingWithdrawal)
+                throw new BadRequestException("Withdrawal already exists.");
 
-            context.Transaction = payment.DeserializeTransaction();
+            context.Transaction = context.WithdrawalRequest.DeserializeTransaction();
             ValidateTransaction(context.Transaction);
 
-            context.WithdrawalItems = context.Transaction.GetWithdrawals(payment.AccountWrapper.Account);
+            context.WithdrawalItems = context.Transaction.GetWithdrawals(context.WithdrawalRequest.AccountWrapper.Account, Global.Constellation);
             if (context.WithdrawalItems.Count() < 1)
-                throw new InvalidOperationException("No payment operations.");
-
-            ValidateChangeTrustOperations(context.Transaction, context.WithdrawalItems);
+                throw new BadRequestException("No payment operations.");
         }
 
         private void ValidateTransaction(Transaction transaction)
         {
             var txSourceAccount = transaction.SourceAccount;
             if (ByteArrayPrimitives.Equals(Global.Constellation.Vault.Data, txSourceAccount.PublicKey))
-                throw new InvalidOperationException("Vault account cannot be used as transaction source.");
+                throw new BadRequestException("Vault account cannot be used as transaction source.");
 
             if (transaction.TimeBounds == null || transaction.TimeBounds.MaxTime <= 0)
-                throw new InvalidOperationException("Max time must be set.");
+                throw new BadRequestException("Max time must be set.");
 
             var currentTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             if (transaction.TimeBounds.MaxTime - currentTime > 1000)
-                throw new InvalidOperationException("Transaction expiration time is to far.");
-        }
+                throw new BadRequestException("Transaction expiration time is to far.");
 
-        private void ValidateChangeTrustOperations(Transaction transaction, IEnumerable<WithdrawalItem> withdrawals)
-        {
-            var changeTrustOps = transaction.Operations
-                .Where(o => o is ChangeTrustOperation)
-                .Cast<ChangeTrustOperation>()
-                .ToArray();
+            if (transaction.Operations.Any(o => !(o is PaymentOperation)))
+                throw new BadRequestException("Only payment operations are allowed.");
 
-            foreach (var changeTrustOp in changeTrustOps)
-            {
-                if (changeTrustOp.SourceAccount != null) //allow change trustline only for tx source 
-                    throw new InvalidOperationException("Change trustline operation only supported for transaction source account.");
-
-                if (changeTrustOp.Asset is AssetTypeNative)
-                    throw new InvalidOperationException("Change trustline operation only supported for non-native assets.");
-
-                var limit = Amount.ToXdr(changeTrustOp.Limit);
-                if (limit == 0)
-                    throw new InvalidOperationException("Trustline deletion is not allowed.");
-
-                if (!Global.Constellation.TryFindAssetSettings(changeTrustOp.Asset, out var asset))
-                    throw new InvalidOperationException("Asset is not allowed by constellation.");
-                var assetWithdrawal = withdrawals.FirstOrDefault(w => w.Asset == asset.Id);
-                if (assetWithdrawal == null)
-                    throw new InvalidOperationException("Change trustline operations allowed only for assets that are used in payments.");
-                if (assetWithdrawal.Amount > limit)
-                    throw new InvalidOperationException("Change trustline limit must be greater or equal to payment amount.");
-            }
-
+            if (transaction.Operations.Length > 100)
+                throw new BadRequestException("Too many operations.");
         }
 
         public override WithdrawalProcessorContext GetContext(EffectProcessorsContainer container)

@@ -4,9 +4,9 @@ using Centaurus.Xdr;
 
 namespace Centaurus.Models
 {
-    public class TransactionSignedEffect : Effect
+    public class TransactionSignedEffect : SideEffect
     {
-        public override EffectTypes EffectType => EffectTypes.TransactionSigned;
+        public override SideEffectTypes EffectType => SideEffectTypes.TransactionSigned;
 
         [XdrField(0)]
         public byte[] TransactionHash { get; set; }

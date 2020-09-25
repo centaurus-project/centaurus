@@ -211,7 +211,7 @@ namespace Centaurus.Domain
 
             var accountStorage = new AccountStorage(accounts, settings.RequestRateLimits);
 
-            var withdrawals = await GetWithdrawals(accountStorage);
+            var withdrawals = await GetWithdrawals(accountStorage, settings);
 
             var orders = await GetOrders(accountStorage);
 
@@ -342,7 +342,7 @@ namespace Centaurus.Domain
             return accounts;
         }
 
-        private static async Task<List<Withdrawal>> GetWithdrawals(AccountStorage accountStorage)
+        private static async Task<List<Withdrawal>> GetWithdrawals(AccountStorage accountStorage, ConstellationSettings constellationSettings)
         {
             var withdrawalQuanta = await Global.PermanentStorage.LoadWithdrawals();
             var withdrawals = withdrawalQuanta
@@ -350,8 +350,8 @@ namespace Centaurus.Domain
                 {
                     var withdrawalQuantum = XdrConverter.Deserialize<MessageEnvelope>(w.RawQuantum);
                     var withdrawalRequest = ((WithdrawalRequest)((RequestQuantum)withdrawalQuantum.Message).RequestMessage);
-                    var withdrawal = withdrawalRequest.GetWithdrawal(w.Apex, accountStorage.GetAccount(w.Account));
-                    return withdrawal;
+                    withdrawalRequest.AccountWrapper = accountStorage.GetAccount(w.Account);
+                    return Withdrawal.GetWithdrawal(withdrawalQuantum, constellationSettings);
                 });
 
             return withdrawals.ToList();

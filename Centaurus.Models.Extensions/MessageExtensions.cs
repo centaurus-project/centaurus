@@ -7,13 +7,16 @@ namespace Centaurus
 {
     public static class MessageExtensions
     {
-        public static MessageEnvelope CreateEnvelope(this Message message)
+        public static MessageEnvelope CreateEnvelope(this Message message, List<SideEffect> sideEffects = null)
         {
-            return new MessageEnvelope
+            var envelope = new MessageEnvelope
             {
                 Message = message,
                 Signatures = new List<Ed25519Signature>()
             };
+            if (sideEffects != null && sideEffects.Count > 0)
+                envelope.SideEffects = sideEffects;
+            return envelope;
         }
     }
 }

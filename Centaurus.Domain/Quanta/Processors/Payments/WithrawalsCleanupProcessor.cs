@@ -18,13 +18,10 @@ namespace Centaurus.Domain
 
         public override Task<ResultMessage> Process(WithdrawalCleanupProcessorContext context)
         {
-            foreach (var withdrawal in context.Withdrawals)
+            context.EffectProcessors.AddWithdrawalRemove(context.Withdrawal, Global.WithdrawalStorage);
+            foreach (var withdrawalItem in context.Withdrawal.Withdrawals)
             {
-                context.EffectProcessors.AddWithdrawalRemove(withdrawal, Global.WithdrawalStorage);
-                foreach (var withdrawalItem in withdrawal.Withdrawals)
-                {
-                    context.EffectProcessors.AddUnlockLiabilities(withdrawal.Source.Account, withdrawalItem.Asset, withdrawalItem.Amount);
-                }
+                context.EffectProcessors.AddUnlockLiabilities(context.Withdrawal.Source.Account, withdrawalItem.Asset, withdrawalItem.Amount);
             }
             return Task.FromResult(context.Envelope.CreateResult(ResultStatusCodes.Success, context.EffectProcessors.GetEffects().ToList()));
         }
@@ -32,19 +29,14 @@ namespace Centaurus.Domain
         public override Task Validate(WithdrawalCleanupProcessorContext context)
         {
             var cleanup = (WithrawalsCleanupQuantum)context.Envelope.Message;
-            if (cleanup.ExpiredWithdrawals.Count < 1)
-                throw new InvalidOperationException("No withdrawals were specified.");
+            if (cleanup.ExpiredWithdrawal == null)
+                throw new InvalidOperationException("No withdrawal was specified.");
 
-            if (cleanup.ExpiredWithdrawals.GroupBy(w => w, new ByteArrayComparer()).Any(g => g.Count() > 1))
-                throw new InvalidOperationException("All withdrawals should be unique.");
+            var withdrawal = Global.WithdrawalStorage.GetWithdrawal(cleanup.ExpiredWithdrawal);
+            if (withdrawal == null)
+                throw new InvalidOperationException("Withdrawal is missing.");
+            context.Withdrawal = withdrawal;
 
-            foreach (var withdrawalHash in cleanup.ExpiredWithdrawals)
-            {
-                var withdrawal = Global.WithdrawalStorage.GetWithdrawal(withdrawalHash);
-                if (withdrawal == null)
-                    throw new InvalidOperationException("Withdrawal is missing.");
-                context.Withdrawals.Add(withdrawal);
-            }
             return Task.CompletedTask;
         }
     }

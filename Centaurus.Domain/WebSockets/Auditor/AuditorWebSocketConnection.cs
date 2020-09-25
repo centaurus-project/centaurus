@@ -91,7 +91,7 @@ namespace Centaurus.Domain
                     {
                         if (ConnectionState == ConnectionState.Ready
                             && !cancellationToken.Token.IsCancellationRequested
-                            && OutgoingMessageStorage.TryPeek(out Message message)
+                            && OutgoingMessageStorage.TryPeek(out MessageEnvelope message)
                             )
                         {
                             try
