@@ -100,12 +100,15 @@ namespace Centaurus.SDK
             paymentMessage.TransactionXdr = tx.ToArray();
 
             var result = await connection.SendMessage(paymentMessage.CreateEnvelope());
+            var txResultMessage = result.Message as ITransactionResultMessage;
+            if (txResultMessage is null)
+                throw new Exception($"Unexpected result type '{result.Message.MessageType}'");
 
             Network.Use(new Network(constellation.StellarNetwork.Passphrase));
             tx.Sign(keyPair);
-            foreach (var signature in result.SideEffects.Where(e => e.EffectType == SideEffectTypes.TransactionSigned).OfType<TransactionSignedEffect>())
+            foreach (var signature in txResultMessage.TxSignatures)
             {
-                tx.Signatures.Add(signature.Signature.ToDecoratedSignature());
+                tx.Signatures.Add(signature.ToDecoratedSignature());
             }
 
             await tx.Submit(constellation);

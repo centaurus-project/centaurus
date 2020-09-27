@@ -12,8 +12,5 @@ namespace Centaurus.Models
 
         [XdrField(1)]
         public List<Ed25519Signature> Signatures { get; set; }
-
-        [XdrField(2, Optional = true)]
-        public List<SideEffect> SideEffects { get; set; }
     }
 }

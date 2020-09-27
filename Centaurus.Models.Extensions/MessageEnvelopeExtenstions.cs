@@ -85,14 +85,13 @@ namespace Centaurus
                     envelope.Signatures.Add(signature);
                 }
             }
-            if ((envelope.SideEffects != null) != (anotherEnvelope.SideEffects != null))
-            {
-                throw new Exception("Side effects conflict");
-            }
-            if (envelope.SideEffects != null)
-            {
-                envelope.SideEffects.AddRange(anotherEnvelope.SideEffects);
-            }
+            var resultMessage = envelope.Message as ITransactionResultMessage;
+            var anotherResultMessage = anotherEnvelope.Message as ITransactionResultMessage;
+            if (resultMessage is null != anotherResultMessage is null)
+                throw new Exception("Result types conflict");
+
+            if (resultMessage != null)
+                resultMessage.TxSignatures.AddRange(anotherResultMessage.TxSignatures);
         }
 
         /// <summary>
@@ -130,7 +129,7 @@ namespace Centaurus
         }
 
         public static TResultMessage CreateResult<TResultMessage>(this MessageEnvelope envelope, ResultStatusCodes status = ResultStatusCodes.InternalError, List<Effect> effects = null)
-            where TResultMessage: ResultMessage
+            where TResultMessage : ResultMessage
         {
             if (envelope == null)
                 throw new ArgumentNullException(nameof(envelope));
@@ -148,11 +147,13 @@ namespace Centaurus
             var messageType = envelope.Message.MessageType;
             if (envelope.Message is RequestQuantum)
                 messageType = ((RequestQuantum)envelope.Message).RequestEnvelope.Message.MessageType;
-            
+
             switch (messageType)
             {
                 case MessageTypes.AccountDataRequest:
                     return CreateResult<AccountDataResponse>(envelope, status, effects);
+                case MessageTypes.WithdrawalRequest:
+                    return CreateResult<ITransactionResultMessage>(envelope, status, effects);
                 default:
                     return CreateResult<ResultMessage>(envelope, status, effects);
             }

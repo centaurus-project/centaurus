@@ -17,11 +17,6 @@ namespace Centaurus.Domain
         static Logger logger = LogManager.GetCurrentClassLogger();
 
         /// <summary>
-        /// Min withdrawal amount in stroops
-        /// </summary>
-        public const long MinWithdrawalAmount = 1000;
-
-        /// <summary>
         /// Delay in seconds
         /// </summary>
         public const int MaxTxSubmitDelay = 5 * 60; //5 minutes

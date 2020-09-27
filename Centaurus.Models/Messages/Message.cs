@@ -9,6 +9,7 @@ namespace Centaurus.Models
     [XdrUnion((int)MessageTypes.WithdrawalRequest, typeof(WithdrawalRequest))]
     [XdrUnion((int)MessageTypes.AccountDataRequest, typeof(AccountDataRequest))]
     [XdrUnion((int)MessageTypes.AccountDataResponse, typeof(AccountDataResponse))]
+    [XdrUnion((int)MessageTypes.ITransactionResultMessage, typeof(ITransactionResultMessage))]
     [XdrUnion((int)MessageTypes.PaymentRequest, typeof(PaymentRequest))]
     [XdrUnion((int)MessageTypes.OrderRequest, typeof(OrderRequest))]
     [XdrUnion((int)MessageTypes.RequestQuantum, typeof(RequestQuantum))]

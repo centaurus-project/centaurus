@@ -60,6 +60,10 @@ namespace Centaurus.Models
         /// </summary>
         ResultMessage = 102,
         /// <summary>
+        /// ITransaction operation result, containing transaction signature, original quantum and processing status.
+        /// </summary>
+        ITransactionResultMessage = 103,
+        /// <summary>
         /// Message from auditor to Alpha server that contains all Stellar payments included into the recent ledger (obtained from the Horizon).
         /// </summary>
         LedgerUpdateNotification = 105,

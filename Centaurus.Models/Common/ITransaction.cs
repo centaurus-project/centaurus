@@ -5,7 +5,7 @@ using System.Text;
 
 namespace Centaurus.Models
 {
-    public interface ITransactionContainer
+    public interface ITransaction
     {
         public byte[] TransactionXdr { get; set; }
     }

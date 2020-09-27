@@ -169,15 +169,13 @@ namespace Centaurus.Domain
 
             Global.QuantumStorage.AddQuantum(envelope);
 
-            var sideEffects = new List<SideEffect>();
-
-            ProcessTransaction(context, ref sideEffects);
+            ProcessTransaction(context, result);
 
             SaveEffects(effectsContainer);
 
             logger.Trace($"Message of type {messageType} with apex {((Quantum)envelope.Message).Apex} is handled.");
 
-            var resultEnvelope = result.CreateEnvelope(sideEffects);
+            var resultEnvelope = result.CreateEnvelope();
 
             OutgoingMessageStorage.EnqueueMessage(resultEnvelope);
 
@@ -203,22 +201,21 @@ namespace Centaurus.Domain
                 return;
             var account = request.RequestMessage.AccountWrapper;
             if (!account.RequestCounter.IncRequestCount(request.Timestamp, out string error))
-                throw new TooManyRequests($"Request limit reached for account {account.Account.Pubkey.ToString()}.");
+                throw new TooManyRequests($"Request limit reached for account {account.Account.Pubkey}.");
         }
 
-        void ProcessTransaction(object context, ref List<SideEffect> sideEffects)
+        void ProcessTransaction(object context, ResultMessage resultMessage)
         {
             var transactionContext = context as ITransactionProcessorContext;
             if (transactionContext == null)
                 return;
-            sideEffects.Add(new TransactionSignedEffect
+            var txResult = resultMessage as ITransactionResultMessage;
+            if (txResult == null)
+                throw new Exception("Result is not ITransactionResultMessage");
+            txResult.TxSignatures.Add(new Ed25519Signature
             {
-                TransactionHash = transactionContext.TransactionHash,
-                Signature = new Ed25519Signature()
-                {
-                    Signature = Global.Settings.KeyPair.Sign(transactionContext.TransactionHash),
-                    Signer = new RawPubKey { Data = Global.Settings.KeyPair.PublicKey }
-                }
+                Signature = Global.Settings.KeyPair.Sign(transactionContext.TransactionHash),
+                Signer = Global.Settings.KeyPair.PublicKey
             });
         }
 

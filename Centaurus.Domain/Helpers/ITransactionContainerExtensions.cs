@@ -8,7 +8,7 @@ namespace Centaurus.Domain
 {
     public static class ITransactionContainerExtensions
     {
-        public static stellar_dotnet_sdk.Transaction DeserializeTransaction(this ITransactionContainer withdrawalRequest)
+        public static stellar_dotnet_sdk.Transaction DeserializeTransaction(this ITransaction withdrawalRequest)
         {
             if (withdrawalRequest == null)
                 throw new ArgumentNullException(nameof(withdrawalRequest));
