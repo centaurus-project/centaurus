@@ -13,7 +13,7 @@ namespace Centaurus.Domain
 
         public ConstellationSettings Settings { get; set; }
 
-        public long Ledger { get; set; }
+        public long TxCursor { get; set; }
 
         public List<Account> Accounts { get; set; }
 

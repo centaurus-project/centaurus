@@ -137,7 +137,7 @@ namespace Centaurus.Domain
 
             private MajorityManager majorityManager;
 
-            private Dictionary<byte[], MessageEnvelope> storage = new Dictionary<byte[], MessageEnvelope>(new ByteArrayComparer());
+            private Dictionary<byte[], MessageEnvelope> storage = new Dictionary<byte[], MessageEnvelope>(ByteArrayComparer.Default);
 
             public async Task Add(MessageEnvelope envelope)
             {

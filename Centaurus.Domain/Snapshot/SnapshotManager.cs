@@ -291,7 +291,7 @@ namespace Centaurus.Domain
             {
                 Apex = apex,
                 Accounts = accountStorage.GetAll().Select(a => a.Account).ToList(),
-                Ledger = stellarData.Ledger,
+                TxCursor = stellarData.TxCursor,
                 Orders = exchange.OrderMap.GetAllOrders().ToList(),
                 Settings = settings,
                 Withdrawals = withdrawals,
@@ -324,8 +324,7 @@ namespace Centaurus.Domain
             var accountModels = await Global.PermanentStorage.LoadAccounts();
             var balanceModels = await Global.PermanentStorage.LoadBalances();
 
-            var comparer = new ByteArrayComparer();
-            var groupedBalances = balanceModels.GroupBy(b => b.Account, comparer).ToDictionary(g => g.Key, g => g, comparer);
+            var groupedBalances = balanceModels.GroupBy(b => b.Account, ByteArrayComparer.Default).ToDictionary(g => g.Key, g => g, ByteArrayComparer.Default);
             var accountsCount = accountModels.Count;
             var accounts = new List<Account>();
             for (var i = 0; i < accountsCount; i++)

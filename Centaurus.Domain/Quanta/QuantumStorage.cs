@@ -38,7 +38,8 @@ namespace Centaurus.Domain
                 {
                     quantum.Apex = ++CurrentApex;
                     quantum.PrevHash = LastQuantumHash;
-                    quantum.Timestamp = DateTime.UtcNow.Ticks;
+                    if (quantum.Timestamp == default) //it could be assigned, if this quantum was handled already
+                        quantum.Timestamp = DateTime.UtcNow.Ticks;
                 }
                 else if (quantum.Apex == default) //when auditor receives quantum, the quantum should already contain apex
                     throw new Exception("Quantum has no apex");

@@ -129,14 +129,13 @@ namespace Centaurus.Test
                     addAssetsFn(clients[i].PublicKey, assets[c].Id);
             }
 
-            var depositeQuantum = new LedgerCommitQuantum
+            var depositeQuantum = new TxCommitQuantum
             {
                 Apex = 2,
                 PrevHash = Global.QuantumStorage.LastQuantumHash,
-                Source = new LedgerUpdateNotification
+                Source = new TxNotification
                 {
-                    LedgerFrom = 2,
-                    LedgerTo = 2,
+                    TxCursor = 2,
                     Payments = deposits
                 }.CreateEnvelope()
             };

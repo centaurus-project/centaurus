@@ -81,7 +81,7 @@ namespace Centaurus.DAL
         }
         public class ConstellationState : BaseDiffModel
         {
-            public long Ledger { get; set; }
+            public long TxCursor { get; set; }
         }
 
         #endregion

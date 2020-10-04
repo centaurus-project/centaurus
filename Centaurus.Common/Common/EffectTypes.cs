@@ -29,6 +29,6 @@ namespace Centaurus
         ConstellationInit = 31,
         ConstellationUpdate = 32,
 
-        LedgerUpdate = 51
+        TxCursorUpdate = 51
     }
 }

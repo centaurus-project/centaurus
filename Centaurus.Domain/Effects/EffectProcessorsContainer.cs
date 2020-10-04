@@ -208,11 +208,11 @@ namespace Centaurus.Domain
             ));
         }
 
-        public void AddLedgerUpdate(LedgerManager ledgerManager, long newLedger, long prevLedger)
+        public void AddCursorUpdate(TxManager txManager, long newCursor, long prevCursor)
         {
-            Add(new LedgerUpdateEffectProcessor(
-                new LedgerUpdateEffect {  Apex = Apex, Ledger = newLedger, PrevLedger = prevLedger },
-                ledgerManager
+            Add(new TxCursorUpdateEffectProcessor(
+                new TxCursorUpdateEffect {  Apex = Apex, Cursor = newCursor, PrevCursor = prevCursor },
+                txManager
             ));
         }
     }

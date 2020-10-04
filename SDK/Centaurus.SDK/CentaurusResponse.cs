@@ -11,11 +11,20 @@ namespace Centaurus.SDK
 {
     public class CentaurusResponse
     {
-        public CentaurusResponse(ConstellationInfo constellationInfo)
+        public CentaurusResponse(ConstellationInfo constellationInfo, int requestTimeout)
         {
             AlphaPubkey = new RawPubKey(constellationInfo.Vault);
             Auditors = constellationInfo.Auditors.Select(a => new RawPubKey(a)).ToArray();
+            _ = StartRequestTimer(requestTimeout);
         }
+
+
+        async Task StartRequestTimer(int requestTimeout)
+        {
+            await Task.Delay(requestTimeout);
+            SetException(new TimeoutException("Request timed out."));
+        }
+
         protected RawPubKey AlphaPubkey { get; }
         protected RawPubKey[] Auditors { get; }
 
@@ -49,10 +58,10 @@ namespace Centaurus.SDK
             acknowledgmentSource.TrySetException(exc);
         }
     }
-    public class CentaurusQuantumResponse: CentaurusResponse
+    public class CentaurusQuantumResponse : CentaurusResponse
     {
-        public CentaurusQuantumResponse(ConstellationInfo constellationInfo)
-            :base(constellationInfo)
+        public CentaurusQuantumResponse(ConstellationInfo constellationInfo, int requestTimeout)
+            : base(constellationInfo, requestTimeout)
         {
         }
 

@@ -270,19 +270,19 @@ namespace Centaurus.DAL.Mongo
 
         private WriteModel<ConstellationState>[] GetStellarDataUpdate(DiffObject.ConstellationState constellationState)
         {
-            var ledger = constellationState.Ledger;
+            var cursor = constellationState.TxCursor;
 
             WriteModel<ConstellationState> updateModel = null;
             if (constellationState.IsInserted)
                 updateModel = new InsertOneModel<ConstellationState>(new ConstellationState
                 {
-                    Ledger = ledger
+                    TxCursor = cursor
                 });
             else if (constellationState.IsDeleted)
                 throw new InvalidOperationException("Stellar data entry cannot be deleted");
             else
             {
-                updateModel = new UpdateOneModel<ConstellationState>(Builders<ConstellationState>.Filter.Empty, Builders<ConstellationState>.Update.Set(s => s.Ledger, ledger));
+                updateModel = new UpdateOneModel<ConstellationState>(Builders<ConstellationState>.Filter.Empty, Builders<ConstellationState>.Update.Set(s => s.TxCursor, cursor));
             }
 
             return new WriteModel<ConstellationState>[] { updateModel };

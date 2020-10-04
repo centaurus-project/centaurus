@@ -18,5 +18,7 @@ namespace Centaurus
         {
             return ByteArrayPrimitives.GetHashCode(key);
         }
+
+        public static ByteArrayComparer Default { get; } = new ByteArrayComparer();
     }
 }

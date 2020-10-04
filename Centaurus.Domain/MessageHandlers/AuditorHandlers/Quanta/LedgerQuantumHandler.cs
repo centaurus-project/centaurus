@@ -7,6 +7,6 @@ namespace Centaurus.Domain
 {
     public class LedgerQuantumHandler : AuditorBaseQuantumHandler
     {
-        public override MessageTypes SupportedMessageType { get; } = MessageTypes.LedgerCommitQuantum;
+        public override MessageTypes SupportedMessageType { get; } = MessageTypes.TxCommitQuantum;
     }
 }

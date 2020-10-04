@@ -83,5 +83,14 @@ namespace Centaurus
                 return null;
             }
         }
+
+        public static TransactionsRequestBuilder GetTransactionsRequestBuilder(this Server server, string pubKey, long cursor, int limit = 200, bool includeFailed = true)
+        {
+            return server.Transactions
+                .ForAccount(pubKey)
+                .IncludeFailed(includeFailed)
+                .Limit(limit)
+                .Cursor(cursor.ToString());
+        }
     }
 }

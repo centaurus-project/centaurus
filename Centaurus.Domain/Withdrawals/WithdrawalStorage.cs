@@ -103,12 +103,12 @@ namespace Centaurus.Domain
             submitTimer.Start();
         }
 
-        private void SubmitTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
+        private async void SubmitTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
             try
             {
                 if (Global.AppState.State == ApplicationState.Ready)
-                    Cleanup();
+                    await Cleanup();
                 submitTimer.Start();
             }
             catch (Exception exc)
@@ -118,7 +118,7 @@ namespace Centaurus.Domain
             }
         }
 
-        private void Cleanup()
+        private async Task Cleanup()
         {
             byte[][] expiredTransactions = null;
             lock (withdrawals)
@@ -126,7 +126,20 @@ namespace Centaurus.Domain
                 var currentTimeSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
                 expiredTransactions = withdrawals.Where(w => w.Value.IsExpired(currentTimeSeconds)).Select(w => w.Key).ToArray();
             }
-            foreach (var expiredTransaction in expiredTransactions)
+
+            //we must ignore all txs that was submitted. TxManager will handle submitted txs.
+            var limit = 200;
+            var unhandledTxs = new List<byte[]>();
+            var pageResult = await Global.StellarNetwork.Server.GetTransactionsRequestBuilder(Global.Constellation.Vault.ToString(), Global.TxManager.TxCursor, limit).Execute();
+            while (pageResult.Records.Count > 0)
+            {
+                unhandledTxs.AddRange(pageResult.Records.Select(r => ByteArrayExtensions.FromHexString(r.Hash)));
+                if (pageResult.Records.Count != limit)
+                    break;
+                pageResult = await pageResult.NextPage();
+            }
+
+            foreach (var expiredTransaction in expiredTransactions.Where(tx => !unhandledTxs.Contains(tx, ByteArrayComparer.Default)))
                 _ = Global.QuantumHandler.HandleAsync(new WithrawalsCleanupQuantum { ExpiredWithdrawal = expiredTransaction }.CreateEnvelope());
         }
 

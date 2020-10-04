@@ -48,7 +48,7 @@ namespace Centaurus.Test
             {
                 Accounts = new List<Models.Account> { account1, account2 },
                 Apex = 0,
-                Ledger = 1,
+                TxCursor = 1,
                 Orders = new List<Order>(),
                 Settings = new ConstellationSettings
                 {

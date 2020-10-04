@@ -1,15 +1,8 @@
-﻿using Centaurus.Domain;
-using Centaurus.Models;
+﻿using Centaurus.Models;
 using NLog;
-using stellar_dotnet_sdk.requests;
-using stellar_dotnet_sdk.responses;
-using stellar_dotnet_sdk.responses.page;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
-using System.Security.Cryptography;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -106,7 +99,7 @@ namespace Centaurus.Domain
                     requestMessage.AccountWrapper = Global.AccountStorage.GetAccount(requestMessage.Account);
                 }
 
-                var resultMessage = await Global.QuantumHandler.HandleAsync(currentQuantumEnvelope);
+                var resultMessage = await Global.QuantumHandler.HandleAsync(currentQuantumEnvelope, currentQuantum.Timestamp);
                 var processedQuantum = (Quantum)resultMessage.OriginalMessage.Message;
                 //TODO: check if we need some extra checks here
                 if (!ByteArrayPrimitives.Equals(currentQuantum.ComputeHash(), processedQuantum.ComputeHash()))

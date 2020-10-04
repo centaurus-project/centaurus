@@ -40,9 +40,9 @@ namespace Centaurus.Models
         /// </summary>
         RequestQuantum = 48,
         /// <summary>
-        /// Quantum created by Alpha server that contains aggregated ledger updates provided by <see cref="LedgerUpdateNotification"/>.
+        /// Quantum created by Alpha server that contains aggregated ledger updates provided by <see cref="TxNotification"/>.
         /// </summary>
-        LedgerCommitQuantum = 49,
+        TxCommitQuantum = 49,
         /// <summary>
         /// A client requested account's effects.
         /// </summary>
@@ -64,9 +64,9 @@ namespace Centaurus.Models
         /// </summary>
         ITransactionResultMessage = 103,
         /// <summary>
-        /// Message from auditor to Alpha server that contains all Stellar payments included into the recent ledger (obtained from the Horizon).
+        /// Message from auditor to Alpha server that contains Stellar payments (obtained from the Horizon).
         /// </summary>
-        LedgerUpdateNotification = 105,
+        TxNotification = 105,
         /// <summary>
         /// Auditor current state (the last snapshot, and all quanta after the last snapshot).
         /// </summary>

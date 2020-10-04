@@ -11,9 +11,9 @@ namespace Centaurus.Domain
     {
         private readonly static ConcurrentQueue<MessageEnvelope> outgoingMessages = new ConcurrentQueue<MessageEnvelope>();
 
-        public static void OnLedger(LedgerUpdateNotification ledger)
+        public static void OnTransaction(TxNotification tx)
         {
-            EnqueueMessage(ledger);
+            EnqueueMessage(tx);
         }
 
         public static void EnqueueMessage(Message message)

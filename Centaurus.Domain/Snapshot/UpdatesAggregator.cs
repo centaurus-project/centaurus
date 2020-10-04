@@ -27,8 +27,8 @@ namespace Centaurus.Domain
 
             DiffObject.ConstellationState stellarData = new DiffObject.ConstellationState();
 
-            var accounts = new Dictionary<byte[], DiffObject.Account>(new ByteArrayComparer());
-            var balances = new Dictionary<byte[], Dictionary<int, DiffObject.Balance>>(new ByteArrayComparer());
+            var accounts = new Dictionary<byte[], DiffObject.Account>(ByteArrayComparer.Default);
+            var balances = new Dictionary<byte[], Dictionary<int, DiffObject.Balance>>(ByteArrayComparer.Default);
 
             var orders = new Dictionary<ulong, DiffObject.Order>();
 
@@ -151,8 +151,8 @@ namespace Centaurus.Domain
                                 orders[orderId].Amount += tradeEffect.AssetAmount;
                             }
                             break;
-                        case LedgerUpdateEffect ledgerUpdateEffect:
-                            stellarData.Ledger = ledgerUpdateEffect.Ledger;
+                        case TxCursorUpdateEffect cursorUpdateEffect:
+                            stellarData.TxCursor = cursorUpdateEffect.Cursor;
                             break;
                         default:
                             break;
@@ -169,7 +169,7 @@ namespace Centaurus.Domain
                 Assets = assets,
                 Orders = orders.Values.ToList(),
                 Settings = constellationSettings,
-                StellarInfoData = stellarData.Ledger == 0 ? null : stellarData //ignore if no changes
+                StellarInfoData = stellarData.TxCursor == 0 ? null : stellarData //ignore if no changes
             };
         }
 
@@ -241,7 +241,7 @@ namespace Centaurus.Domain
             diffObject.StellarInfoData = new DiffObject.ConstellationState
             {
                 IsInserted = true,
-                Ledger = snapshot.Ledger
+                TxCursor = snapshot.TxCursor
             };
 
             diffObject.Quanta = new List<QuantumModel>();
@@ -271,9 +271,9 @@ namespace Centaurus.Domain
                 balances[pubKey].Add(asset, new DiffObject.Balance { AssetId = asset, PubKey = pubKey });
         }
 
-        private static DiffObject.ConstellationState GetStellarData(long ledger)
+        private static DiffObject.ConstellationState GetStellarData(long cursor)
         {
-            return new DiffObject.ConstellationState { Ledger = ledger };
+            return new DiffObject.ConstellationState { TxCursor = cursor };
         }
 
         private static SettingsModel GetConstellationSettings(ConstellationEffect constellationInit)

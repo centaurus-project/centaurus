@@ -21,7 +21,7 @@ namespace Centaurus.Domain
             {
                 logger.Info($"Majority result received ({majorityResult}).");
             }
-            var quantum = new LedgerCommitQuantum
+            var quantum = new TxCommitQuantum
             {
                 Source = result
             };

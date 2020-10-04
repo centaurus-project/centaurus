@@ -6,9 +6,9 @@ using Centaurus.Models;
 
 namespace Centaurus.Domain.Handlers.AlphaHandlers
 {
-    public class LedgerUpdateMessageHandler : BaseAlphaMessageHandler
+    public class TxNotificationMessageHandler : BaseAlphaMessageHandler
     {
-        public override MessageTypes SupportedMessageType { get; } = MessageTypes.LedgerUpdateNotification;
+        public override MessageTypes SupportedMessageType { get; } = MessageTypes.TxNotification;
 
         public override bool IsAuditorOnly { get; } = true;
 

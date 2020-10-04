@@ -73,14 +73,13 @@ namespace Centaurus.Test
 
             var clientConnection = new AuditorWebSocketConnection(new FakeWebSocket(), null) { ConnectionState = state };
 
-            var ledgerNotification = new LedgerUpdateNotification
+            var ledgerNotification = new TxNotification
             {
-                LedgerFrom = 0,
-                LedgerTo = 63,
+                TxCursor = 0,
                 Payments = new List<PaymentBase>()
             };
 
-            var envelope = new LedgerCommitQuantum
+            var envelope = new TxCommitQuantum
             {
                 Source = ledgerNotification.CreateEnvelope()
             }.CreateEnvelope();

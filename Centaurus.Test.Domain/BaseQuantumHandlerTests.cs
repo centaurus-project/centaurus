@@ -16,12 +16,11 @@ namespace Centaurus.Test
     {
 
         [Test]
-        [TestCase(1, 0, 0, 0, typeof(InvalidOperationException))]
-        [TestCase(3, 0, 0, 0, typeof(InvalidOperationException))]
-        [TestCase(3, 63, 0, 0, typeof(InvalidOperationException))]
-        [TestCase(3, 63, 1000, 10, typeof(InvalidOperationException))]
-        [TestCase(3, 63, 1000, 0, null)]
-        public async Task LedgerQuantumTest(int ledgerFrom, int ledgerTo, int amount, int asset, Type excpectedException)
+        [TestCase(0, 0, 0, typeof(InvalidOperationException))]
+        [TestCase(1, 0, 0, typeof(InvalidOperationException))]
+        [TestCase(10, 1000, 10, typeof(InvalidOperationException))]
+        [TestCase(10, 1000, 0, null)]
+        public async Task TxCommitQuantumTest(int cursor, int amount, int asset, Type excpectedException)
         {
             Global.AppState.State = ApplicationState.Ready;
 
@@ -79,10 +78,9 @@ namespace Centaurus.Test
 
             var depositeAmount = new Random().Next(10, 1000);
 
-            var ledgerNotification = new LedgerUpdateNotification
+            var ledgerNotification = new TxNotification
             {
-                LedgerFrom = (uint)ledgerFrom,
-                LedgerTo = (uint)ledgerTo,
+                TxCursor = (uint)cursor,
                 Payments = new List<PaymentBase>
                     {
                         new Deposit
@@ -101,7 +99,7 @@ namespace Centaurus.Test
             var ledgerNotificationEnvelope = ledgerNotification.CreateEnvelope();
             ledgerNotificationEnvelope.Sign(TestEnvironment.Auditor1KeyPair);
 
-            var ledgerCommitEnv = new LedgerCommitQuantum
+            var ledgerCommitEnv = new TxCommitQuantum
             {
                 Source = ledgerNotificationEnvelope,
                 Apex = ++apex
@@ -114,7 +112,7 @@ namespace Centaurus.Test
             await AssertQuantumHandling(ledgerCommitEnv, excpectedException);
             if (excpectedException == null)
             {
-                Assert.AreEqual(Global.LedgerManager.Ledger, ledgerNotification.LedgerTo);
+                Assert.AreEqual(Global.TxManager.TxCursor, ledgerNotification.TxCursor);
 
                 Assert.AreEqual(account1.GetBalance(asset).Liabilities, 0);
                 Assert.AreEqual(account1.GetBalance(asset).Amount, client1StartBalanceAmount - amount + depositeAmount); //acc balance + deposit - withdrawal

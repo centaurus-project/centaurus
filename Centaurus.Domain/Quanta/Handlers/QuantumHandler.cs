@@ -14,13 +14,15 @@ namespace Centaurus.Domain
     {
         protected class HandleItem
         {
-            public HandleItem(MessageEnvelope quantum)
+            public HandleItem(MessageEnvelope quantum, long timestamp = 0)
             {
                 Quantum = quantum;
                 HandlingTaskSource = new TaskCompletionSource<ResultMessage>();
+                Timestamp = timestamp;
             }
             public MessageEnvelope Quantum { get; }
             public TaskCompletionSource<ResultMessage> HandlingTaskSource { get; }
+            public long Timestamp { get; }
         }
 
         static Logger logger = LogManager.GetCurrentClassLogger();
@@ -37,9 +39,10 @@ namespace Centaurus.Domain
         /// Handles the quantum and returns Task.
         /// </summary>
         /// <param name="envelope">Quantum to handle</param>
-        public Task<ResultMessage> HandleAsync(MessageEnvelope envelope)
+        /// <param name="long">Quantum timestamp. We need it for quanta recovery, otherwise Alpha will have different hash.</param>
+        public Task<ResultMessage> HandleAsync(MessageEnvelope envelope, long timestamp = 0)
         {
-            var newHandleItem = new HandleItem(envelope);
+            var newHandleItem = new HandleItem(envelope, timestamp);
             awaitedQuanta.Add(newHandleItem);
             if (!Global.IsAlpha)
                 LastAddedQuantumApex = ((Quantum)envelope.Message).Apex;
@@ -72,7 +75,7 @@ namespace Centaurus.Domain
             {
                 Global.ExtensionsManager.BeforeQuantumHandle(envelope);
 
-                result = await HandleQuantum(envelope);
+                result = await HandleQuantum(envelope, handleItem.Timestamp);
                 if (result.Status != ResultStatusCodes.Success)
                     throw new Exception();
                 tcs.SetResult(result);
@@ -104,14 +107,14 @@ namespace Centaurus.Domain
             return envelope.Message.MessageType;
         }
 
-        async Task<ResultMessage> HandleQuantum(MessageEnvelope quantumEnvelope)
+        async Task<ResultMessage> HandleQuantum(MessageEnvelope quantumEnvelope, long timestamp)
         {
             return Global.IsAlpha
-                ? await AlphaHandleQuantum(quantumEnvelope)
+                ? await AlphaHandleQuantum(quantumEnvelope, timestamp)
                 : await AuditorHandleQuantum(quantumEnvelope);
         }
 
-        async Task<ResultMessage> AlphaHandleQuantum(MessageEnvelope envelope)
+        async Task<ResultMessage> AlphaHandleQuantum(MessageEnvelope envelope, long timestamp)
         {
             var processor = GetProcessorItem(envelope.Message.MessageType);
 
@@ -126,6 +129,8 @@ namespace Centaurus.Domain
             var context = processor.GetContext(effectsContainer);
 
             await processor.Validate(context);
+
+            quantum.Timestamp = timestamp;
 
             //we must add it before processing, otherwise the quantum that we are processing here will be different from the quantum that will come to the auditor
             Global.QuantumStorage.AddQuantum(quantumEnvelope);

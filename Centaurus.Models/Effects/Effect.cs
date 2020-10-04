@@ -14,7 +14,7 @@ namespace Centaurus.Models
     [XdrUnion((int)EffectTypes.OrderPlaced, typeof(OrderPlacedEffect))]
     [XdrUnion((int)EffectTypes.OrderRemoved, typeof(OrderRemovedEffect))]
     [XdrUnion((int)EffectTypes.Trade, typeof(TradeEffect))]
-    [XdrUnion((int)EffectTypes.LedgerUpdate, typeof(LedgerUpdateEffect))]
+    [XdrUnion((int)EffectTypes.TxCursorUpdate, typeof(TxCursorUpdateEffect))]
     [XdrUnion((int)EffectTypes.ConstellationInit, typeof(ConstellationInitEffect))]
     [XdrUnion((int)EffectTypes.ConstellationUpdate, typeof(ConstellationUpdateEffect))]
     [XdrUnion((int)EffectTypes.WithdrawalCreate, typeof(WithdrawalCreateEffect))]

@@ -193,8 +193,8 @@ namespace Centaurus.Test
             {
                 if (constellationState == null)
                     constellationState = new ConstellationState();
-                if (_stellarData.Ledger > 0)
-                    constellationState.Ledger = _stellarData.Ledger;
+                if (_stellarData.TxCursor > 0)
+                    constellationState.TxCursor = _stellarData.TxCursor;
             }
         }
 

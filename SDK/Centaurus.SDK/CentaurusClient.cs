@@ -1,6 +1,7 @@
 ﻿using Centaurus.Models;
 using Centaurus.SDK.Models;
 using Centaurus.Xdr;
+using NLog;
 using NSec.Cryptography;
 using stellar_dotnet_sdk;
 using stellar_dotnet_sdk.xdr;
@@ -17,9 +18,12 @@ using System.Threading.Tasks;
 
 namespace Centaurus.SDK
 {
-    public class CentaurusClient: IDisposable
+    public class CentaurusClient : IDisposable
     {
 
+        static Logger logger = LogManager.GetCurrentClassLogger();
+
+        const int timeout = 5000;
         public CentaurusClient(Uri alphaWebSocketAddress, KeyPair keyPair, ConstellationInfo constellationInfo)
         {
             this.alphaWebSocketAddress = alphaWebSocketAddress ?? throw new ArgumentNullException(nameof(alphaWebSocketAddress));
@@ -37,19 +41,15 @@ namespace Centaurus.SDK
                 SubscribeToEvents(connection);
                 await connection.EstablishConnection();
 
-                var connectionStartedAt = DateTime.UtcNow;
-                while (!handshakeResult.Task.IsCompleted
-                    && DateTime.UtcNow - connectionStartedAt < new TimeSpan(0, 0, 5))
-                    await Task.Delay(100);
-
-                if (!handshakeResult.Task.IsCompleted || handshakeResult.Task.Result == false)
-                    throw new Exception("Login failed.");
+                await handshakeResult.Task;
             }
             catch
             {
                 UnsubscribeFromEvents(connection);
-                connection?.Dispose();
-                throw;
+                if (connection != null)
+                    await connection.CloseConnection();
+                connection = null;
+                throw new Exception("Login failed.");
             }
             finally
             {
@@ -58,13 +58,13 @@ namespace Centaurus.SDK
             }
         }
 
-        public void CloseConnection()
+        public async Task CloseConnection()
         {
             try
             {
                 connectionSemaphore.Wait();
                 if (connection != null)
-                    connection.Dispose();
+                    await connection.CloseAndDispose();
                 connection = null;
             }
             finally
@@ -111,7 +111,11 @@ namespace Centaurus.SDK
                 tx.Signatures.Add(signature.ToDecoratedSignature());
             }
 
-            await tx.Submit(constellation);
+            var submitResult = await tx.Submit(constellation);
+            if (!submitResult.IsSuccess())
+            {
+                logger.Error($"Submit withdrawal failed. Result xdr: {submitResult.ResultXdr}");
+            }
             return result;
         }
 
@@ -127,7 +131,7 @@ namespace Centaurus.SDK
         public void Dispose()
         {
             UnsubscribeFromEvents(connection);
-            connection?.Dispose();
+            CloseConnection().Wait();
         }
 
         #region Private members
@@ -167,22 +171,29 @@ namespace Centaurus.SDK
         {
             if (envelope.Message is HandshakeInit)
             {
+                logger.Trace("Handshake: started.");
                 isConnecting = true;
+                logger.Trace("Handshake: isConnecting is set to true.");
                 try
                 {
                     var resultTask = connection.SendMessage(envelope.Message.CreateEnvelope());
-                    resultTask.Wait();
+                    logger.Trace("Handshake: message is sent.");
                     var result = (ResultMessage)resultTask.Result.Message;
+                    logger.Trace("Handshake: response awaited.");
                     if (result.Status != ResultStatusCodes.Success)
                         throw new Exception();
                     handshakeResult.SetResult(true);
+                    logger.Trace("Handshake: result is set to true.");
                     isConnected = true;
+                    logger.Trace("Handshake: isConnected is set.");
                 }
-                catch
+                catch (Exception exc)
                 {
-                    handshakeResult.SetResult(false);
+                    handshakeResult.TrySetException(exc);
+                    logger.Trace("Handshake: exception is set.");
                 }
                 isConnecting = false;
+                logger.Trace("Handshake: isConnecting is set to false.");
                 return true;
             }
             return false;
@@ -200,11 +211,24 @@ namespace Centaurus.SDK
 
         private void Connection_OnMessage(MessageEnvelope envelope)
         {
+            logger.Trace($"OnMessage: {envelope.Message.MessageType}");
             if (!isConnecting)
+            {
                 if (!isConnected)
+                {
+                    logger.Trace($"OnMessage: no connected.");
                     HandleHandshake(envelope);
+                }
                 else
+                {
+                    logger.Trace($"OnMessage: connected.");
                     OnMessage?.Invoke(envelope);
+                }
+            }
+            else
+            {
+                logger.Trace($"OnMessage: already connecting");
+            }
         }
 
         private void Connection_OnException(Exception exception)
@@ -243,35 +267,37 @@ namespace Centaurus.SDK
 
             public async Task EstablishConnection()
             {
-                var payload = DateTime.UtcNow.Ticks;
-                var signature = Convert.ToBase64String(BitConverter.GetBytes(payload).Sign(clientKeyPair).Signature);
-                webSocket.Options.SetRequestHeader("Authorization", $"ed25519 {clientKeyPair.AccountId}.{payload}.{signature}");
+                //var payload = DateTime.UtcNow.Ticks;
+                //var signature = Convert.ToBase64String(BitConverter.GetBytes(payload).Sign(clientKeyPair).Signature);
+                //webSocket.Options.SetRequestHeader("Authorization", $"ed25519 {clientKeyPair.AccountId}.{payload}.{signature}");
                 await webSocket.ConnectAsync(websocketAddress, CancellationToken.None);
                 _ = Listen();
             }
 
-            public void CloseConnection(WebSocketCloseStatus status = WebSocketCloseStatus.NormalClosure, string desc = null)
+            public async Task CloseConnection(WebSocketCloseStatus status = WebSocketCloseStatus.NormalClosure, string desc = null)
             {
-                var _webSocket = webSocket;
-                if (_webSocket == null)
+                if (webSocket == null)
                     return;
-
-                lock (_webSocket)
+                try
                 {
                     if (webSocket.State == WebSocketState.Open || webSocket.State == WebSocketState.Connecting)
-                        webSocket.Abort();
-                    webSocket.Dispose();
-                    webSocket = null;
-                    var allPendingRequests = Requests.Values;
-                    var closeException = new ConnectionCloseException(status, desc);
-                    foreach (var pendingRequest in allPendingRequests)
-                        pendingRequest.SetException(closeException);
-
-                    if (status != WebSocketCloseStatus.NormalClosure)
-                        _ = Task.Factory.StartNew(() => OnException?.Invoke(closeException));
-
-                    _ = Task.Factory.StartNew(() => OnClosed?.Invoke(status));
+                        await webSocket.CloseAsync(status, desc, CancellationToken.None);
                 }
+                catch (WebSocketException exc)
+                {
+                    //ignore "closed-without-completing-handshake" error
+                    if (exc.WebSocketErrorCode != WebSocketError.ConnectionClosedPrematurely)
+                        throw;
+                }
+                var allPendingRequests = Requests.Values;
+                var closeException = new ConnectionCloseException(status, desc);
+                foreach (var pendingRequest in allPendingRequests)
+                    pendingRequest.SetException(closeException);
+
+                if (status != WebSocketCloseStatus.NormalClosure)
+                    _ = Task.Factory.StartNew(() => OnException?.Invoke(closeException));
+
+                _ = Task.Factory.StartNew(() => OnClosed?.Invoke(status));
             }
 
             public async Task<MessageEnvelope> SendMessage(MessageEnvelope envelope, CancellationToken ct = default)
@@ -291,7 +317,9 @@ namespace Centaurus.SDK
                 try
                 {
                     var serializedData = XdrConverter.Serialize(envelope);
+                    Debug.WriteLine($"Message before sent: {envelope.Message.GetType().Name}_{envelope.Message.MessageId}");
                     await webSocket.SendAsync(serializedData, WebSocketMessageType.Binary, true, (ct == default ? CancellationToken.None : ct));
+                    Debug.WriteLine($"Message after sent: {envelope.Message.GetType().Name}_{envelope.Message.MessageId}");
 
                     _ = Task.Factory.StartNew(() => OnSend?.Invoke(envelope));
 
@@ -308,14 +336,19 @@ namespace Centaurus.SDK
                 return await (resultTask?.ResponseTask ?? Task.FromResult<MessageEnvelope>(null));
             }
 
+            public async Task CloseAndDispose(WebSocketCloseStatus status = WebSocketCloseStatus.NormalClosure, string desc = null)
+            {
+                await CloseConnection(status);
+                Dispose();
+            }
+
             public void Dispose()
             {
-                CloseConnection();
+                webSocket?.Dispose();
+                webSocket = null;
             }
 
             #region Private Members
-
-            private readonly SemaphoreSlim requestsSemaphore = new SemaphoreSlim(1);
 
             private System.Timers.Timer heartbeatTimer = null;
 
@@ -361,7 +394,7 @@ namespace Centaurus.SDK
                 lock (Requests)
                 {
                     var messageId = envelope.Message.MessageId;
-                    var response = messageId >= 0 ? new CentaurusQuantumResponse(constellationInfo): new CentaurusResponse(constellationInfo);
+                    var response = envelope.Message is NonceRequestMessage ? new CentaurusQuantumResponse(constellationInfo, timeout) : new CentaurusResponse(constellationInfo, timeout);
                     if (!Requests.TryAdd(messageId, response))
                         throw new Exception("Unable to add request to pending requests.");
                     return response;
@@ -384,14 +417,18 @@ namespace Centaurus.SDK
                             task.AssignResponse(envelope);
                             if (task.IsCompleted)
                                 Requests.TryRemove(messageId, out _);
-                            Debug.WriteLine($"{envelope.Message.MessageType} result was set.");
+                            logger.Trace($"{envelope.Message.MessageType}:{messageId} result was set.");
                             return true;
                         }
                         else
                         {
-                            Debug.WriteLine($"Unable set result for msg with id {messageId}.");
+                            logger.Trace($"Unable set result for msg with id {envelope.Message.MessageType}:{messageId}.");
                         }
                     }
+                }
+                else
+                {
+                    logger.Trace("Request is not result message.");
                 }
                 return false;
             }
@@ -428,15 +465,15 @@ namespace Centaurus.SDK
                 }
                 catch (WebSocketException e)
                 {
-                    CloseConnection(WebSocketCloseStatus.ProtocolError, e.Message);
+                    await CloseConnection(WebSocketCloseStatus.ProtocolError, e.Message);
                 }
                 catch (ConnectionCloseException e)
                 {
-                    CloseConnection(e.Status, e.Description);
+                    await CloseConnection(e.Status, e.Description);
                 }
                 catch (Exception e)
                 {
-                    CloseConnection(WebSocketCloseStatus.InternalServerError, e.Message);
+                    await CloseConnection(WebSocketCloseStatus.InternalServerError, e.Message);
                 }
             }
 
@@ -445,6 +482,7 @@ namespace Centaurus.SDK
             private void HandleMessage(MessageEnvelope envelope)
             {
                 TryResolveRequest(envelope);
+                Thread.Sleep(100);
                 _ = Task.Factory.StartNew(() => OnMessage?.Invoke(envelope));
             }
 

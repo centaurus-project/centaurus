@@ -111,7 +111,7 @@ namespace Centaurus.Test
             await AssertMessageHandling(clientConnection, envelope, excpectedException);
         }
 
-        static object[] LedgerUpdateTestCases =
+        static object[] TxNotificationTestCases =
         {
             new object[] { TestEnvironment.Client1KeyPair, ConnectionState.Validated, typeof(UnauthorizedException) },
             new object[] { TestEnvironment.Auditor1KeyPair, ConnectionState.Validated, typeof(InvalidStateException) },
@@ -119,8 +119,8 @@ namespace Centaurus.Test
         };
 
         [Test]
-        [TestCaseSource(nameof(LedgerUpdateTestCases))]
-        public async Task LedgerUpdateTest(KeyPair clientKeyPair, ConnectionState state, Type excpectedException)
+        [TestCaseSource(nameof(TxNotificationTestCases))]
+        public async Task TxNotificationTest(KeyPair clientKeyPair, ConnectionState state, Type excpectedException)
         {
             Global.AppState.State = ApplicationState.Ready;
 
@@ -130,11 +130,9 @@ namespace Centaurus.Test
                 ConnectionState = state
             };
 
-            var ledgerTo = 63;
-            var envelope = new LedgerUpdateNotification
+            var envelope = new TxNotification
             {
-                LedgerFrom = Global.LedgerManager.Ledger + 1,
-                LedgerTo = (uint)ledgerTo,
+                TxCursor = Global.TxManager.TxCursor + 1,
                 Payments = new List<PaymentBase>()
             }.CreateEnvelope();
             envelope.Sign(clientKeyPair);
