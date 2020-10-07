@@ -12,6 +12,7 @@ namespace Centaurus.Models
     [XdrUnion((int)MessageTypes.ITransactionResultMessage, typeof(ITransactionResultMessage))]
     [XdrUnion((int)MessageTypes.PaymentRequest, typeof(PaymentRequest))]
     [XdrUnion((int)MessageTypes.OrderRequest, typeof(OrderRequest))]
+    [XdrUnion((int)MessageTypes.OrderCancellationRequest, typeof(OrderCancellationRequest))]
     [XdrUnion((int)MessageTypes.RequestQuantum, typeof(RequestQuantum))]
     [XdrUnion((int)MessageTypes.TxCommitQuantum, typeof(TxCommitQuantum))]
     [XdrUnion((int)MessageTypes.ResultMessage, typeof(ResultMessage))]

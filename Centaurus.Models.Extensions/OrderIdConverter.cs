@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Centaurus.Domain
+namespace Centaurus
 {
     public class OrderIdConverter
     {
@@ -28,6 +28,11 @@ namespace Centaurus.Domain
                 Side = orderId % 2 == 1 ? OrderSides.Buy : OrderSides.Sell
             };
             return decoded;
+        }
+
+        public static ulong FromRequest(OrderRequest request, long apex)
+        {
+            return Encode(unchecked((ulong)apex), request.Asset, request.Side);
         }
     }
 }

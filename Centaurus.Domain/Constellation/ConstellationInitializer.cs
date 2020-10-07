@@ -72,7 +72,6 @@ namespace Centaurus.Domain
                 MinAccountBalance = constellationInitInfo.MinAccountBalance,
                 MinAllowedLotSize = constellationInitInfo.MinAllowedLotSize,
                 PrevHash = new byte[] { },
-                Ledger = ledgerId,
                 RequestRateLimits = constellationInitInfo.RequestRateLimits
             };
 

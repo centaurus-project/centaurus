@@ -8,9 +8,6 @@ namespace Centaurus.Models
     [XdrContract]
     public class ConstellationInitEffect : ConstellationEffect
     {
-        [XdrField(0)]
-        public long Ledger { get; set; }
-
         public override EffectTypes EffectType => EffectTypes.ConstellationInit; 
     }
 }

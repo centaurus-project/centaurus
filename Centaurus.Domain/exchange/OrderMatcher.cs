@@ -13,7 +13,7 @@ namespace Centaurus.Domain
             resultEffects = effectsContainer;
             takerOrder = new Order()
             {
-                OrderId = OrderIdConverter.Encode(unchecked((ulong)effectsContainer.Apex), orderRequest.Asset, orderRequest.Side),
+                OrderId = OrderIdConverter.FromRequest(orderRequest, effectsContainer.Apex),
                 Account = orderRequest.AccountWrapper.Account,
                 Amount = orderRequest.Amount,
                 Price = orderRequest.Price
@@ -186,7 +186,6 @@ namespace Centaurus.Domain
                      );
 
                 //record taker trade effect
-
                 matcher.resultEffects.AddTrade(
                          matcher.takerOrder,
                          matcher.asset,

@@ -4,7 +4,7 @@ using Centaurus.Xdr;
 
 namespace Centaurus.Models
 {
-    public class OrderCancelationRequest: NonceRequestMessage
+    public class OrderCancellationRequest: NonceRequestMessage
     {
         public override MessageTypes MessageType => MessageTypes.OrderCancellationRequest;
 

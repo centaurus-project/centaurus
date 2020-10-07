@@ -45,9 +45,7 @@ namespace Centaurus.Domain
                     MinAccountBalance = initQuantum.MinAccountBalance,
                     MinAllowedLotSize = initQuantum.MinAllowedLotSize,
                     Vault = initQuantum.Vault,
-                    Ledger = initQuantum.Ledger,
                     RequestRateLimits = initQuantum.RequestRateLimits
-
                 }
             };
 
@@ -291,7 +289,7 @@ namespace Centaurus.Domain
             {
                 Apex = apex,
                 Accounts = accountStorage.GetAll().Select(a => a.Account).ToList(),
-                TxCursor = stellarData.TxCursor,
+                TxCursor = stellarData?.TxCursor ?? 0,
                 Orders = exchange.OrderMap.GetAllOrders().ToList(),
                 Settings = settings,
                 Withdrawals = withdrawals,

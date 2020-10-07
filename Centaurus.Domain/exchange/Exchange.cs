@@ -34,6 +34,11 @@ namespace Centaurus.Domain
             throw new InvalidOperationException($"Asset {asset} is not supported");
         }
 
+        public bool HasMarket(int asset)
+        {
+            return Markets.ContainsKey(asset);
+        }
+
         public Market AddMarket(AssetSettings asset)
         {
             var market = asset.CreateMarket(OrderMap);
@@ -50,7 +55,22 @@ namespace Centaurus.Domain
         public Orderbook GetOrderbook(ulong offerId)
         {
             var parts = OrderIdConverter.Decode(offerId);
-            return GetMarket(parts.Asset).GetOrderbook(parts.Side);
+            return GetOrderbook(parts.Asset, parts.Side);
+        }
+
+        public Orderbook GetOrderbook(int asset, OrderSides side)
+        {
+            return GetMarket(asset).GetOrderbook(side);
+        }
+
+        public Order GetOrder(ulong offerId)
+        {
+            return GetOrderbook(offerId).GetOrder(offerId);
+        }
+
+        public bool RemoveOrder(ulong offerId)
+        {
+            return GetOrderbook(offerId).RemoveOrder(offerId);
         }
 
         public static Exchange RestoreExchange(List<AssetSettings> assets, List<Order> orders)

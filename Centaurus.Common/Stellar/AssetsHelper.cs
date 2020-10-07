@@ -11,5 +11,7 @@ namespace Centaurus
             string[] parts = assetSymbol.Split('-');
             return Asset.CreateNonNativeAsset(parts[0], parts[1]);
         }
+
+        public const int StroopsPerAsset = 10_000_000; 
     }
 }

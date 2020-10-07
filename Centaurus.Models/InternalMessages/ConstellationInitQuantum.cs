@@ -9,8 +9,5 @@ namespace Centaurus.Models
     public class ConstellationInitQuantum : ConstellationSettingsQuantum
     {
         public override MessageTypes MessageType => MessageTypes.ConstellationInitQuantum;
-
-        [XdrField(0)]
-        public long Ledger { get; set; }
     }
 }

@@ -25,7 +25,7 @@ namespace Centaurus.Domain
 
             SettingsModel constellationSettings = null;
 
-            DiffObject.ConstellationState stellarData = new DiffObject.ConstellationState();
+            DiffObject.ConstellationState stellarData = null;
 
             var accounts = new Dictionary<byte[], DiffObject.Account>(ByteArrayComparer.Default);
             var balances = new Dictionary<byte[], Dictionary<int, DiffObject.Balance>>(ByteArrayComparer.Default);
@@ -33,7 +33,6 @@ namespace Centaurus.Domain
             var orders = new Dictionary<ulong, DiffObject.Order>();
 
             var assets = new List<AssetModel>();
-
 
             var updateLength = update.Count;
             var quanta = new List<QuantumModel>();
@@ -58,7 +57,7 @@ namespace Centaurus.Domain
                     {
                         case ConstellationInitEffect constellationInit:
                             constellationSettings = GetConstellationSettings(constellationInit);
-                            stellarData = GetStellarData(constellationInit.Ledger);
+                            stellarData = GetStellarData(0);
                             stellarData.IsInserted = true;
                             assets = GetAssets(constellationInit, null);
                             break;
@@ -125,21 +124,24 @@ namespace Centaurus.Domain
                         case OrderPlacedEffect orderPlacedEffect:
                             {
                                 var orderId = orderPlacedEffect.OrderId;
-                                orders.Add(orderId, new DiffObject.Order
+                                orders[orderId] = new DiffObject.Order
                                 {
                                     Amount = orderPlacedEffect.Amount,
                                     IsInserted = true,
                                     OrderId = orderId,
                                     Price = orderPlacedEffect.Price,
                                     Pubkey = orderPlacedEffect.Pubkey.Data
-                                });
+                                };
                             }
                             break;
                         case OrderRemovedEffect orderRemovedEffect:
                             {
                                 var orderId = orderRemovedEffect.OrderId;
                                 if (!orders.ContainsKey(orderId))
-                                    orders.Add(orderId, new DiffObject.Order { OrderId = orderId });
+                                    orders.Add(orderId, new DiffObject.Order
+                                    {
+                                        OrderId = orderId
+                                    });
                                 orders[orderId].IsDeleted = true;
                             }
                             break;
@@ -152,11 +154,19 @@ namespace Centaurus.Domain
                             }
                             break;
                         case TxCursorUpdateEffect cursorUpdateEffect:
-                            stellarData.TxCursor = cursorUpdateEffect.Cursor;
+                            stellarData = GetStellarData(cursorUpdateEffect.Cursor);
                             break;
                         default:
                             break;
                     }
+                }
+                //TODO: find more elegant way to handle this scenario
+                //we mustn't save orders that were closed immediately without adding to order-book
+                if (quantumMessage is RequestQuantum request
+                    && request.RequestMessage is OrderRequest orderRequest
+                    && !quatumEffects.Any(e => e.EffectType == EffectTypes.OrderPlaced))
+                {
+                    orders.Remove(OrderIdConverter.FromRequest(orderRequest, quantumMessage.Apex));
                 }
             }
 
@@ -169,7 +179,7 @@ namespace Centaurus.Domain
                 Assets = assets,
                 Orders = orders.Values.ToList(),
                 Settings = constellationSettings,
-                StellarInfoData = stellarData.TxCursor == 0 ? null : stellarData //ignore if no changes
+                StellarInfoData = stellarData
             };
         }
 
