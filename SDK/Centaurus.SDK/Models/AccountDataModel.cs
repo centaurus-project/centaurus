@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Centaurus.Models;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -9,5 +10,7 @@ namespace Centaurus.SDK.Models
         public long Nonce { get; set; }
 
         public List<BalanceModel> Balances { get; set; }
+
+        public List<OrderModel> Orders { get; set; }
     }
 }

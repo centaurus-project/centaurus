@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Centaurus.Models;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -16,5 +17,15 @@ namespace Centaurus.SDK.Models
         }
 
         public const int StroopsPerXlm = 10000000;
+
+        public static BalanceModel FromBalance(Balance balance)
+        {
+            return new BalanceModel
+            {
+                Asset = balance.Asset,
+                Amount = balance.Amount,
+                Liabilities = balance.Liabilities
+            };
+        }
     }
 }

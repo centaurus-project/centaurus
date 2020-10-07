@@ -88,7 +88,8 @@ namespace Centaurus.SDK
             var rawMessage = (AccountDataResponse)data.Message;
             return new AccountDataModel
             {
-                Balances = rawMessage.Balances.Select(x => new BalanceModel { Amount = x.Amount, Asset = x.Asset, Liabilities = x.Liabilities }).ToList()
+                Balances = rawMessage.Balances.Select(x => BalanceModel.FromBalance(x)).ToList(),
+                Orders = rawMessage.Orders.Select(x => OrderModel.FromOrder(x)).ToList()
             };
         }
 
@@ -119,7 +120,19 @@ namespace Centaurus.SDK
             return result;
         }
 
+        public async Task<MessageEnvelope> CreateOrder(long amount, double price, OrderSides side, ConstellationInfo.Asset asset)
+        {
+            var order = new OrderRequest { Amount = amount, Price = price, Side = side, Asset = asset.Id };
+            var result = await connection.SendMessage(order.CreateEnvelope());
+            return result;
+        }
 
+        public async Task<MessageEnvelope> CancelOrder(ulong orderId)
+        {
+            var order = new OrderCancellationRequest { OrderId = orderId };
+            var result = await connection.SendMessage(order.CreateEnvelope());
+            return result;
+        }
 
         public async Task<MessageEnvelope> MakePayment(KeyPair destination, long amount, ConstellationInfo.Asset asset)
         {
