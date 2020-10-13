@@ -94,20 +94,12 @@ namespace Centaurus.Domain
                                 balances[pubKey][asset].Amount += balanceUpdateEffect.Amount;
                             }
                             break;
-                        case LockLiabilitiesEffect lockLiabilitiesEffect:
+                        case UpdateLiabilitiesEffect lockLiabilitiesEffect:
                             {
                                 var pubKey = lockLiabilitiesEffect.Pubkey.Data;
                                 var asset = lockLiabilitiesEffect.Asset;
                                 EnsureBalanceExists(balances, pubKey, asset);
                                 balances[pubKey][asset].Liabilities += lockLiabilitiesEffect.Amount;
-                            }
-                            break;
-                        case UnlockLiabilitiesEffect unlockLiabilitiesEffect:
-                            {
-                                var pubKey = unlockLiabilitiesEffect.Pubkey.Data;
-                                var asset = unlockLiabilitiesEffect.Asset;
-                                EnsureBalanceExists(balances, pubKey, asset);
-                                balances[pubKey][asset].Liabilities -= unlockLiabilitiesEffect.Amount;
                             }
                             break;
                         case RequestRateLimitUpdateEffect requestRateLimitUpdateEffect:

@@ -64,6 +64,10 @@ namespace Centaurus.Models
         /// </summary>
         ITransactionResultMessage = 103,
         /// <summary>
+        /// Message from Alpha to a client with all effects that affects the client, and wasn't triggered by the client (Trade for example).
+        /// </summary>
+        EffectsNotification = 104,
+        /// <summary>
         /// Message from auditor to Alpha server that contains Stellar payments (obtained from the Horizon).
         /// </summary>
         TxNotification = 105,

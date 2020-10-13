@@ -138,18 +138,10 @@ namespace Centaurus.Domain
             ));
         }
 
-        public void AddUnlockLiabilities(Account account, int asset, long amount)
+        public void AddUpdateLiabilities(Account account, int asset, long amount)
         {
-            Add(new UnlockLiabilitiesEffectProcessor(
-                new UnlockLiabilitiesEffect { Amount = amount, Asset = asset, Pubkey = account.Pubkey, Apex = Apex },
-                account
-            ));
-        }
-
-        public void AddLockLiabilities(Account account, int asset, long amount)
-        {
-            Add(new LockLiabilitiesEffectProcessor(
-                new LockLiabilitiesEffect { Amount = amount, Asset = asset, Pubkey = account.Pubkey, Apex = Apex },
+            Add(new UpdateLiabilitiesEffectProcessor(
+                new UpdateLiabilitiesEffect { Amount = amount, Asset = asset, Pubkey = account.Pubkey, Apex = Apex },
                 account
             ));
         }

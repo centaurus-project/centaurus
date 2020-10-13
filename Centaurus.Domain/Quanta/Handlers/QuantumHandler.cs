@@ -144,7 +144,12 @@ namespace Centaurus.Domain
 
             SaveEffects(effectsContainer);
 
+            //TODO: create single method for getting result message and all additional messages
             Notifier.OnMessageProcessResult(resultMessage);
+
+            var additionalMessages = processor.GetNotificationMessages(context);
+            foreach (var m in additionalMessages)
+                Notifier.Notify(m.Key, m.Value.CreateEnvelope());
 
             logger.Trace($"Message of type {envelope.Message} with apex {quantum.Apex} is handled.");
 

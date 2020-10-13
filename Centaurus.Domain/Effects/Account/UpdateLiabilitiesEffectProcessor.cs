@@ -5,9 +5,9 @@ using System.Text;
 
 namespace Centaurus.Domain
 {
-    public class LockLiabilitiesEffectProcessor : BaseAccountEffectProcessor<LockLiabilitiesEffect>
+    public class UpdateLiabilitiesEffectProcessor : BaseAccountEffectProcessor<UpdateLiabilitiesEffect>
     {
-        public LockLiabilitiesEffectProcessor(LockLiabilitiesEffect effect, Account account)
+        public UpdateLiabilitiesEffectProcessor(UpdateLiabilitiesEffect effect, Account account)
             : base(effect, account)
         {
 
@@ -17,13 +17,13 @@ namespace Centaurus.Domain
         {
             MarkAsProcessed();
             var balance = Account.GetBalance(Effect.Asset);
-            balance.LockLiabilities(Effect.Amount);
+            balance.UpdateLiabilities(Effect.Amount);
         }
 
         public override void RevertEffect()
         {
             MarkAsProcessed();
-            Account.GetBalance(Effect.Asset).UnlockLiabilities(Effect.Amount);
+            Account.GetBalance(Effect.Asset).UpdateLiabilities(Effect.Amount);
         }
     }
 }

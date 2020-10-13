@@ -28,9 +28,9 @@ namespace Centaurus.Domain
             //lock order reserve
             if (context.OrderSide == OrderSides.Buy)
                 //TODO: check this - potential rounding error with multiple trades
-                context.EffectProcessors.AddUnlockLiabilities(orderRequest.AccountWrapper.Account, 0, xmlAmount);
+                context.EffectProcessors.AddUpdateLiabilities(orderRequest.AccountWrapper.Account, 0, -xmlAmount);
             else
-                context.EffectProcessors.AddUnlockLiabilities(orderRequest.AccountWrapper.Account, context.Asset, context.Order.Amount);
+                context.EffectProcessors.AddUpdateLiabilities(orderRequest.AccountWrapper.Account, context.Asset, -context.Order.Amount);
 
             context.EffectProcessors.AddOrderRemoved(context.Orderbook, context.Order);
 

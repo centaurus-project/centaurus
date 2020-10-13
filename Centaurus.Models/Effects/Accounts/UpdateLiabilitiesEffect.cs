@@ -6,8 +6,8 @@ using System.Text;
 namespace Centaurus.Models
 {
     [XdrContract]
-    public class UnlockLiabilitiesEffect : BaseBalanceEffect
+    public class UpdateLiabilitiesEffect : BaseBalanceEffect
     {
-        public override EffectTypes EffectType => EffectTypes.UnlockLiabilities;
+        public override EffectTypes EffectType => EffectTypes.UpdateLiabilities;
     }
 }

@@ -105,7 +105,7 @@ namespace Centaurus.Test
             Global.Exchange.ExecuteOrder(orderEffectsContainer);
             var effects = orderEffectsContainer.GetEffects();
             Assert.AreEqual(effects.Length, 2);
-            Assert.AreEqual(effects[0].EffectType, EffectTypes.LockLiabilities);
+            Assert.AreEqual(effects[0].EffectType, EffectTypes.UpdateLiabilities);
             Assert.AreEqual(effects[1].EffectType, EffectTypes.OrderPlaced);
             if (side == OrderSides.Sell)
             {

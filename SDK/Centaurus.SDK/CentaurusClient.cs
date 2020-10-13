@@ -42,6 +42,8 @@ namespace Centaurus.SDK
                 await connection.EstablishConnection();
 
                 await handshakeResult.Task;
+
+                await UpdateAccountData();
             }
             catch
             {
@@ -56,6 +58,11 @@ namespace Centaurus.SDK
 
                 connectionSemaphore.Release();
             }
+        }
+
+        public async Task UpdateAccountData()
+        {
+            AccountData = await GetAccountData();
         }
 
         public async Task CloseConnection()
@@ -80,6 +87,8 @@ namespace Centaurus.SDK
 
         public event Action<Exception> OnException;
 
+        public event Action<AccountDataModel> OnAccountUpdate;
+
         public event Action<WebSocketCloseStatus> OnClosed;
 
         public async Task<AccountDataModel> GetAccountData()
@@ -88,8 +97,8 @@ namespace Centaurus.SDK
             var rawMessage = (AccountDataResponse)data.Message;
             return new AccountDataModel
             {
-                Balances = rawMessage.Balances.Select(x => BalanceModel.FromBalance(x)).ToList(),
-                Orders = rawMessage.Orders.Select(x => OrderModel.FromOrder(x)).ToList()
+                Balances = rawMessage.Balances.Select(x => BalanceModel.FromBalance(x)).ToDictionary(k => k.Asset, v => v),
+                Orders = rawMessage.Orders.Select(x => OrderModel.FromOrder(x)).ToDictionary(k => k.OrderId, v => v)
             };
         }
 
@@ -162,6 +171,51 @@ namespace Centaurus.SDK
         private ConstellationInfo constellation;
         private TaskCompletionSource<bool> handshakeResult = new TaskCompletionSource<bool>();
 
+        private void ResultMessageHandler(MessageEnvelope envelope)
+        {
+            if (AccountData == null || envelope.Signatures.Count != 1) //ignore if AccountData is null or if it's audit result
+                return;
+            var resultMessage = envelope.Message as IEffectsContainer;
+            try
+            {
+                foreach (var effect in resultMessage.Effects)
+                {
+                    switch (effect)
+                    {
+                        case NonceUpdateEffect nonceUpdateEffect:
+                            AccountData.Nonce = nonceUpdateEffect.Nonce;
+                            break;
+                        case BalanceCreateEffect balanceCreateEffect:
+                            AccountData.Balances[balanceCreateEffect.Asset] = new BalanceModel { Asset = balanceCreateEffect.Asset };
+                            break;
+                        case BalanceUpdateEffect balanceUpdateEffect:
+                            AccountData.Balances[balanceUpdateEffect.Asset].Amount += balanceUpdateEffect.Amount;
+                            break;
+                        case UpdateLiabilitiesEffect updateLiabilitiesEffect:
+                            AccountData.Balances[updateLiabilitiesEffect.Asset].Liabilities += updateLiabilitiesEffect.Amount;
+                            break;
+                        case OrderPlacedEffect orderPlacedEffect:
+                            AccountData.Orders[orderPlacedEffect.OrderId] = new OrderModel { Amount = orderPlacedEffect.Amount, Price = orderPlacedEffect.Price, OrderId = orderPlacedEffect.OrderId };
+                            break;
+                        case OrderRemovedEffect orderRemoveEffect:
+                            AccountData.Orders.Remove(orderRemoveEffect.OrderId);
+                            break;
+                        case TradeEffect tradeEffect:
+                            if (AccountData.Orders.TryGetValue(tradeEffect.OrderId, out var order)) //trade could occur without adding the order to orderbook
+                                order.Amount -= tradeEffect.AssetAmount;
+                            break;
+                        default:
+                            break;
+                    }
+                }
+                OnAccountUpdate?.Invoke(AccountData);
+            }
+            catch (Exception exc)
+            {
+                OnException?.Invoke(exc);
+            }
+        }
+
         private void SubscribeToEvents(CentaurusConnection connection)
         {
             connection.OnClosed += Connection_OnClosed;
@@ -216,6 +270,17 @@ namespace Centaurus.SDK
 
         private bool isConnecting = false;
 
+        private AccountDataModel accountData;
+        public AccountDataModel AccountData 
+        {
+            get => accountData; 
+            private set
+            {
+                accountData = value;
+                OnAccountUpdate?.Invoke(accountData);
+            }
+        }
+
         private void Connection_OnSend(MessageEnvelope envelope)
         {
             if (isConnected)
@@ -235,6 +300,7 @@ namespace Centaurus.SDK
                 else
                 {
                     logger.Trace($"OnMessage: connected.");
+                    ResultMessageHandler(envelope);
                     OnMessage?.Invoke(envelope);
                 }
             }

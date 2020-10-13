@@ -21,7 +21,7 @@ namespace Centaurus.Domain
             context.EffectProcessors.AddWithdrawalRemove(context.Withdrawal, Global.WithdrawalStorage);
             foreach (var withdrawalItem in context.Withdrawal.Withdrawals)
             {
-                context.EffectProcessors.AddUnlockLiabilities(context.Withdrawal.Source.Account, withdrawalItem.Asset, withdrawalItem.Amount);
+                context.EffectProcessors.AddUpdateLiabilities(context.Withdrawal.Source.Account, withdrawalItem.Asset, -withdrawalItem.Amount);
             }
             return Task.FromResult(context.Envelope.CreateResult(ResultStatusCodes.Success, context.EffectProcessors.GetEffects().ToList()));
         }

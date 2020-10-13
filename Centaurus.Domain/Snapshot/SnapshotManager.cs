@@ -238,11 +238,8 @@ namespace Centaurus.Domain
                     case BalanceUpdateEffect balanceUpdateEffect:
                         processor = new BalanceUpdateEffectProcesor(balanceUpdateEffect, account.Value.Account);
                         break;
-                    case LockLiabilitiesEffect lockLiabilitiesEffect:
-                        processor = new LockLiabilitiesEffectProcessor(lockLiabilitiesEffect, account.Value.Account);
-                        break;
-                    case UnlockLiabilitiesEffect unlockLiabilitiesEffect:
-                        processor = new UnlockLiabilitiesEffectProcessor(unlockLiabilitiesEffect, account.Value.Account);
+                    case UpdateLiabilitiesEffect updateLiabilitiesEffect:
+                        processor = new UpdateLiabilitiesEffectProcessor(updateLiabilitiesEffect, account.Value.Account);
                         break;
                     case RequestRateLimitUpdateEffect requestRateLimitUpdateEffect:
                         processor = new RequestRateLimitUpdateEffectProcessor(requestRateLimitUpdateEffect, account.Value, settings.RequestRateLimits);

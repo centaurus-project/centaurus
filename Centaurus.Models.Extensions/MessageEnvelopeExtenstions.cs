@@ -27,7 +27,7 @@ namespace Centaurus
         /// </summary>
         /// <param name="messageEnvelope">Envelope to sign</param>
         /// <param name="keyPair">Key pair to use for signing</param>
-        public static void Sign(this MessageEnvelope messageEnvelope, KeyPair keyPair)
+        public static MessageEnvelope Sign(this MessageEnvelope messageEnvelope, KeyPair keyPair)
         {
             if (messageEnvelope == null)
                 throw new ArgumentNullException(nameof(messageEnvelope));
@@ -35,6 +35,7 @@ namespace Centaurus
                 throw new ArgumentNullException(nameof(keyPair));
             var signature = messageEnvelope.ComputeMessageHash().Sign(keyPair);
             messageEnvelope.Signatures.Add(signature);
+            return messageEnvelope;
         }
 
         /// <summary>

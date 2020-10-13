@@ -6,7 +6,7 @@ namespace Centaurus.Models
     /// <summary>
     /// Message used as a quantum response.
     /// </summary>
-    public class ResultMessage : Message
+    public class ResultMessage : Message, IEffectsContainer
     {
         public override MessageTypes MessageType => MessageTypes.ResultMessage;
 

@@ -80,25 +80,25 @@ namespace Centaurus.Domain
             }
         }
 
-        private void PlaceReminderOrder(long emulatedAmount)
+        private void PlaceReminderOrder(long amount)
         {
-            if (emulatedAmount <= 0) return;
-            var xmlAmount = EstimateTradedXlmAmount(emulatedAmount, takerOrder.Price);
+            if (amount <= 0) return;
+            var xmlAmount = EstimateTradedXlmAmount(amount, takerOrder.Price);
             if (xmlAmount <= 0) return;
             //lock order reserve
             if (side == OrderSides.Buy)
             {
                 //TODO: check this - potential rounding error with multiple trades
-                resultEffects.AddLockLiabilities(takerOrder.Account, 0, xmlAmount);
+                resultEffects.AddUpdateLiabilities(takerOrder.Account, 0, xmlAmount);
             }
             else
             {
-                resultEffects.AddLockLiabilities(takerOrder.Account, asset, emulatedAmount);
+                resultEffects.AddUpdateLiabilities(takerOrder.Account, asset, amount);
             }
             //select the market to add new order
             var reminderOrderbook = market.GetOrderbook(side);
             //record maker trade effect
-            resultEffects.AddOrderPlaced(reminderOrderbook, takerOrder, emulatedAmount, asset, side);
+            resultEffects.AddOrderPlaced(reminderOrderbook, takerOrder, amount, asset, side);
         }
 
         /// <summary>
@@ -137,7 +137,7 @@ namespace Centaurus.Domain
                 if (matcher.side == OrderSides.Buy)
                 {
                     //unlock required asset amount on maker's side
-                    matcher.resultEffects.AddUnlockLiabilities(makerOrder.Account, matcher.asset, AssetAmount);
+                    matcher.resultEffects.AddUpdateLiabilities(makerOrder.Account, matcher.asset, -AssetAmount);
 
                     //transfer asset from maker to taker
                     matcher.resultEffects.AddBalanceUpdate(makerOrder.Account, matcher.asset, -AssetAmount);
@@ -150,7 +150,7 @@ namespace Centaurus.Domain
                 else
                 {
                     //unlock required XLM amount on maker's side
-                    matcher.resultEffects.AddUnlockLiabilities(makerOrder.Account, 0, xlmAmount);
+                    matcher.resultEffects.AddUpdateLiabilities(makerOrder.Account, 0, -xlmAmount);
 
                     //transfer asset from taker to maker
                     matcher.resultEffects.AddBalanceUpdate(matcher.takerOrder.Account, matcher.asset, -AssetAmount);

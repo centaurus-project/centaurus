@@ -9,8 +9,8 @@ namespace Centaurus.SDK.Models
     {
         public long Nonce { get; set; }
 
-        public List<BalanceModel> Balances { get; set; }
+        public Dictionary<int, BalanceModel> Balances { get; set; }
 
-        public List<OrderModel> Orders { get; set; }
+        public Dictionary<ulong, OrderModel> Orders { get; set; }
     }
 }

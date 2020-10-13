@@ -136,7 +136,7 @@ namespace Centaurus.Domain
             var isSuccess = withdrawalModel.PaymentResult == PaymentResults.Success;
             foreach (var withdrawalItem in withdrawal.Withdrawals)
             {
-                context.EffectProcessors.AddUnlockLiabilities(withdrawal.Source.Account, withdrawalItem.Asset, withdrawalItem.Amount);
+                context.EffectProcessors.AddUpdateLiabilities(withdrawal.Source.Account, withdrawalItem.Asset, -withdrawalItem.Amount);
                 if (isSuccess)
                     context.EffectProcessors.AddBalanceUpdate(withdrawal.Source.Account, withdrawalItem.Asset, -withdrawalItem.Amount);
             }

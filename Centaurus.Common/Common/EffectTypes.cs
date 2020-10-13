@@ -13,9 +13,8 @@ namespace Centaurus
         NonceUpdate = 2,
         BalanceCreate = 3,
         BalanceUpdate = 4,
-        LockLiabilities = 5,
-        UnlockLiabilities = 6,
-        RequestRateLimitUpdate = 7,
+        UpdateLiabilities = 5,
+        RequestRateLimitUpdate = 6,
 
         OrderPlaced = 10,
         OrderRemoved = 11,

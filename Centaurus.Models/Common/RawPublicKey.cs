@@ -25,6 +25,11 @@ namespace Centaurus.Models
             return StrKey.EncodeStellarAccountId(Data);
         }
 
+        public static implicit operator byte[](RawPubKey pubKey)
+        {
+            return pubKey.Data;
+        }
+
         public static implicit operator RawPubKey(byte[] data)
         {
             return new RawPubKey() { Data = data };

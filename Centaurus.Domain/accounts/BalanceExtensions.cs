@@ -18,23 +18,10 @@ namespace Centaurus.Domain
         /// </summary>
         /// <param name="balance">Asset balance</param>
         /// <param name="amount">Amount to lock</param>
-        public static void LockLiabilities(this Balance balance, long amount)
+        public static void UpdateLiabilities(this Balance balance, long amount)
         {
-            if (amount <= 0) throw new ArgumentException("Invalid operation amount: " + amount);
             balance.Liabilities += amount;
-            if (balance.Liabilities > balance.Amount) throw new InvalidOperationException("Invalid liabilities lock request. " + balance.ToString());
-        }
-
-        /// <summary>
-        /// Unlock previously locked funds on account balance.
-        /// </summary>
-        /// <param name="balance">Asset balance</param>
-        /// <param name="amount">Amount to unlock</param>
-        public static void UnlockLiabilities(this Balance balance, long amount)
-        {
-            if (amount <= 0) throw new ArgumentException("Invalid operation amount: " + amount);
-            balance.Liabilities -= amount;
-            if (balance.Liabilities < 0) throw new InvalidOperationException("Invalid liabilities unlock request. " + balance.ToString());
+            if (balance.Liabilities > balance.Amount || balance.Liabilities < 0) throw new InvalidOperationException("Invalid liabilities update request. " + balance.ToString());
         }
 
         /// <summary>

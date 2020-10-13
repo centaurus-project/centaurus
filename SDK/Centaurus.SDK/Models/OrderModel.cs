@@ -25,7 +25,7 @@ namespace Centaurus.SDK.Models
 
         public double Price { get; set; }
 
-        public string PriceXdr => string.Format("{0:0.##}", (Price / AssetsHelper.StroopsPerAsset));
+        public string PriceStr => Price.ToString("0.#########");
 
         public long Amount { get; set; }
 

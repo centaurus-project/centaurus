@@ -27,7 +27,7 @@ namespace Centaurus.Domain
             context.EffectProcessors.AddWithdrawalCreate(withdrawal, Global.WithdrawalStorage);
 
             foreach (var withdrawalItem in context.WithdrawalItems)
-                context.EffectProcessors.AddLockLiabilities(context.WithdrawalRequest.AccountWrapper.Account, withdrawalItem.Asset, withdrawalItem.Amount);
+                context.EffectProcessors.AddUpdateLiabilities(context.WithdrawalRequest.AccountWrapper.Account, withdrawalItem.Asset, withdrawalItem.Amount);
 
             var effects = context.EffectProcessors.GetEffects();
 
