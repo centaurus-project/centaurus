@@ -67,7 +67,7 @@ namespace Centaurus.Test
 
         [Test]
         [TestCaseSource(nameof(LedgerQuantumTestCases))]
-        public async Task LedgerQuantumTest(KeyPair alphaKeyPair, ConnectionState state, Type excpectedException)
+        public async Task TxCommitQuantumTest(KeyPair alphaKeyPair, ConnectionState state, Type excpectedException)
         {
             Global.AppState.State = ApplicationState.Ready;
 
