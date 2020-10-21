@@ -5,7 +5,7 @@ namespace Centaurus.Models
 {
     public abstract class Quantum : Message
     {
-        public override ulong MessageId => unchecked((ulong)Apex);
+        public override long MessageId => Apex;
 
         /// <summary>
         /// Unique sequential quantum id. Assigned by Alpha server.

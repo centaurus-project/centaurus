@@ -48,9 +48,8 @@ namespace Centaurus.Test
             {
                 Accounts = new List<Models.Account> { account1, account2 },
                 Apex = 0,
-                Ledger = 1,
+                TxCursor = 1,
                 Orders = new List<Order>(),
-                VaultSequence = 1,
                 Settings = new ConstellationSettings
                 {
                     Vault = KeyPair.Random().PublicKey,
@@ -106,7 +105,7 @@ namespace Centaurus.Test
             Global.Exchange.ExecuteOrder(orderEffectsContainer);
             var effects = orderEffectsContainer.GetEffects();
             Assert.AreEqual(effects.Length, 2);
-            Assert.AreEqual(effects[0].EffectType, EffectTypes.LockLiabilities);
+            Assert.AreEqual(effects[0].EffectType, EffectTypes.UpdateLiabilities);
             Assert.AreEqual(effects[1].EffectType, EffectTypes.OrderPlaced);
             if (side == OrderSides.Sell)
             {
@@ -174,7 +173,7 @@ namespace Centaurus.Test
                         Message = new OrderRequest
                         {
                             Account = account1.Pubkey,
-                            Nonce = (ulong)i,
+                            Nonce = i,
                             Amount = rnd.Next(1, 20),
                             Asset = 1,
                             Price = Math.Round(price * 10) / 10,

@@ -2,6 +2,7 @@
 using stellar_dotnet_sdk.xdr;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
 using static stellar_dotnet_sdk.xdr.OperationType;
 
@@ -25,7 +26,7 @@ namespace Centaurus.Domain
             return true;
         }
 
-        public static bool FromOperationResponse(Operation.OperationBody operation, stellar_dotnet_sdk.KeyPair source, PaymentResults pResult, byte[] transactionHash, out PaymentBase payment)
+        public static bool FromOperationResponse(stellar_dotnet_sdk.xdr.Operation.OperationBody operation, stellar_dotnet_sdk.KeyPair source, Models.PaymentResults pResult, byte[] transactionHash, out PaymentBase payment)
         {
             payment = null;
             int asset;
@@ -35,9 +36,8 @@ namespace Centaurus.Domain
                 case OperationTypeEnum.PAYMENT:
                     if (!TryGetAsset(operation.PaymentOp.Asset, out asset))
                         return result;
-
                     var amount = operation.PaymentOp.Amount.InnerValue;
-                    var destKeypair = stellar_dotnet_sdk.KeyPair.FromXdrPublicKey(operation.PaymentOp.Destination.InnerValue);
+                    var destKeypair = stellar_dotnet_sdk.KeyPair.FromPublicKey(operation.PaymentOp.Destination.Ed25519.InnerValue);
                     if (Global.Constellation.Vault.Equals((RawPubKey)destKeypair.PublicKey))
                         payment = new Deposit
                         {
@@ -51,13 +51,13 @@ namespace Centaurus.Domain
                         var withdrawal = Global.WithdrawalStorage.GetWithdrawal(transactionHash);
                         if (withdrawal == null)
                             throw new Exception("Unable to find withdrawal by hash.");
-                        if (withdrawal.Asset != asset)
-                            throw new Exception("Assets are not equal.");
-                        if (withdrawal.Amount != amount)
-                            throw new Exception("Amounts are not equal.");
-                        if (ByteArrayPrimitives.Equals(withdrawal.Destination, destKeypair))
-                            throw new Exception("Destinations are not equal.");
-                        payment = withdrawal;
+                        //if (withdrawal.Asset != asset)
+                        //    throw new Exception("Assets are not equal.");
+                        //if (withdrawal.Amount != amount)
+                        //    throw new Exception("Amounts are not equal.");
+                        //if (ByteArrayPrimitives.Equals(withdrawal.Destination, destKeypair))
+                        //    throw new Exception("Destinations are not equal.");
+                        payment = new Models.Withdrawal { TransactionHash = transactionHash  };
                     }
                     if (payment != null)
                     {

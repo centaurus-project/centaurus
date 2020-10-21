@@ -9,8 +9,5 @@ namespace Centaurus.Models
     public class WithdrawalCreateEffect: Effect
     {
         public override EffectTypes EffectType => EffectTypes.WithdrawalCreate;
-
-        [XdrField(0)]
-        public Withdrawal Withdrawal { get; set; }
     }
 }

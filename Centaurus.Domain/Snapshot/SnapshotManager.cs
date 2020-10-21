@@ -8,6 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Centaurus.Models;
 using Centaurus.Xdr;
+using System.Diagnostics;
 
 namespace Centaurus.Domain
 {
@@ -44,10 +45,7 @@ namespace Centaurus.Domain
                     MinAccountBalance = initQuantum.MinAccountBalance,
                     MinAllowedLotSize = initQuantum.MinAllowedLotSize,
                     Vault = initQuantum.Vault,
-                    VaultSequence = initQuantum.VaultSequence,
-                    Ledger = initQuantum.Ledger,
                     RequestRateLimits = initQuantum.RequestRateLimits
-
                 }
             };
 
@@ -146,6 +144,12 @@ namespace Centaurus.Domain
             return await Global.PermanentStorage.GetLastApex();
         }
 
+        public static async Task<MessageEnvelope> GetQuantum(long apex)
+        {
+            var quantumModel = await Global.PermanentStorage.LoadQuantum(apex);
+            return XdrConverter.Deserialize<MessageEnvelope>(quantumModel.RawQuantum);
+        }
+
         /// <summary>
         /// Fetches current snapshot
         /// </summary>
@@ -203,15 +207,15 @@ namespace Centaurus.Domain
 
             var accounts = await GetAccounts();
 
-            var withdrawals = await GetWithdrawals();
-
             var accountStorage = new AccountStorage(accounts, settings.RequestRateLimits);
+
+            var withdrawals = await GetWithdrawals(accountStorage, settings);
 
             var orders = await GetOrders(accountStorage);
 
             var exchange = await GetRestoredExchange(orders);
 
-            var withdrawalsStorage = new WithdrawalStorage(withdrawals);
+            var withdrawalsStorage = new WithdrawalStorage(withdrawals, false);
 
             var effectModels = await Global.PermanentStorage.LoadEffectsAboveApex(apex);
             for (var i = effectModels.Count - 1; i >= 0; i--)
@@ -234,11 +238,8 @@ namespace Centaurus.Domain
                     case BalanceUpdateEffect balanceUpdateEffect:
                         processor = new BalanceUpdateEffectProcesor(balanceUpdateEffect, account.Value.Account);
                         break;
-                    case LockLiabilitiesEffect lockLiabilitiesEffect:
-                        processor = new LockLiabilitiesEffectProcessor(lockLiabilitiesEffect, account.Value.Account);
-                        break;
-                    case UnlockLiabilitiesEffect unlockLiabilitiesEffect:
-                        processor = new UnlockLiabilitiesEffectProcessor(unlockLiabilitiesEffect, account.Value.Account);
+                    case UpdateLiabilitiesEffect updateLiabilitiesEffect:
+                        processor = new UpdateLiabilitiesEffectProcessor(updateLiabilitiesEffect, account.Value.Account);
                         break;
                     case RequestRateLimitUpdateEffect requestRateLimitUpdateEffect:
                         processor = new RequestRateLimitUpdateEffectProcessor(requestRateLimitUpdateEffect, account.Value, settings.RequestRateLimits);
@@ -264,12 +265,14 @@ namespace Centaurus.Domain
                         break;
                     case WithdrawalCreateEffect withdrawalCreate:
                         {
-                            processor = new WithdrawalCreateEffectProcessor(withdrawalCreate, withdrawalsStorage);
+                            var withdrawal = withdrawalsStorage.GetWithdrawal(withdrawalCreate.Apex);
+                            processor = new WithdrawalCreateEffectProcessor(withdrawalCreate, withdrawal, withdrawalsStorage);
                         }
                         break;
                     case WithdrawalRemoveEffect withdrawalRemove:
                         {
-                            processor = new WithdrawalRemoveEffectProcessor(withdrawalRemove, withdrawalsStorage);
+                            var withdrawal = withdrawalsStorage.GetWithdrawal(withdrawalRemove.Apex);
+                            processor = new WithdrawalRemoveEffectProcessor(withdrawalRemove, withdrawal, withdrawalsStorage);
                         }
                         break;
                     default:
@@ -283,10 +286,9 @@ namespace Centaurus.Domain
             {
                 Apex = apex,
                 Accounts = accountStorage.GetAll().Select(a => a.Account).ToList(),
-                Ledger = stellarData.Ledger,
+                TxCursor = stellarData?.TxCursor ?? 0,
                 Orders = exchange.OrderMap.GetAllOrders().ToList(),
                 Settings = settings,
-                VaultSequence = stellarData.VaultSequence,
                 Withdrawals = withdrawals,
                 LastHash = lastQuantum.Message.ComputeHash()
             };
@@ -317,8 +319,7 @@ namespace Centaurus.Domain
             var accountModels = await Global.PermanentStorage.LoadAccounts();
             var balanceModels = await Global.PermanentStorage.LoadBalances();
 
-            var comparer = new ByteArrayComparer();
-            var groupedBalances = balanceModels.GroupBy(b => b.Account, comparer).ToDictionary(g => g.Key, g => g, comparer);
+            var groupedBalances = balanceModels.GroupBy(b => b.Account, ByteArrayComparer.Default).ToDictionary(g => g.Key, g => g, ByteArrayComparer.Default);
             var accountsCount = accountModels.Count;
             var accounts = new List<Account>();
             for (var i = 0; i < accountsCount; i++)
@@ -335,11 +336,19 @@ namespace Centaurus.Domain
             return accounts;
         }
 
-        private static async Task<List<Withdrawal>> GetWithdrawals()
+        private static async Task<List<Withdrawal>> GetWithdrawals(AccountStorage accountStorage, ConstellationSettings constellationSettings)
         {
-            var withdrawalModels = await Global.PermanentStorage.LoadWithdrawals();
+            var withdrawalQuanta = await Global.PermanentStorage.LoadWithdrawals();
+            var withdrawals = withdrawalQuanta
+                .Select(w =>
+                {
+                    var withdrawalQuantum = XdrConverter.Deserialize<MessageEnvelope>(w.RawQuantum);
+                    var withdrawalRequest = ((WithdrawalRequest)((RequestQuantum)withdrawalQuantum.Message).RequestMessage);
+                    withdrawalRequest.AccountWrapper = accountStorage.GetAccount(w.Account);
+                    return Withdrawal.GetWithdrawal(withdrawalQuantum, constellationSettings);
+                });
 
-            return withdrawalModels.Select(w => XdrConverter.Deserialize<Withdrawal>(w.RawWithdrawal)).ToList();
+            return withdrawals.ToList();
         }
 
         private static async Task<List<Order>> GetOrders(AccountStorage accountStorage)

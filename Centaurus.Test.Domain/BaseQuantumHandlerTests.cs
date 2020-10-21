@@ -2,8 +2,11 @@
 using Centaurus.Models;
 using NUnit.Framework;
 using stellar_dotnet_sdk;
+using stellar_dotnet_sdk.responses;
+using stellar_dotnet_sdk.xdr;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,12 +17,11 @@ namespace Centaurus.Test
     {
 
         [Test]
-        [TestCase(1, 0, 0, 0, typeof(InvalidOperationException))]
-        [TestCase(3, 0, 0, 0, typeof(InvalidOperationException))]
-        [TestCase(3, 63, 0, 0, typeof(InvalidOperationException))]
-        [TestCase(3, 63, 100, 10, typeof(InvalidOperationException))]
-        [TestCase(3, 63, 100, 0, null)]
-        public async Task LedgerQuantumTest(int ledgerFrom, int ledgerTo, int amount, int asset, Type excpectedException)
+        [TestCase(0, 0, 0, typeof(InvalidOperationException))]
+        [TestCase(1, 0, 0, typeof(InvalidOperationException))]
+        [TestCase(10, 1000, 10, typeof(InvalidOperationException))]
+        [TestCase(10, 1000, 0, null)]
+        public async Task TxCommitQuantumTest(int cursor, int amount, int asset, Type excpectedException)
         {
             Global.AppState.State = ApplicationState.Ready;
 
@@ -37,28 +39,30 @@ namespace Centaurus.Test
             {
                 client1StartBalanceAmount = clientAccountBalance.Amount;
 
-                var transactionBuilder = new Transaction.Builder(Global.VaultAccount.GetAccount());
-                transactionBuilder.AddOperation(
-                    new PaymentOperation.Builder(
-                        withdrawalDest,
-                        new AssetTypeNative(),
-                        amount.ToString()
-                ).Build());
-                var transaction = transactionBuilder.Build();
 
-                var txXdr = transaction.ToRawEnvelopeXdr();
+                Global.Constellation.TryFindAssetSettings(asset, out var assetSettings);
 
-                txHash = txXdr.ComputeHash();
+                var account = new stellar_dotnet_sdk.Account(TestEnvironment.Client1KeyPair.AccountId, 1);
+                var txBuilder = new TransactionBuilder(account);
+                txBuilder.SetFee(10_000);
+                txBuilder.AddTimeBounds(new stellar_dotnet_sdk.TimeBounds(DateTimeOffset.UtcNow, new TimeSpan(0, 5, 0)));
+                txBuilder.AddOperation(
+                    new PaymentOperation.Builder(withdrawalDest, assetSettings.ToAsset(), Amount.FromXdr(amount).ToString())
+                        .SetSourceAccount((KeyPair)Global.Constellation.Vault)
+                        .Build()
+                    );
+                var tx = txBuilder.Build();
+                txHash = tx.Hash();
+
+                var txV1 = tx.ToXdrV1();
+                var txStream = new XdrDataOutputStream();
+                stellar_dotnet_sdk.xdr.Transaction.Encode(txStream, txV1);
 
                 var withdrawal = new WithdrawalRequest
                 {
                     Account = TestEnvironment.Client1KeyPair,
-                    Destination = withdrawalDest.PublicKey,
-                    Amount = amount,
-                    Asset = asset,
-                    Nonce = (ulong)DateTime.UtcNow.Ticks,
-                    TransactionHash = txHash,
-                    TransactionXdr = txXdr,
+                    TransactionXdr = txStream.ToArray(),
+                    Nonce = DateTime.UtcNow.Ticks,
                     AccountWrapper = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair)
                 };
 
@@ -75,10 +79,9 @@ namespace Centaurus.Test
 
             var depositeAmount = new Random().Next(10, 1000);
 
-            var ledgerNotification = new LedgerUpdateNotification
+            var ledgerNotification = new TxNotification
             {
-                LedgerFrom = (uint)ledgerFrom,
-                LedgerTo = (uint)ledgerTo,
+                TxCursor = (uint)cursor,
                 Payments = new List<PaymentBase>
                     {
                         new Deposit
@@ -87,12 +90,8 @@ namespace Centaurus.Test
                             Destination = TestEnvironment.Client1KeyPair,
                             Asset = asset
                         },
-                        new Withdrawal
+                        new Models.Withdrawal
                         {
-                            Amount = amount,
-                            Destination = withdrawalDest,
-                            Source = TestEnvironment.Client1KeyPair,
-                            Asset = asset,
                             TransactionHash = txHash,
                             PaymentResult = PaymentResults.Success
                         }
@@ -101,7 +100,7 @@ namespace Centaurus.Test
             var ledgerNotificationEnvelope = ledgerNotification.CreateEnvelope();
             ledgerNotificationEnvelope.Sign(TestEnvironment.Auditor1KeyPair);
 
-            var ledgerCommitEnv = new LedgerCommitQuantum
+            var ledgerCommitEnv = new TxCommitQuantum
             {
                 Source = ledgerNotificationEnvelope,
                 Apex = ++apex
@@ -114,7 +113,7 @@ namespace Centaurus.Test
             await AssertQuantumHandling(ledgerCommitEnv, excpectedException);
             if (excpectedException == null)
             {
-                Assert.AreEqual(Global.LedgerManager.Ledger, ledgerNotification.LedgerTo);
+                Assert.AreEqual(Global.TxManager.TxCursor, ledgerNotification.TxCursor);
 
                 Assert.AreEqual(account1.GetBalance(asset).Liabilities, 0);
                 Assert.AreEqual(account1.GetBalance(asset).Amount, client1StartBalanceAmount - amount + depositeAmount); //acc balance + deposit - withdrawal
@@ -133,7 +132,7 @@ namespace Centaurus.Test
             var order = new OrderRequest
             {
                 Account = TestEnvironment.Client1KeyPair,
-                Nonce = (ulong)nonce,
+                Nonce = nonce,
                 Amount = amount,
                 Asset = asset,
                 Price = 100,
@@ -166,6 +165,226 @@ namespace Centaurus.Test
         }
 
         [Test]
+        [TestCase(1, 100, OrderSides.Sell, 111, false, typeof(BadRequestException))]
+        [TestCase(1, 100, OrderSides.Buy, 111, false, typeof(BadRequestException))]
+        [TestCase(1, 100, OrderSides.Sell, 0, true, typeof(UnauthorizedAccessException))]
+        [TestCase(1, 100, OrderSides.Sell, 0, false, null)]
+        [TestCase(1, 100, OrderSides.Buy, 0, false, null)]
+        public async Task OrderCancellationQuantumTest(int asset, int amount, OrderSides side, int apexMod, bool useFakeSigner, Type excpectedException)
+        {
+            var order = new OrderRequest
+            {
+                Account = TestEnvironment.Client1KeyPair,
+                Nonce = 1,
+                Amount = amount,
+                Asset = asset,
+                Price = 100,
+                Side = side,
+                AccountWrapper = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair)
+            };
+
+            var envelope = order.CreateEnvelope();
+            envelope.Sign(useFakeSigner ? TestEnvironment.Client2KeyPair : TestEnvironment.Client1KeyPair);
+
+            if (!Global.IsAlpha)
+            {
+                var quantum = new RequestQuantum { Apex = Global.QuantumStorage.CurrentApex + 1, RequestEnvelope = envelope };
+                envelope = quantum.CreateEnvelope();
+                envelope.Sign(TestEnvironment.AlphaKeyPair);
+            }
+
+            var result = await AssertQuantumHandling(envelope, excpectedException);
+
+            var apex = ((Quantum)result.OriginalMessage.Message).Apex + apexMod;
+
+            var orderCancellation = new OrderCancellationRequest
+            {
+                Account = TestEnvironment.Client1KeyPair,
+                Nonce = 2,
+                OrderId = OrderIdConverter.Encode((ulong)apex, asset, side),
+                AccountWrapper = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair)
+            };
+
+            envelope = orderCancellation.CreateEnvelope();
+            envelope.Sign(TestEnvironment.Client1KeyPair);
+
+            if (!Global.IsAlpha)
+            {
+                var quantum = new RequestQuantum { Apex = Global.QuantumStorage.CurrentApex + 1, RequestEnvelope = envelope };
+                envelope = quantum.CreateEnvelope();
+                envelope.Sign(TestEnvironment.AlphaKeyPair);
+            }
+
+            await AssertQuantumHandling(envelope, excpectedException);
+
+            if (excpectedException == null)
+            {
+                var currentMarket = Global.Exchange.GetMarket(asset);
+                Assert.IsTrue(currentMarket != null);
+
+                var requests = side == OrderSides.Buy ? currentMarket.Bids : currentMarket.Asks;
+                Assert.AreEqual(requests.Count, 1);
+
+                Assert.AreEqual(requests.TotalAmount, amount);
+                Assert.AreEqual(requests.Volume, amount * order.Price);
+            }
+        }
+
+
+
+        [Test]
+        [TestCase(100, false, true, typeof(BadRequestException))]
+        [TestCase(100, false, false, typeof(BadRequestException))]
+        [TestCase(1000000000000, false, false, typeof(BadRequestException))]
+        [TestCase(100, true, false, typeof(BadRequestException))]
+        [TestCase(100, false, true, typeof(BadRequestException))]
+        [TestCase(100, false, false, typeof(UnauthorizedAccessException))]
+        [TestCase(100, false, false, null)]
+        public async Task WithdrawalQuantumTest(double amount, bool hasWithdrawal, bool useFakeSigner, Type excpectedException)
+        {
+            var outputStream = new XdrDataOutputStream();
+            var txBuilder = new TransactionBuilder(new AccountResponse(TestEnvironment.Client1KeyPair.AccountId, 1));
+            txBuilder.SetFee(10_000);
+
+            txBuilder.AddOperation(new PaymentOperation.Builder(TestEnvironment.Client1KeyPair, new AssetTypeNative(), (amount / AssetsHelper.StroopsPerAsset).ToString("0.##########")).SetSourceAccount(TestEnvironment.AlphaKeyPair).Build());
+            txBuilder.AddTimeBounds(new stellar_dotnet_sdk.TimeBounds(maxTime: DateTimeOffset.UtcNow.AddSeconds(60)));
+            var tx = txBuilder.Build();
+            stellar_dotnet_sdk.xdr.Transaction.Encode(outputStream, tx.ToXdrV1());
+
+            var account = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
+            account.HasPendingWithdrawal = hasWithdrawal;
+
+            var withdrawal = new WithdrawalRequest
+            {
+                Account = TestEnvironment.Client1KeyPair,
+                Nonce = 1,
+                TransactionXdr = outputStream.ToArray(),
+                AccountWrapper = account
+            };
+
+            var envelope = withdrawal.CreateEnvelope();
+            envelope.Sign(useFakeSigner ? TestEnvironment.Client2KeyPair : TestEnvironment.Client1KeyPair);
+
+            if (!Global.IsAlpha)
+            {
+                var quantum = new RequestQuantum { Apex = Global.QuantumStorage.CurrentApex + 1, RequestEnvelope = envelope };
+                envelope = quantum.CreateEnvelope();
+                envelope.Sign(TestEnvironment.AlphaKeyPair);
+            }
+
+            var result = await AssertQuantumHandling(envelope, excpectedException);
+
+            if (excpectedException == null)
+            {
+                Assert.IsTrue(account.HasPendingWithdrawal);
+
+                Assert.IsTrue(account.Account.GetBalance(0).Liabilities == amount);
+            }
+        }
+
+
+        [Test]
+        [TestCase(100, true, typeof(InvalidOperationException))]
+        [TestCase(100, false, null)]
+        public async Task WithdrawalCleanupQuantumTest(double amount, bool useFakeHash, Type excpectedException)
+        {
+            var outputStream = new XdrDataOutputStream();
+            var txBuilder = new TransactionBuilder(new AccountResponse(TestEnvironment.Client1KeyPair.AccountId, 1));
+            txBuilder.SetFee(10_000);
+
+            txBuilder.AddOperation(new PaymentOperation.Builder(TestEnvironment.Client1KeyPair, new AssetTypeNative(), (amount / AssetsHelper.StroopsPerAsset).ToString("0.##########")).SetSourceAccount(TestEnvironment.AlphaKeyPair).Build());
+            txBuilder.AddTimeBounds(new stellar_dotnet_sdk.TimeBounds(maxTime: DateTimeOffset.UtcNow.AddSeconds(60)));
+            var tx = txBuilder.Build();
+            stellar_dotnet_sdk.xdr.Transaction.Encode(outputStream, tx.ToXdrV1());
+
+            var account = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
+
+            var withdrawal = new WithdrawalRequest
+            {
+                Account = TestEnvironment.Client1KeyPair,
+                Nonce = 1,
+                TransactionXdr = outputStream.ToArray(),
+                AccountWrapper = account
+            };
+
+            var envelope = withdrawal.CreateEnvelope();
+            envelope.Sign(TestEnvironment.Client1KeyPair);
+
+            if (!Global.IsAlpha)
+            {
+                var quantum = new RequestQuantum { Apex = Global.QuantumStorage.CurrentApex + 1, RequestEnvelope = envelope };
+                envelope = quantum.CreateEnvelope();
+                envelope.Sign(TestEnvironment.AlphaKeyPair);
+            }
+
+            var result = await AssertQuantumHandling(envelope, null);
+
+            if (result.Status != ResultStatusCodes.Success)
+                throw new Exception("Withdrawal creation failed.");
+
+            var cleanup = new WithrawalsCleanupQuantum
+            {
+                ExpiredWithdrawal = useFakeHash ? new byte[] { } : tx.Hash(),
+                Apex = Global.QuantumStorage.CurrentApex + 1
+            };
+
+            envelope = cleanup.CreateEnvelope();
+
+
+            if (!Global.IsAlpha)
+                envelope.Sign(TestEnvironment.AlphaKeyPair);
+
+            await AssertQuantumHandling(envelope, excpectedException);
+
+            if (excpectedException == null)
+            {
+                Assert.IsTrue(!account.HasPendingWithdrawal);
+
+                Assert.AreEqual(account.Account.GetBalance(0).Liabilities, 0);
+            }
+        }
+
+        [Test]
+        [TestCase(100, false, typeof(BadRequestException))]
+        [TestCase(100, false, typeof(BadRequestException))]
+        [TestCase(1000000000000, false, typeof(BadRequestException))]
+        [TestCase(100, true, typeof(BadRequestException))]
+        [TestCase(100, false, null)]
+        public async Task PaymentQuantumTest(long amount, bool useFakeSigner, Type excpectedException)
+        {
+            var account = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
+
+            var withdrawal = new PaymentRequest
+            {
+                Account = TestEnvironment.Client1KeyPair,
+                Nonce = 1,
+                Asset = 0,
+                Destination = TestEnvironment.Client2KeyPair,
+                Amount = amount,
+                AccountWrapper = account
+            };
+
+            var envelope = withdrawal.CreateEnvelope();
+            envelope.Sign(useFakeSigner ? TestEnvironment.Client2KeyPair : TestEnvironment.Client1KeyPair);
+
+            if (!Global.IsAlpha)
+            {
+                var quantum = new RequestQuantum { Apex = Global.QuantumStorage.CurrentApex + 1, RequestEnvelope = envelope };
+                envelope = quantum.CreateEnvelope();
+                envelope.Sign(TestEnvironment.AlphaKeyPair);
+            }
+
+            var expextedBalance = account.Account.GetBalance(0).Amount - amount;
+
+            await AssertQuantumHandling(envelope, excpectedException);
+
+            if (excpectedException == null)
+            {
+                Assert.AreEqual(account.Account.GetBalance(0).Amount, expextedBalance);
+            }
+        }
+
+        [Test]
         [TestCase(0, typeof(UnauthorizedException))]
         [TestCase(1, null)]
         public async Task AccountDataRequestTest(int nonce, Type excpectedException)
@@ -175,7 +394,7 @@ namespace Centaurus.Test
             var order = new AccountDataRequest
             {
                 Account = TestEnvironment.Client1KeyPair,
-                Nonce = (ulong)nonce,
+                Nonce = nonce,
                 AccountWrapper = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair)
             };
 
@@ -191,7 +410,7 @@ namespace Centaurus.Test
 
             var res = await AssertQuantumHandling(envelope, excpectedException);
             if (excpectedException == null)
-                Assert.IsInstanceOf<AccountDataResponse>(res);
+                Assert.IsInstanceOf<Models.AccountDataResponse>(res);
         }
 
         [Test]
@@ -211,7 +430,7 @@ namespace Centaurus.Test
                 var envelope = new AccountDataRequest
                 {
                     Account = clientKeyPair,
-                    Nonce = (ulong)(i + 1),
+                    Nonce = i + 1,
                     AccountWrapper = Global.AccountStorage.GetAccount(clientKeyPair)
                 }.CreateEnvelope();
                 envelope.Sign(clientKeyPair);
@@ -228,6 +447,8 @@ namespace Centaurus.Test
                     await AssertQuantumHandling(envelope, null);
             }
         }
+
+
 
         protected async Task<ResultMessage> AssertQuantumHandling(MessageEnvelope quantum, Type excpectedException = null)
         {

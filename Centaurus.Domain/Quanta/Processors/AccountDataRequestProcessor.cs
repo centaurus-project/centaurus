@@ -7,31 +7,31 @@ using Centaurus.Models;
 
 namespace Centaurus.Domain
 {
-    public class AccountDataRequestProcessor : ClientRequestProcessorBase
+    public class AccountDataRequestProcessor : QuantumRequestProcessor
     {
         public override MessageTypes SupportedMessageType => MessageTypes.AccountDataRequest;
 
-        public override Task<ResultMessage> Process(MessageEnvelope envelope, EffectProcessorsContainer effectsContainer)
+        public override Task<ResultMessage> Process(ProcessorContext context)
         {
-            var quantum = (RequestQuantum)envelope.Message;
+            var quantum = (RequestQuantum)context.Envelope.Message;
             var requestMessage = quantum.RequestMessage;
 
-            UpdateNonce(effectsContainer);
+            context.UpdateNonce();
 
-            var accountEffects = effectsContainer.GetEffects(requestMessage.Account).ToList();
+            var accountEffects = context.EffectProcessors.GetEffects(requestMessage.Account).ToList();
 
             var account = requestMessage.AccountWrapper.Account;
 
-            var resultMessage = envelope.CreateResult<AccountDataResponse>(ResultStatusCodes.Success, accountEffects);
+            var resultMessage = context.Envelope.CreateResult<AccountDataResponse>(ResultStatusCodes.Success, accountEffects);
             resultMessage.Balances = account.Balances;
             resultMessage.Orders = Global.Exchange.OrderMap.GetAllAccountOrders(account).ToList();
 
             return Task.FromResult((ResultMessage)resultMessage);
         }
 
-        public override Task Validate(MessageEnvelope envelope)
+        public override Task Validate(ProcessorContext context)
         {
-            ValidateNonce(envelope);
+            context.ValidateNonce();
             return Task.CompletedTask;
         }
     }

@@ -1,4 +1,5 @@
 ﻿using Centaurus.Models;
+using stellar_dotnet_sdk.xdr;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -32,57 +33,17 @@ namespace Centaurus.Domain
                 return;
             }
 
-            if (confirmation.Message is ITransactionContainer)
-                await SubmitTransaction(confirmation);
-
             ProccessResult(confirmation);
-        }
-
-        private async Task SubmitTransaction(MessageEnvelope confirmation)
-        {
-            try
-            {
-                //we have consensus
-                var tx = ((ITransactionContainer)confirmation.Message).GetTransaction();
-
-                int majority = MajorityHelper.GetMajorityCount();
-
-                var resultMessage = (ResultMessage)confirmation.Message;
-
-                var transactionEffects = resultMessage.Effects
-                    .Where(e => e is TransactionSignedEffect)
-                    .Cast<TransactionSignedEffect>()
-                    .ToArray();
-
-                for (var i = 0; i < transactionEffects.Length && tx.Signatures.Count <= majority; i++)
-                {
-                    var effect = transactionEffects[i];
-                    var signature = effect.Signature.ToDecoratedSignature();
-                    //TODO: verify the signature here and check that it is unique
-                    tx.Signatures.Add(signature);
-                }
-
-                if (tx.Signatures.Count <= majority)
-                    throw new InvalidOperationException("Not enough signatures to match the threshold.");
-                var result = await Global.StellarNetwork.Server.SubmitTransaction(tx);
-                //TODO: cleanup this mess
-                if (!result.IsSuccess())
-                    throw new Exception("Failed to submit transaction. Result is: " + result.ResultXdr);
-            }
-            catch (Exception e)
-            {
-                logger.Error(e);
-                Global.AppState.State = ApplicationState.Failed;
-            }
         }
 
         private void ProccessResult(MessageEnvelope confirmation)
         {
+            var originalEnvelope = ((ResultMessage)confirmation.Message).OriginalMessage;
             NonceRequestMessage requestMessage = null;
-            if (confirmation.Message is NonceRequestMessage)
-                requestMessage = (NonceRequestMessage)confirmation.Message;
-            else if (confirmation.Message is RequestQuantum)
-                requestMessage = ((RequestQuantum)confirmation.Message).RequestEnvelope.Message as NonceRequestMessage;
+            if (originalEnvelope.Message is NonceRequestMessage)
+                requestMessage = (NonceRequestMessage)originalEnvelope.Message;
+            else if (originalEnvelope.Message is RequestQuantum)
+                requestMessage = ((RequestQuantum)originalEnvelope.Message).RequestEnvelope.Message as NonceRequestMessage;
 
             if (requestMessage != null)
                 Notifier.Notify(requestMessage.Account, confirmation);

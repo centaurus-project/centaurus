@@ -169,5 +169,10 @@ namespace Centaurus.Domain
             }
             return false;
         }
+
+        public Order GetOrder(ulong orderId)
+        {
+            return orderMap.GetOrder(orderId);
+        }
     }
 }

@@ -7,11 +7,19 @@ namespace Centaurus.Models
 {
     public abstract class RequestMessage : Message
     {
+        public override long MessageId => RequestId;
+
         /// <summary>
-        /// An account that initiated a quantum request.
+        /// An account that initiated a request.
         /// </summary>
         [XdrField(0)]
         public RawPubKey Account { get; set; }
+
+        /// <summary>
+        /// Client request id.
+        /// </summary>
+        [XdrField(1)]
+        public long RequestId { get; set; }
 
         /// <summary>
         /// For request processing purposes. Do not serialize it.

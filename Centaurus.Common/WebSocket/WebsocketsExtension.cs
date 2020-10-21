@@ -12,6 +12,8 @@ namespace Centaurus
         const int chunkSize = 512;
         const int maxMessageSize = 10240;
 
+        //TODO: add cancellation token
+
         public static async Task<XdrReader> GetInputStreamReader(this WebSocket webSocket)
         {
             var buffer = new byte[chunkSize];

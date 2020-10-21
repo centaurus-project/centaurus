@@ -1,10 +1,8 @@
-﻿using Centaurus.Domain;
-using Centaurus.Models;
+﻿using Centaurus.Models;
 using NLog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -86,15 +84,25 @@ namespace Centaurus.Domain
         }
 
         private static async Task ApplyQuanta(List<MessageEnvelope> quanta)
-        { 
+        {
             var quantaCount = quanta.Count;
             for (var i = 0; i < quantaCount; i++)
             {
                 var currentQuantumEnvelope = quanta[i];
                 var currentQuantum = ((Quantum)currentQuantumEnvelope.Message);
-                var quantumApex = currentQuantum.Apex;
-                await Global.QuantumHandler.HandleAsync(currentQuantumEnvelope);
-                if (quantumApex != currentQuantum.Apex)
+
+                //try to unwrap for Alpha
+                if (currentQuantum is RequestQuantum)
+                {
+                    currentQuantumEnvelope = ((RequestQuantum)currentQuantum).RequestEnvelope;
+                    var requestMessage = (RequestMessage)currentQuantumEnvelope.Message;
+                    requestMessage.AccountWrapper = Global.AccountStorage.GetAccount(requestMessage.Account);
+                }
+
+                var resultMessage = await Global.QuantumHandler.HandleAsync(currentQuantumEnvelope, currentQuantum.Timestamp);
+                var processedQuantum = (Quantum)resultMessage.OriginalMessage.Message;
+                //TODO: check if we need some extra checks here
+                if (!ByteArrayPrimitives.Equals(currentQuantum.ComputeHash(), processedQuantum.ComputeHash()))
                     throw new Exception("Apexes are not equal for a quantum on restore.");
             }
         }

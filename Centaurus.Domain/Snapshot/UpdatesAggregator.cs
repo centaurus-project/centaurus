@@ -25,16 +25,14 @@ namespace Centaurus.Domain
 
             SettingsModel constellationSettings = null;
 
-            DiffObject.ConstellationState stellarData = new DiffObject.ConstellationState();
+            DiffObject.ConstellationState stellarData = null;
 
-            var accounts = new Dictionary<byte[], DiffObject.Account>(new ByteArrayComparer());
-            var balances = new Dictionary<byte[], Dictionary<int, DiffObject.Balance>>(new ByteArrayComparer());
+            var accounts = new Dictionary<byte[], DiffObject.Account>(ByteArrayComparer.Default);
+            var balances = new Dictionary<byte[], Dictionary<int, DiffObject.Balance>>(ByteArrayComparer.Default);
 
             var orders = new Dictionary<ulong, DiffObject.Order>();
-            var withdrawals = new List<DiffObject.Withdrawal>();
 
             var assets = new List<AssetModel>();
-
 
             var updateLength = update.Count;
             var quanta = new List<QuantumModel>();
@@ -46,8 +44,6 @@ namespace Centaurus.Domain
 
                 quanta.Add(QuantumModelExtensions.FromQuantum(currentUpdateItem.Quantum));
                 var quantumMessage = (Quantum)currentUpdateItem.Quantum.Message;
-                //update current apex
-                stellarData.CurrentApex = quantumMessage.Apex;
 
                 var quatumEffects = currentUpdateItem.Effects;
                 var quatumEffectsLength = quatumEffects.Length;
@@ -61,7 +57,7 @@ namespace Centaurus.Domain
                     {
                         case ConstellationInitEffect constellationInit:
                             constellationSettings = GetConstellationSettings(constellationInit);
-                            stellarData = GetStellarData(constellationInit.Ledger, constellationInit.VaultSequence);
+                            stellarData = GetStellarData(0);
                             stellarData.IsInserted = true;
                             assets = GetAssets(constellationInit, null);
                             break;
@@ -98,20 +94,12 @@ namespace Centaurus.Domain
                                 balances[pubKey][asset].Amount += balanceUpdateEffect.Amount;
                             }
                             break;
-                        case LockLiabilitiesEffect lockLiabilitiesEffect:
+                        case UpdateLiabilitiesEffect lockLiabilitiesEffect:
                             {
                                 var pubKey = lockLiabilitiesEffect.Pubkey.Data;
                                 var asset = lockLiabilitiesEffect.Asset;
                                 EnsureBalanceExists(balances, pubKey, asset);
                                 balances[pubKey][asset].Liabilities += lockLiabilitiesEffect.Amount;
-                            }
-                            break;
-                        case UnlockLiabilitiesEffect unlockLiabilitiesEffect:
-                            {
-                                var pubKey = unlockLiabilitiesEffect.Pubkey.Data;
-                                var asset = unlockLiabilitiesEffect.Asset;
-                                EnsureBalanceExists(balances, pubKey, asset);
-                                balances[pubKey][asset].Liabilities -= unlockLiabilitiesEffect.Amount;
                             }
                             break;
                         case RequestRateLimitUpdateEffect requestRateLimitUpdateEffect:
@@ -128,21 +116,24 @@ namespace Centaurus.Domain
                         case OrderPlacedEffect orderPlacedEffect:
                             {
                                 var orderId = orderPlacedEffect.OrderId;
-                                orders.Add(orderId, new DiffObject.Order
+                                orders[orderId] = new DiffObject.Order
                                 {
                                     Amount = orderPlacedEffect.Amount,
                                     IsInserted = true,
                                     OrderId = orderId,
                                     Price = orderPlacedEffect.Price,
                                     Pubkey = orderPlacedEffect.Pubkey.Data
-                                });
+                                };
                             }
                             break;
                         case OrderRemovedEffect orderRemovedEffect:
                             {
                                 var orderId = orderRemovedEffect.OrderId;
                                 if (!orders.ContainsKey(orderId))
-                                    orders.Add(orderId, new DiffObject.Order { OrderId = orderId });
+                                    orders.Add(orderId, new DiffObject.Order
+                                    {
+                                        OrderId = orderId
+                                    });
                                 orders[orderId].IsDeleted = true;
                             }
                             break;
@@ -154,31 +145,20 @@ namespace Centaurus.Domain
                                 orders[orderId].Amount += tradeEffect.AssetAmount;
                             }
                             break;
-                        case LedgerUpdateEffect ledgerUpdateEffect:
-                            stellarData.Ledger = ledgerUpdateEffect.Ledger;
-                            break;
-                        case VaultSequenceUpdateEffect vaultSequenceUpdateEffect:
-                            stellarData.VaultSequence = vaultSequenceUpdateEffect.Sequence;
-                            break;
-                        case WithdrawalCreateEffect withdrawalEffect:
-                            withdrawals.Add(new DiffObject.Withdrawal
-                            {
-                                Apex = withdrawalEffect.Apex,
-                                TransactionHash = withdrawalEffect.Withdrawal.TransactionHash,
-                                RawWithdrawal = XdrConverter.Serialize(withdrawalEffect.Withdrawal),
-                                IsInserted = true
-                            });
-                            break;
-                        case WithdrawalRemoveEffect withdrawalEffect:
-                            withdrawals.Add(new DiffObject.Withdrawal
-                            {
-                                Apex = withdrawalEffect.Apex,
-                                IsDeleted = true
-                            });
+                        case TxCursorUpdateEffect cursorUpdateEffect:
+                            stellarData = GetStellarData(cursorUpdateEffect.Cursor);
                             break;
                         default:
                             break;
                     }
+                }
+                //TODO: find more elegant way to handle this scenario
+                //we mustn't save orders that were closed immediately without adding to order-book
+                if (quantumMessage is RequestQuantum request
+                    && request.RequestMessage is OrderRequest orderRequest
+                    && !quatumEffects.Any(e => e.EffectType == EffectTypes.OrderPlaced))
+                {
+                    orders.Remove(OrderIdConverter.FromRequest(orderRequest, quantumMessage.Apex));
                 }
             }
 
@@ -191,8 +171,7 @@ namespace Centaurus.Domain
                 Assets = assets,
                 Orders = orders.Values.ToList(),
                 Settings = constellationSettings,
-                StellarInfoData = stellarData,
-                Widthrawals = withdrawals
+                StellarInfoData = stellarData
             };
         }
 
@@ -261,20 +240,10 @@ namespace Centaurus.Domain
                 Pubkey = o.Account.Pubkey.Data
             }).ToList();
 
-            diffObject.Widthrawals = snapshot.Withdrawals.Select(w => new DiffObject.Withdrawal
-            {
-                IsInserted = true,
-                Apex = apex,
-                RawWithdrawal = XdrConverter.Serialize(w),
-                TransactionHash = w.TransactionHash
-            }).ToList();
-
             diffObject.StellarInfoData = new DiffObject.ConstellationState
             {
                 IsInserted = true,
-                CurrentApex = apex,
-                Ledger = snapshot.Ledger,
-                VaultSequence = snapshot.VaultSequence
+                TxCursor = snapshot.TxCursor
             };
 
             diffObject.Quanta = new List<QuantumModel>();
@@ -304,9 +273,9 @@ namespace Centaurus.Domain
                 balances[pubKey].Add(asset, new DiffObject.Balance { AssetId = asset, PubKey = pubKey });
         }
 
-        private static DiffObject.ConstellationState GetStellarData(long ledger, long vaultSequence)
+        private static DiffObject.ConstellationState GetStellarData(long cursor)
         {
-            return new DiffObject.ConstellationState { Ledger = ledger, VaultSequence = vaultSequence };
+            return new DiffObject.ConstellationState { TxCursor = cursor };
         }
 
         private static SettingsModel GetConstellationSettings(ConstellationEffect constellationInit)

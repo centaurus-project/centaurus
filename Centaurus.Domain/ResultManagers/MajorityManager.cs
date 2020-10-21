@@ -11,9 +11,62 @@ using System.Threading.Tasks;
 namespace Centaurus.Domain
 {
     //TODO: add validation timeout
-    //TODO: pending aggregates cleanup
-    public abstract class MajorityManager
+    public abstract class MajorityManager: IDisposable
     {
+        public MajorityManager()
+        {
+            InitCleanupTimer();
+        }
+
+        public void Dispose()
+        {
+            if (cleanupTimer != null)
+            {
+                cleanupTimer.Stop();
+                cleanupTimer.Dispose();
+                cleanupTimer = null;
+            }
+        }
+
+        private void InitCleanupTimer()
+        {
+            cleanupTimer = new System.Timers.Timer();
+            cleanupTimer.Interval = 60 * 1000;
+            cleanupTimer.AutoReset = false;
+            cleanupTimer.Elapsed += CleanupTimer_Elapsed;
+            cleanupTimer.Start();
+        }
+
+        private TimeSpan aggregateLifeTime = new TimeSpan(0, 10, 0);
+
+        private void CleanupTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
+        {
+            lock (syncRoot)
+            {
+                var itemsToRemove = new List<string>();
+                foreach (var kv in pendingAggregates)
+                {
+                    if (DateTime.UtcNow - kv.Value.CreatedAt > aggregateLifeTime)
+                    {
+                        if (!kv.Value.AlreadyHasResult) //something went wrong
+                        {
+                            logger.Error("Aggregation has expired, but no consensus yet.");
+                            Global.AppState.State = ApplicationState.Failed;
+                            return;
+                        }
+                        itemsToRemove.Add(kv.Key);
+                    }
+                    //all next items will have greater CreateAt time, no need to continue
+                    break;
+                }
+                foreach (var itemKey in itemsToRemove)
+                    pendingAggregates.Remove(itemKey);
+            }
+            cleanupTimer.Start();
+        }
+
+        private System.Timers.Timer cleanupTimer;
+
         protected static Logger logger = LogManager.GetCurrentClassLogger();
 
         protected static string GetId(MessageEnvelope envelope)
@@ -21,9 +74,9 @@ namespace Centaurus.Domain
             return $"{(int)envelope.Message.MessageType}_{envelope.Message.MessageId}";
         }
 
-        Dictionary<string, ConsensusAggregate> pendingAggregates = new Dictionary<string, ConsensusAggregate>();
+        private Dictionary<string, ConsensusAggregate> pendingAggregates = new Dictionary<string, ConsensusAggregate>();
 
-        object syncRoot = new { };
+        private object syncRoot = new { };
 
         private ConsensusAggregate GetConsensusAggregate(string id)
         {
@@ -74,15 +127,17 @@ namespace Centaurus.Domain
             public ConsensusAggregate(MajorityManager majorityManager)
             {
                 this.majorityManager = majorityManager;
+                this.CreatedAt = DateTime.UtcNow;
             }
+
+            public readonly DateTime CreatedAt;
+            public bool AlreadyHasResult { get; private set; }
 
             private object syncRoot = new { };
 
             private MajorityManager majorityManager;
 
-            private bool alreadyHasResult = false;
-
-            private Dictionary<byte[], MessageEnvelope> storage = new Dictionary<byte[], MessageEnvelope>(new ByteArrayComparer());
+            private Dictionary<byte[], MessageEnvelope> storage = new Dictionary<byte[], MessageEnvelope>(ByteArrayComparer.Default);
 
             public async Task Add(MessageEnvelope envelope)
             {
@@ -90,16 +145,19 @@ namespace Centaurus.Domain
                 MajorityResults majorityResult = MajorityResults.Unknown;
                 lock (syncRoot)
                 {
-                    if (alreadyHasResult)
+                    if (AlreadyHasResult)
                         return;
                     var envelopeHash = envelope.ComputeMessageHash();
                     if (!storage.ContainsKey(envelopeHash))//first result with such hash
                         storage[envelopeHash] = envelope;
                     else
-                        storage[envelopeHash].AggregateEnvelopUnsafe(envelope);//we can use AggregateEnvelopUnsafe, we compute hash for every envelope above
+                    {
+                        var resultStorageEnvelope = storage[envelopeHash];
+                        resultStorageEnvelope.AggregateEnvelopUnsafe(envelope);//we can use AggregateEnvelopUnsafe, we compute hash for every envelope above
+                    }
                     majorityResult = CheckMajority(out consensus);
                     if (majorityResult != MajorityResults.Unknown)
-                        alreadyHasResult = true;
+                        AlreadyHasResult = true;
                 }
                 if (majorityResult != MajorityResults.Unknown)
                     await majorityManager.OnResult(majorityResult, consensus);

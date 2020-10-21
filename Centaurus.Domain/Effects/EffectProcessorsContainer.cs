@@ -99,10 +99,9 @@ namespace Centaurus.Domain
             var effect = new WithdrawalCreateEffect
             {
                 Apex = Apex,
-                Pubkey = withdrawal.Source,
-                Withdrawal = withdrawal
+                Pubkey = withdrawal.Source.Account.Pubkey
             };
-            Add(new WithdrawalCreateEffectProcessor(effect, withdrawalStorage));
+            Add(new WithdrawalCreateEffectProcessor(effect, withdrawal, withdrawalStorage));
         }
 
         public void AddWithdrawalRemove(Withdrawal withdrawal, WithdrawalStorage withdrawalStorage)
@@ -110,10 +109,9 @@ namespace Centaurus.Domain
             var effect = new WithdrawalRemoveEffect
             {
                 Apex = Apex,
-                Withdrawal = withdrawal,
-                Pubkey = withdrawal.Source
+                Pubkey = withdrawal.Source.Account.Pubkey
             };
-            Add(new WithdrawalRemoveEffectProcessor(effect, withdrawalStorage));
+            Add(new WithdrawalRemoveEffectProcessor(effect, withdrawal, withdrawalStorage));
         }
 
         public void AddAccountCreate(AccountStorage accountStorage, RawPubKey publicKey)
@@ -140,18 +138,10 @@ namespace Centaurus.Domain
             ));
         }
 
-        public void AddUnlockLiabilities(Account account, int asset, long amount)
+        public void AddUpdateLiabilities(Account account, int asset, long amount)
         {
-            Add(new UnlockLiabilitiesEffectProcessor(
-                new UnlockLiabilitiesEffect { Amount = amount, Asset = asset, Pubkey = account.Pubkey, Apex = Apex },
-                account
-            ));
-        }
-
-        public void AddLockLiabilities(Account account, int asset, long amount)
-        {
-            Add(new LockLiabilitiesEffectProcessor(
-                new LockLiabilitiesEffect { Amount = amount, Asset = asset, Pubkey = account.Pubkey, Apex = Apex },
+            Add(new UpdateLiabilitiesEffectProcessor(
+                new UpdateLiabilitiesEffect { Amount = amount, Asset = asset, Pubkey = account.Pubkey, Apex = Apex },
                 account
             ));
         }
@@ -202,7 +192,7 @@ namespace Centaurus.Domain
 
 
 
-        public void AddNonceUpdate(Account account, ulong newNonce, ulong currentNonce)
+        public void AddNonceUpdate(Account account, long newNonce, long currentNonce)
         {
             Add(new NonceUpdateEffectProcessor(
                 new NonceUpdateEffect { Nonce = newNonce, PrevNonce = currentNonce, Pubkey = account.Pubkey, Apex = Apex },
@@ -210,11 +200,11 @@ namespace Centaurus.Domain
             ));
         }
 
-        public void AddLedgerUpdate(LedgerManager ledgerManager, long newLedger, long prevLedger)
+        public void AddCursorUpdate(TxManager txManager, long newCursor, long prevCursor)
         {
-            Add(new LedgerUpdateEffectProcessor(
-                new LedgerUpdateEffect {  Apex = Apex, Ledger = newLedger, PrevLedger = prevLedger },
-                ledgerManager
+            Add(new TxCursorUpdateEffectProcessor(
+                new TxCursorUpdateEffect {  Apex = Apex, Cursor = newCursor, PrevCursor = prevCursor },
+                txManager
             ));
         }
     }

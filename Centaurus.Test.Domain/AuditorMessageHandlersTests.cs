@@ -67,20 +67,19 @@ namespace Centaurus.Test
 
         [Test]
         [TestCaseSource(nameof(LedgerQuantumTestCases))]
-        public async Task LedgerQuantumTest(KeyPair alphaKeyPair, ConnectionState state, Type excpectedException)
+        public async Task TxCommitQuantumTest(KeyPair alphaKeyPair, ConnectionState state, Type excpectedException)
         {
             Global.AppState.State = ApplicationState.Ready;
 
             var clientConnection = new AuditorWebSocketConnection(new FakeWebSocket(), null) { ConnectionState = state };
 
-            var ledgerNotification = new LedgerUpdateNotification
+            var ledgerNotification = new TxNotification
             {
-                LedgerFrom = 0,
-                LedgerTo = 63,
+                TxCursor = 0,
                 Payments = new List<PaymentBase>()
             };
 
-            var envelope = new LedgerCommitQuantum
+            var envelope = new TxCommitQuantum
             {
                 Source = ledgerNotification.CreateEnvelope()
             }.CreateEnvelope();

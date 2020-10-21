@@ -1,13 +1,16 @@
 ﻿using stellar_dotnet_sdk;
+using stellar_dotnet_sdk.requests;
+using stellar_dotnet_sdk.responses;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace Centaurus
 {
     public class TransactionBuilderOptions
     {
-        public TransactionBuilderOptions(AccountData source, uint fee, string memo = null)
+        public TransactionBuilderOptions(Account source, uint fee, string memo = null)
         {
             if (fee <= 0)
                 throw new ArgumentNullException(nameof(fee));
@@ -17,7 +20,7 @@ namespace Centaurus
             Memo = memo;
         }
 
-        public AccountData Source { get; set; }
+        public Account Source { get; set; }
 
         public uint Fee { get; set; }
         
@@ -26,9 +29,9 @@ namespace Centaurus
 
     public static class TransactionHelper
     {
-        public static Transaction BuildPaymentTransaction(TransactionBuilderOptions options, KeyPair destination, Asset asset, string amount)
+        public static Transaction BuildPaymentTransaction(TransactionBuilderOptions options, KeyPair destination, Asset asset, long amount)
         {
-            var paymentOperation = new PaymentOperation.Builder(destination, asset, amount).Build();
+            var paymentOperation = new PaymentOperation.Builder(destination, asset, Amount.FromXdr(amount)).Build();
 
             return BuildTransaction(options, paymentOperation);
         }
@@ -42,7 +45,7 @@ namespace Centaurus
 
         public static Transaction BuildTransaction(TransactionBuilderOptions options, params Operation[] operations)
         {
-            var builder = new Transaction.Builder(options.Source);
+            var builder = new TransactionBuilder(options.Source);
             builder.SetFee(options.Fee);
             if (!string.IsNullOrWhiteSpace(options.Memo))
                 builder.AddMemo(Memo.Text(options.Memo));
@@ -55,6 +58,39 @@ namespace Centaurus
             var transaction = builder.Build();
 
             return transaction;
+        }
+
+        /// <summary>
+        /// Returns tx by hash or null if not found
+        /// </summary>
+        /// <param name="transactionHash"></param>
+        /// <returns></returns>
+        public static async Task<TransactionResponse> GetTransaction(this Server server, byte[] transactionHash)
+        {
+            if (server == null)
+                throw new ArgumentNullException(nameof(server));
+            if (transactionHash == null || transactionHash.Length == 0)
+                throw new ArgumentNullException(nameof(transactionHash));
+            try
+            {
+                var transactionResponse = await server.Transactions.IncludeFailed(true).Transaction(transactionHash.ToHex().ToLower());
+                return transactionResponse;
+            }
+            catch (HttpResponseException exc)
+            {
+                if (exc.StatusCode != 404)
+                    throw;
+                return null;
+            }
+        }
+
+        public static TransactionsRequestBuilder GetTransactionsRequestBuilder(this Server server, string pubKey, long cursor, int limit = 200, bool includeFailed = true)
+        {
+            return server.Transactions
+                .ForAccount(pubKey)
+                .IncludeFailed(includeFailed)
+                .Limit(limit)
+                .Cursor(cursor.ToString());
         }
     }
 }

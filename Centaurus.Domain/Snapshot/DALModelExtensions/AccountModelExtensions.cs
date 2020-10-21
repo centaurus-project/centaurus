@@ -13,7 +13,7 @@ namespace Centaurus.Domain
         {
             var acc = new Account
             {
-                Nonce = unchecked((ulong)accountModel.Nonce),
+                Nonce = accountModel.Nonce,
                 Pubkey = new RawPubKey { Data = accountModel.PubKey }
             };
 

@@ -7,13 +7,13 @@ using Centaurus.Models;
 
 namespace Centaurus.Domain
 {
-    public class InitQuantumProcessor : IQuantumRequestProcessor
+    public class InitQuantumProcessor : QuantumRequestProcessor
     {
-        public MessageTypes SupportedMessageType => MessageTypes.ConstellationInitQuantum;
+        public override MessageTypes SupportedMessageType => MessageTypes.ConstellationInitQuantum;
 
-        public async Task<ResultMessage> Process(MessageEnvelope envelope, EffectProcessorsContainer effectProcessorsContainer)
+        public override async Task<ResultMessage> Process(ProcessorContext context)
         {
-            var initEffects = await SnapshotManager.ApplyInitUpdates(envelope);
+            var initEffects = await SnapshotManager.ApplyInitUpdates(context.Envelope);
 
             var snapshot = await SnapshotManager.GetSnapshot();
 
@@ -27,18 +27,18 @@ namespace Centaurus.Domain
                 OutgoingMessageStorage.EnqueueMessage(new SetApexCursor { Apex = 1 });
             }
 
-            return envelope.CreateResult(ResultStatusCodes.Success, new List<Effect>(initEffects));
+            return context.Envelope.CreateResult(ResultStatusCodes.Success, new List<Effect>(initEffects));
         }
 
-        public Task Validate(MessageEnvelope envelope)
+        public override Task Validate(ProcessorContext context)
         {
             if (Global.AppState.State != ApplicationState.WaitingForInit)
                 throw new InvalidOperationException("Init quantum can be handled only when application is in WaitingForInit state.");
 
-            if (!Global.IsAlpha && !envelope.IsSignedBy(((AuditorSettings)Global.Settings).AlphaKeyPair.PublicKey))
+            if (!Global.IsAlpha && !context.Envelope.IsSignedBy(((AuditorSettings)Global.Settings).AlphaKeyPair.PublicKey))
                 throw new InvalidOperationException("The quantum isn't signed by Alpha.");
 
-            if (!envelope.AreSignaturesValid())
+            if (!context.Envelope.AreSignaturesValid())
                 throw new InvalidOperationException("The quantum's signatures are invalid.");
 
             return Task.CompletedTask;

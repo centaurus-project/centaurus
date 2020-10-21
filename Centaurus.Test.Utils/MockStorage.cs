@@ -18,7 +18,6 @@ namespace Centaurus.Test
         private List<AccountModel> accountsCollection = new List<AccountModel>();
         private List<BalanceModel> balancesCollection = new List<BalanceModel>();
         private List<QuantumModel> quantaCollection = new List<QuantumModel>();
-        private List<WithdrawalModel> withdrawalsCollection = new List<WithdrawalModel>();
         private List<EffectModel> effectsCollection = new List<EffectModel>();
         private List<SettingsModel> settingsCollection = new List<SettingsModel>();
         private List<AssetModel> assetSettings = new List<AssetModel>();
@@ -113,9 +112,26 @@ namespace Centaurus.Test
             return Task.FromResult(assets);
         }
 
-        public override Task<List<WithdrawalModel>> LoadWithdrawals()
+        public override Task<List<QuantumModel>> LoadWithdrawals()
         {
-            return Task.FromResult(withdrawalsCollection);
+            var allAccounts = effectsCollection.Select(e => e.Account).Distinct().ToList();
+
+            var withdrawals = new List<QuantumModel>();
+            var effectTypes = new int[] { (int)EffectTypes.WithdrawalCreate, (int)EffectTypes.WithdrawalRemove };
+            foreach (var acc in allAccounts)
+            {
+                var lastEffect = effectsCollection
+                    .OrderByDescending(e => e.Id)
+                    .FirstOrDefault(e => ByteArrayPrimitives.Equals(e.Account, acc));
+                if (lastEffect?.EffectType == (int)EffectTypes.WithdrawalCreate)
+                {
+                    var quantum = quantaCollection.FirstOrDefault(q => q.Apex == lastEffect.Apex);
+                    if (quantum == null)
+                        throw new Exception($"Unable to find quantum with apex {lastEffect.Apex}");
+                    withdrawals.Add(quantum);
+                }
+            }
+            return Task.FromResult(withdrawals);
         }
 
         public override Task<List<OrderModel>> LoadOrders()
@@ -139,8 +155,6 @@ namespace Centaurus.Test
             GetBalanceUpdates(update.Balances);
 
             UpdateOrders(update.Orders);
-
-            UpdateWithdrawals(update.Widthrawals);
 
             UpdateQuanta(update.Quanta);
 
@@ -179,27 +193,8 @@ namespace Centaurus.Test
             {
                 if (constellationState == null)
                     constellationState = new ConstellationState();
-                if (_stellarData.Ledger > 0)
-                    constellationState.Ledger = _stellarData.Ledger;
-                if (_stellarData.VaultSequence > 0)
-                    constellationState.VaultSequence = _stellarData.VaultSequence;
-            }
-        }
-
-        private void UpdateWithdrawals(List<DiffObject.Withdrawal> withdrawals)
-        {
-            for (int i = 0; i < withdrawals.Count; i++)
-            {
-                var withdrawal = withdrawals[i];
-                var apex = (long)withdrawal.Apex;
-                var trHash = withdrawal.TransactionHash;
-                var currentWidthrawal = withdrawalsCollection.FirstOrDefault(w => w.Apex == apex);
-                if (withdrawal.IsInserted)
-                    withdrawalsCollection.Add(new WithdrawalModel { Apex = apex, TransactionHash = trHash });
-                else if (withdrawal.IsDeleted)
-                    withdrawalsCollection.Remove(currentWidthrawal);
-                else
-                    throw new InvalidOperationException("Withdrawal object cannot be updated");
+                if (_stellarData.TxCursor > 0)
+                    constellationState.TxCursor = _stellarData.TxCursor;
             }
         }
 

@@ -5,11 +5,10 @@ using System.Text;
 namespace Centaurus.DAL.Models
 {
     /// <summary>
-    /// Contains last processed ledger sequence, vault account sequence and current apex
+    /// Contains last processed payment token
     /// </summary>
     public class ConstellationState
     {
-        public long VaultSequence { get; set; }
-        public long Ledger { get; set; }
+        public long TxCursor { get; set; }
     }
 }

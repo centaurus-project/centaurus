@@ -84,7 +84,16 @@ namespace Centaurus
                     desc = desc ?? status.ToString();
                     logger.Info($"Connection with {connectionPubKey} is closed. Status: {status.ToString()}, description: {desc}");
 
-                    await webSocket.CloseAsync(status, desc, CancellationToken.None);
+                    try
+                    {
+                        await webSocket.CloseAsync(status, desc, CancellationToken.None);
+                    }
+                    catch (WebSocketException exc)
+                    {
+                        //ignore client disconnection
+                        if (exc.WebSocketErrorCode != WebSocketError.ConnectionClosedPrematurely)
+                            throw;
+                    }
                 }
                 Dispose();
             }
@@ -149,7 +158,7 @@ namespace Centaurus
 
                         //prevent recursive error sending
                         if (!(envelope.Message is ResultMessage))
-                            _ = SendMessage(new ResultMessage { Status = statusCode, OriginalMessage = envelope });
+                            _ = SendMessage(envelope.CreateResult(statusCode));
                         if (statusCode == ResultStatusCodes.InternalError || !Global.IsAlpha)
                             logger.Error(exc);
                     }
@@ -162,9 +171,13 @@ namespace Centaurus
             }
             catch (WebSocketException e)
             {
-                Global.ExtensionsManager.HandleMessageFailed(this, null, e);
-                logger.Error(e);
-                await CloseConnection(WebSocketCloseStatus.InternalServerError);
+                Global.ExtensionsManager.HandleMessageFailed(this, null, e); 
+                var closureStatus = WebSocketCloseStatus.InternalServerError;
+                if (e.WebSocketErrorCode == WebSocketError.ConnectionClosedPrematurely)
+                    closureStatus = WebSocketCloseStatus.NormalClosure;
+                else
+                    logger.Error(e);
+                await CloseConnection(closureStatus);
             }
             catch (Exception e)
             {

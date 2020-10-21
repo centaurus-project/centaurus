@@ -8,5 +8,7 @@ namespace Centaurus.Models
 
         [XdrField(0)]
         public HandshakeData HandshakeData { get; set; }
+
+        public override long MessageId => HandshakeData?.Data.GetInt64Fingerprint() ?? 0;
     }
 }

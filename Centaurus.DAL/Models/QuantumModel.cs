@@ -6,8 +6,6 @@ namespace Centaurus.DAL.Models
 {
     public class QuantumModel
     {
-
-        //it stores ulong
         public long Apex { get; set; }
 
         public byte[] Account { get; set; }

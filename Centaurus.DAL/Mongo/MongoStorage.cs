@@ -23,7 +23,6 @@ namespace Centaurus.DAL.Mongo
         private IMongoCollection<BalanceModel> balancesCollection;
         private IMongoCollection<QuantumModel> quantaCollection;
         private IMongoCollection<ConstellationState> constellationStateCollection;
-        private IMongoCollection<WithdrawalModel> withdrawalsCollection;
         private IMongoCollection<EffectModel> effectsCollection;
         private IMongoCollection<SettingsModel> settingsCollection;
         private IMongoCollection<AssetModel> assetsCollection;
@@ -51,7 +50,6 @@ namespace Centaurus.DAL.Mongo
             balancesCollection = database.GetCollection<BalanceModel>("balances");
             quantaCollection = database.GetCollection<QuantumModel>("quanta");
             constellationStateCollection = database.GetCollection<ConstellationState>("constellationState");
-            withdrawalsCollection = database.GetCollection<WithdrawalModel>("withdrawals");
 
             effectsCollection = database.GetCollection<EffectModel>("effects", new MongoCollectionSettings { AssignIdOnInsert = false });
 
@@ -67,11 +65,25 @@ namespace Centaurus.DAL.Mongo
             return Task.CompletedTask;
         }
 
-        public override async Task<List<WithdrawalModel>> LoadWithdrawals()
+        public override async Task<List<QuantumModel>> LoadWithdrawals()
         {
-            return await withdrawalsCollection
-                .Find(FilterDefinition<WithdrawalModel>.Empty)
-                .ToListAsync();
+            var allAccounts = await effectsCollection.Distinct(e => e.Account, FilterDefinition<EffectModel>.Empty).ToListAsync();
+
+            var withdrawals = new List<QuantumModel>();
+            var effectTypes = new int[] { (int)EffectTypes.WithdrawalCreate, (int)EffectTypes.WithdrawalRemove };
+            foreach (var acc in allAccounts)
+            {
+                var filter = Builders<EffectModel>.Filter.And(Builders<EffectModel>.Filter.Eq(e => e.Account, acc), Builders<EffectModel>.Filter.In(e => e.EffectType, effectTypes));
+                var lastEffect = await effectsCollection.Find(filter).SortByDescending(e => e.Id).FirstOrDefaultAsync();
+                if (lastEffect?.EffectType == (int)EffectTypes.WithdrawalCreate)
+                {
+                    var quantum = await quantaCollection.Find(q => q.Apex == lastEffect.Apex).FirstOrDefaultAsync();
+                    if (quantum == null)
+                        throw new Exception($"Unable to find quantum with apex {lastEffect.Apex}");
+                    withdrawals.Add(quantum);
+                }
+            }
+            return withdrawals;
         }
 
         public override async Task<List<OrderModel>> LoadOrders()
@@ -241,9 +253,6 @@ namespace Centaurus.DAL.Mongo
                     if (update.Orders != null && update.Orders.Count > 0)
                         updateTasks.Add(ordersCollection.BulkWriteAsync(GetOrderUpdates(update.Orders)));
 
-                    if (update.Widthrawals != null && update.Widthrawals.Count > 0)
-                        updateTasks.Add(withdrawalsCollection.BulkWriteAsync(GetWithdrawalsUpdates(update.Widthrawals)));
-
                     updateTasks.Add(quantaCollection.InsertManyAsync(update.Quanta));
                     updateTasks.Add(effectsCollection.InsertManyAsync(update.Effects));
 
@@ -259,66 +268,21 @@ namespace Centaurus.DAL.Mongo
             }
         }
 
-        private WriteModel<WithdrawalModel>[] GetWithdrawalsUpdates(List<DiffObject.Withdrawal> widthrawals)
-        {
-            unchecked
-            {
-                var filter = Builders<WithdrawalModel>.Filter;
-                var update = Builders<WithdrawalModel>.Update;
-
-                var widthrawalsLength = widthrawals.Count;
-                var updates = new WriteModel<WithdrawalModel>[widthrawalsLength];
-
-                for (int i = 0; i < widthrawalsLength; i++)
-                {
-                    var widthrawal = widthrawals[i];
-                    var apex = widthrawal.Apex;
-                    var trHash = widthrawal.TransactionHash;
-                    var raw = widthrawal.RawWithdrawal;
-                    if (widthrawal.IsInserted)
-                        updates[i] = new InsertOneModel<WithdrawalModel>(new WithdrawalModel
-                        {
-                            Apex = apex,
-                            TransactionHash = trHash,
-                            RawWithdrawal = raw
-                        });
-                    else if (widthrawal.IsDeleted)
-                        updates[i] = new DeleteOneModel<WithdrawalModel>(filter.Eq(a => a.Apex, apex));
-                    else
-                        throw new InvalidOperationException("Withdrawal object cannot be updated");
-                }
-                return updates;
-            }
-        }
-
         private WriteModel<ConstellationState>[] GetStellarDataUpdate(DiffObject.ConstellationState constellationState)
         {
-            var filter = Builders<ConstellationState>.Filter;
-            var update = Builders<ConstellationState>.Update;
-
-            var ledger = constellationState.Ledger;
-            var vaultSequence = constellationState.VaultSequence;
-            var apex = constellationState.CurrentApex;
+            var cursor = constellationState.TxCursor;
 
             WriteModel<ConstellationState> updateModel = null;
             if (constellationState.IsInserted)
                 updateModel = new InsertOneModel<ConstellationState>(new ConstellationState
                 {
-                    Ledger = ledger,
-                    VaultSequence = vaultSequence
+                    TxCursor = cursor
                 });
             else if (constellationState.IsDeleted)
                 throw new InvalidOperationException("Stellar data entry cannot be deleted");
             else
             {
-                UpdateDefinition<ConstellationState> updateCommand = null;
-                if (ledger > 0)
-                    updateCommand = update.Set(s => s.Ledger, ledger);
-                if (vaultSequence > 0)
-                    updateCommand = updateCommand == null
-                        ? update.Set(s => s.VaultSequence, vaultSequence)
-                        : updateCommand.Set(s => s.VaultSequence, vaultSequence);
-                updateModel = new UpdateOneModel<ConstellationState>(filter.Empty, updateCommand);
+                updateModel = new UpdateOneModel<ConstellationState>(Builders<ConstellationState>.Filter.Empty, Builders<ConstellationState>.Update.Set(s => s.TxCursor, cursor));
             }
 
             return new WriteModel<ConstellationState>[] { updateModel };

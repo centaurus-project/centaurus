@@ -13,5 +13,7 @@ namespace Centaurus.Models
         public Account Account { get; }
 
         public AccountRequestCounter RequestCounter { get; }
+
+        public bool HasPendingWithdrawal { get; set; }
     }
 }

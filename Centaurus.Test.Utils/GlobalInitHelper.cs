@@ -94,8 +94,6 @@ namespace Centaurus.Test
                 MinAccountBalance = 1,
                 MinAllowedLotSize = 1,
                 Vault = settings is AlphaSettings ? settings.KeyPair.PublicKey : ((AuditorSettings)settings).AlphaKeyPair.PublicKey,
-                VaultSequence = 1,
-                Ledger = 1,
                 PrevHash = new byte[] { },
                 RequestRateLimits = new RequestRateLimits { HourLimit = 1000, MinuteLimit = 100 }
             };
@@ -130,14 +128,13 @@ namespace Centaurus.Test
                     addAssetsFn(clients[i].PublicKey, assets[c].Id);
             }
 
-            var depositeQuantum = new LedgerCommitQuantum
+            var depositeQuantum = new TxCommitQuantum
             {
                 Apex = 2,
                 PrevHash = Global.QuantumStorage.LastQuantumHash,
-                Source = new LedgerUpdateNotification
+                Source = new TxNotification
                 {
-                    LedgerFrom = 2,
-                    LedgerTo = 2,
+                    TxCursor = 2,
                     Payments = deposits
                 }.CreateEnvelope()
             };

@@ -8,23 +8,25 @@ namespace Centaurus.Domain
     public class WithdrawalCreateEffectProcessor : EffectProcessor<WithdrawalCreateEffect>
     {
         private WithdrawalStorage withdrawalStorage;
+        private Withdrawal withdrawal;
 
-        public WithdrawalCreateEffectProcessor(WithdrawalCreateEffect effect, WithdrawalStorage withdrawalStorage)
+        public WithdrawalCreateEffectProcessor(WithdrawalCreateEffect effect, Withdrawal withdrawal, WithdrawalStorage withdrawalStorage)
             :base(effect)
         {
             this.withdrawalStorage = withdrawalStorage ?? throw new ArgumentNullException(nameof(withdrawalStorage));
+            this.withdrawal = withdrawal ?? throw new ArgumentNullException(nameof(withdrawal));
         }
 
         public override void CommitEffect()
         {
             MarkAsProcessed();
-            withdrawalStorage.Add(Effect.Withdrawal);
+            withdrawalStorage.Add(withdrawal);
         }
 
         public override void RevertEffect()
         {
             MarkAsProcessed();
-            withdrawalStorage.Remove(Effect.Withdrawal.TransactionHash);
+            withdrawalStorage.Remove(withdrawal.Hash);
         }
     }
 }

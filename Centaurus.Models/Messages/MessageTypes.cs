@@ -40,13 +40,17 @@ namespace Centaurus.Models
         /// </summary>
         RequestQuantum = 48,
         /// <summary>
-        /// Quantum created by Alpha server that contains aggregated ledger updates provided by <see cref="LedgerUpdateNotification"/>.
+        /// Quantum created by Alpha server that contains aggregated ledger updates provided by <see cref="TxNotification"/>.
         /// </summary>
-        LedgerCommitQuantum = 49,
+        TxCommitQuantum = 49,
         /// <summary>
         /// A client requested account's effects.
         /// </summary>
         EffectsRequest = 50,
+        /// <summary>
+        /// Quantum created by Alpha server that contains all withdrawal transaction hashes that are expired.
+        /// </summary>
+        WithrawalsCleanup = 51,
         /// <summary>
         /// Initiate connection handshake.
         /// </summary>
@@ -56,9 +60,17 @@ namespace Centaurus.Models
         /// </summary>
         ResultMessage = 102,
         /// <summary>
-        /// Message from auditor to Alpha server that contains all Stellar payments included into the recent ledger (obtained from the Horizon).
+        /// ITransaction operation result, containing transaction signature, original quantum and processing status.
         /// </summary>
-        LedgerUpdateNotification = 105,
+        ITransactionResultMessage = 103,
+        /// <summary>
+        /// Message from Alpha to a client with all effects that affects the client, and wasn't triggered by the client (Trade for example).
+        /// </summary>
+        EffectsNotification = 104,
+        /// <summary>
+        /// Message from auditor to Alpha server that contains Stellar payments (obtained from the Horizon).
+        /// </summary>
+        TxNotification = 105,
         /// <summary>
         /// Auditor current state (the last snapshot, and all quanta after the last snapshot).
         /// </summary>

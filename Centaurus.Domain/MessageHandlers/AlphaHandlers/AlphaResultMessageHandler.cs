@@ -17,20 +17,22 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
 
         public override bool IsAuditorOnly { get; } = true;
 
-        public override async Task HandleMessage(AlphaWebSocketConnection connection, MessageEnvelope envelope)
+        //TODO: run result aggregation in separate thread
+        public override Task HandleMessage(AlphaWebSocketConnection connection, MessageEnvelope envelope)
         {
             var resultMessage = (ResultMessage)envelope.Message;
             if (resultMessage.OriginalMessage.Message is Quantum) //we need majority only for quanta
-                await Global.AuditResultManager.Add(envelope);
+                _ = Global.AuditResultManager.Add(envelope);
             else if (resultMessage.Status != ResultStatusCodes.Success)
                 logger.Error("Auditor message handling failed. " + StringifyResult(connection, resultMessage));
             else
                 logger.Trace(StringifyResult(connection, resultMessage));
+            return Task.CompletedTask;
         }
 
         private string StringifyResult(AlphaWebSocketConnection connection, ResultMessage resultMessage)
         {
-            return $"Result message from auditor {connection.ClientPubKey.ToString()}: {{ " +
+            return $"Result message from auditor {connection.ClientPubKey}: {{ " +
                 $"Status: {resultMessage.Status}, " +
                 $"SourceMessageType: {resultMessage.OriginalMessage.Message.MessageType}" +
                 $"}}";

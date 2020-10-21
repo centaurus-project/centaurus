@@ -6,7 +6,7 @@ namespace Centaurus.Models
     /// <summary>
     /// Message used as a quantum response.
     /// </summary>
-    public class ResultMessage : Message
+    public class ResultMessage : Message, IEffectsContainer
     {
         public override MessageTypes MessageType => MessageTypes.ResultMessage;
 
@@ -19,6 +19,6 @@ namespace Centaurus.Models
         [XdrField(2)]
         public List<Effect> Effects { get; set; }
 
-        public override ulong MessageId => OriginalMessage.Message.MessageId;
+        public override long MessageId => OriginalMessage.Message.MessageId;
     }
 }

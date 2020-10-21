@@ -37,7 +37,7 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
         {
             Message message;
             if (Global.AppState.State == ApplicationState.Rising)
-                message = new AuditorStateRequest { TargetApex = await SnapshotManager.GetLastApex(), Hash = new byte[] { } };
+                message = new AuditorStateRequest { TargetApex = await SnapshotManager.GetLastApex() };
             else
             {
                 var alphaStateManager = (AlphaStateManager)Global.AppState;
@@ -51,6 +51,8 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
             if (Global.AppState.State != ApplicationState.Ready)
                 throw new ConnectionCloseException(WebSocketCloseStatus.ProtocolError, "Alpha is not in Ready state.");
             connection.Account = Global.AccountStorage.GetAccount(connection.ClientPubKey);
+            if (connection.Account == null)
+                throw new ConnectionCloseException(WebSocketCloseStatus.NormalClosure, "Account is not registered.");
             connection.ConnectionState = ConnectionState.Ready;
             await connection.SendMessage(envelope.CreateResult(ResultStatusCodes.Success));
         }

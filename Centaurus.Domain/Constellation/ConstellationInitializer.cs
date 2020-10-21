@@ -64,8 +64,6 @@ namespace Centaurus.Domain
 
             SetIdToAssets();
 
-            var vaultAccountInfo = await Global.StellarNetwork.Server.Accounts.Account(Global.Settings.KeyPair.AccountId);
-
             var initQuantum = new ConstellationInitQuantum
             {
                 Assets = constellationInitInfo.Assets.ToList(),
@@ -74,8 +72,6 @@ namespace Centaurus.Domain
                 MinAccountBalance = constellationInitInfo.MinAccountBalance,
                 MinAllowedLotSize = constellationInitInfo.MinAllowedLotSize,
                 PrevHash = new byte[] { },
-                Ledger = ledgerId,
-                VaultSequence = vaultAccountInfo.SequenceNumber,
                 RequestRateLimits = constellationInitInfo.RequestRateLimits
             };
 
@@ -101,9 +97,9 @@ namespace Centaurus.Domain
         {
             var majority = MajorityHelper.GetMajorityCount(constellationInitInfo.Auditors.Count());
 
-            var sourceAccount = await Global.StellarNetwork.Server.Accounts.Account(Global.Settings.KeyPair.AccountId);
+            var sourceAccount = await StellarAccountHelper.GetStellarAccount(vaultAccount.KeyPair);
 
-            var transactionBuilder = new Transaction.Builder(sourceAccount);
+            var transactionBuilder = new TransactionBuilder(sourceAccount);
             transactionBuilder.SetFee(10_000);
 
             var existingTrustlines = vaultAccount.Balances
@@ -152,7 +148,7 @@ namespace Centaurus.Domain
         {
             try
             {
-                return await Global.StellarNetwork.Server.Accounts.Account(Global.Settings.KeyPair.AccountId);
+                return await StellarAccountHelper.GetStellarAccount(Global.Settings.KeyPair);
             }
             catch (HttpResponseException exc)
             {
