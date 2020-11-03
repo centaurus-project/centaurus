@@ -17,7 +17,7 @@ namespace Centaurus.Domain
         public static void Notify(RawPubKey account, MessageEnvelope envelope)
         {
             Global.ExtensionsManager.BeforeNotify(account, envelope);
-            if (ConnectionManager.TryGetConnection(account, out AlphaWebSocketConnection connection))
+            if (ConnectionManager.TryGetConnection(account, out Centaurus.AlphaWebSocketConnection connection))
                 _ = connection.SendMessage(envelope);
         }
 

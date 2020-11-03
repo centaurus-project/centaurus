@@ -5,8 +5,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Timers;
+using Centaurus.Analytics;
 using Centaurus.DAL;
 using Centaurus.DAL.Mongo;
+using Centaurus.Exchange.Analytics;
 using Centaurus.Models;
 using NLog;
 
@@ -26,7 +28,7 @@ namespace Centaurus.Domain
         /// </summary>
         /// <param name="settings">Application config</param>
         /// <param name="storage">Permanent storage object</param>
-        public static void Init(BaseSettings settings, BaseStorage storage)
+        public static void Init(BaseSettings settings, IStorage storage)
         {
             ExtensionsManager = new ExtensionsManager();
 
@@ -81,7 +83,7 @@ namespace Centaurus.Domain
 
             AccountStorage = new AccountStorage(snapshot.Accounts, Constellation.RequestRateLimits);
 
-            Exchange = Exchange.RestoreExchange(snapshot.Settings.Assets, snapshot.Orders);
+            Exchange = Exchange.RestoreExchange(snapshot.Settings.Assets, snapshot.Orders, IsAlpha);
 
             AuditLedgerManager?.Dispose(); AuditLedgerManager = new AuditLedgerManager();
 
@@ -91,8 +93,36 @@ namespace Centaurus.Domain
 
             TxManager?.Dispose(); TxManager = new TxManager(snapshot.TxCursor);
 
+            if (IsAlpha)
+            {
+                if (AnalyticsManager != null)
+                {
+                    try
+                    {
+                        AnalyticsManager.SaveUpdates(PermanentStorage).Wait();
+                        //var saveStartTime = DateTime.UtcNow;
+                        //while (!task.IsCompleted && DateTime.UtcNow - saveStartTime < TimeSpan.FromSeconds(5))
+                        //    System.Threading.Thread.Sleep(100);
+                    }
+                    catch
+                    {
+                        //TODO: should we crash here?
+                    }
+                    Exchange.OnTrade -= Exchange_OnTrade;
+                    AnalyticsManager.Dispose();
+                }
+                AnalyticsManager = new AnalyticsManager(PermanentStorage, Constellation.Assets.Where(a => !a.IsXlm).Select(a => a.Id).ToList());
+                Exchange.OnTrade += Exchange_OnTrade;
+            }
+
             ExtensionsManager?.Dispose(); ExtensionsManager = new ExtensionsManager();
             ExtensionsManager.RegisterAllExtensions();
+        }
+
+        private static void Exchange_OnTrade(List<Trade> trades)
+        {
+           var updates = AnalyticsManager.OnTrade(trades);
+           InfoConnectionManager.SendMarketUpdates(updates.market, updates.frames, updates.trades);
         }
 
         public static Exchange Exchange { get; private set; }
@@ -123,9 +153,9 @@ namespace Centaurus.Domain
         public static ExtensionsManager ExtensionsManager { get; private set; }
         public static StateManager AppState { get; private set; }
         public static QuantumProcessorsStorage QuantumProcessor { get; private set; }
-
+        public static AnalyticsManager AnalyticsManager { get; private set; }
         public static bool IsAlpha { get; private set; }
-        public static BaseStorage PermanentStorage { get; private set; }
+        public static IStorage PermanentStorage { get; private set; }
         public static BaseSettings Settings { get; private set; }
         public static StellarNetwork StellarNetwork { get; private set; }
 

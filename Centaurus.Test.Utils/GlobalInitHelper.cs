@@ -80,7 +80,7 @@ namespace Centaurus.Test
         /// <param name="clients">Clients to add to constellation</param>
         /// <param name="auditors">Auditors to add to constellation</param>
         /// <param name="settings">Settings that will be used to init Global</param>
-        public static void Setup(List<KeyPair> clients, List<KeyPair> auditors, BaseSettings settings, BaseStorage storage)
+        public static void Setup(List<KeyPair> clients, List<KeyPair> auditors, BaseSettings settings, IStorage storage)
         {
             Global.Init(settings, storage);
 

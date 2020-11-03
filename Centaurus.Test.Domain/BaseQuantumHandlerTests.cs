@@ -6,6 +6,7 @@ using stellar_dotnet_sdk.responses;
 using stellar_dotnet_sdk.xdr;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Reflection;
 using System.Threading;
@@ -246,7 +247,7 @@ namespace Centaurus.Test
             var txBuilder = new TransactionBuilder(new AccountResponse(TestEnvironment.Client1KeyPair.AccountId, 1));
             txBuilder.SetFee(10_000);
 
-            txBuilder.AddOperation(new PaymentOperation.Builder(TestEnvironment.Client1KeyPair, new AssetTypeNative(), (amount / AssetsHelper.StroopsPerAsset).ToString("0.##########")).SetSourceAccount(TestEnvironment.AlphaKeyPair).Build());
+            txBuilder.AddOperation(new PaymentOperation.Builder(TestEnvironment.Client1KeyPair, new AssetTypeNative(), (amount / AssetsHelper.StroopsPerAsset).ToString("0.##########", CultureInfo.InvariantCulture)).SetSourceAccount(TestEnvironment.AlphaKeyPair).Build());
             txBuilder.AddTimeBounds(new stellar_dotnet_sdk.TimeBounds(maxTime: DateTimeOffset.UtcNow.AddSeconds(60)));
             var tx = txBuilder.Build();
             stellar_dotnet_sdk.xdr.Transaction.Encode(outputStream, tx.ToXdrV1());
@@ -292,7 +293,7 @@ namespace Centaurus.Test
             var txBuilder = new TransactionBuilder(new AccountResponse(TestEnvironment.Client1KeyPair.AccountId, 1));
             txBuilder.SetFee(10_000);
 
-            txBuilder.AddOperation(new PaymentOperation.Builder(TestEnvironment.Client1KeyPair, new AssetTypeNative(), (amount / AssetsHelper.StroopsPerAsset).ToString("0.##########")).SetSourceAccount(TestEnvironment.AlphaKeyPair).Build());
+            txBuilder.AddOperation(new PaymentOperation.Builder(TestEnvironment.Client1KeyPair, new AssetTypeNative(), (amount / AssetsHelper.StroopsPerAsset).ToString("0.##########", CultureInfo.InvariantCulture)).SetSourceAccount(TestEnvironment.AlphaKeyPair).Build());
             txBuilder.AddTimeBounds(new stellar_dotnet_sdk.TimeBounds(maxTime: DateTimeOffset.UtcNow.AddSeconds(60)));
             var tx = txBuilder.Build();
             stellar_dotnet_sdk.xdr.Transaction.Encode(outputStream, tx.ToXdrV1());

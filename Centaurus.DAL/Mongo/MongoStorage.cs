@@ -1,4 +1,6 @@
-﻿using Centaurus.DAL.Models;
+﻿using Centaurus.Analytics;
+using Centaurus.DAL.Models;
+using Centaurus.DAL.Models.Analytics;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
 using MongoDB.Bson.Serialization.Conventions;
@@ -14,7 +16,7 @@ using System.Threading.Tasks;
 
 namespace Centaurus.DAL.Mongo
 {
-    public class MongoStorage : BaseStorage
+    public class MongoStorage : IStorage
     {
         private MongoClient client;
         private IMongoDatabase database;
@@ -27,6 +29,9 @@ namespace Centaurus.DAL.Mongo
         private IMongoCollection<SettingsModel> settingsCollection;
         private IMongoCollection<AssetModel> assetsCollection;
 
+        private IMongoCollection<OHLCFrameModel> framesCollection;
+        private IMongoCollection<TradeModel> tradesCollection;
+
         private async Task CreateIndexes()
         {
             await accountsCollection.Indexes.CreateOneAsync(
@@ -35,7 +40,7 @@ namespace Centaurus.DAL.Mongo
             );
         }
 
-        public override async Task OpenConnection(string connectionString)
+        public async Task OpenConnection(string connectionString)
         {
             var mongoUrl = new MongoUrl(connectionString);
 
@@ -57,15 +62,18 @@ namespace Centaurus.DAL.Mongo
 
             assetsCollection = database.GetCollection<AssetModel>("assets");
 
+            framesCollection = database.GetCollection<OHLCFrameModel>("analyticsFrames");
+            tradesCollection = database.GetCollection<TradeModel>("analyticsTrades");
+
             await CreateIndexes();
         }
 
-        public override Task CloseConnection()
+        public Task CloseConnection()
         {
             return Task.CompletedTask;
         }
 
-        public override async Task<List<QuantumModel>> LoadWithdrawals()
+        public async Task<List<QuantumModel>> LoadWithdrawals()
         {
             var allAccounts = await effectsCollection.Distinct(e => e.Account, FilterDefinition<EffectModel>.Empty).ToListAsync();
 
@@ -86,14 +94,14 @@ namespace Centaurus.DAL.Mongo
             return withdrawals;
         }
 
-        public override async Task<List<OrderModel>> LoadOrders()
+        public async Task<List<OrderModel>> LoadOrders()
         {
             return await ordersCollection
                 .Find(FilterDefinition<OrderModel>.Empty)
                 .ToListAsync();
         }
 
-        public override async Task<SettingsModel> LoadSettings(long apex)
+        public async Task<SettingsModel> LoadSettings(long apex)
         {
             return await settingsCollection
                 .Find(s => s.Apex <= apex)
@@ -101,42 +109,42 @@ namespace Centaurus.DAL.Mongo
                 .FirstOrDefaultAsync();
         }
 
-        public override async Task<List<AssetModel>> LoadAssets(long apex)
+        public async Task<List<AssetModel>> LoadAssets(long apex)
         {
             return await assetsCollection
                 .Find(a => a.Apex <= apex)
                 .ToListAsync();
         }
 
-        public override async Task<List<AccountModel>> LoadAccounts()
+        public async Task<List<AccountModel>> LoadAccounts()
         {
             return await accountsCollection
                 .Find(FilterDefinition<AccountModel>.Empty)
                 .ToListAsync();
         }
 
-        public override async Task<List<BalanceModel>> LoadBalances()
+        public async Task<List<BalanceModel>> LoadBalances()
         {
             return await balancesCollection
                 .Find(FilterDefinition<BalanceModel>.Empty)
                 .ToListAsync();
         }
 
-        public override async Task<ConstellationState> LoadConstellationState()
+        public async Task<ConstellationState> LoadConstellationState()
         {
             return await constellationStateCollection
                 .Find(FilterDefinition<ConstellationState>.Empty)
                 .FirstOrDefaultAsync();
         }
 
-        public override async Task<QuantumModel> LoadQuantum(long apex)
+        public async Task<QuantumModel> LoadQuantum(long apex)
         {
             return await quantaCollection
                    .Find(q => q.Apex == apex)
                    .FirstAsync();
         }
 
-        public override async Task<List<QuantumModel>> LoadQuanta(params long[] apexes)
+        public async Task<List<QuantumModel>> LoadQuanta(params long[] apexes)
         {
             var filter = FilterDefinition<QuantumModel>.Empty;
             if (apexes.Length > 0)
@@ -152,7 +160,7 @@ namespace Centaurus.DAL.Mongo
             return res;
         }
 
-        public override async Task<List<QuantumModel>> LoadQuantaAboveApex(long apex, int count = 0)
+        public async Task<List<QuantumModel>> LoadQuantaAboveApex(long apex, int count = 0)
         {
             var query = quantaCollection
                 .Find(q => q.Apex > apex);
@@ -161,7 +169,7 @@ namespace Centaurus.DAL.Mongo
             return await query.ToListAsync();
         }
 
-        public override async Task<long> GetFirstEffectApex()
+        public async Task<long> GetFirstEffectApex()
         {
             var firstEffect = await effectsCollection
                    .Find(FilterDefinition<EffectModel>.Empty)
@@ -171,21 +179,21 @@ namespace Centaurus.DAL.Mongo
             return firstEffect?.Apex ?? -1;
         }
 
-        public override async Task<List<EffectModel>> LoadEffectsForApex(long apex)
+        public async Task<List<EffectModel>> LoadEffectsForApex(long apex)
         {
             return await effectsCollection
                 .Find(e => e.Apex == apex)
                 .ToListAsync();
         }
 
-        public override async Task<List<EffectModel>> LoadEffectsAboveApex(long apex)
+        public async Task<List<EffectModel>> LoadEffectsAboveApex(long apex)
         {
             return await effectsCollection
                 .Find(e => e.Apex > apex)
                 .ToListAsync();
         }
 
-        public override async Task<long> GetLastApex()
+        public async Task<long> GetLastApex()
         {
             var quanta = await quantaCollection
                    .Find(FilterDefinition<QuantumModel>.Empty)
@@ -195,7 +203,7 @@ namespace Centaurus.DAL.Mongo
             return quanta?.Apex ?? -1;
         }
 
-        public override async Task<List<EffectModel>> LoadEffects(byte[] cursor, bool isDesc, int limit, byte[] account)
+        public async Task<List<EffectModel>> LoadEffects(byte[] cursor, bool isDesc, int limit, byte[] account)
         {
             if (account == null)
                 throw new ArgumentNullException(nameof(account));
@@ -224,9 +232,24 @@ namespace Centaurus.DAL.Mongo
             return effects;
         }
 
+
+        public async Task<List<OHLCFrameModel>> GetFrames(int unixTimeStamp, int asset, OHLCFramePeriod period, int limit = 1000)
+        {
+            var query = framesCollection.Find(
+                Builders<OHLCFrameModel>.Filter.And(
+                    Builders<OHLCFrameModel>.Filter.Eq(f => f.Market, asset),
+                    Builders<OHLCFrameModel>.Filter.Eq(f => f.Period, (int)period),
+                    Builders<OHLCFrameModel>.Filter.Gte(f => f.TimeStamp, unixTimeStamp)
+                    )
+                );
+            return await query
+                .Limit(limit)
+                .ToListAsync();
+        }
+
         #region Updates
 
-        public override async Task Update(DiffObject update)
+        public async Task Update(DiffObject update)
         {
             using (var session = await client.StartSessionAsync())
             {
@@ -410,6 +433,31 @@ namespace Centaurus.DAL.Mongo
                 return updates;
             }
         }
+
+
+
+        public async Task SaveAnalytics(List<OHLCFrameModel> frames)
+        {
+            await framesCollection.BulkWriteAsync(GetFramesUpdate(frames));
+        }
+
+        private List<ReplaceOneModel<OHLCFrameModel>> GetFramesUpdate(List<OHLCFrameModel> frames)
+        {
+            var updates = new List<ReplaceOneModel<OHLCFrameModel>>();
+            var filter = Builders<OHLCFrameModel>.Filter;
+            foreach (var frame in frames)
+            {
+                var frameFilter = filter.And(
+                    filter.Eq(s => s.TimeStamp, frame.TimeStamp),
+                    filter.Eq(f => f.Period, frame.Period),
+                    filter.Eq(f => f.Market, frame.Market)
+                    );
+                var update = new ReplaceOneModel<OHLCFrameModel>(frameFilter, frame);
+                updates.Add(update);
+            }
+            return updates;
+        }
+
         #endregion
     }
 }

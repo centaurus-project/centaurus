@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
+using Centaurus.Analytics;
 using Centaurus.Models;
 
 namespace Centaurus.Domain
@@ -11,6 +12,7 @@ namespace Centaurus.Domain
         public OrderMatcher(OrderRequest orderRequest, EffectProcessorsContainer effectsContainer)
         {
             resultEffects = effectsContainer;
+
             takerOrder = new Order()
             {
                 OrderId = OrderIdConverter.FromRequest(orderRequest, effectsContainer.Apex),
@@ -51,9 +53,11 @@ namespace Centaurus.Domain
         /// </summary>
         /// <param name="timeInForce">Order time in force</param>
         /// <returns>Matching effects</returns>
-        public void Match()
+        public List<Trade> Match()
         {
             var counterOrder = orderbook.Head;
+
+            var trades = new List<Trade>();
 
             //orders in the orderbook are already sorted by price and age, so we can iterate through them in natural order
             while (counterOrder != null)
@@ -63,8 +67,7 @@ namespace Centaurus.Domain
                 if (side == OrderSides.Buy && counterOrder.Price > takerOrder.Price) break;
 
                 var match = new OrderMatch(this, counterOrder);
-                var orderMatchResult = match.ProcessOrderMatch();
-                if (!orderMatchResult) break;
+                trades.Add(match.ProcessOrderMatch());
 
                 //stop if incoming order has been executed in full
                 if (takerOrder.Amount == 0)
@@ -78,6 +81,7 @@ namespace Centaurus.Domain
             {
                 PlaceReminderOrder(takerOrder.Amount);
             }
+            return trades;
         }
 
         private void PlaceReminderOrder(long amount)
@@ -131,7 +135,7 @@ namespace Centaurus.Domain
             /// <summary>
             /// Process matching.
             /// </summary>
-            public bool ProcessOrderMatch()
+            public Trade ProcessOrderMatch()
             {
                 //trade assets
                 if (matcher.side == OrderSides.Buy)
@@ -162,7 +166,7 @@ namespace Centaurus.Domain
                 }
 
                 //record trade effects
-                RecordTrade();
+                var trade = RecordTrade();
 
                 if (makerOrder.Amount == 0)
                 { //schedule removal for the fully executed counter order
@@ -170,10 +174,10 @@ namespace Centaurus.Domain
                     RecordOrderRemoved();
                 }
 
-                return true;
+                return trade;
             }
 
-            private void RecordTrade()
+            private Trade RecordTrade()
             {
                 //record maker trade effect
                 matcher.resultEffects.AddTrade(
@@ -194,6 +198,15 @@ namespace Centaurus.Domain
                          makerOrder.Price,
                          matcher.side
                      );
+
+                return new Trade
+                {
+                    Amount = AssetAmount,
+                    Asset = matcher.asset,
+                    BaseAmount = xlmAmount,
+                    Price = makerOrder.Price,
+                    Timestamp = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+                };
             }
 
             private void RecordOrderRemoved()

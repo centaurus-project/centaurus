@@ -8,6 +8,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="WebSockets\Alpha\Info\Subscriptions\**" />
+    <EmbeddedResource Remove="WebSockets\Alpha\Info\Subscriptions\**" />
+    <None Remove="WebSockets\Alpha\Info\Subscriptions\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Remove="Catchups\AuditorCatchup.cs" />
   </ItemGroup>
 
@@ -19,6 +25,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Centaurus.DAL\Centaurus.DAL.csproj" />
     <ProjectReference Include="..\Centaurus.DynamicSerializers\Centaurus.DynamicSerializers.csproj" />
+    <ProjectReference Include="..\Centaurus.Exchange.Analytics\Centaurus.Exchange.Analytics.csproj" />
     <ProjectReference Include="..\Centaurus.Models.Extensions\Centaurus.Models.Extensions.csproj" />
     <ProjectReference Include="..\Centaurus.Models\Centaurus.Models.csproj" />
   </ItemGroup>

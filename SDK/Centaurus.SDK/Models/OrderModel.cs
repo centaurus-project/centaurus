@@ -1,6 +1,7 @@
 ﻿using Centaurus.Models;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Text;
 
 namespace Centaurus.SDK.Models
@@ -25,7 +26,7 @@ namespace Centaurus.SDK.Models
 
         public double Price { get; set; }
 
-        public string PriceStr => Price.ToString("0.#########");
+        public string PriceStr => Price.ToString("0.#########", CultureInfo.InvariantCulture);
 
         public long Amount { get; set; }
 
