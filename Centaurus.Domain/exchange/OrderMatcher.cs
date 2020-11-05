@@ -205,7 +205,7 @@ namespace Centaurus.Domain
                     Asset = matcher.asset,
                     BaseAmount = xlmAmount,
                     Price = makerOrder.Price,
-                    Timestamp = (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+                    Timestamp = DateTime.UtcNow.Ticks
                 };
             }
 

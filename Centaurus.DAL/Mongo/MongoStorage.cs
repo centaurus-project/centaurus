@@ -233,18 +233,23 @@ namespace Centaurus.DAL.Mongo
         }
 
 
-        public async Task<List<OHLCFrameModel>> GetFrames(int unixTimeStamp, int asset, OHLCFramePeriod period, int limit = 1000)
+        public async Task<List<OHLCFrameModel>> GetFrames(int fromUnixTimeStamp, int toUnixTimeStamp, int asset, OHLCFramePeriod period)
         {
             var query = framesCollection.Find(
-                Builders<OHLCFrameModel>.Filter.And(
-                    Builders<OHLCFrameModel>.Filter.Eq(f => f.Market, asset),
-                    Builders<OHLCFrameModel>.Filter.Eq(f => f.Period, (int)period),
-                    Builders<OHLCFrameModel>.Filter.Gte(f => f.TimeStamp, unixTimeStamp)
-                    )
-                );
+                   Builders<OHLCFrameModel>.Filter.And(
+                       Builders<OHLCFrameModel>.Filter.Eq(f => f.Market, asset),
+                       Builders<OHLCFrameModel>.Filter.Eq(f => f.Period, (int)period),
+                       Builders<OHLCFrameModel>.Filter.Gte(f => f.TimeStamp, fromUnixTimeStamp),
+                       Builders<OHLCFrameModel>.Filter.Lt(f => f.TimeStamp, toUnixTimeStamp)
+                       )
+                   );
             return await query
-                .Limit(limit)
                 .ToListAsync();
+        }
+
+        public async Task<int> GetFirstFrameDate(OHLCFramePeriod period)
+        {
+            return (await framesCollection.Find(Builders<OHLCFrameModel>.Filter.Eq(f => f.Period, (int)period)).FirstOrDefaultAsync())?.TimeStamp ?? 0;
         }
 
         #region Updates
@@ -434,8 +439,6 @@ namespace Centaurus.DAL.Mongo
             }
         }
 
-
-
         public async Task SaveAnalytics(List<OHLCFrameModel> frames)
         {
             await framesCollection.BulkWriteAsync(GetFramesUpdate(frames));
@@ -452,7 +455,7 @@ namespace Centaurus.DAL.Mongo
                     filter.Eq(f => f.Period, frame.Period),
                     filter.Eq(f => f.Market, frame.Market)
                     );
-                var update = new ReplaceOneModel<OHLCFrameModel>(frameFilter, frame);
+                var update = new ReplaceOneModel<OHLCFrameModel>(frameFilter, frame) { IsUpsert = true };
                 updates.Add(update);
             }
             return updates;

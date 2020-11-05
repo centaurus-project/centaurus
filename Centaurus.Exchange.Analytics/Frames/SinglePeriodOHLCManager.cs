@@ -33,14 +33,25 @@ namespace Centaurus.Exchange.Analytics
                 }
             };
         }
+
+        public async Task RestoreCurrentFrame()
+        {
+            CurrentFramesUnitDate = GetFramesUnitDate(DateTime.UtcNow);
+            var frames = await GetUnit(GetFramesUnitDate(DateTime.UtcNow), true);
+            CurrentFrame = frames.LastOrDefault();
+        }
+
         public OHLCFrame CurrentFrame { get; private set; }
 
         public void RegisterNewFrame(OHLCFrame frame)
         {
-            lock (this)
+            var unitDate = GetFramesUnitDate(frame.StartTime); //get current frames unit start date
+
+            var semaphore = locks.GetOrAdd(unitDate, (d) => new SemaphoreSlim(1));
+            semaphore.Wait();
+            try
             {
-                var framePeriodDate = GetFramesUnitStart(frame.StartTime); //get current frames unit start date
-                if (!framesUnit.TryGetValue<List<OHLCFrame>>(framePeriodDate, out var frames)) //if no unit for the frame, we need to register new one
+                if (!framesUnit.TryGetValue<List<OHLCFrame>>(unitDate, out var frames)) //if no unit for the frame, we need to register new one
                 {
                     if (CurrentFramesUnitDate != default) //update current cache item entry if it's presented
                     {
@@ -51,21 +62,25 @@ namespace Centaurus.Exchange.Analytics
                     }
                     //register new frames unit
                     frames = new List<OHLCFrame>();
-                    framesUnit.Set(framePeriodDate, frames, GetMemoryCacheEntryOptions(true, FramesPerUnit));
-                    CurrentFramesUnitDate = framePeriodDate;
+                    framesUnit.Set(unitDate, frames, GetMemoryCacheEntryOptions(true, FramesPerUnit));
+                    CurrentFramesUnitDate = unitDate;
                 }
                 frames.Add(frame);
                 CurrentFrame = frame;
             }
+            finally
+            {
+                semaphore.Release();
+            }
         }
 
-        public void RegisterTrade(Trade trade)
+        public void OnTrade(Trade trade)
         {
-            CurrentFrame.RegisterTrade(trade);
+            CurrentFrame.OnTrade(trade);
             updates.AddUpdate(CurrentFramesUnitDate, CurrentFrame);
         }
 
-        public IEnumerable<OHLCFrame> PullUpdates()
+        public List<OHLCFrame> PullUpdates()
         {
             return updates.PullUpdates();
         }
@@ -101,7 +116,7 @@ namespace Centaurus.Exchange.Analytics
         private readonly IAnalyticsStorage analyticsStorage;
         private readonly int market;
 
-        private readonly ConcurrentDictionary<DateTime, SemaphoreSlim> locks = new ConcurrentDictionary<DateTime, SemaphoreSlim>();
+        private ConcurrentDictionary<DateTime, SemaphoreSlim> locks = new ConcurrentDictionary<DateTime, SemaphoreSlim>();
 
         private int FramesPerUnit
         {
@@ -124,12 +139,12 @@ namespace Centaurus.Exchange.Analytics
         }
 
         /// <summary>
-        /// 
+        /// Finds current date unit start date
         /// </summary>
         /// <param name="dateTime">Trimmed date</param>
         /// <param name="period"></param>
         /// <returns></returns>
-        private DateTime GetFramesUnitStart(DateTime dateTime)
+        private DateTime GetFramesUnitDate(DateTime dateTime)
         {
             switch (Period)
             {
@@ -153,17 +168,19 @@ namespace Centaurus.Exchange.Analytics
         /// <param name="dateTime">Current frames unit start</param>
         /// <param name="period"></param>
         /// <returns></returns>
-        private DateTime GetNextFrameStart(DateTime dateTime)
+        private DateTime GetFramesNextUnitStart(DateTime dateTime, bool inverse = false)
         {
+            var currentUnitDate = GetFramesUnitDate(dateTime);
+            var direction = inverse ? -1 : 1;
             switch (Period)
             {
                 case OHLCFramePeriod.Minute:
                 case OHLCFramePeriod.Hour:
                 case OHLCFramePeriod.Day:
                 case OHLCFramePeriod.Week:
-                    return dateTime.AddTicks(TicksPerPeriod * FramesPerUnit);
+                    return dateTime.AddTicks((TicksPerPeriod * FramesPerUnit) * direction);
                 case OHLCFramePeriod.Month:
-                    return dateTime.AddYears(1);
+                    return dateTime.AddYears(1 * direction);
                 default:
                     throw new NotSupportedException($"{Period} is not supported.");
             }
@@ -193,7 +210,7 @@ namespace Centaurus.Exchange.Analytics
 
         public OHLCFramePeriod Period { get; }
 
-        private async Task<List<OHLCFrame>> GetUnit(DateTime unitDate)
+        private async Task<List<OHLCFrame>> GetUnit(DateTime unitDate, bool isCurrentFrame = false)
         {
             if (!framesUnit.TryGetValue<List<OHLCFrame>>(unitDate, out var frames))
             {
@@ -204,9 +221,10 @@ namespace Centaurus.Exchange.Analytics
                     if (!framesUnit.TryGetValue(unitDate, out frames))
                     {
                         var unixTimeStamp = (int)((DateTimeOffset)unitDate).ToUnixTimeSeconds();
-                        var period = await analyticsStorage.GetFrames(unixTimeStamp, market, Period, FramesPerUnit);
-                        framesUnit.Set(unitDate, period, GetMemoryCacheEntryOptions(false, period.Count));
-                        frames = period.Cast<OHLCFrame>().ToList();
+                        var tillTimeStamp = (int)((DateTimeOffset)GetFramesNextUnitStart(unitDate)).ToUnixTimeSeconds();
+                        var rawFrames = await analyticsStorage.GetFrames(unixTimeStamp, tillTimeStamp, market, Period);
+                        frames = rawFrames.Select(f => f.FromModel()).ToList();
+                        framesUnit.Set(unitDate, frames, GetMemoryCacheEntryOptions(isCurrentFrame, frames.Count));
                     }
                 }
                 finally
@@ -217,29 +235,61 @@ namespace Centaurus.Exchange.Analytics
             return frames;
         }
 
-        public async Task<List<OHLCFrame>> GetPeriod(DateTime from, DateTime to)
+        public async Task<(List<OHLCFrame> frames, DateTime nextCursor)> GetFramesForDate(DateTime cursor)
         {
-            var fetchTasks = new List<Task<List<OHLCFrame>>>();
-            var fromPeriod = GetFramesUnitStart(from);
-            var toPeriod = GetFramesUnitStart(to);
-            if (fromPeriod >= CurrentFramesUnitDate)
-                return new List<OHLCFrame>();
-            do
+            if (cursor == default)
+                cursor = DateTime.UtcNow.Trim(Period);
+
+            var fromPeriod = GetFramesUnitDate(cursor);
+            if (fromPeriod > CurrentFramesUnitDate && CurrentFramesUnitDate != default)
+                throw new BadRequestException("Cursor is too far.");
+
+            List<OHLCFrame> frames;
+            frames = await GetUnit(fromPeriod);
+            return (
+                frames,
+                nextCursor: (await HasMore(fromPeriod) ? GetFramesNextUnitStart(fromPeriod, true) : default)
+                );
+        }
+
+        private SemaphoreSlim firstDateSemaphore = new SemaphoreSlim(1);
+
+        public DateTime FirstFramesUnitDate { get; set; }
+
+        private async Task<bool> HasMore(DateTime fromPeriod)
+        {
+            if (FirstFramesUnitDate == default)
             {
-                fetchTasks.Add(GetUnit(fromPeriod));
-                fromPeriod = GetNextFrameStart(fromPeriod);
+                await firstDateSemaphore.WaitAsync();
+                try
+                {
+                    if (FirstFramesUnitDate == default)
+                    {
+                        var firstTimeStamp = await analyticsStorage.GetFirstFrameDate(Period);
+                        if (firstTimeStamp > 0)
+                            FirstFramesUnitDate = GetFramesUnitDate(DateTimeOffset.FromUnixTimeSeconds(firstTimeStamp).DateTime);
+                    }
+                }
+                finally
+                {
+                    firstDateSemaphore.Release();
+                }
             }
-            while (toPeriod > fromPeriod || toPeriod >= CurrentFramesUnitDate);
-
-            await Task.WhenAll(fetchTasks);
-
-            return fetchTasks.SelectMany(t => t.Result).ToList();
+            return FirstFramesUnitDate != default && FirstFramesUnitDate < fromPeriod;
         }
 
         public void Dispose()
         {
             framesUnit?.Dispose();
             framesUnit = null;
+            if (locks != null)
+            {
+                foreach (var @lock in locks)
+                    @lock.Value.Dispose();
+                locks = null;
+            }
+            firstDateSemaphore?.Dispose();
+            firstDateSemaphore = null;
         }
     }
 }

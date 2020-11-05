@@ -11,5 +11,7 @@ namespace Centaurus.Domain
         public List<OHLCFrame> Frames { get; set; }
 
         public List<Trade> Trades { get; set; }
+
+        public int NextCursor { get; set; }
     }
 }

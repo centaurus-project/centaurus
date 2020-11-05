@@ -9,8 +9,10 @@ namespace Centaurus.DAL
 {
     public interface IAnalyticsStorage
     {
-        Task<List<OHLCFrameModel>> GetFrames(int unixTimeStamp, int asset, OHLCFramePeriod period, int limit = 1000);
+        Task<List<OHLCFrameModel>> GetFrames(int fromUnixTimeStamp, int toUnixTimeStamp, int asset, OHLCFramePeriod period);
 
         Task SaveAnalytics(List<OHLCFrameModel> frames);
+
+        Task<int> GetFirstFrameDate(OHLCFramePeriod period);
     }
 }

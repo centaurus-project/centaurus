@@ -1,18 +1,27 @@
-﻿using Newtonsoft.Json;
+﻿
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Centaurus.Domain
 {
     public abstract class BaseCommand
     {
-        private static JsonSerializerSettings settings;
+        public static JsonSerializerOptions SerializeOptions { get; }
 
         static BaseCommand()
         {
-            settings = new JsonSerializerSettings { TypeNameHandling = TypeNameHandling.Objects };
-            settings.Converters.Add(new CommandsConverter());
+            SerializeOptions = new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                PropertyNameCaseInsensitive = true,
+                WriteIndented = true
+            };
+            SerializeOptions.Converters.Add(new CommandWrapperConverter());
+            //SerializeOptions.Converters.Add(new OHLCFramePeriodConverter());
+            SerializeOptions.Converters.Add(new JsonStringEnumConverter());
         }
 
         public long RequestId { get; set; }
@@ -22,7 +31,13 @@ namespace Centaurus.Domain
         public static BaseCommand Deserialize(byte[] request)
         {
             var stringifiedRequest = Encoding.UTF8.GetString(request);
-            return JsonConvert.DeserializeObject<BaseCommand>(stringifiedRequest, settings);
+            return Deserialize(stringifiedRequest);
+        }
+
+        public static BaseCommand Deserialize(string request)
+        {
+            var obj = JsonSerializer.Deserialize<CommandWrapper>(request, SerializeOptions);
+            return obj.CommandObject;
         }
     }
 }

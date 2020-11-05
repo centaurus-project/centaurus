@@ -3,6 +3,7 @@ using Centaurus.DAL;
 using NLog;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -25,13 +26,20 @@ namespace Centaurus.Exchange.Analytics
             InitTimer();
         }
 
+        public async Task Restore()
+        {
+            await OHLCManager.RestoreCurrentFrames();
+        }
+
         public async Task SaveUpdates(IAnalyticsStorage analyticsStorage, int numberOfTries = 5)
         {
             await syncRoot.WaitAsync();
             try
             {
                 var frames = OHLCManager.PullUpdates();
-                var trades = TradesHistoryManager.PullUpdates();
+                //var trades = TradesHistoryManager.PullUpdates();
+                if (frames.Count < 1)
+                    return;
                 var currentTry = 0;
                 while (currentTry < numberOfTries)
                 {

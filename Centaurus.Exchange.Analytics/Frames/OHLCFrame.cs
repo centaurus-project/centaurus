@@ -36,13 +36,14 @@ namespace Centaurus.Exchange.Analytics
 
         public double Volume { get; set; }
 
-        public void RegisterTrade(Trade trade)
+        public void OnTrade(Trade trade)
         {
             if (trade == null)
                 throw new ArgumentNullException(nameof(trade));
             if (Open == default) //register first trade
             {
-                Open = Hi = Low = Close;
+                Open = Hi = Low = Close = trade.Price;
+                Volume = trade.BaseAmount;
                 return;
             }
             if (Hi < trade.Price)

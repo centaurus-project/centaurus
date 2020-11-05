@@ -33,7 +33,7 @@ namespace Centaurus.Exchange.Analytics
             return trades.Take(limit == default ? maxSize : limit).ToList();
         }
 
-        public IEnumerable<Trade> PullUpdates()
+        public List<Trade> PullUpdates()
         {
             return updates.PullUpdates();
         }

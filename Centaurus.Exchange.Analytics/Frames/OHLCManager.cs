@@ -23,6 +23,15 @@ namespace Centaurus.Exchange.Analytics
                     managers.Add(EncodeManagerId(market, period), new SinglePeriodOHLCManager(period, market, storage));
         }
 
+        public async Task RestoreCurrentFrames()
+        {
+            foreach (var manager in managers)
+            {
+                await manager.Value.RestoreCurrentFrame();
+            }
+        }
+             
+
         /// <summary>
         /// Records all trades.
         /// </summary>
@@ -44,7 +53,7 @@ namespace Centaurus.Exchange.Analytics
                     {
                         frameManager.RegisterNewFrame(new OHLCFrame(trimmedDateTime, frameManager.Period, trade.Asset));
                     }
-                    frameManager.RegisterTrade(trade);
+                    frameManager.OnTrade(trade);
                     if (!updatedFrames[period].Contains(frameManager.CurrentFrame))
                         updatedFrames[period].Add(frameManager.CurrentFrame);
                 }
@@ -52,16 +61,22 @@ namespace Centaurus.Exchange.Analytics
             return updatedFrames;
         }
 
-        public async Task<IEnumerable<OHLCFrame>> GetPeriod(DateTime from, DateTime to, int market, OHLCFramePeriod framePeriod)
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="cursor">Unix timestamp</param>
+        /// <param name="market"></param>
+        /// <param name="framePeriod"></param>
+        /// <returns></returns>
+        public async Task<(List<OHLCFrame> frames, int nextCursor)> GetPeriod(int cursor, int market, OHLCFramePeriod framePeriod)
         {
-            if (to <= from)
-                throw new Exception("Specified period is invalid.");
-
-            from = from.Trim(framePeriod);
-            to = to.Trim(framePeriod);
             var managerId = EncodeManagerId(market, framePeriod);
-            var frames = await managers[managerId].GetPeriod(from, to);
-            return frames.SkipWhile(f => f.StartTime < from).TakeWhile(f => f.StartTime < to);
+            var cursorDate = cursor == 0 ? default : DateTimeOffset.FromUnixTimeSeconds(cursor).DateTime;
+            var res = await managers[managerId].GetFramesForDate(cursorDate);
+            return (
+                res.frames,
+                nextCursor: (res.nextCursor == default ? 0 : (int)((DateTimeOffset)res.nextCursor).ToUnixTimeSeconds())
+                );
         }
 
         public List<OHLCFrame> GetAllCurrentFrames(int market)
@@ -79,7 +94,12 @@ namespace Centaurus.Exchange.Analytics
         {
             var updates = new List<OHLCFrame>();
             foreach (var manager in managers.Values)
-                updates.AddRange(manager.PullUpdates());
+            {
+                var updateData = manager.PullUpdates();
+                if (updateData.Count < 1)
+                    continue;
+                updates.AddRange(updateData);
+            }
             return updates;
         }
 

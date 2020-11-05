@@ -141,7 +141,7 @@ namespace Centaurus
             static async Task InfoWebSocketHandler(HttpContext context, Func<Task> next)
             {
                 var webSocket = await context.WebSockets.AcceptWebSocketAsync();
-                InfoConnectionManager.OnNewConnection(webSocket, context.Connection.Id, context.Connection.RemoteIpAddress.ToString());
+                await InfoConnectionManager.OnNewConnection(webSocket, context.Connection.Id, context.Connection.RemoteIpAddress.ToString());
             }
 
             // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

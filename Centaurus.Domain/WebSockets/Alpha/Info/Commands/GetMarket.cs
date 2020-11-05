@@ -1,5 +1,6 @@
 ﻿using Centaurus.Analytics;
 using System;
+using System.Text.Json.Serialization;
 
 namespace Centaurus.Domain
 {
@@ -12,10 +13,9 @@ namespace Centaurus.Domain
 
         public bool SubscribeToUpdates { get; set; }
 
-        public DateTime DateFrom { get; set; }
-
-        public DateTime DateTo { get; set; }
-
-        public int Limit { get; set; } = 100;
+        /// <summary>
+        /// Unix timestamp
+        /// </summary>
+        public int Cursor { get; set; }
     }
 }

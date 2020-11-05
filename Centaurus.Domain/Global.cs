@@ -112,6 +112,7 @@ namespace Centaurus.Domain
                     AnalyticsManager.Dispose();
                 }
                 AnalyticsManager = new AnalyticsManager(PermanentStorage, Constellation.Assets.Where(a => !a.IsXlm).Select(a => a.Id).ToList());
+                AnalyticsManager.Restore().Wait();
                 Exchange.OnTrade += Exchange_OnTrade;
             }
 
@@ -121,8 +122,10 @@ namespace Centaurus.Domain
 
         private static void Exchange_OnTrade(List<Trade> trades)
         {
-           var updates = AnalyticsManager.OnTrade(trades);
-           InfoConnectionManager.SendMarketUpdates(updates.market, updates.frames, updates.trades);
+            if (trades == null || trades.Count < 1)
+                return;
+            var updates = AnalyticsManager.OnTrade(trades);
+            InfoConnectionManager.SendMarketUpdates(updates.market, updates.frames, updates.trades);
         }
 
         public static Exchange Exchange { get; private set; }

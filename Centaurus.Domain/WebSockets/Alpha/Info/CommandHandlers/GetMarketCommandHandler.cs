@@ -18,11 +18,12 @@ namespace Centaurus.Domain
             if (command.SubscribeToUpdates && !infoWebSocket.Subscriptions.Contains(subscriptionId))
                 infoWebSocket.Subscriptions.Add(subscriptionId);
 
-            var frames = (await Global.AnalyticsManager.OHLCManager.GetPeriod(command.DateFrom, command.DateTo, command.Market, command.Period)).ToList();
+            var res = (await Global.AnalyticsManager.OHLCManager.GetPeriod(command.Cursor, command.Market, command.Period));
             return new MarketResponse { 
                 RequestId = command.RequestId,
-                Frames = frames,
-                Trades = Global.AnalyticsManager.TradesHistoryManager.GetTrades(command.Market)
+                Frames = res.frames,
+                Trades = Global.AnalyticsManager.TradesHistoryManager.GetTrades(command.Market),
+                NextCursor = res.nextCursor
             };
         }
     }

@@ -38,7 +38,12 @@ namespace Centaurus.Exchange.Analytics
         {
             var updates = new List<Trade>();
             foreach (var manager in managers.Values)
-                updates.AddRange(manager.PullUpdates());
+            {
+                var updatesData = manager.PullUpdates();
+                if (updatesData.Count < 1)
+                    continue;
+                updates.AddRange(updatesData);
+            }
             return updates;
         }
 

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace Centaurus.Exchange.Analytics
@@ -22,11 +23,11 @@ namespace Centaurus.Exchange.Analytics
             }
         }
 
-        public IEnumerable<TValue> PullUpdates()
+        public List<TValue> PullUpdates()
         {
             lock(this)
             {
-                var values = updates.Values;
+                var values = updates.Values.ToList();
                 updates.Clear();
                 return values;
             }

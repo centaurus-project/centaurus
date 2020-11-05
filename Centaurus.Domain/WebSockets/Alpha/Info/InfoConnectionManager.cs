@@ -24,12 +24,13 @@ namespace Centaurus.Domain
         /// Registers new client websocket connection
         /// </summary>
         /// <param name="webSocket">New websocket connection</param>
-        public static void OnNewConnection(WebSocket webSocket, string connectionId, string ip)
+        public static async Task OnNewConnection(WebSocket webSocket, string connectionId, string ip)
         {
             var connection = new InfoWebSocketConnection(webSocket, connectionId, ip);
             Subscribe(connection);
             if (!connections.TryAdd(connectionId, connection))
                 throw new Exception($"Connection with id {connectionId} already exists.");
+            await connection.Listen();
         }
 
         public static void SendMarketUpdates(int market, Dictionary<OHLCFramePeriod, List<OHLCFrame>> frames, List<Trade> trades)

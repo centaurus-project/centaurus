@@ -313,15 +313,20 @@ namespace Centaurus.Test
             return Task.FromResult(effects);
         }
 
-        public Task<List<OHLCFrameModel>> GetFrames(int unixTimeStamp, int asset, OHLCFramePeriod period, int limit = 1000)
+        public Task<List<OHLCFrameModel>> GetFrames(int fromUnixTimeStamp, int toUnixTimeStamp, int asset, OHLCFramePeriod period)
         {
             var result = frames
                 .Where(f => f.Market == asset && f.Period == (int)period)
-                .SkipWhile(f => f.TimeStamp < unixTimeStamp)
-                .Take(limit)
+                .SkipWhile(f => f.TimeStamp < fromUnixTimeStamp)
+                .TakeWhile(f => f.TimeStamp < toUnixTimeStamp)
                 .ToList();
 
             return Task.FromResult(result);
+        }
+
+        public Task<int> GetFirstFrameDate(OHLCFramePeriod period)
+        {
+            return Task.FromResult(frames.FirstOrDefault()?.TimeStamp ?? 0);
         }
 
         public Task SaveAnalytics(List<OHLCFrameModel> frames)

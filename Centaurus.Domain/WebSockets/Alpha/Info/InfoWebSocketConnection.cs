@@ -70,7 +70,7 @@ namespace Centaurus.Domain
         {
             try
             {
-                var reader = await webSocket.GetInputArray();
+                var reader = await webSocket.GetString();
                 while (true)
                 {
                     BaseCommand command = null;
@@ -95,7 +95,7 @@ namespace Centaurus.Domain
                         if (statusCode == ResultStatusCodes.InternalError || !Global.IsAlpha)
                             logger.Error(exc);
                     }
-                    reader = await webSocket.GetInputArray();
+                    reader = await webSocket.GetString();
                 }
             }
             catch (ConnectionCloseException e)

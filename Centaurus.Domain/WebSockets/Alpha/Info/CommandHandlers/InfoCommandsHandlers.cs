@@ -14,34 +14,42 @@ namespace Centaurus.Domain
 
         static InfoCommandsHandlers()
         {
-            var discoveredRequestProcessors = Assembly.GetExecutingAssembly()
-                .GetTypes()
-                .Where(x => typeof(IBaseCommandHandler).IsAssignableFrom(x)
-                    && !x.IsInterface
-                    && !x.IsAbstract);
+                var discoveredRequestProcessors = Assembly.GetExecutingAssembly()
+                    .GetTypes()
+                    .Where(x => typeof(IBaseCommandHandler).IsAssignableFrom(x)
+                        && !x.IsInterface
+                        && !x.IsAbstract);
 
-            var processors = new Dictionary<string, IBaseCommandHandler>(StringComparer.OrdinalIgnoreCase);
-            foreach (var processorType in discoveredRequestProcessors)
-            {
-                var instance = Activator.CreateInstance(processorType) as IBaseCommandHandler;
-                var constraints = processorType.GetGenericParameterConstraints();
-                if (constraints.Length != 1 
-                    || !typeof(BaseCommand).IsAssignableFrom(constraints[0]) 
-                    || constraints[0].IsAbstract
-                    || constraints[0].IsInterface)
-                    throw new Exception("Info command handler should be constrained with one of info command types.");
+                var processors = new Dictionary<string, IBaseCommandHandler>();
+                foreach (var processorType in discoveredRequestProcessors)
+                {
+                    Type baseCommandHandlerClass = processorType;
+                    while(baseCommandHandlerClass.Name != typeof(BaseCommandHandler<>).Name //TODO: find more elegant and reliable way to check generic types
+                        && baseCommandHandlerClass.BaseType != null)
+                        baseCommandHandlerClass = processorType.BaseType;
 
-                var commandType = constraints[0];
+                    if (!baseCommandHandlerClass.IsGenericType)
+                        return;
 
-                var commandAttribute = commandType.GetCustomAttribute<CommandAttribute>();
-                if (commandAttribute == null)
-                    throw new Exception($"Info command {commandType.Name} is missing InfoCommandAttribute.");
+                    var constraints = baseCommandHandlerClass.GenericTypeArguments;
+                    if (constraints.Length != 1
+                        || !typeof(BaseCommand).IsAssignableFrom(constraints[0])
+                        || constraints[0].IsAbstract
+                        || constraints[0].IsInterface)
+                        throw new Exception("Info command handler should be constrained with one of info command types.");
 
-                if (processors.ContainsKey(commandAttribute.Command))
-                    throw new Exception($"Handler for command type {commandAttribute.Command} is already registered");
-                processors.Add(commandAttribute.Command, instance);
-            }
-            handlers = processors.ToImmutableDictionary();
+                    var commandType = constraints[0];
+
+                    var commandAttribute = commandType.GetCustomAttribute<CommandAttribute>();
+                    if (commandAttribute == null)
+                        throw new Exception($"Info command {commandType.Name} is missing InfoCommandAttribute.");
+
+                    if (processors.ContainsKey(commandAttribute.Command))
+                        throw new Exception($"Handler for command type {commandAttribute.Command} is already registered");
+                    var instance = Activator.CreateInstance(processorType) as IBaseCommandHandler;
+                    processors.Add(commandAttribute.Command, instance);
+                }
+                handlers = processors.ToImmutableDictionary(StringComparer.OrdinalIgnoreCase);
         }
 
         public async Task<BaseResponse> HandleCommand(InfoWebSocketConnection infoWebSocket, BaseCommand command)
