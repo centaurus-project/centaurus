@@ -233,16 +233,16 @@ namespace Centaurus.DAL.Mongo
         }
 
 
-        public async Task<List<OHLCFrameModel>> GetFrames(int fromUnixTimeStamp, int toUnixTimeStamp, int asset, OHLCFramePeriod period)
+        public async Task<List<OHLCFrameModel>> GetFrames(int cursorTimeStamp, int toUnixTimeStamp, int asset, OHLCFramePeriod period)
         {
             var query = framesCollection.Find(
                    Builders<OHLCFrameModel>.Filter.And(
                        Builders<OHLCFrameModel>.Filter.Eq(f => f.Market, asset),
                        Builders<OHLCFrameModel>.Filter.Eq(f => f.Period, (int)period),
-                       Builders<OHLCFrameModel>.Filter.Gte(f => f.TimeStamp, fromUnixTimeStamp),
-                       Builders<OHLCFrameModel>.Filter.Lt(f => f.TimeStamp, toUnixTimeStamp)
+                       Builders<OHLCFrameModel>.Filter.Lt(f => f.TimeStamp, cursorTimeStamp),
+                       Builders<OHLCFrameModel>.Filter.Gte(f => f.TimeStamp, toUnixTimeStamp)
                        )
-                   );
+                   ).SortByDescending(x => x.TimeStamp);
             return await query
                 .ToListAsync();
         }

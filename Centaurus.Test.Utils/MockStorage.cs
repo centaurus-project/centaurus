@@ -313,12 +313,13 @@ namespace Centaurus.Test
             return Task.FromResult(effects);
         }
 
-        public Task<List<OHLCFrameModel>> GetFrames(int fromUnixTimeStamp, int toUnixTimeStamp, int asset, OHLCFramePeriod period)
+        public Task<List<OHLCFrameModel>> GetFrames(int cursorTimeStamp, int toUnixTimeStamp, int asset, OHLCFramePeriod period)
         {
             var result = frames
                 .Where(f => f.Market == asset && f.Period == (int)period)
-                .SkipWhile(f => f.TimeStamp < fromUnixTimeStamp)
-                .TakeWhile(f => f.TimeStamp < toUnixTimeStamp)
+                .OrderByDescending(f => f.TimeStamp)
+                .SkipWhile(f => f.TimeStamp >= cursorTimeStamp)
+                .TakeWhile(f => f.TimeStamp >= toUnixTimeStamp)
                 .ToList();
 
             return Task.FromResult(result);
@@ -329,9 +330,9 @@ namespace Centaurus.Test
             return Task.FromResult(frames.FirstOrDefault()?.TimeStamp ?? 0);
         }
 
-        public Task SaveAnalytics(List<OHLCFrameModel> frames)
+        public Task SaveAnalytics(List<OHLCFrameModel> update)
         {
-            foreach (var frame in frames)
+            foreach (var frame in update)
             {
                 var frameIndex = frames.FindIndex(f => f.TimeStamp == frame.TimeStamp && f.Period == frame.Period && f.Market == frame.Market);
                 if (frameIndex >= 0)

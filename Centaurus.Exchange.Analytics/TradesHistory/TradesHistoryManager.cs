@@ -34,19 +34,6 @@ namespace Centaurus.Exchange.Analytics
             return trades;
         }
 
-        public List<Trade> PullUpdates()
-        {
-            var updates = new List<Trade>();
-            foreach (var manager in managers.Values)
-            {
-                var updatesData = manager.PullUpdates();
-                if (updatesData.Count < 1)
-                    continue;
-                updates.AddRange(updatesData);
-            }
-            return updates;
-        }
-
         public List<Trade> GetTrades(int market)
         {
             return managers[market].GetLastTrades();

@@ -26,9 +26,9 @@ namespace Centaurus.Exchange.Analytics
             InitTimer();
         }
 
-        public async Task Restore()
+        public async Task Restore(DateTime dateTime)
         {
-            await OHLCManager.RestoreCurrentFrames();
+            await OHLCManager.Restore(dateTime);
         }
 
         public async Task SaveUpdates(IAnalyticsStorage analyticsStorage, int numberOfTries = 5)
@@ -45,9 +45,8 @@ namespace Centaurus.Exchange.Analytics
                 {
                     try
                     {
-                        await analyticsStorage.SaveAnalytics(
-                            frames.Select(f => f.ToFrameModel()).ToList()
-                        );
+                        var frameModels = frames.Select(f => f.ToFrameModel()).ToList();
+                        await analyticsStorage.SaveAnalytics(frameModels);
                         break;
                     }
                     catch

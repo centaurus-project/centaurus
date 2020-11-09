@@ -1,4 +1,5 @@
-﻿using System;
+﻿using MongoDB.Bson;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -6,8 +7,6 @@ namespace Centaurus.DAL.Models.Analytics
 {
     public class OHLCFrameModel
     {
-        //public long Id { get; set; }
-
         public int TimeStamp { get; set; }
 
         public int Market { get; set; }

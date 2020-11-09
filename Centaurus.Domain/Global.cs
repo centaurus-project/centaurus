@@ -100,9 +100,6 @@ namespace Centaurus.Domain
                     try
                     {
                         AnalyticsManager.SaveUpdates(PermanentStorage).Wait();
-                        //var saveStartTime = DateTime.UtcNow;
-                        //while (!task.IsCompleted && DateTime.UtcNow - saveStartTime < TimeSpan.FromSeconds(5))
-                        //    System.Threading.Thread.Sleep(100);
                     }
                     catch
                     {
@@ -112,7 +109,7 @@ namespace Centaurus.Domain
                     AnalyticsManager.Dispose();
                 }
                 AnalyticsManager = new AnalyticsManager(PermanentStorage, Constellation.Assets.Where(a => !a.IsXlm).Select(a => a.Id).ToList());
-                AnalyticsManager.Restore().Wait();
+                AnalyticsManager.Restore(DateTime.UtcNow).Wait();
                 Exchange.OnTrade += Exchange_OnTrade;
             }
 

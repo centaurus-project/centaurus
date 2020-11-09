@@ -9,7 +9,15 @@ namespace Centaurus.DAL
 {
     public interface IAnalyticsStorage
     {
-        Task<List<OHLCFrameModel>> GetFrames(int fromUnixTimeStamp, int toUnixTimeStamp, int asset, OHLCFramePeriod period);
+        /// <summary>
+        /// Fetches frames in reversed order (frames are LIFO collection)
+        /// </summary>
+        /// <param name="cursorTimeStamp">Cursor time-stamp</param>
+        /// <param name="toUnixTimeStamp">Indicates up to what date frames should be taken. We cannot use limit, because there could be gaps if there were no trades during the period.</param>
+        /// <param name="asset"></param>
+        /// <param name="period"></param>
+        /// <returns></returns>
+        Task<List<OHLCFrameModel>> GetFrames(int cursorTimeStamp, int toUnixTimeStamp, int asset, OHLCFramePeriod period);
 
         Task SaveAnalytics(List<OHLCFrameModel> frames);
 

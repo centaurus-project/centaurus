@@ -6,7 +6,7 @@ using System.Text;
 
 namespace Centaurus.Exchange.Analytics
 {
-    public class OHLCFrame
+    public class OHLCFrame : IEquatable<OHLCFrame>
     {
         /// <summary>
         /// 
@@ -57,6 +57,39 @@ namespace Centaurus.Exchange.Analytics
         public bool IsExpired(DateTime currentDateTime)
         {
             return StartTime.GetDiff(currentDateTime, Period) != 0;
+        }
+
+        public override bool Equals(object obj)
+        {
+            return Equals(obj as OHLCFrame);
+        }
+
+        public bool Equals(OHLCFrame other)
+        {
+            return other != null &&
+                   StartTime == other.StartTime &&
+                   Period == other.Period &&
+                   Market == other.Market &&
+                   Hi == other.Hi &&
+                   Low == other.Low &&
+                   Open == other.Open &&
+                   Close == other.Close &&
+                   Volume == other.Volume;
+        }
+
+        public override int GetHashCode()
+        {
+            return HashCode.Combine(StartTime, Period, Market, Hi, Low, Open, Close, Volume);
+        }
+
+        public static bool operator ==(OHLCFrame left, OHLCFrame right)
+        {
+            return EqualityComparer<OHLCFrame>.Default.Equals(left, right);
+        }
+
+        public static bool operator !=(OHLCFrame left, OHLCFrame right)
+        {
+            return !(left == right);
         }
     }
 }

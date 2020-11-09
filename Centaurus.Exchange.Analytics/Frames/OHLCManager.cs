@@ -23,11 +23,11 @@ namespace Centaurus.Exchange.Analytics
                     managers.Add(EncodeManagerId(market, period), new SinglePeriodOHLCManager(period, market, storage));
         }
 
-        public async Task RestoreCurrentFrames()
+        public async Task Restore(DateTime dateTime)
         {
             foreach (var manager in managers)
             {
-                await manager.Value.RestoreCurrentFrame();
+                await manager.Value.Restore(dateTime);
             }
         }
              
@@ -77,17 +77,6 @@ namespace Centaurus.Exchange.Analytics
                 res.frames,
                 nextCursor: (res.nextCursor == default ? 0 : (int)((DateTimeOffset)res.nextCursor).ToUnixTimeSeconds())
                 );
-        }
-
-        public List<OHLCFrame> GetAllCurrentFrames(int market)
-        {
-            var currentFrames = new List<OHLCFrame>();
-            foreach (var period in periods)
-            {
-                var managerId = EncodeManagerId(market, period);
-                currentFrames.Add(managers[managerId].CurrentFrame);
-            }
-            return currentFrames;
         }
 
         public List<OHLCFrame> PullUpdates()

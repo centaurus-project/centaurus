@@ -18,24 +18,17 @@ namespace Centaurus.Exchange.Analytics
 
         private int maxSize;
         private LinkedList<Trade> trades = new LinkedList<Trade>();
-        private UpdateContainer<long, Trade> updates = new UpdateContainer<long, Trade>();
 
         public void OnTrade(Trade trade)
         {
             trades.AddFirst(trade);
             if (trades.Count > maxSize)
                 trades.RemoveLast();
-            updates.AddUpdate(trade.Timestamp, trade);
         }
 
         public List<Trade> GetLastTrades(int limit = 0)
         {
             return trades.Take(limit == default ? maxSize : limit).ToList();
-        }
-
-        public List<Trade> PullUpdates()
-        {
-            return updates.PullUpdates();
         }
     }
 }
