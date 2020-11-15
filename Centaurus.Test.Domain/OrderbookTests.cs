@@ -67,9 +67,9 @@ namespace Centaurus.Test
         }
 
         [Test]
-        [TestCase(OrderSides.Buy)]
-        [TestCase(OrderSides.Sell)]
-        public void SimpleMatchingTest(OrderSides side)
+        [TestCase(OrderSide.Buy)]
+        [TestCase(OrderSide.Sell)]
+        public void SimpleMatchingTest(OrderSide side)
         {
             var acc1XlmLiabilities = account1.Balances[0].Liabilities;
             var acc1XlmAmount = account1.Balances[0].Amount;
@@ -107,7 +107,7 @@ namespace Centaurus.Test
             Assert.AreEqual(effects.Length, 2);
             Assert.AreEqual(effects[0].EffectType, EffectTypes.UpdateLiabilities);
             Assert.AreEqual(effects[1].EffectType, EffectTypes.OrderPlaced);
-            if (side == OrderSides.Sell)
+            if (side == OrderSide.Sell)
             {
                 Assert.AreEqual(account1.Balances[1].Liabilities, acc1AssetLiabilities + orderRequest1.Amount);
                 Assert.AreEqual(account1.Balances[1].Amount, acc1AssetAmount);
@@ -140,7 +140,7 @@ namespace Centaurus.Test
 
             var conterOrderEffectsContainer = new EffectProcessorsContainer(conterOrder.CreateEnvelope(), (env, effs) => { });
             Global.Exchange.ExecuteOrder(conterOrderEffectsContainer);
-            if (orderRequest2.Side == OrderSides.Sell)
+            if (orderRequest2.Side == OrderSide.Sell)
             {
                 Assert.AreEqual(account2.Balances[1].Liabilities, acc2AssetLiabilities + (orderRequest2.Amount - orderRequest1.Amount));
                 Assert.AreEqual(account2.Balances[1].Amount, acc2AssetAmount - orderRequest1.Amount);
@@ -177,7 +177,7 @@ namespace Centaurus.Test
                             Amount = rnd.Next(1, 20),
                             Asset = 1,
                             Price = Math.Round(price * 10) / 10,
-                            Side = rnd.NextDouble() >= 0.5 ? OrderSides.Buy : OrderSides.Sell,
+                            Side = rnd.NextDouble() >= 0.5 ? OrderSide.Buy : OrderSide.Sell,
                             AccountWrapper = Global.AccountStorage.GetAccount(account1.Pubkey)
                         }
                     }

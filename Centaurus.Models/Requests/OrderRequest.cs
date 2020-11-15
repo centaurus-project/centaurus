@@ -12,7 +12,7 @@ namespace Centaurus.Models
         public TimeInForce TimeInForce { get; set; }
 
         [XdrField(1)]
-        public OrderSides Side { get; set; }
+        public OrderSide Side { get; set; }
 
         [XdrField(2)]
         public int Asset { get; set; }

@@ -29,7 +29,7 @@ namespace Centaurus.Test.Exchange.Analytics
             storage = new MockStorage();
             markets = Enumerable.Range(1, 2).ToList();
             historyLength = 100;
-            analyticsManager = new AnalyticsManager(storage, markets, historyLength);
+            analyticsManager = new AnalyticsManager(storage, new List<double> { 1 }, new MockOrderMap(), markets, historyLength);
         }
 
         protected void GenerateTrades(int totalTradesCount)
@@ -58,7 +58,13 @@ namespace Centaurus.Test.Exchange.Analytics
                         minPrice = Math.Min(minPrice, price);
                     now += 1;
                 }
-                analyticsManager.OnTrade(trades);
+                var groupedTrades = trades.GroupBy(t => t.Asset);
+                foreach (var g in groupedTrades)
+                {
+                    var updates = new ExchangeUpdate(g.Key);
+                    updates.Trades.AddRange(g);
+                    analyticsManager.OnUpdates(updates);
+                }    
                 now += TimeSpan.TicksPerSecond * 20;
             }
         }

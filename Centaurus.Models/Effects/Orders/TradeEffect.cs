@@ -12,7 +12,7 @@ namespace Centaurus.Models
         public ulong OrderId { get; set; }
 
         [XdrField(1)]
-        public OrderSides OrderSide { get; set; }
+        public OrderSide OrderSide { get; set; }
 
         [XdrField(2)]
         public int Asset { get; set; }

@@ -40,7 +40,7 @@ namespace Centaurus.Domain
 
         private readonly int asset;
 
-        private readonly OrderSides side;
+        private readonly OrderSide side;
 
         private readonly Orderbook orderbook;
 
@@ -53,21 +53,23 @@ namespace Centaurus.Domain
         /// </summary>
         /// <param name="timeInForce">Order time in force</param>
         /// <returns>Matching effects</returns>
-        public List<Trade> Match()
+        public ExchangeUpdate Match()
         {
             var counterOrder = orderbook.Head;
 
-            var trades = new List<Trade>();
+            var updates = new ExchangeUpdate(asset);
 
             //orders in the orderbook are already sorted by price and age, so we can iterate through them in natural order
             while (counterOrder != null)
             {
                 //check that counter order price matches our order
-                if (side == OrderSides.Sell && counterOrder.Price < takerOrder.Price) break;
-                if (side == OrderSides.Buy && counterOrder.Price > takerOrder.Price) break;
+                if (side == OrderSide.Sell && counterOrder.Price < takerOrder.Price) break;
+                if (side == OrderSide.Buy && counterOrder.Price > takerOrder.Price) break;
 
                 var match = new OrderMatch(this, counterOrder);
-                trades.Add(match.ProcessOrderMatch());
+                var matchUpdates = match.ProcessOrderMatch();
+                updates.Trades.Add(matchUpdates.trade);
+                updates.OrderUpdates.Add(matchUpdates.removedOrder);
 
                 //stop if incoming order has been executed in full
                 if (takerOrder.Amount == 0)
@@ -79,30 +81,32 @@ namespace Centaurus.Domain
 
             if (timeInForce == TimeInForce.GoodTillExpire)
             {
-                PlaceReminderOrder(takerOrder.Amount);
+                PlaceReminderOrder();
+
+                updates.OrderUpdates.Add(new OrderUpdate(takerOrder.ToOrderInfo()));
             }
-            return trades;
+            return updates;
         }
 
-        private void PlaceReminderOrder(long amount)
+        private void PlaceReminderOrder()
         {
-            if (amount <= 0) return;
-            var xmlAmount = EstimateTradedXlmAmount(amount, takerOrder.Price);
+            if (takerOrder.Amount <= 0) return;
+            var xmlAmount = EstimateTradedXlmAmount(takerOrder.Amount, takerOrder.Price);
             if (xmlAmount <= 0) return;
             //lock order reserve
-            if (side == OrderSides.Buy)
+            if (side == OrderSide.Buy)
             {
                 //TODO: check this - potential rounding error with multiple trades
                 resultEffects.AddUpdateLiabilities(takerOrder.Account, 0, xmlAmount);
             }
             else
             {
-                resultEffects.AddUpdateLiabilities(takerOrder.Account, asset, amount);
+                resultEffects.AddUpdateLiabilities(takerOrder.Account, asset, takerOrder.Amount);
             }
             //select the market to add new order
             var reminderOrderbook = market.GetOrderbook(side);
             //record maker trade effect
-            resultEffects.AddOrderPlaced(reminderOrderbook, takerOrder, amount, asset, side);
+            resultEffects.AddOrderPlaced(reminderOrderbook, takerOrder, takerOrder.Amount, asset, side);
         }
 
         /// <summary>
@@ -135,10 +139,10 @@ namespace Centaurus.Domain
             /// <summary>
             /// Process matching.
             /// </summary>
-            public Trade ProcessOrderMatch()
+            public (Trade trade, OrderUpdate removedOrder) ProcessOrderMatch()
             {
                 //trade assets
-                if (matcher.side == OrderSides.Buy)
+                if (matcher.side == OrderSide.Buy)
                 {
                     //unlock required asset amount on maker's side
                     matcher.resultEffects.AddUpdateLiabilities(makerOrder.Account, matcher.asset, -AssetAmount);
@@ -167,14 +171,15 @@ namespace Centaurus.Domain
 
                 //record trade effects
                 var trade = RecordTrade();
-
+                var removedOrder = default(OrderUpdate);
                 if (makerOrder.Amount == 0)
                 { //schedule removal for the fully executed counter order
                     //matcher.orderbook.RemoveEmptyHeadOrder();
                     RecordOrderRemoved();
+                    removedOrder = new OrderUpdate(makerOrder.ToOrderInfo(), true);
                 }
 
-                return trade;
+                return (trade, removedOrder);
             }
 
             private Trade RecordTrade()

@@ -38,6 +38,14 @@ namespace Centaurus.DAL.Mongo
                  new CreateIndexModel<AccountModel>(Builders<AccountModel>.IndexKeys.Ascending(a => a.PubKey),
                  new CreateIndexOptions { Unique = true, Background = true })
             );
+
+            await framesCollection.Indexes.CreateOneAsync(
+                new CreateIndexModel<OHLCFrameModel>(Builders<OHLCFrameModel>.IndexKeys.Combine(
+                     Builders<OHLCFrameModel>.IndexKeys.Ascending(f => f.Market),
+                     Builders<OHLCFrameModel>.IndexKeys.Ascending(f => f.Period),
+                     Builders<OHLCFrameModel>.IndexKeys.Descending(f => f.TimeStamp)),
+                new CreateIndexOptions { Unique = true, Background = true })
+            );
         }
 
         public async Task OpenConnection(string connectionString)
@@ -441,10 +449,10 @@ namespace Centaurus.DAL.Mongo
 
         public async Task SaveAnalytics(List<OHLCFrameModel> frames)
         {
-            await framesCollection.BulkWriteAsync(GetFramesUpdate(frames));
+            await framesCollection.BulkWriteAsync(PrepareFramesUpdateBatch(frames));
         }
 
-        private List<ReplaceOneModel<OHLCFrameModel>> GetFramesUpdate(List<OHLCFrameModel> frames)
+        private List<ReplaceOneModel<OHLCFrameModel>> PrepareFramesUpdateBatch(List<OHLCFrameModel> frames)
         {
             var updates = new List<ReplaceOneModel<OHLCFrameModel>>();
             var filter = Builders<OHLCFrameModel>.Filter;

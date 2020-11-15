@@ -11,7 +11,15 @@ using System.Threading.Tasks;
 namespace Centaurus.Test.Exchange.Analytics
 {
 
-    public class AnalyticsManagerTest: BaseAnalyticsTest
+    public class MockOrderMap : IOrderMap
+    {
+        public OrderInfo GetNextOrder(ulong currentOrderId)
+        {
+            return null;
+        }
+    }
+
+    public class AnalyticsManagerTest : BaseAnalyticsTest
     {
 
         [Test]
@@ -20,21 +28,30 @@ namespace Centaurus.Test.Exchange.Analytics
             GenerateTrades(10_000);
             await analyticsManager.SaveUpdates(storage);
 
-            var restoredAnalyticsManager = new AnalyticsManager(storage, markets, historyLength);
+            var restoredAnalyticsManager = new AnalyticsManager(storage, new List<double> { 1 }, new MockOrderMap(), markets, historyLength);
             await restoredAnalyticsManager.Restore(new DateTime(now, DateTimeKind.Utc));
 
             foreach (var market in markets)
             {
-                foreach (var period in Enum.GetValues(typeof(OHLCFramePeriod)))
+                foreach (var period in EnumExtensions.GetValues<OHLCFramePeriod>())
                 {
-                    var frames = await analyticsManager.OHLCManager.GetPeriod(0, market, (OHLCFramePeriod)period);
-                    var restoredFrames = await restoredAnalyticsManager.OHLCManager.GetPeriod(0, market, (OHLCFramePeriod)period);
-                    Assert.AreEqual(frames.frames.Count, restoredFrames.frames.Count, "Current frames unit and restored frames unit have differnt size.");
+                    var frames = await analyticsManager.OHLCManager.GetPeriod(0, market, period);
+                    var restoredFrames = await restoredAnalyticsManager.OHLCManager.GetPeriod(0, market, period);
+                    Assert.AreEqual(frames.frames.Count, restoredFrames.frames.Count, "Current frames unit and restored frames unit have different size.");
                     for (var i = 0; i < frames.frames.Count; i++)
                     {
                         var frame = frames.frames[i];
                         var restoredFrame = restoredFrames.frames[i];
-                        Assert.AreEqual(frame, restoredFrame, "Restored frame doesn't equal to current frame.");
+
+                        Assert.IsTrue(frame.StartTime == restoredFrame.StartTime &&
+                           frame.Period == restoredFrame.Period &&
+                           frame.Market == restoredFrame.Market &&
+                           frame.High == restoredFrame.High &&
+                           frame.Low == restoredFrame.Low &&
+                           frame.Open == restoredFrame.Open &&
+                           frame.Close == restoredFrame.Close &&
+                           frame.Volume == restoredFrame.Volume, 
+                           "Restored frame doesn't equal to current frame.");
                     }
                 }
             }

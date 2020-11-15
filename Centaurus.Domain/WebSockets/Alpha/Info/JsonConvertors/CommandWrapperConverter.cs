@@ -29,11 +29,6 @@ namespace Centaurus.Domain
 
         private static ImmutableDictionary<string, Type> commands;
 
-        public override bool CanConvert(Type typeToConvert)
-        {
-            return base.CanConvert(typeToConvert);
-        }
-
         public override CommandWrapper Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             if (reader.TokenType != JsonTokenType.StartObject)
@@ -43,23 +38,23 @@ namespace Centaurus.Domain
 
             if (!reader.Read()
                     || reader.TokenType != JsonTokenType.PropertyName
-                    || !reader.GetString().Equals("command", StringComparison.OrdinalIgnoreCase))
+                    || !reader.GetString().Equals(nameof(CommandWrapper.Command), StringComparison.OrdinalIgnoreCase))
             {
                 throw new JsonException("First property should be command.");
             }
 
             if (!reader.Read() || reader.TokenType != JsonTokenType.String)
             {
-                throw new JsonException("Command property value should be string.");
+                throw new JsonException("Command property value must be string.");
             }
             var command = reader.GetString();
             if (!commands.TryGetValue(command, out var commandType))
                 throw new NotSupportedException($"Command {command} is not supported.");
             if (!reader.Read()
                     || reader.TokenType != JsonTokenType.PropertyName
-                    || !reader.GetString().Equals("commandObject", StringComparison.OrdinalIgnoreCase))
+                    || !reader.GetString().Equals(nameof(CommandWrapper.CommandObject), StringComparison.OrdinalIgnoreCase))
             {
-                throw new JsonException("Second property should be CommandObject.");
+                throw new JsonException("Second property must be CommandObject.");
             }
             reader.Read();//move reader to the start of nested object
             var commandObj = (BaseCommand)JsonSerializer.Deserialize(ref reader, commandType, options);
@@ -75,40 +70,6 @@ namespace Centaurus.Domain
         public override void Write(Utf8JsonWriter writer, CommandWrapper value, JsonSerializerOptions options)
         {
             throw new NotImplementedException();
-        }
-    }
-
-    public class OHLCFramePeriodConverter : JsonConverter<OHLCFramePeriod>
-    {
-        public override bool CanConvert(Type typeToConvert)
-        {
-            var val = typeof(OHLCFramePeriod) == typeToConvert;
-            return val;
-        }
-
-        public override OHLCFramePeriod Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
-        {
-            if (reader.TokenType == JsonTokenType.String)
-            {
-                reader.Read();
-                if (!Enum.TryParse<OHLCFramePeriod>(reader.GetString(), out var value))
-                    throw new JsonException($"Unable to parse \"{reader.GetString()}\" as OHLCFramePeriod.");
-                return value;
-            }
-            else if (reader.TokenType == JsonTokenType.Number)
-            {
-                reader.Read();
-                    var intVal = reader.GetInt32();
-                if (!Enum.GetValues(typeof(OHLCFramePeriod)).Cast<int>().Any(v => v == intVal))
-                    throw new JsonException($"Unable to parse \"{intVal}\" as OHLCFramePeriod.");
-                return (OHLCFramePeriod)intVal;
-            }
-            throw new JsonException($"{reader.TokenType} is not valid type for OHLCFramePeriod.");
-        }
-
-        public override void Write(Utf8JsonWriter writer, OHLCFramePeriod value, JsonSerializerOptions options)
-        {
-            writer.WriteStringValue(value.ToString());
         }
     }
 }

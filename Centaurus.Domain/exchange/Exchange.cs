@@ -18,19 +18,19 @@ namespace Centaurus.Domain
         {
             if (observeTrades)
             {
-                awaitedTrades = new BlockingCollection<List<Trade>>();
-                Task.Factory.StartNew(ObserveTrades, cancellationTokenSource.Token, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+                awaitedUpdates = new BlockingCollection<ExchangeUpdate>();
+                Task.Factory.StartNew(ObserveUpdates, cancellationTokenSource.Token, TaskCreationOptions.LongRunning, TaskScheduler.Default);
             }
         }
 
 
         private CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
-        private void ObserveTrades()
+        private void ObserveUpdates()
         {
             try
             {
-                foreach (var trades in awaitedTrades.GetConsumingEnumerable(cancellationTokenSource.Token))
-                    OnTrade?.Invoke(trades);
+                foreach (var updates in awaitedUpdates.GetConsumingEnumerable(cancellationTokenSource.Token))
+                    OnUpdates?.Invoke(updates);
             }
             catch (Exception exc)
             {
@@ -40,9 +40,11 @@ namespace Centaurus.Domain
 
         private Dictionary<int, Market> Markets = new Dictionary<int, Market>();
 
-        private BlockingCollection<List<Trade>> awaitedTrades;
+        private BlockingCollection<ExchangeUpdate> awaitedUpdates;
 
         public OrderMap OrderMap { get; } = new OrderMap();
+        public Action<OrderInfo> OnNewOrder { get; internal set; }
+        public Action<OrderInfo> OnOrderRemoved { get; internal set; }
 
         /// <summary>
         /// Process customer's order request.
@@ -53,11 +55,11 @@ namespace Centaurus.Domain
         {
             RequestQuantum orderRequestQuantum = (RequestQuantum)effectsContainer.Envelope.Message;
             var orderRequest = (OrderRequest)orderRequestQuantum.RequestEnvelope.Message;
-            var trades = new OrderMatcher(orderRequest, effectsContainer).Match();
-            awaitedTrades?.Add(trades);
+            var updates = new OrderMatcher(orderRequest, effectsContainer).Match();
+            awaitedUpdates?.Add(updates);
         }
 
-        public event Action<List<Trade>> OnTrade;
+        public event Action<ExchangeUpdate> OnUpdates;
 
         public Market GetMarket(int asset)
         {
@@ -89,12 +91,12 @@ namespace Centaurus.Domain
             return GetOrderbook(parts.Asset, parts.Side);
         }
 
-        public Orderbook GetOrderbook(int asset, OrderSides side)
+        public Orderbook GetOrderbook(int asset, OrderSide side)
         {
             return GetMarket(asset).GetOrderbook(side);
         }
 
-        public Order GetOrder(ulong offerId)
+        public Models.Order GetOrder(ulong offerId)
         {
             return GetOrderbook(offerId).GetOrder(offerId);
         }
@@ -104,7 +106,7 @@ namespace Centaurus.Domain
             return GetOrderbook(offerId).RemoveOrder(offerId);
         }
 
-        public static Exchange RestoreExchange(List<AssetSettings> assets, List<Order> orders, bool observeTrades)
+        public static Exchange RestoreExchange(List<AssetSettings> assets, List<Models.Order> orders, bool observeTrades)
         {
             var exchange = new Exchange(observeTrades);
             foreach (var asset in assets)
@@ -124,8 +126,8 @@ namespace Centaurus.Domain
         {
             cancellationTokenSource?.Cancel();
             cancellationTokenSource = null;
-            awaitedTrades?.Dispose();
-            awaitedTrades = null;
+            awaitedUpdates?.Dispose();
+            awaitedUpdates = null;
         }
     }
 }

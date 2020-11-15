@@ -6,7 +6,7 @@ using System.Text;
 
 namespace Centaurus.Exchange.Analytics
 {
-    public class OHLCFrame : IEquatable<OHLCFrame>
+    public class OHLCFrame
     {
         /// <summary>
         /// 
@@ -26,7 +26,7 @@ namespace Centaurus.Exchange.Analytics
 
         public int Market { get; }
 
-        public double Hi { get; set; }
+        public double High { get; set; }
 
         public double Low { get; set; }
 
@@ -42,12 +42,12 @@ namespace Centaurus.Exchange.Analytics
                 throw new ArgumentNullException(nameof(trade));
             if (Open == default) //register first trade
             {
-                Open = Hi = Low = Close = trade.Price;
+                Open = High = Low = Close = trade.Price;
                 Volume = trade.BaseAmount;
                 return;
             }
-            if (Hi < trade.Price)
-                Hi = trade.Price;
+            if (High < trade.Price)
+                High = trade.Price;
             if (Low > trade.Price)
                 Low = trade.Price;
             Close = trade.Price;
@@ -57,39 +57,6 @@ namespace Centaurus.Exchange.Analytics
         public bool IsExpired(DateTime currentDateTime)
         {
             return StartTime.GetDiff(currentDateTime, Period) != 0;
-        }
-
-        public override bool Equals(object obj)
-        {
-            return Equals(obj as OHLCFrame);
-        }
-
-        public bool Equals(OHLCFrame other)
-        {
-            return other != null &&
-                   StartTime == other.StartTime &&
-                   Period == other.Period &&
-                   Market == other.Market &&
-                   Hi == other.Hi &&
-                   Low == other.Low &&
-                   Open == other.Open &&
-                   Close == other.Close &&
-                   Volume == other.Volume;
-        }
-
-        public override int GetHashCode()
-        {
-            return HashCode.Combine(StartTime, Period, Market, Hi, Low, Open, Close, Volume);
-        }
-
-        public static bool operator ==(OHLCFrame left, OHLCFrame right)
-        {
-            return EqualityComparer<OHLCFrame>.Default.Equals(left, right);
-        }
-
-        public static bool operator !=(OHLCFrame left, OHLCFrame right)
-        {
-            return !(left == right);
         }
     }
 }

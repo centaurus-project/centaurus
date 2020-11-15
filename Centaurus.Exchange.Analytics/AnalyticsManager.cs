@@ -18,17 +18,19 @@ namespace Centaurus.Exchange.Analytics
 
         private System.Timers.Timer updatesTimer;
 
-        public AnalyticsManager(IAnalyticsStorage analyticsStorage, List<int> markets, int tradesHistorySize = 100)
+        public AnalyticsManager(IAnalyticsStorage analyticsStorage, List<double> precisions, IOrderMap orders, List<int> markets, int tradesHistorySize = 100)
         {
-            this.analyticsStorage = analyticsStorage;
-            OHLCManager = new OHLCManager(analyticsStorage, markets);
+            this.analyticsStorage = analyticsStorage ?? throw new ArgumentNullException(nameof(analyticsStorage));
+            OHLCManager = new OHLCManager(analyticsStorage, markets ?? throw new ArgumentNullException(nameof(markets)));
             TradesHistoryManager = new TradesHistoryManager(markets, tradesHistorySize);
+            MarketDepthsManager = new MarketDepthsManager(markets, precisions, orders);
             InitTimer();
         }
 
         public async Task Restore(DateTime dateTime)
         {
             await OHLCManager.Restore(dateTime);
+            MarketDepthsManager.Restore();
         }
 
         public async Task SaveUpdates(IAnalyticsStorage analyticsStorage, int numberOfTries = 5)
@@ -67,6 +69,7 @@ namespace Centaurus.Exchange.Analytics
 
         public OHLCManager OHLCManager { get; private set; }
         public TradesHistoryManager TradesHistoryManager { get; private set; }
+        public MarketDepthsManager MarketDepthsManager { get; private set; }
 
         public void Dispose()
         {
@@ -100,16 +103,11 @@ namespace Centaurus.Exchange.Analytics
             }
         }
 
-        public (int market, Dictionary<OHLCFramePeriod, List<OHLCFrame>> frames, List<Trade> trades) OnTrade(List<Trade> trades)
+        public void OnUpdates(ExchangeUpdate updates)
         {
-            if (OHLCManager == null)
-                throw new ObjectDisposedException(nameof(AnalyticsManager));
-
-            return (
-                market: trades.First().Asset,
-                frames: OHLCManager.OnTrade(trades),
-                trades: TradesHistoryManager.OnTrade(trades)
-            );
+            OHLCManager.OnTrade(updates.Trades);
+            TradesHistoryManager.OnTrade(updates.Market, updates.Trades);
+            MarketDepthsManager.OnOrderUpdates(updates.Market, updates.OrderUpdates);
         }
 
         private IAnalyticsStorage analyticsStorage;

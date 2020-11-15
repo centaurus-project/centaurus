@@ -11,7 +11,7 @@ namespace Centaurus.Domain
     {
         public override Task<BaseResponse> Handle(InfoWebSocketConnection infoWebSocket, UnsubscribeFromMarket command)
         {
-            var subscriptionId = OHLCManager.EncodeManagerId(command.Market, command.Period);
+            var subscriptionId = OHLCManager.EncodeAssetTradesResolution(command.Market, command.Period);
             if (infoWebSocket.Subscriptions.Contains(subscriptionId))
                 infoWebSocket.Subscriptions.Remove(subscriptionId);
             return Task.FromResult((BaseResponse)new SuccesResponse { RequestId = command.RequestId });

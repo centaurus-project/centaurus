@@ -122,13 +122,13 @@ namespace Centaurus.Test
         }
 
         [Test]
-        [TestCase(0, 0, 0, OrderSides.Sell, typeof(UnauthorizedException))]
-        [TestCase(1, 0, 0, OrderSides.Sell, typeof(InvalidOperationException))]
-        [TestCase(1, 1, 0, OrderSides.Sell, typeof(BadRequestException))]
-        [TestCase(1, 1, 1000000000, OrderSides.Sell, typeof(BadRequestException))]
-        [TestCase(1, 1, 100, OrderSides.Sell, null)]
-        [TestCase(1, 1, 100, OrderSides.Buy, null)]
-        public async Task OrderQuantumTest(int nonce, int asset, int amount, OrderSides side, Type excpectedException)
+        [TestCase(0, 0, 0, OrderSide.Sell, typeof(UnauthorizedException))]
+        [TestCase(1, 0, 0, OrderSide.Sell, typeof(InvalidOperationException))]
+        [TestCase(1, 1, 0, OrderSide.Sell, typeof(BadRequestException))]
+        [TestCase(1, 1, 1000000000, OrderSide.Sell, typeof(BadRequestException))]
+        [TestCase(1, 1, 100, OrderSide.Sell, null)]
+        [TestCase(1, 1, 100, OrderSide.Buy, null)]
+        public async Task OrderQuantumTest(int nonce, int asset, int amount, OrderSide side, Type excpectedException)
         {
             var order = new OrderRequest
             {
@@ -157,7 +157,7 @@ namespace Centaurus.Test
                 var currentMarket = Global.Exchange.GetMarket(asset);
                 Assert.IsTrue(currentMarket != null);
 
-                var requests = side == OrderSides.Buy ? currentMarket.Bids : currentMarket.Asks;
+                var requests = side == OrderSide.Buy ? currentMarket.Bids : currentMarket.Asks;
                 Assert.AreEqual(requests.Count, 1);
 
                 Assert.AreEqual(requests.TotalAmount, amount);
@@ -166,12 +166,12 @@ namespace Centaurus.Test
         }
 
         [Test]
-        [TestCase(1, 100, OrderSides.Sell, 111, false, typeof(BadRequestException))]
-        [TestCase(1, 100, OrderSides.Buy, 111, false, typeof(BadRequestException))]
-        [TestCase(1, 100, OrderSides.Sell, 0, true, typeof(UnauthorizedAccessException))]
-        [TestCase(1, 100, OrderSides.Sell, 0, false, null)]
-        [TestCase(1, 100, OrderSides.Buy, 0, false, null)]
-        public async Task OrderCancellationQuantumTest(int asset, int amount, OrderSides side, int apexMod, bool useFakeSigner, Type excpectedException)
+        [TestCase(1, 100, OrderSide.Sell, 111, false, typeof(BadRequestException))]
+        [TestCase(1, 100, OrderSide.Buy, 111, false, typeof(BadRequestException))]
+        [TestCase(1, 100, OrderSide.Sell, 0, true, typeof(UnauthorizedAccessException))]
+        [TestCase(1, 100, OrderSide.Sell, 0, false, null)]
+        [TestCase(1, 100, OrderSide.Buy, 0, false, null)]
+        public async Task OrderCancellationQuantumTest(int asset, int amount, OrderSide side, int apexMod, bool useFakeSigner, Type excpectedException)
         {
             var order = new OrderRequest
             {
@@ -223,7 +223,7 @@ namespace Centaurus.Test
                 var currentMarket = Global.Exchange.GetMarket(asset);
                 Assert.IsTrue(currentMarket != null);
 
-                var requests = side == OrderSides.Buy ? currentMarket.Bids : currentMarket.Asks;
+                var requests = side == OrderSide.Buy ? currentMarket.Bids : currentMarket.Asks;
                 Assert.AreEqual(requests.Count, 1);
 
                 Assert.AreEqual(requests.TotalAmount, amount);

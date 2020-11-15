@@ -17,10 +17,10 @@ namespace Centaurus.Exchange.Analytics
     {
         public OHLCManager(IAnalyticsStorage storage, List<int> markets)
         {
-            periods = Enum.GetValues(typeof(OHLCFramePeriod)).Cast<OHLCFramePeriod>();
+            periods = EnumExtensions.GetValues<OHLCFramePeriod>();
             foreach (var period in periods)
                 foreach (var market in markets)
-                    managers.Add(EncodeManagerId(market, period), new SinglePeriodOHLCManager(period, market, storage));
+                    managers.Add(EncodeAssetTradesResolution(market, period), new SinglePeriodOHLCManager(period, market, storage));
         }
 
         public async Task Restore(DateTime dateTime)
@@ -45,7 +45,7 @@ namespace Centaurus.Exchange.Analytics
                 var tradeDateTime = new DateTime(trade.Timestamp, DateTimeKind.Utc);
                 foreach (var period in periods)
                 {
-                    var managerId = EncodeManagerId(trade.Asset, period);
+                    var managerId = EncodeAssetTradesResolution(trade.Asset, period);
                     var frameManager = managers[managerId];
 
                     var trimmedDateTime = tradeDateTime.Trim(frameManager.Period);
@@ -70,7 +70,7 @@ namespace Centaurus.Exchange.Analytics
         /// <returns></returns>
         public async Task<(List<OHLCFrame> frames, int nextCursor)> GetPeriod(int cursor, int market, OHLCFramePeriod framePeriod)
         {
-            var managerId = EncodeManagerId(market, framePeriod);
+            var managerId = EncodeAssetTradesResolution(market, framePeriod);
             var cursorDate = cursor == 0 ? default : DateTimeOffset.FromUnixTimeSeconds(cursor).DateTime;
             var res = await managers[managerId].GetFramesForDate(cursorDate);
             return (
@@ -98,12 +98,12 @@ namespace Centaurus.Exchange.Analytics
                 m.Value.Dispose();
         }
 
-        public static long EncodeManagerId(int market, OHLCFramePeriod period)
+        public static long EncodeAssetTradesResolution(int market, OHLCFramePeriod period)
         {
             return (uint.MaxValue * (long)market) + (int)period;
         }
 
-        public static (int market, OHLCFramePeriod period) DecodeManagerId(long managerId)
+        public static (int market, OHLCFramePeriod period) DecodeAssetTradesResolution(long managerId)
         {
             return (
                 market: (int)Math.Floor(decimal.Divide(managerId, uint.MaxValue)),

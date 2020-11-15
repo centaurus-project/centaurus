@@ -14,7 +14,7 @@ namespace Centaurus.Exchange.Analytics
             {
                 Open = frameModel.Open,
                 Close = frameModel.Close,
-                Hi = frameModel.Hi,
+                High = frameModel.High,
                 Low = frameModel.Low,
                 Volume = frameModel.Volume
             };
@@ -31,7 +31,7 @@ namespace Centaurus.Exchange.Analytics
                 Open = frame.Open,
                 Close = frame.Close,
                 Low = frame.Low,
-                Hi = frame.Hi,
+                High = frame.High,
                 Period = (int)frame.Period,
                 Volume = frame.Volume
             };

@@ -7,9 +7,9 @@ namespace Centaurus.Domain
 {
     public static class MarketExtensions
     {
-        public static Orderbook GetOrderbook(this Market market, OrderSides side)
+        public static Orderbook GetOrderbook(this Market market, OrderSide side)
         {
-            return side == OrderSides.Buy ? market.Bids : market.Asks;
+            return side == OrderSide.Buy ? market.Bids : market.Asks;
         }
     }
 }

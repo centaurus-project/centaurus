@@ -103,26 +103,26 @@ namespace Centaurus.Domain
                     }
                     catch
                     {
-                        //TODO: should we crash here?
+                        throw new Exception("Unable to save trades history.");
                     }
-                    Exchange.OnTrade -= Exchange_OnTrade;
+                    Exchange.OnUpdates -= Exchange_OnTrade;
                     AnalyticsManager.Dispose();
                 }
-                AnalyticsManager = new AnalyticsManager(PermanentStorage, Constellation.Assets.Where(a => !a.IsXlm).Select(a => a.Id).ToList());
+                AnalyticsManager = new AnalyticsManager(PermanentStorage, DepthsSubscription.Precisions.ToList(), Exchange.OrderMap, Constellation.Assets.Where(a => !a.IsXlm).Select(a => a.Id).ToList());
                 AnalyticsManager.Restore(DateTime.UtcNow).Wait();
-                Exchange.OnTrade += Exchange_OnTrade;
+                Exchange.OnUpdates += Exchange_OnTrade;
             }
 
             ExtensionsManager?.Dispose(); ExtensionsManager = new ExtensionsManager();
             ExtensionsManager.RegisterAllExtensions();
         }
 
-        private static void Exchange_OnTrade(List<Trade> trades)
+        private static void Exchange_OnTrade(ExchangeUpdate updates)
         {
-            if (trades == null || trades.Count < 1)
+            if (updates == null)
                 return;
-            var updates = AnalyticsManager.OnTrade(trades);
-            InfoConnectionManager.SendMarketUpdates(updates.market, updates.frames, updates.trades);
+            AnalyticsManager.OnUpdates(updates);
+            //InfoConnectionManager.SendMarketUpdates(updates.market, updates.frames, updates.trades);
         }
 
         public static Exchange Exchange { get; private set; }

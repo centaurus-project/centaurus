@@ -14,6 +14,9 @@ namespace Centaurus.Analytics
 
         public double BaseAmount { get; set; }
 
+        /// <summary>
+        /// TimeStamp in ticks. We need it for sorting
+        /// </summary>
         public long Timestamp { get; set; }
     }
 }

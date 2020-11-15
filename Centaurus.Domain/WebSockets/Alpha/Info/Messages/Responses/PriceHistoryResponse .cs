@@ -6,11 +6,9 @@ using System.Text;
 
 namespace Centaurus.Domain
 {
-    public class MarketResponse: SuccesResponse
+    public class PriceHistoryResponse : SuccesResponse
     {
-        public List<OHLCFrame> Frames { get; set; }
-
-        public List<Trade> Trades { get; set; }
+        public List<Trade> PriceHistory  { get; set; }
 
         public int NextCursor { get; set; }
     }

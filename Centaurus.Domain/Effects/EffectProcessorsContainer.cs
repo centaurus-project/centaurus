@@ -146,7 +146,7 @@ namespace Centaurus.Domain
             ));
         }
 
-        public void AddOrderPlaced(Orderbook orderBook, Order order, long orderAmount, int asset, OrderSides side)
+        public void AddOrderPlaced(Orderbook orderBook, Order order, long orderAmount, int asset, OrderSide side)
         {
             var effect = new OrderPlacedEffect
             {
@@ -163,7 +163,7 @@ namespace Centaurus.Domain
         }
 
 
-        public void AddTrade(Order order, int asset, long assetAmount, long xlmAmount, double price, OrderSides side)
+        public void AddTrade(Order order, int asset, long assetAmount, long xlmAmount, double price, OrderSide side)
         {
             var trade = new TradeEffect
             {

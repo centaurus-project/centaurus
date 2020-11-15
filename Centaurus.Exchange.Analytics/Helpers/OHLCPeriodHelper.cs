@@ -7,22 +7,40 @@ namespace Centaurus.Exchange.Analytics
 {
     public static class OHLCPeriodHelper
     {
+        const long TicksPerWeek = TimeSpan.TicksPerDay * 7;
+
+        public static long TicksPerPeriod(OHLCFramePeriod period)
+        {
+                switch (period)
+                {
+                    case OHLCFramePeriod.Minute:
+                        return TimeSpan.TicksPerMinute;
+                    case OHLCFramePeriod.Minutes15:
+                        return TimeSpan.TicksPerMinute * 15;
+                    case OHLCFramePeriod.Minutes30:
+                        return TimeSpan.TicksPerMinute * 30;
+                    case OHLCFramePeriod.Hour:
+                        return TimeSpan.TicksPerHour;
+                    case OHLCFramePeriod.Hours4:
+                        return TimeSpan.TicksPerHour * 4;
+                    case OHLCFramePeriod.Day:
+                        return TimeSpan.TicksPerDay;
+                    case OHLCFramePeriod.Week:
+                        return TicksPerWeek;
+                    default:
+                        throw new InvalidOperationException($"{period} doesn't support ticks.");
+                }
+        }
+
         public static DateTime Trim(this DateTime dateTime, OHLCFramePeriod period)
         {
             switch (period)
             {
-                case OHLCFramePeriod.Minute:
-                    return new DateTime(dateTime.Year, dateTime.Month, dateTime.Day, dateTime.Hour, dateTime.Minute, 0, dateTime.Kind);
-                case OHLCFramePeriod.Hour:
-                    return new DateTime(dateTime.Year, dateTime.Month, dateTime.Day, dateTime.Hour, 0, 0, dateTime.Kind);
-                case OHLCFramePeriod.Day:
-                    return dateTime.Date;
-                case OHLCFramePeriod.Week:
-                    return GetPeriodMonday(dateTime);
                 case OHLCFramePeriod.Month:
-                    return GetPeriodMonthFirstDay(dateTime);
+                    return new DateTime(dateTime.Year, dateTime.Month, 1, 0, 0, 0, dateTime.Kind).Date;
                 default:
-                    throw new InvalidOperationException($"{period} period is not supported.");
+                    var trimmed = dateTime.Ticks - dateTime.Ticks % TicksPerPeriod(period);
+                    return new DateTime(trimmed, dateTime.Kind);
             }
         }
 
@@ -42,38 +60,17 @@ namespace Centaurus.Exchange.Analytics
 
             switch (period)
             {
-                case OHLCFramePeriod.Minute:
-                    return (int)(dateTo - dateFrom).TotalMinutes;
-                case OHLCFramePeriod.Hour:
-                    return (int)(dateTo - dateFrom).TotalHours;
-                case OHLCFramePeriod.Day:
-                    return (int)(dateTo - dateFrom).TotalDays;
-                case OHLCFramePeriod.Week:
                 case OHLCFramePeriod.Month:
                     var totalDiff = 0;
                     while ((dateTo - dateFrom).TotalDays > 0)
                     {
-                        dateFrom = period == OHLCFramePeriod.Week ? dateFrom.AddDays(7) : dateFrom.AddMonths(1);
+                        dateFrom = dateFrom.AddMonths(1);
                         totalDiff++;
                     }
                     return totalDiff;
                 default:
-                    throw new NotSupportedException($"{period} is not supported yet.");
+                    return (int)Math.Floor(decimal.Divide(dateTo.Ticks - dateFrom.Ticks, TicksPerPeriod(period)));
             }
         }
-
-        #region private members
-
-        static DateTime GetPeriodMonday(DateTime dateTime)
-        {
-            return dateTime.AddDays((int)DayOfWeek.Monday - (dateTime.DayOfWeek == DayOfWeek.Sunday ? 7 : (int)dateTime.DayOfWeek)).Date;
-        }
-
-        static DateTime GetPeriodMonthFirstDay(DateTime dateTime)
-        {
-            return new DateTime(dateTime.Year, dateTime.Month, 1, 0, 0, 0, dateTime.Kind).Date;
-        }
-
-        #endregion
     }
 }

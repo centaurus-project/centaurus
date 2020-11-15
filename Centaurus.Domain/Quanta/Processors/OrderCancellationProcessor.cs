@@ -26,7 +26,7 @@ namespace Centaurus.Domain
 
             var xmlAmount = OrderMatcher.EstimateTradedXlmAmount(context.Order.Amount, context.Order.Price);
             //lock order reserve
-            if (context.OrderSide == OrderSides.Buy)
+            if (context.OrderSide == OrderSide.Buy)
                 //TODO: check this - potential rounding error with multiple trades
                 context.EffectProcessors.AddUpdateLiabilities(orderRequest.AccountWrapper.Account, 0, -xmlAmount);
             else

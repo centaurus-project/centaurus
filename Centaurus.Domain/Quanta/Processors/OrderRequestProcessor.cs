@@ -45,7 +45,7 @@ namespace Centaurus.Domain
             var account = orderRequest.AccountWrapper.Account;
 
             //check required balances
-            if (orderRequest.Side == OrderSides.Sell)
+            if (orderRequest.Side == OrderSide.Sell)
             {
                 var balance = account.GetBalance(orderRequest.Asset);
                 if (!balance.HasSufficientBalance(orderRequest.Amount)) throw new BadRequestException("Insufficient funds");

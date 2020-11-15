@@ -43,7 +43,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Centaurus.Models.Extensions
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Centaurus.Exchange.Analytics", "Centaurus.Exchange.Analytics\Centaurus.Exchange.Analytics.csproj", "{80D0144F-0B3E-413D-A5FE-7EB849513C9F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Centaurus.Test.Exchange.Analytics", "Centaurus.Test.Exchange.Analytics\Centaurus.Test.Exchange.Analytics.csproj", "{5A142170-1C8E-486C-8E18-C0C64ACF5A2D}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Centaurus.Test.Exchange.Analytics", "Centaurus.Test.Exchange.Analytics\Centaurus.Test.Exchange.Analytics.csproj", "{5A142170-1C8E-486C-8E18-C0C64ACF5A2D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

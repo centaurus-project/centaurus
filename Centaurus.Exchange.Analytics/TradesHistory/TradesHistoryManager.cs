@@ -24,9 +24,14 @@ namespace Centaurus.Exchange.Analytics
         /// </summary>
         /// <param name="trades"></param>
         /// <returns>Last trades</returns>
-        public List<Trade> OnTrade(List<Trade> trades)
+        public List<Trade> OnTrade(int market, List<Trade> trades)
         {
-            var manager = managers[trades.First().Asset];
+            if (!managers.ContainsKey(market))
+                throw new ArgumentException($"Market {market} is not supported.");
+            if (trades == null)
+                throw new ArgumentNullException(nameof(trades));
+
+            var manager = managers[market];
             foreach (var trade in trades)
                 manager.OnTrade(trade);
             if (trades.Count > HistorySize)

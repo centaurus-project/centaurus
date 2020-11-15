@@ -20,7 +20,7 @@ namespace Centaurus.Exchange.Analytics
 
         public SinglePeriodOHLCManager(OHLCFramePeriod period, int market, IAnalyticsStorage analyticsStorage)
         {
-            this.analyticsStorage = analyticsStorage;
+            this.analyticsStorage = analyticsStorage ?? throw new ArgumentNullException(nameof(analyticsStorage));
             this.market = market;
             framesUnit = new MemoryCache(new MemoryCacheOptions { ExpirationScanFrequency = TimeSpan.FromSeconds(15), SizeLimit = 3_000_000 });
             Period = period;
@@ -162,16 +162,12 @@ namespace Centaurus.Exchange.Analytics
             {
                 switch (Period)
                 {
-                    case OHLCFramePeriod.Minute:
-                    case OHLCFramePeriod.Hour:
-                    case OHLCFramePeriod.Day:
-                        return 1000;
                     case OHLCFramePeriod.Week:
                         return 100;
                     case OHLCFramePeriod.Month:
                         return 12;
                     default:
-                        throw new NotSupportedException($"{Period} is not supported yet.");
+                        return 1000;
                 }
             }
         }
@@ -186,18 +182,13 @@ namespace Centaurus.Exchange.Analytics
         {
             switch (Period)
             {
-                case OHLCFramePeriod.Minute:
-                case OHLCFramePeriod.Hour:
-                case OHLCFramePeriod.Day:
-                case OHLCFramePeriod.Week:
+                case OHLCFramePeriod.Month:
+                    return new DateTime(dateTime.Year, 1, 1, 0, 0, 0, dateTime.Kind);
+                default:
                     var dateTicks = dateTime.Ticks / TicksPerPeriod;
                     var unitReminder = dateTicks % FramesPerUnit;
                     var periodStartDateTicks = dateTicks - unitReminder;
                     return new DateTime(periodStartDateTicks * TicksPerPeriod, dateTime.Kind);
-                case OHLCFramePeriod.Month:
-                    return new DateTime(dateTime.Year, 1, 1, 0, 0, 0, dateTime.Kind);
-                default:
-                    throw new NotSupportedException($"{Period} is not supported.");
             }
         }
 
@@ -212,41 +203,15 @@ namespace Centaurus.Exchange.Analytics
             var direction = inverse ? -1 : 1;
             switch (Period)
             {
-                case OHLCFramePeriod.Minute:
-                case OHLCFramePeriod.Hour:
-                case OHLCFramePeriod.Day:
-                case OHLCFramePeriod.Week:
-                    return dateTime.AddTicks((TicksPerPeriod * FramesPerUnit) * direction);
                 case OHLCFramePeriod.Month:
                     return dateTime.AddYears(1 * direction);
                 default:
-                    throw new NotSupportedException($"{Period} is not supported.");
-            }
-        }
-
-        const long TicksPerWeek = TimeSpan.TicksPerDay * 7;
-
-        private long TicksPerPeriod
-        {
-            get
-            {
-                switch (Period)
-                {
-                    case OHLCFramePeriod.Minute:
-                        return TimeSpan.TicksPerMinute;
-                    case OHLCFramePeriod.Hour:
-                        return TimeSpan.TicksPerHour;
-                    case OHLCFramePeriod.Day:
-                        return TimeSpan.TicksPerDay;
-                    case OHLCFramePeriod.Week:
-                        return TicksPerWeek;
-                    default:
-                        throw new InvalidOperationException($"{Period} doesn't support ticks.");
-                }
+                    return dateTime.AddTicks((TicksPerPeriod * FramesPerUnit) * direction);
             }
         }
 
         public OHLCFramePeriod Period { get; }
+        private long TicksPerPeriod => OHLCPeriodHelper.TicksPerPeriod(Period);
 
         private async Task<List<OHLCFrame>> GetUnit(DateTime unitDate, bool isCurrentFrame = false)
         {

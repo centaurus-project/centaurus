@@ -33,18 +33,6 @@ namespace Centaurus.Domain
             await connection.Listen();
         }
 
-        public static void SendMarketUpdates(int market, Dictionary<OHLCFramePeriod, List<OHLCFrame>> frames, List<Trade> trades)
-        {
-            foreach (var f in frames)
-            {
-                var subsId = OHLCManager.EncodeManagerId(market, f.Key);
-                var subscribers = connections.Values.Where(s => s.Subscriptions.Contains(subsId));
-                var updateMessage = new MarketUpdate { Market = market, Period = f.Key, Frames = f.Value, Trades = trades };
-                foreach (var subscriber in subscribers)
-                    _ = subscriber.SendMessage(updateMessage);
-            }
-        }
-
         /// <summary>
         /// Closes all connection
         /// </summary>

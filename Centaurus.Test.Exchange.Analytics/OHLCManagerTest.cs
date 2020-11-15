@@ -17,16 +17,16 @@ namespace Centaurus.Test.Exchange.Analytics
 
             foreach (var market in markets)
             {
-                foreach (var period in Enum.GetValues(typeof(OHLCFramePeriod)))
+                foreach (var period in EnumExtensions.GetValues<OHLCFramePeriod>())
                 {
                     var prevPeriodFrame = default(OHLCFrame);
                     var cursor = 0;
                     do
                     {
-                        var periodRespond = await analyticsManager.OHLCManager.GetPeriod(cursor, market, (OHLCFramePeriod)period);
+                        var periodRespond = await analyticsManager.OHLCManager.GetPeriod(cursor, market, period);
                         foreach (var frame in periodRespond.frames)
                         {
-                            Assert.GreaterOrEqual(frame.Hi, frame.Low, "Frame Hi price is greater than Low price.");
+                            Assert.GreaterOrEqual(frame.High, frame.Low, "Frame High price is greater than Low price.");
                             Assert.Greater(frame.Volume, 0, "Volume must be greater than 0.");
                             if (prevPeriodFrame != null)
                                 Assert.Greater(prevPeriodFrame.StartTime, frame.StartTime, "Current frame start time cannot greater or equal to the previous one.");

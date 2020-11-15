@@ -4,14 +4,12 @@ using System.Text.Json.Serialization;
 
 namespace Centaurus.Domain
 {
-    [Command("GetMarket")]
-    public class GetMarket: BaseCommand
+    [Command("GetPriceHistory")]
+    public class GetPriceHistory: BaseCommand
     {
         public int Market { get; set; }
 
         public OHLCFramePeriod Period { get; set; }
-
-        public bool SubscribeToUpdates { get; set; }
 
         /// <summary>
         /// Unix timestamp

@@ -13,7 +13,7 @@ namespace Centaurus.DAL.Models.Analytics
 
         public int Period { get; set; }
 
-        public double Hi { get; set; }
+        public double High { get; set; }
 
         public double Low { get; set; }
 
