@@ -21,6 +21,8 @@ namespace Centaurus.DAL.Models.Analytics
 
         public double Close { get; set; }
 
-        public double Volume { get; set; }
+        public double BaseAssetVolume { get; set; }
+
+        public double MarketAssetVolume { get; set; }
     }
 }

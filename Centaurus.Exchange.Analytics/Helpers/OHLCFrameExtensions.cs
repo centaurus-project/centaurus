@@ -10,13 +10,14 @@ namespace Centaurus.Exchange.Analytics
         {
             if (frameModel is null)
                 throw new ArgumentNullException(nameof(frameModel));
-            return new OHLCFrame(DateTimeOffset.FromUnixTimeSeconds(frameModel.TimeStamp).UtcDateTime, (OHLCFramePeriod)frameModel.Period, frameModel.Market)
+            return new OHLCFrame(DateTimeOffset.FromUnixTimeSeconds(frameModel.TimeStamp).UtcDateTime, (OHLCFramePeriod)frameModel.Period, frameModel.Market, frameModel.Open)
             {
                 Open = frameModel.Open,
                 Close = frameModel.Close,
                 High = frameModel.High,
                 Low = frameModel.Low,
-                Volume = frameModel.Volume
+                BaseAssetVolume = frameModel.BaseAssetVolume,
+                MarketAssetVolume = frameModel.MarketAssetVolume
             };
         }
 
@@ -33,7 +34,8 @@ namespace Centaurus.Exchange.Analytics
                 Low = frame.Low,
                 High = frame.High,
                 Period = (int)frame.Period,
-                Volume = frame.Volume
+                BaseAssetVolume = frame.BaseAssetVolume,
+                MarketAssetVolume = frame.MarketAssetVolume
             };
         }
     }

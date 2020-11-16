@@ -49,9 +49,12 @@ namespace Centaurus.Exchange.Analytics
                     var frameManager = managers[managerId];
 
                     var trimmedDateTime = tradeDateTime.Trim(frameManager.Period);
-                    if (frameManager.CurrentFrame is null || frameManager.CurrentFrame.IsExpired(trimmedDateTime))
+                    while (frameManager.CurrentFrame is null || frameManager.CurrentFrame.IsExpired(trimmedDateTime))
                     {
-                        frameManager.RegisterNewFrame(new OHLCFrame(trimmedDateTime, frameManager.Period, trade.Asset));
+                        var nextFrameStartDate = frameManager.CurrentFrame?.StartTime.GetNextFrameDate(frameManager.Period) ?? trimmedDateTime;
+                        var closePrice = frameManager.CurrentFrame?.Close ?? 0;
+                        var nextFrame = new OHLCFrame(nextFrameStartDate, frameManager.Period, trade.Asset, closePrice);
+                        frameManager.RegisterNewFrame(nextFrame);
                     }
                     frameManager.OnTrade(trade);
                     if (!updatedFrames[period].Contains(frameManager.CurrentFrame))
@@ -71,7 +74,7 @@ namespace Centaurus.Exchange.Analytics
         public async Task<(List<OHLCFrame> frames, int nextCursor)> GetPeriod(int cursor, int market, OHLCFramePeriod framePeriod)
         {
             var managerId = EncodeAssetTradesResolution(market, framePeriod);
-            var cursorDate = cursor == 0 ? default : DateTimeOffset.FromUnixTimeSeconds(cursor).DateTime;
+            var cursorDate = cursor == 0 ? default : DateTimeOffset.FromUnixTimeSeconds(cursor).UtcDateTime;
             var res = await managers[managerId].GetFramesForDate(cursorDate);
             return (
                 res.frames,

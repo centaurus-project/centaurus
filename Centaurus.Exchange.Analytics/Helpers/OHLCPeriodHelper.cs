@@ -44,6 +44,17 @@ namespace Centaurus.Exchange.Analytics
             }
         }
 
+        public static DateTime GetNextFrameDate(this DateTime dateTime, OHLCFramePeriod period)
+        {
+            switch (period)
+            {
+                case OHLCFramePeriod.Month:
+                    return dateTime.AddMonths(1);
+                default:
+                    return dateTime.AddTicks(TicksPerPeriod(period));
+            }
+        }
+
         /// <summary>
         /// Get diff between two dates in specified periods. DateTime values must be already trimmed 
         /// </summary>

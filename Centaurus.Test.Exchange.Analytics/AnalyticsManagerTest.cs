@@ -50,7 +50,8 @@ namespace Centaurus.Test.Exchange.Analytics
                            frame.Low == restoredFrame.Low &&
                            frame.Open == restoredFrame.Open &&
                            frame.Close == restoredFrame.Close &&
-                           frame.Volume == restoredFrame.Volume, 
+                           frame.BaseAssetVolume == restoredFrame.BaseAssetVolume && 
+                           frame.MarketAssetVolume == restoredFrame.MarketAssetVolume,
                            "Restored frame doesn't equal to current frame.");
                     }
                 }

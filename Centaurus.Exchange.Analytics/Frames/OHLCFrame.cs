@@ -13,11 +13,12 @@ namespace Centaurus.Exchange.Analytics
         /// </summary>
         /// <param name="startTime">Trimmed date time</param>
         /// <param name="period"></param>
-        public OHLCFrame(DateTime startTime, OHLCFramePeriod period, int market)
+        public OHLCFrame(DateTime startTime, OHLCFramePeriod period, int market, double open)
         {
             StartTime = startTime;
             Period = period;
             Market = market;
+            Open = Close = open;
         }
 
         public DateTime StartTime { get; }
@@ -34,16 +35,20 @@ namespace Centaurus.Exchange.Analytics
 
         public double Close { get; set; }
 
-        public double Volume { get; set; }
+        public double BaseAssetVolume { get; set; }
+
+        public double MarketAssetVolume { get; set; }
 
         public void OnTrade(Trade trade)
         {
             if (trade == null)
                 throw new ArgumentNullException(nameof(trade));
-            if (Open == default) //register first trade
+            if (!HadTrades) //register first trade
             {
                 Open = High = Low = Close = trade.Price;
-                Volume = trade.BaseAmount;
+                BaseAssetVolume = trade.BaseAmount;
+                MarketAssetVolume = trade.Amount;
+                HadTrades = true;
                 return;
             }
             if (High < trade.Price)
@@ -51,12 +56,15 @@ namespace Centaurus.Exchange.Analytics
             if (Low > trade.Price)
                 Low = trade.Price;
             Close = trade.Price;
-            Volume += trade.BaseAmount;
+            BaseAssetVolume += trade.BaseAmount;
+            MarketAssetVolume += trade.Amount;
         }
 
         public bool IsExpired(DateTime currentDateTime)
         {
             return StartTime.GetDiff(currentDateTime, Period) != 0;
         }
+
+        public bool HadTrades { get; private set; }
     }
 }
