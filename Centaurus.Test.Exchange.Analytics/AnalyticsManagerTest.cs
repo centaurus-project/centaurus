@@ -35,8 +35,8 @@ namespace Centaurus.Test.Exchange.Analytics
             {
                 foreach (var period in EnumExtensions.GetValues<OHLCFramePeriod>())
                 {
-                    var frames = await analyticsManager.OHLCManager.GetPeriod(0, market, period);
-                    var restoredFrames = await restoredAnalyticsManager.OHLCManager.GetPeriod(0, market, period);
+                    var frames = await analyticsManager.OHLCManager.GetFrames(0, market, period);
+                    var restoredFrames = await restoredAnalyticsManager.OHLCManager.GetFrames(0, market, period);
                     Assert.AreEqual(frames.frames.Count, restoredFrames.frames.Count, "Current frames unit and restored frames unit have different size.");
                     for (var i = 0; i < frames.frames.Count; i++)
                     {

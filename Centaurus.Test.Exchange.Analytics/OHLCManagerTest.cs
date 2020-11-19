@@ -23,7 +23,7 @@ namespace Centaurus.Test.Exchange.Analytics
                     var cursor = 0;
                     do
                     {
-                        var periodResponse = await analyticsManager.OHLCManager.GetPeriod(cursor, market, period);
+                        var periodResponse = await analyticsManager.OHLCManager.GetFrames(cursor, market, period);
 
                         for (var i = 0; i < periodResponse.frames.Count; i++)
                         {

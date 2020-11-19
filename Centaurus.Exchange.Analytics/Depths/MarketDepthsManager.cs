@@ -19,22 +19,22 @@ namespace Centaurus.Exchange.Analytics
             if (precisions.Count < 1)
                 precisions = new List<double> { 1 };
 
-            var depths = new Dictionary<int, Dictionary<double, SingleMarketDepths>>();
+            var depths = new Dictionary<int, Dictionary<double, MarketDepth>>();
             foreach (var market in markets)
             {
-                depths.Add(market, new Dictionary<double, SingleMarketDepths>());
+                depths.Add(market, new Dictionary<double, MarketDepth>());
                 foreach (var precision in precisions)
-                    depths[market].Add(precision, new SingleMarketDepths(market, precision, orders));
+                    depths[market].Add(precision, new MarketDepth(market, precision, orders));
             }
-            this.depths = depths.ToImmutableDictionary();
+            this.marketDepths = depths.ToImmutableDictionary();
         }
 
-        private ImmutableDictionary<int, Dictionary<double, SingleMarketDepths>> depths;
+        private ImmutableDictionary<int, Dictionary<double, MarketDepth>> marketDepths;
 
         public void Restore()
         {
-            foreach (var market in depths.Keys)
-                foreach (var depthManager in depths[market].Values)
+            foreach (var market in marketDepths.Keys)
+                foreach (var depthManager in marketDepths[market].Values)
                 {
                     depthManager.Restore();
                 }
@@ -42,12 +42,21 @@ namespace Centaurus.Exchange.Analytics
 
         public void OnOrderUpdates(int market, List<OrderUpdate> orderUpdates)
         {
-            if (!depths.ContainsKey(market))
+            if (!marketDepths.ContainsKey(market))
                 throw new ArgumentException($"Market {market} is not supported.");
-            foreach (var depthManager in depths[market].Values)
+            foreach (var depthManager in marketDepths[market].Values)
             {
                 depthManager.OnOrderUpdates(orderUpdates);
             }
+        }
+
+        public MarketDepth GetDepth(int market, double precision)
+        {
+            if (!marketDepths.TryGetValue(market, out var currentMarketDepths))
+                throw new ArgumentException($"Market {market} is not supported.");
+            if (!currentMarketDepths.TryGetValue(precision, out var depht))
+                throw new ArgumentException($"Precision {precision} is not supported.");
+            return depht;
         }
     }
 }

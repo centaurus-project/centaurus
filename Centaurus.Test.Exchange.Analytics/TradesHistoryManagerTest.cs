@@ -11,7 +11,7 @@ namespace Centaurus.Test.Exchange.Analytics
         [Test]
         public void GetTradesTest()
         {
-            GenerateTrades(50_000);
+            GenerateTrades(historyLength * 10);
 
             foreach (var market in markets)
             {

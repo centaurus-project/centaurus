@@ -15,7 +15,7 @@ namespace Centaurus.Exchange.Analytics
         /// <param name="period"></param>
         public OHLCFrame(DateTime startTime, OHLCFramePeriod period, int market, double open)
         {
-            StartTime = startTime;
+            StartTime = UpdatedAt = startTime;
             Period = period;
             Market = market;
             Open = Close = open;
@@ -43,6 +43,7 @@ namespace Centaurus.Exchange.Analytics
         {
             if (trade == null)
                 throw new ArgumentNullException(nameof(trade));
+            UpdatedAt = DateTime.UtcNow;
             if (!HadTrades) //register first trade
             {
                 Open = High = Low = Close = trade.Price;
@@ -64,6 +65,8 @@ namespace Centaurus.Exchange.Analytics
         {
             return StartTime.GetDiff(currentDateTime, Period) != 0;
         }
+
+        public DateTime UpdatedAt { get; private set; }
 
         public bool HadTrades { get; private set; }
     }

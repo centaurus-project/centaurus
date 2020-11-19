@@ -16,7 +16,8 @@ namespace Centaurus.Exchange.Analytics
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        private System.Timers.Timer updatesTimer;
+        private System.Timers.Timer saveTimer;
+        private System.Timers.Timer updateTimer;
 
         public AnalyticsManager(IAnalyticsStorage analyticsStorage, List<double> precisions, IOrderMap orders, List<int> markets, int tradesHistorySize = 100)
         {
@@ -24,6 +25,7 @@ namespace Centaurus.Exchange.Analytics
             OHLCManager = new OHLCManager(analyticsStorage, markets ?? throw new ArgumentNullException(nameof(markets)));
             TradesHistoryManager = new TradesHistoryManager(markets, tradesHistorySize);
             MarketDepthsManager = new MarketDepthsManager(markets, precisions, orders);
+            MarketTickersManager = new MarketTickersManager(markets, OHLCManager);
             InitTimer();
         }
 
@@ -66,13 +68,25 @@ namespace Centaurus.Exchange.Analytics
             }
         }
 
+        public event Action OnUpdate;
+
+        public event Action<Exception> OnError;
 
         public OHLCManager OHLCManager { get; private set; }
         public TradesHistoryManager TradesHistoryManager { get; private set; }
         public MarketDepthsManager MarketDepthsManager { get; private set; }
+        public MarketTickersManager MarketTickersManager { get; private set; }
 
         public void Dispose()
         {
+            saveTimer?.Stop();
+            saveTimer?.Dispose();
+            saveTimer = null;
+
+            updateTimer?.Stop();
+            updateTimer?.Dispose();
+            updateTimer = null;
+
             OHLCManager?.Dispose();
             OHLCManager = null;
             TradesHistoryManager = null;
@@ -80,32 +94,54 @@ namespace Centaurus.Exchange.Analytics
 
         private void InitTimer()
         {
-            updatesTimer = new System.Timers.Timer();
-            updatesTimer.Interval = 5 * 1000;
-            updatesTimer.AutoReset = false;
-            updatesTimer.Elapsed += UpdatesTimer_Elapsed;
-            updatesTimer.Start();
+            saveTimer = new System.Timers.Timer();
+            saveTimer.Interval = 5 * 1000;
+            saveTimer.AutoReset = false;
+            saveTimer.Elapsed += SaveTimer_Elapsed;
+            saveTimer.Start();
+
+            updateTimer = new System.Timers.Timer();
+            updateTimer.Interval = 1000;
+            updateTimer.AutoReset = false;
+            updateTimer.Elapsed += UpdateTimer_Elapsed;
+            updateTimer.Start();
+        }
+
+
+
+        private async void UpdateTimer_Elapsed(object sender, ElapsedEventArgs e)
+        {
+            try
+            {
+                OHLCManager.Update();
+                await MarketTickersManager.Update();
+                updateTimer?.Start();
+                OnUpdate?.Invoke();
+            }
+            catch(Exception exc)
+            {
+                OnError?.Invoke(exc);
+            }
         }
 
         private SemaphoreSlim syncRoot = new SemaphoreSlim(1);
 
-        private async void UpdatesTimer_Elapsed(object sender, ElapsedEventArgs e)
+        private async void SaveTimer_Elapsed(object sender, ElapsedEventArgs e)
         {
             try
             {
                 await SaveUpdates(analyticsStorage);
-                updatesTimer?.Start();
+                saveTimer?.Start();
             }
             catch (Exception exc)
             {
-                logger.Error(exc);
-                //TODO: should we crash Alpha if we are unable to save updates?
+                OnError?.Invoke(exc);
             }
         }
 
-        public void OnUpdates(ExchangeUpdate updates)
+        public async Task OnUpdates(ExchangeUpdate updates)
         {
-            OHLCManager.OnTrade(updates.Trades);
+            await OHLCManager.OnTrade(updates.Market, updates.Trades);
             TradesHistoryManager.OnTrade(updates.Market, updates.Trades);
             MarketDepthsManager.OnOrderUpdates(updates.Market, updates.OrderUpdates);
         }

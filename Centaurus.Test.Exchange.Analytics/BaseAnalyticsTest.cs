@@ -63,7 +63,7 @@ namespace Centaurus.Test.Exchange.Analytics
                 {
                     var updates = new ExchangeUpdate(g.Key);
                     updates.Trades.AddRange(g);
-                    analyticsManager.OnUpdates(updates);
+                    analyticsManager.OnUpdates(updates).Wait();
                 }    
                 now += TimeSpan.TicksPerSecond * 20;
             }

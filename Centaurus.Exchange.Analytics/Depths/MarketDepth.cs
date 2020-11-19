@@ -8,9 +8,9 @@ using System.Text;
 
 namespace Centaurus.Exchange
 {
-    public class MarketDepthsPrice
+    public class MarketDepthPrice
     {
-        public MarketDepthsPrice(double price)
+        public MarketDepthPrice(double price)
         {
             Price = price;
         }
@@ -22,10 +22,10 @@ namespace Centaurus.Exchange
         public List<ulong> Orders { get; } = new List<ulong>();
     }
 
-    public class SingleMarketDepths
+    public class MarketDepth
     {
 
-        public SingleMarketDepths(int market, double precision, IOrderMap orderMap, int maxLevelCount = 20)
+        public MarketDepth(int market, double precision, IOrderMap orderMap, int maxLevelCount = 20)
         {
             if (orderMap == null)
                 throw new ArgumentNullException(nameof(orderMap));
@@ -38,7 +38,7 @@ namespace Centaurus.Exchange
             this.orderMap = orderMap;
         }
 
-        private Dictionary<OrderSide, List<MarketDepthsPrice>> prices = new Dictionary<OrderSide, List<MarketDepthsPrice>>();
+        private Dictionary<OrderSide, List<MarketDepthPrice>> prices = new Dictionary<OrderSide, List<MarketDepthPrice>>();
         private int decimalsCount;
         private int maxPricesCount;
         private IOrderMap orderMap;
@@ -75,11 +75,15 @@ namespace Centaurus.Exchange
                 if (updatedSides.Count > 0)
                     Fill(lastOrderId, updatedSides);
             }
+
+            UpdatedAt = DateTime.UtcNow;
         }
 
         public int Market { get; }
 
         public double Precision { get; }
+
+        public DateTime UpdatedAt { get; private set; }
 
         public void Restore()
         {
@@ -120,7 +124,7 @@ namespace Centaurus.Exchange
             var currentPrice = source.FirstOrDefault(p => p.Price == price);
             if (currentPrice == null)
             {
-                currentPrice = new MarketDepthsPrice(price);
+                currentPrice = new MarketDepthPrice(price);
                 var indexToInsert = source.FindIndex(p => p.Price < price);
                 if (indexToInsert == -1 && source.Count == maxPricesCount)
                     return false;

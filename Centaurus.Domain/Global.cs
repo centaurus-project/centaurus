@@ -106,23 +106,19 @@ namespace Centaurus.Domain
                         throw new Exception("Unable to save trades history.");
                     }
                     Exchange.OnUpdates -= Exchange_OnTrade;
+                    AnalyticsManager.OnError -= AnalyticsManager_OnError;
+                    AnalyticsManager.OnUpdate -= AnalyticsManager_OnUpdate;
                     AnalyticsManager.Dispose();
                 }
                 AnalyticsManager = new AnalyticsManager(PermanentStorage, DepthsSubscription.Precisions.ToList(), Exchange.OrderMap, Constellation.Assets.Where(a => !a.IsXlm).Select(a => a.Id).ToList());
                 AnalyticsManager.Restore(DateTime.UtcNow).Wait();
+                AnalyticsManager.OnError += AnalyticsManager_OnError;
+                AnalyticsManager.OnUpdate += AnalyticsManager_OnUpdate;
                 Exchange.OnUpdates += Exchange_OnTrade;
             }
 
             ExtensionsManager?.Dispose(); ExtensionsManager = new ExtensionsManager();
             ExtensionsManager.RegisterAllExtensions();
-        }
-
-        private static void Exchange_OnTrade(ExchangeUpdate updates)
-        {
-            if (updates == null)
-                return;
-            AnalyticsManager.OnUpdates(updates);
-            //InfoConnectionManager.SendMarketUpdates(updates.market, updates.frames, updates.trades);
         }
 
         public static Exchange Exchange { get; private set; }
@@ -241,5 +237,66 @@ namespace Centaurus.Domain
         private static Timer snapshotTimoutTimer;
 
         private static Timer snapshotRunTimer;
+
+        #region Analytics
+
+        private static async void AnalyticsManager_OnUpdate()
+        {
+            var updates = new Dictionary<BaseSubscription, SubscriptionUpdateBase>();
+            foreach (var subs in InfoConnectionManager.GetActiveSubscriptions())
+            {
+                switch (subs)
+                {
+                    case DepthsSubscription depthsSubscription:
+                        {
+                            var depth = AnalyticsManager.MarketDepthsManager.GetDepth(depthsSubscription.Market, depthsSubscription.Precision);
+                            updates.Add(depthsSubscription, new MarketDepthUpdate { MarketDepth = depth, UpdateDate = depth.UpdatedAt });
+                        }
+                        break;
+                    case PriceHistorySubscription priceHistorySubscription:
+                        {
+                            var frames = await AnalyticsManager.OHLCManager.GetFrames(0, priceHistorySubscription.Market, priceHistorySubscription.FramePeriod);
+                            updates.Add(priceHistorySubscription, new PriceHistoryUpdate { Prices = frames.frames, UpdateDate = frames.frames.Max(f => f.UpdatedAt) });
+                        }
+                        break;
+                    case TradesFeedSubscription tradesFeedSubscription:
+                        {
+                            var trades = AnalyticsManager.TradesHistoryManager.GetTrades(tradesFeedSubscription.Market);
+                            updates.Add(tradesFeedSubscription, new TradesFeedUpdate { Trades = trades, UpdateDate = new DateTime(trades.FirstOrDefault()?.Timestamp ?? 0, DateTimeKind.Utc) });
+                        }
+                        break;
+                    case AllMarketTickersSubscription allMarketTickersSubscription:
+                        {
+                            var allTickers = AnalyticsManager.MarketTickersManager.GetAllTickers();
+                            updates.Add(allMarketTickersSubscription, new AllTickersUpdate { Tickers = allTickers, UpdateDate = allTickers.Max(t => t.UpdatedAt) });
+                        }
+                        break;
+                    case MarketTickerSubscription marketTickerSubscription:
+                        {
+                            var marketTicker = AnalyticsManager.MarketTickersManager.GetMarketTicker(marketTickerSubscription.Market);
+                            updates.Add(marketTickerSubscription, new MarketTickerUpdate { MarketTicker = marketTicker, UpdateDate = marketTicker.UpdatedAt });
+                        }
+                        break;
+                    default:
+                        break;
+                }
+            }
+            InfoConnectionManager.SendSubscriptionUpdates(updates);
+        }
+
+        private static void AnalyticsManager_OnError(Exception exc)
+        {
+            logger.Error(exc);
+            AppState.State = ApplicationState.Failed;
+        }
+
+        private static async void Exchange_OnTrade(ExchangeUpdate updates)
+        {
+            if (updates == null)
+                return;
+            await AnalyticsManager.OnUpdates(updates);
+        }
+
+        #endregion
     }
 }

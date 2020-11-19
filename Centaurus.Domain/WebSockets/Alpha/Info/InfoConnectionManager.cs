@@ -65,6 +65,29 @@ namespace Centaurus.Domain
             connection.OnClosed -= OnClosed;
         }
 
+        public static List<BaseSubscription> GetActiveSubscriptions()
+        {
+            return connections.Values.SelectMany(c => c.GetSubscriptions()).Distinct().ToList();
+        }
+
+        public static void SendSubscriptionUpdates(Dictionary<BaseSubscription, SubscriptionUpdateBase> subsUpdates)
+        {
+            foreach (var update in subsUpdates)
+            {
+                var subs = update.Key;
+                var subsUpdate = update.Value;
+                foreach (var connection in connections)
+                {
+                    Task.Factory.StartNew(async () => await SendSubscriptionUpdate(subs, subsUpdate, connection.Value));
+                }
+            }
+        }
+
+        static async Task SendSubscriptionUpdate(BaseSubscription subscription, SubscriptionUpdateBase update, InfoWebSocketConnection connection)
+        {
+            await connection.SendSubscriptionUpdate(subscription, update);
+        }
+
         static void OnClosed(object sender, EventArgs args)
         {
             RemoveConnection((InfoWebSocketConnection)sender);

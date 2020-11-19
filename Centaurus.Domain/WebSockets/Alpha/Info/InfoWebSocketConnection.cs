@@ -1,6 +1,7 @@
 ﻿using Newtonsoft.Json;
 using NLog;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -23,7 +24,31 @@ namespace Centaurus.Domain
         public string Ip { get; }
         public string ConnectionId { get; }
 
-        public List<long> Subscriptions { get; } = new List<long>();
+        private ConcurrentDictionary<BaseSubscription, DateTime> Subscriptions { get; } = new ConcurrentDictionary<BaseSubscription, DateTime>();
+
+        public void AddSubscription(BaseSubscription baseSubscription)
+        {
+            Subscriptions.TryAdd(baseSubscription, default);
+        }
+
+        public List<BaseSubscription> GetSubscriptions()
+        {
+            return Subscriptions.Keys.ToList();
+        }
+
+        public void RemoveSubsctioption(BaseSubscription baseSubscription)
+        {
+            Subscriptions.TryRemove(baseSubscription, out _);
+        }
+
+        public async Task SendSubscriptionUpdate(BaseSubscription baseSubscription, SubscriptionUpdateBase update)
+        {
+            if (Subscriptions.TryGetValue(baseSubscription, out var lastUpdate) 
+                && Subscriptions.TryUpdate(baseSubscription, lastUpdate, update.UpdateDate)) //assume that UpdateDate will be always greater than subscriptions last updated date
+            {
+                await SendMessage(update);
+            }
+        }
 
         public InfoWebSocketConnection(WebSocket webSocket, string connectionId, string ip)
         {
@@ -119,7 +144,7 @@ namespace Centaurus.Domain
 
         public async Task SendMessage(object message)
         {
-            await webSocket.SendAsync(Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(message)), WebSocketMessageType.Binary, true, CancellationToken.None);
+            await webSocket.SendAsync(Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(message)), WebSocketMessageType.Text, true, CancellationToken.None);
         }
 
         public void Dispose()

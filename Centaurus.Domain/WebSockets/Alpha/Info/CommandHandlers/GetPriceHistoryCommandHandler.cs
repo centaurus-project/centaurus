@@ -7,18 +7,18 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public class GetPriceHistoryCommandHandler : BaseCommandHandler<GetPriceHistory>
+    public class GetPriceHistoryCommandHandler : BaseCommandHandler<GetPriceHistoryCommand>
     {
-        public override async Task<BaseResponse> Handle(InfoWebSocketConnection infoWebSocket, GetPriceHistory command)
+        public override async Task<BaseResponse> Handle(InfoWebSocketConnection infoWebSocket, GetPriceHistoryCommand command)
         {
             var asset = Global.Constellation.Assets.FirstOrDefault(a => a.Id == command.Market);
             if (asset == null && asset.IsXlm)
                 throw new BadRequestException("Invalid market.");
 
-            var res = (await Global.AnalyticsManager.OHLCManager.GetPeriod(command.Cursor, command.Market, command.Period));
+            var res = await Global.AnalyticsManager.OHLCManager.GetFrames(command.Cursor, command.Market, command.Period);
             return new PriceHistoryResponse  { 
                 RequestId = command.RequestId,
-                PriceHistory  = Global.AnalyticsManager.TradesHistoryManager.GetTrades(command.Market),
+                PriceHistory  = res.frames,
                 NextCursor = res.nextCursor
             };
         }

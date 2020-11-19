@@ -12,10 +12,10 @@ namespace Centaurus.Exchange.Analytics
         {
             HistorySize = historySize;
             foreach (var market in markets)
-                managers.Add(market, new SingleMarketTradesHistoryManager(market, historySize));
+                managers.Add(market, new MarketTradesHistoryManager(market, historySize));
         }
 
-        private Dictionary<int, SingleMarketTradesHistoryManager> managers = new Dictionary<int, SingleMarketTradesHistoryManager>();
+        private Dictionary<int, MarketTradesHistoryManager> managers = new Dictionary<int, MarketTradesHistoryManager>();
 
         public int HistorySize { get; }
 
@@ -24,24 +24,23 @@ namespace Centaurus.Exchange.Analytics
         /// </summary>
         /// <param name="trades"></param>
         /// <returns>Last trades</returns>
-        public List<Trade> OnTrade(int market, List<Trade> trades)
+        public void OnTrade(int market, List<Trade> trades)
         {
             if (!managers.ContainsKey(market))
                 throw new ArgumentException($"Market {market} is not supported.");
             if (trades == null)
                 throw new ArgumentNullException(nameof(trades));
 
-            var manager = managers[market];
-            foreach (var trade in trades)
-                manager.OnTrade(trade);
-            if (trades.Count > HistorySize)
-                return manager.GetLastTrades();
-            return trades;
+            lock (managers)
+                managers[market].OnTrade(trades);
         }
 
         public List<Trade> GetTrades(int market)
         {
-            return managers[market].GetLastTrades();
+            if (!managers.ContainsKey(market))
+                throw new ArgumentException($"Market {market} is not supported.");
+            lock (managers)
+                return managers[market].GetLastTrades();
         }
     }
 }

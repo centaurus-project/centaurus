@@ -14,14 +14,14 @@ using System.Threading.Tasks;
 namespace Centaurus.Exchange.Analytics
 {
 
-    public class SinglePeriodOHLCManager : IDisposable
+    public class OHLCPeriodManager : IDisposable
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public SinglePeriodOHLCManager(OHLCFramePeriod period, int market, IAnalyticsStorage analyticsStorage)
+        public OHLCPeriodManager(OHLCFramePeriod period, int market, IAnalyticsStorage analyticsStorage)
         {
             this.analyticsStorage = analyticsStorage ?? throw new ArgumentNullException(nameof(analyticsStorage));
-            this.market = market;
+            Market = market;
             framesUnit = new MemoryCache(new MemoryCacheOptions { ExpirationScanFrequency = TimeSpan.FromSeconds(15), SizeLimit = 3_000_000 });
             Period = period;
             evictionCallback = new PostEvictionCallbackRegistration()
@@ -33,19 +33,22 @@ namespace Centaurus.Exchange.Analytics
                 }
             };
         }
+        public int Market { get; }
 
         public async Task Restore(DateTime dateTime)
         {
             CurrentFramesUnitDate = GetFramesUnitDate(dateTime);
             var frames = await GetUnit(CurrentFramesUnitDate, true);
-            CurrentFrame = frames.FirstOrDefault();
+            LastAddedFrame = frames.FirstOrDefault();
 
             var firstFramesDate = (await analyticsStorage.GetFirstFrameDate(Period));
             if (firstFramesDate == 0)
                 firstFramesUnitDate = GetFramesUnitDate(DateTimeOffset.FromUnixTimeSeconds(firstFramesDate).DateTime);
         }
 
-        public OHLCFrame CurrentFrame { get; private set; }
+        public OHLCFrame LastAddedFrame { get; private set; }
+
+        public DateTime LastUpdated { get; private set; }
 
         public void RegisterNewFrame(OHLCFrame frame)
         {
@@ -71,10 +74,8 @@ namespace Centaurus.Exchange.Analytics
                     if (firstFramesUnitDate == default)
                         firstFramesUnitDate = CurrentFramesUnitDate;
                 }
-                if (frame.StartTime < CurrentFramesUnitDate)
-                { }
                 frames.Insert(0, frame);
-                CurrentFrame = frame;
+                LastAddedFrame = frame;
             }
             finally
             {
@@ -82,10 +83,19 @@ namespace Centaurus.Exchange.Analytics
             }
         }
 
-        public void OnTrade(Trade trade)
+        public async Task OnTrade(List<Trade> trades)
         {
-            CurrentFrame.OnTrade(trade);
-            updates.AddUpdate(CurrentFrame.StartTime, CurrentFrame);
+            var frame = default(OHLCFrame);
+            foreach (var trade in trades)
+            {
+                var tradeDate = new DateTime(trade.Timestamp, DateTimeKind.Utc).Trim(Period);
+                if (frame == null || frame.IsExpired(tradeDate))
+                    frame = await GetFrame(tradeDate);
+                if (frame == null)
+                    throw new Exception($"Unable to find frame for date time {tradeDate}.");
+                frame.OnTrade(trade);
+                updates.AddUpdate(frame.StartTime, frame);
+            }
         }
 
         public List<OHLCFrame> PullUpdates()
@@ -96,7 +106,7 @@ namespace Centaurus.Exchange.Analytics
         public async Task<(List<OHLCFrame> frames, DateTime nextCursor)> GetFramesForDate(DateTime cursor)
         {
             if (cursor == default)
-                cursor = CurrentFrame?.StartTime ?? default;
+                cursor = LastAddedFrame?.StartTime ?? default;
 
             var fromPeriod = GetFramesUnitDate(cursor);
             if (fromPeriod > CurrentFramesUnitDate && CurrentFramesUnitDate != default)
@@ -150,7 +160,6 @@ namespace Centaurus.Exchange.Analytics
         private MemoryCache framesUnit;
 
         private readonly IAnalyticsStorage analyticsStorage;
-        private readonly int market;
 
         private DateTime firstFramesUnitDate;
 
@@ -225,7 +234,7 @@ namespace Centaurus.Exchange.Analytics
                     {
                         var fromTimeStamp = (int)((DateTimeOffset)GetFramesNextUnitStart(unitDate)).ToUnixTimeSeconds();
                         var unixTimeStamp = (int)((DateTimeOffset)unitDate).ToUnixTimeSeconds();
-                        var rawFrames = await analyticsStorage.GetFrames(fromTimeStamp, unixTimeStamp, market, Period);
+                        var rawFrames = await analyticsStorage.GetFrames(fromTimeStamp, unixTimeStamp, Market, Period);
                         frames = rawFrames.Select(f => f.FromModel()).ToList();
                         framesUnit.Set(unitDate, frames, GetMemoryCacheEntryOptions(isCurrentFrame, frames.Count));
                     }
@@ -236,6 +245,14 @@ namespace Centaurus.Exchange.Analytics
                 }
             }
             return frames;
+        }
+
+        private async Task<OHLCFrame> GetFrame(DateTime dateTime)
+        {
+            var unitDate = GetFramesUnitDate(dateTime);
+            var unit = await GetUnit(unitDate);
+            var currentDateFrame = unit?.FirstOrDefault(f => f.StartTime == dateTime);
+            return currentDateFrame;
         }
 
         private bool HasMore(DateTime fromPeriod)

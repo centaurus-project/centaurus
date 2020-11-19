@@ -5,7 +5,7 @@ using System.Text.Json.Serialization;
 namespace Centaurus.Domain
 {
     [Command("GetPriceHistory")]
-    public class GetPriceHistory: BaseCommand
+    public class GetPriceHistoryCommand: BaseCommand
     {
         public int Market { get; set; }
 
