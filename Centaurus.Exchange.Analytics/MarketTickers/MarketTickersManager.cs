@@ -49,15 +49,16 @@ namespace Centaurus.Exchange.Analytics
             var frames = await framesManager.GetFrames(0, market, period);
             var fromDate = DateTime.UtcNow.AddDays(-1);
             var framesFor24Hours = frames.frames.TakeWhile(f => f.StartTime >= fromDate);
-            var marketTicker = new MarketTicker(market)
-            {
-                Open = framesFor24Hours.LastOrDefault()?.Open ?? 0,
-                Close = framesFor24Hours.FirstOrDefault()?.Close ?? 0,
-                High = framesFor24Hours.Select(f => f.High).Max(),
-                Low = framesFor24Hours.Select(f => f.Low).Min(),
-                BaseAssetVolume = framesFor24Hours.Sum(f => f.BaseAssetVolume),
-                MarketAssetVolume = framesFor24Hours.Sum(f => f.MarketAssetVolume)
-            };
+            var marketTicker = new MarketTicker(market);
+            if (framesFor24Hours.Count() < 1)
+                return marketTicker;
+
+            marketTicker.Open = framesFor24Hours.Last().Open;
+            marketTicker.Close = framesFor24Hours.First().Close;
+            marketTicker.High = framesFor24Hours.Select(f => f.High).Max();
+            marketTicker.Low = framesFor24Hours.Select(f => f.Low).Min();
+            marketTicker.BaseAssetVolume = framesFor24Hours.Sum(f => f.BaseAssetVolume);
+            marketTicker.MarketAssetVolume = framesFor24Hours.Sum(f => f.MarketAssetVolume);
             return marketTicker;
         }
 

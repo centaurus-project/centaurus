@@ -38,6 +38,8 @@ namespace Centaurus.Exchange.Analytics
         /// <returns>Returns updated frames.</returns>
         public async Task OnTrade(int market, List<Trade> trades)
         {
+            if (trades == null || trades.Count < 1)
+                return;
             syncRoot.Wait();
             try
             {

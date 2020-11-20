@@ -250,13 +250,16 @@ namespace Centaurus.Domain
                     case DepthsSubscription depthsSubscription:
                         {
                             var depth = AnalyticsManager.MarketDepthsManager.GetDepth(depthsSubscription.Market, depthsSubscription.Precision);
-                            updates.Add(depthsSubscription, new MarketDepthUpdate { MarketDepth = depth, UpdateDate = depth.UpdatedAt });
+
+                            if (depth != null)
+                                updates.Add(depthsSubscription, new MarketDepthUpdate { MarketDepth = depth, UpdateDate = depth.UpdatedAt });
                         }
                         break;
                     case PriceHistorySubscription priceHistorySubscription:
                         {
                             var frames = await AnalyticsManager.OHLCManager.GetFrames(0, priceHistorySubscription.Market, priceHistorySubscription.FramePeriod);
-                            updates.Add(priceHistorySubscription, new PriceHistoryUpdate { Prices = frames.frames, UpdateDate = frames.frames.Max(f => f.UpdatedAt) });
+                            if (frames.frames.Count > 0)
+                                updates.Add(priceHistorySubscription, new PriceHistoryUpdate { Prices = frames.frames, UpdateDate = frames.frames.Max(f => f.UpdatedAt) });
                         }
                         break;
                     case TradesFeedSubscription tradesFeedSubscription:
@@ -268,12 +271,14 @@ namespace Centaurus.Domain
                     case AllMarketTickersSubscription allMarketTickersSubscription:
                         {
                             var allTickers = AnalyticsManager.MarketTickersManager.GetAllTickers();
-                            updates.Add(allMarketTickersSubscription, new AllTickersUpdate { Tickers = allTickers, UpdateDate = allTickers.Max(t => t.UpdatedAt) });
+                            if (allTickers.Count > 0)
+                                updates.Add(allMarketTickersSubscription, new AllTickersUpdate { Tickers = allTickers, UpdateDate = allTickers.Max(t => t.UpdatedAt) });
                         }
                         break;
                     case MarketTickerSubscription marketTickerSubscription:
                         {
                             var marketTicker = AnalyticsManager.MarketTickersManager.GetMarketTicker(marketTickerSubscription.Market);
+                            if (marketTicker != null)
                             updates.Add(marketTickerSubscription, new MarketTickerUpdate { MarketTicker = marketTicker, UpdateDate = marketTicker.UpdatedAt });
                         }
                         break;
