@@ -1,5 +1,4 @@
-﻿using Centaurus.Analytics;
-using Centaurus.Models;
+﻿using Centaurus.Models;
 using Microsoft.Extensions.Logging;
 using NLog;
 using System;

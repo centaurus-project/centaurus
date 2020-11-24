@@ -1,4 +1,4 @@
-﻿using Centaurus.Analytics;
+﻿using Centaurus.Models;
 using Centaurus.DAL;
 using Centaurus.DAL.Models.Analytics;
 using Microsoft.Extensions.Caching.Memory;
@@ -13,14 +13,14 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Exchange.Analytics
 {
-    public class OHLCManager : IDisposable
+    public class PriceHistoryManager : IDisposable
     {
-        public OHLCManager(IAnalyticsStorage storage, List<int> markets)
+        public PriceHistoryManager(IAnalyticsStorage storage, List<int> markets)
         {
-            periods = EnumExtensions.GetValues<OHLCFramePeriod>();
+            periods = Enum.GetValues(typeof(PriceHistoryPeriod)).Cast<PriceHistoryPeriod>();
             foreach (var period in periods)
                 foreach (var market in markets)
-                    managers.Add(EncodeAssetTradesResolution(market, period), new OHLCPeriodManager(period, market, storage));
+                    managers.Add(EncodeAssetTradesResolution(market, period), new PriceHistoryPeriodManager(period, market, storage));
         }
 
         public async Task Restore(DateTime dateTime)
@@ -79,7 +79,7 @@ namespace Centaurus.Exchange.Analytics
                 {
                     var nextFrameStartDate = manager.LastAddedFrame?.StartTime.GetNextFrameDate(manager.Period) ?? trimmedDate;
                     var closePrice = manager.LastAddedFrame?.Close ?? 0;
-                    var nextFrame = new OHLCFrame(nextFrameStartDate, manager.Period, manager.Market, closePrice);
+                    var nextFrame = new PriceHistoryFrame(nextFrameStartDate, manager.Period, manager.Market, closePrice);
                     manager.RegisterNewFrame(nextFrame);
                 }
             }
@@ -92,20 +92,20 @@ namespace Centaurus.Exchange.Analytics
         /// <param name="market"></param>
         /// <param name="framePeriod"></param>
         /// <returns></returns>
-        public async Task<(List<OHLCFrame> frames, int nextCursor)> GetFrames(int cursor, int market, OHLCFramePeriod framePeriod)
+        public async Task<(List<PriceHistoryFrame> frames, int nextCursor)> GetPriceHistory(int cursor, int market, PriceHistoryPeriod framePeriod)
         {
             var managerId = EncodeAssetTradesResolution(market, framePeriod);
             var cursorDate = cursor == 0 ? default : DateTimeOffset.FromUnixTimeSeconds(cursor).UtcDateTime;
-            var res = await managers[managerId].GetFramesForDate(cursorDate);
+            var res = await managers[managerId].GetPriceHistoryForDate(cursorDate);
             return (
                 res.frames,
                 nextCursor: (res.nextCursor == default ? 0 : (int)((DateTimeOffset)res.nextCursor).ToUnixTimeSeconds())
-                );
+            );
         }
 
-        public List<OHLCFrame> PullUpdates()
+        public List<PriceHistoryFrame> PullUpdates()
         {
-            var updates = new List<OHLCFrame>();
+            var updates = new List<PriceHistoryFrame>();
             foreach (var manager in managers.Values)
             {
                 var updateData = manager.PullUpdates();
@@ -124,21 +124,21 @@ namespace Centaurus.Exchange.Analytics
             syncRoot = null;
         }
 
-        public static long EncodeAssetTradesResolution(int market, OHLCFramePeriod period)
+        public static long EncodeAssetTradesResolution(int market, PriceHistoryPeriod period)
         {
             return (uint.MaxValue * (long)market) + (int)period;
         }
 
-        public static (int market, OHLCFramePeriod period) DecodeAssetTradesResolution(long managerId)
+        public static (int market, PriceHistoryPeriod period) DecodeAssetTradesResolution(long managerId)
         {
             return (
                 market: (int)Math.Floor(decimal.Divide(managerId, uint.MaxValue)),
-                period: (OHLCFramePeriod)(int)(managerId % uint.MaxValue)
+                period: (PriceHistoryPeriod)(int)(managerId % uint.MaxValue)
             );
         }
 
-        private Dictionary<long, OHLCPeriodManager> managers = new Dictionary<long, OHLCPeriodManager>();
-        private IEnumerable<OHLCFramePeriod> periods;
+        private Dictionary<long, PriceHistoryPeriodManager> managers = new Dictionary<long, PriceHistoryPeriodManager>();
+        private IEnumerable<PriceHistoryPeriod> periods;
         private SemaphoreSlim syncRoot = new SemaphoreSlim(1);
     }
 }

@@ -4,9 +4,10 @@ using System.Text;
 
 namespace Centaurus.Domain
 {
-    [Subscription(SubscriptionType.AllMarketTickersSubscription)]
     public class AllMarketTickersSubscription : BaseSubscription
     {
+        public override string Name => "AllMarketTickersSubscription";
+
         public override bool Equals(object obj)
         {
             return obj is AllMarketTickersSubscription;
@@ -17,9 +18,9 @@ namespace Centaurus.Domain
             return HashCode.Combine(GetType().FullName);
         }
 
-        public override void SetValues(string[] values)
+        public override void SetValues(string values)
         {
-            Name = GetNameBuilder().ToString();
+            return;
         }
     }
 }

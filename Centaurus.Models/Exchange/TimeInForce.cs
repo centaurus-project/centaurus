@@ -1,4 +1,4 @@
-﻿namespace Centaurus
+﻿namespace Centaurus.Models
 {
     public enum TimeInForce
     {

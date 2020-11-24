@@ -1,14 +1,15 @@
-﻿using Centaurus.Analytics;
+﻿using Centaurus.Models;
 using System;
 using System.Collections.Generic;
 using System.Text;
 
 namespace Centaurus.Domain
 {
-    [Subscription(SubscriptionType.PriceHistorySubscription)]
     public class PriceHistorySubscription : BaseMarketSubscription
     {
-        public OHLCFramePeriod FramePeriod { get; set; }
+        public override string Name => $"PriceHistorySubscription@{Market}-{FramePeriod}";
+
+        public PriceHistoryPeriod FramePeriod { get; set; }
 
         public override bool Equals(object obj)
         {
@@ -22,16 +23,17 @@ namespace Centaurus.Domain
             return HashCode.Combine(Market, FramePeriod);
         }
 
-        public override void SetValues(string[] values)
+        public override void SetValues(string rawValues)
         {
-            base.SetValues(values);
-            Name = GetNameBuilder().ToString();
-        }
+            var values = rawValues.Split('-', StringSplitOptions.RemoveEmptyEntries);
 
-        protected override StringBuilder GetNameBuilder()
-        {
-            return base.GetNameBuilder()
-                .Append("_").Append(FramePeriod);
+            if (values.Length != 2) //Market, FramePeriod
+                throw new ArgumentException("Market or FramePeriod property is not specified.");
+
+            SetMarket(values[0]);
+            if (!Enum.TryParse<PriceHistoryPeriod>(values[1], out var framePeriod))
+                throw new ArgumentException($"{framePeriod} is not valid FramePeriod value.");
+            FramePeriod = framePeriod;
         }
     }
 }

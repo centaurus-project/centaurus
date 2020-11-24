@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Centaurus.Analytics
+namespace Centaurus.Models
 {
     public class ExchangeUpdate
     {
@@ -13,7 +13,7 @@ namespace Centaurus.Analytics
 
         public List<Trade> Trades { get; } = new List<Trade>();
 
-        public List<OrderUpdate> OrderUpdates { get; } = new List<OrderUpdate>();
+        public List<OrderInfo> OrderUpdates { get; } = new List<OrderInfo>();
 
         public int Market { get; }
     }

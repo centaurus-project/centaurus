@@ -1,15 +1,14 @@
-﻿using Centaurus.Analytics;
+﻿using Centaurus.Models;
 using Centaurus.DAL;
 using Centaurus.DAL.Models;
 using Centaurus.DAL.Models.Analytics;
-using Centaurus.Domain;
-using Centaurus.Models;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Centaurus.DAL.Mongo;
 
 namespace Centaurus.Test
 {
@@ -23,7 +22,7 @@ namespace Centaurus.Test
         private List<EffectModel> effectsCollection = new List<EffectModel>();
         private List<SettingsModel> settingsCollection = new List<SettingsModel>();
         private List<AssetModel> assetSettings = new List<AssetModel>();
-        private List<OHLCFrameModel> frames = new List<OHLCFrameModel>();
+        private List<PriceHistoryFrameModel> frames = new List<PriceHistoryFrameModel>();
         private ConstellationState constellationState;
 
         public Task OpenConnection(string connectionString)
@@ -313,28 +312,37 @@ namespace Centaurus.Test
             return Task.FromResult(effects);
         }
 
-        public Task<List<OHLCFrameModel>> GetFrames(int cursorTimeStamp, int toUnixTimeStamp, int asset, OHLCFramePeriod period)
+        public Task<List<PriceHistoryFrameModel>> GetPriceHistory(int cursorTimeStamp, int toUnixTimeStamp, int asset, PriceHistoryPeriod period)
         {
+            var cursorId = PriceHistoryExtesnions.EncodeId(asset, (int)period, cursorTimeStamp);
+            var toId = PriceHistoryExtesnions.EncodeId(asset, (int)period, toUnixTimeStamp);
+
             var result = frames
-                .Where(f => f.Market == asset && f.Period == (int)period)
-                .OrderByDescending(f => f.TimeStamp)
-                .SkipWhile(f => f.TimeStamp >= cursorTimeStamp)
-                .TakeWhile(f => f.TimeStamp >= toUnixTimeStamp)
+                .Where(f => f.Id >= cursorId && f.Id < toId)
+                .OrderByDescending(f => f.Id)
                 .ToList();
 
             return Task.FromResult(result);
         }
 
-        public Task<int> GetFirstFrameDate(OHLCFramePeriod period)
+        public Task<int> GetFirstPriceHistoryFrameDate(int market, PriceHistoryPeriod period)
         {
-            return Task.FromResult(frames.FirstOrDefault()?.TimeStamp ?? 0);
+            var firstId = PriceHistoryExtesnions.EncodeId(market, (int)period, 0);
+            var firstFrame = frames
+                .OrderByDescending(f => f.Id)
+                .FirstOrDefault(f => f.Id >= firstId);
+
+            if (firstFrame == null)
+                return Task.FromResult(0);
+
+            return Task.FromResult(PriceHistoryExtesnions.DecodeId(firstFrame.Id).timestamp);
         }
 
-        public Task SaveAnalytics(List<OHLCFrameModel> update)
+        public Task SaveAnalytics(List<PriceHistoryFrameModel> update)
         {
             foreach (var frame in update)
             {
-                var frameIndex = frames.FindIndex(f => f.TimeStamp == frame.TimeStamp && f.Period == frame.Period && f.Market == frame.Market);
+                var frameIndex = frames.FindIndex(f => f.Id == frame.Id);
                 if (frameIndex >= 0)
                     frames[frameIndex] = frame;
                 else

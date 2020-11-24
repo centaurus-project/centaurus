@@ -1,4 +1,4 @@
-﻿using Centaurus.Analytics;
+﻿using Centaurus.Models;
 using Centaurus.DAL;
 using NLog;
 using System;
@@ -22,16 +22,16 @@ namespace Centaurus.Exchange.Analytics
         public AnalyticsManager(IAnalyticsStorage analyticsStorage, List<double> precisions, IOrderMap orders, List<int> markets, int tradesHistorySize = 100)
         {
             this.analyticsStorage = analyticsStorage ?? throw new ArgumentNullException(nameof(analyticsStorage));
-            OHLCManager = new OHLCManager(analyticsStorage, markets ?? throw new ArgumentNullException(nameof(markets)));
+            PriceHistoryManager = new PriceHistoryManager(analyticsStorage, markets ?? throw new ArgumentNullException(nameof(markets)));
             TradesHistoryManager = new TradesHistoryManager(markets, tradesHistorySize);
             MarketDepthsManager = new MarketDepthsManager(markets, precisions, orders);
-            MarketTickersManager = new MarketTickersManager(markets, OHLCManager);
+            MarketTickersManager = new MarketTickersManager(markets, PriceHistoryManager);
             InitTimer();
         }
 
         public async Task Restore(DateTime dateTime)
         {
-            await OHLCManager.Restore(dateTime);
+            await PriceHistoryManager.Restore(dateTime);
             MarketDepthsManager.Restore();
         }
 
@@ -40,8 +40,7 @@ namespace Centaurus.Exchange.Analytics
             await syncRoot.WaitAsync();
             try
             {
-                var frames = OHLCManager.PullUpdates();
-                //var trades = TradesHistoryManager.PullUpdates();
+                var frames = PriceHistoryManager.PullUpdates();
                 if (frames.Count < 1)
                     return;
                 var currentTry = 0;
@@ -72,7 +71,7 @@ namespace Centaurus.Exchange.Analytics
 
         public event Action<Exception> OnError;
 
-        public OHLCManager OHLCManager { get; private set; }
+        public PriceHistoryManager PriceHistoryManager { get; private set; }
         public TradesHistoryManager TradesHistoryManager { get; private set; }
         public MarketDepthsManager MarketDepthsManager { get; private set; }
         public MarketTickersManager MarketTickersManager { get; private set; }
@@ -87,8 +86,8 @@ namespace Centaurus.Exchange.Analytics
             updateTimer?.Dispose();
             updateTimer = null;
 
-            OHLCManager?.Dispose();
-            OHLCManager = null;
+            PriceHistoryManager?.Dispose();
+            PriceHistoryManager = null;
             TradesHistoryManager = null;
         }
 
@@ -113,7 +112,7 @@ namespace Centaurus.Exchange.Analytics
         {
             try
             {
-                OHLCManager.Update();
+                PriceHistoryManager.Update();
                 await MarketTickersManager.Update();
                 updateTimer?.Start();
                 OnUpdate?.Invoke();
@@ -141,7 +140,7 @@ namespace Centaurus.Exchange.Analytics
 
         public async Task OnUpdates(ExchangeUpdate updates)
         {
-            await OHLCManager.OnTrade(updates.Market, updates.Trades);
+            await PriceHistoryManager.OnTrade(updates.Market, updates.Trades);
             TradesHistoryManager.OnTrade(updates.Market, updates.Trades);
             MarketDepthsManager.OnOrderUpdates(updates.Market, updates.OrderUpdates);
         }

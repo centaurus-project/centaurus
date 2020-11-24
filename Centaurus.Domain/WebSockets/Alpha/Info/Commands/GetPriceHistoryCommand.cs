@@ -1,4 +1,4 @@
-﻿using Centaurus.Analytics;
+﻿using Centaurus.Models;
 using System;
 using System.Text.Json.Serialization;
 
@@ -9,7 +9,7 @@ namespace Centaurus.Domain
     {
         public int Market { get; set; }
 
-        public OHLCFramePeriod Period { get; set; }
+        public PriceHistoryPeriod Period { get; set; }
 
         /// <summary>
         /// Unix timestamp

@@ -1,4 +1,4 @@
-﻿using Centaurus.Analytics;
+﻿using Centaurus.Models;
 using Centaurus.DAL;
 using Centaurus.Exchange.Analytics;
 using NUnit.Framework;
@@ -33,10 +33,10 @@ namespace Centaurus.Test.Exchange.Analytics
 
             foreach (var market in markets)
             {
-                foreach (var period in EnumExtensions.GetValues<OHLCFramePeriod>())
+                foreach (var period in Enum.GetValues(typeof(PriceHistoryPeriod)).Cast<PriceHistoryPeriod>())
                 {
-                    var frames = await analyticsManager.OHLCManager.GetFrames(0, market, period);
-                    var restoredFrames = await restoredAnalyticsManager.OHLCManager.GetFrames(0, market, period);
+                    var frames = await analyticsManager.PriceHistoryManager.GetPriceHistory(0, market, period);
+                    var restoredFrames = await restoredAnalyticsManager.PriceHistoryManager.GetPriceHistory(0, market, period);
                     Assert.AreEqual(frames.frames.Count, restoredFrames.frames.Count, "Current frames unit and restored frames unit have different size.");
                     for (var i = 0; i < frames.frames.Count; i++)
                     {
@@ -50,8 +50,8 @@ namespace Centaurus.Test.Exchange.Analytics
                            frame.Low == restoredFrame.Low &&
                            frame.Open == restoredFrame.Open &&
                            frame.Close == restoredFrame.Close &&
-                           frame.BaseAssetVolume == restoredFrame.BaseAssetVolume && 
-                           frame.MarketAssetVolume == restoredFrame.MarketAssetVolume,
+                           frame.BaseVolume == restoredFrame.BaseVolume && 
+                           frame.CounterVolume == restoredFrame.CounterVolume,
                            "Restored frame doesn't equal to current frame.");
                     }
                 }

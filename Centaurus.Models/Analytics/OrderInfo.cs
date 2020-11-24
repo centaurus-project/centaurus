@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Centaurus.Analytics
+namespace Centaurus.Models
 {
     public class OrderInfo
     {
@@ -15,5 +15,7 @@ namespace Centaurus.Analytics
         public double Price { get; set; }
 
         public long Amount { get; set; }
+
+        public bool IsDeleted { get; set; }
     }
 }

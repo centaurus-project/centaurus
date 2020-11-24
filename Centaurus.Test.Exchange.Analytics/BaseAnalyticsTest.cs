@@ -1,9 +1,9 @@
-﻿using Centaurus.Analytics;
-using Centaurus.Exchange.Analytics;
+﻿using Centaurus.Exchange.Analytics;
 using NUnit.Framework;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Centaurus.Models;
 using System.Text;
 
 namespace Centaurus.Test.Exchange.Analytics
@@ -14,13 +14,11 @@ namespace Centaurus.Test.Exchange.Analytics
         protected MockStorage storage;
         protected List<int> markets;
         protected int historyLength;
-        protected long analyticsStartDate;
         protected long now;
 
         public BaseAnalyticsTest()
         {
-            analyticsStartDate = DateTime.UtcNow.Ticks;
-            now = analyticsStartDate;
+            now = DateTime.UtcNow.Ticks;
         }
 
         [SetUp]

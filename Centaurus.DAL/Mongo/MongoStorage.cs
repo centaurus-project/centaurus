@@ -1,4 +1,4 @@
-﻿using Centaurus.Analytics;
+﻿using Centaurus.Models;
 using Centaurus.DAL.Models;
 using Centaurus.DAL.Models.Analytics;
 using MongoDB.Bson;
@@ -29,22 +29,13 @@ namespace Centaurus.DAL.Mongo
         private IMongoCollection<SettingsModel> settingsCollection;
         private IMongoCollection<AssetModel> assetsCollection;
 
-        private IMongoCollection<OHLCFrameModel> framesCollection;
-        private IMongoCollection<TradeModel> tradesCollection;
+        private IMongoCollection<PriceHistoryFrameModel> priceHistoryCollection;
 
         private async Task CreateIndexes()
         {
             await accountsCollection.Indexes.CreateOneAsync(
                  new CreateIndexModel<AccountModel>(Builders<AccountModel>.IndexKeys.Ascending(a => a.PubKey),
                  new CreateIndexOptions { Unique = true, Background = true })
-            );
-
-            await framesCollection.Indexes.CreateOneAsync(
-                new CreateIndexModel<OHLCFrameModel>(Builders<OHLCFrameModel>.IndexKeys.Combine(
-                     Builders<OHLCFrameModel>.IndexKeys.Ascending(f => f.Market),
-                     Builders<OHLCFrameModel>.IndexKeys.Ascending(f => f.Period),
-                     Builders<OHLCFrameModel>.IndexKeys.Descending(f => f.TimeStamp)),
-                new CreateIndexOptions { Unique = true, Background = true })
             );
         }
 
@@ -70,8 +61,7 @@ namespace Centaurus.DAL.Mongo
 
             assetsCollection = database.GetCollection<AssetModel>("assets");
 
-            framesCollection = database.GetCollection<OHLCFrameModel>("analyticsFrames");
-            tradesCollection = database.GetCollection<TradeModel>("analyticsTrades");
+            priceHistoryCollection = database.GetCollection<PriceHistoryFrameModel>("priceHistory");
 
             await CreateIndexes();
         }
@@ -241,23 +231,32 @@ namespace Centaurus.DAL.Mongo
         }
 
 
-        public async Task<List<OHLCFrameModel>> GetFrames(int cursorTimeStamp, int toUnixTimeStamp, int asset, OHLCFramePeriod period)
+        public async Task<List<PriceHistoryFrameModel>> GetPriceHistory(int cursorTimeStamp, int toUnixTimeStamp, int asset, PriceHistoryPeriod period)
         {
-            var query = framesCollection.Find(
-                   Builders<OHLCFrameModel>.Filter.And(
-                       Builders<OHLCFrameModel>.Filter.Eq(f => f.Market, asset),
-                       Builders<OHLCFrameModel>.Filter.Eq(f => f.Period, (int)period),
-                       Builders<OHLCFrameModel>.Filter.Lt(f => f.TimeStamp, cursorTimeStamp),
-                       Builders<OHLCFrameModel>.Filter.Gte(f => f.TimeStamp, toUnixTimeStamp)
+            var cursorId = PriceHistoryExtesnions.EncodeId(asset, (int)period, cursorTimeStamp);
+            var toId = PriceHistoryExtesnions.EncodeId(asset, (int)period, toUnixTimeStamp);
+            var query = priceHistoryCollection.Find(
+                   Builders<PriceHistoryFrameModel>.Filter.And(
+                       Builders<PriceHistoryFrameModel>.Filter.Gte(f => f.Id, cursorId),
+                       Builders<PriceHistoryFrameModel>.Filter.Lt(f => f.Id, toId)
                        )
-                   ).SortByDescending(x => x.TimeStamp);
+                   ).SortByDescending(x => x.Id);
             return await query
                 .ToListAsync();
         }
 
-        public async Task<int> GetFirstFrameDate(OHLCFramePeriod period)
+        public async Task<int> GetFirstPriceHistoryFrameDate(int market, PriceHistoryPeriod period)
         {
-            return (await framesCollection.Find(Builders<OHLCFrameModel>.Filter.Eq(f => f.Period, (int)period)).FirstOrDefaultAsync())?.TimeStamp ?? 0;
+            var firstId = PriceHistoryExtesnions.EncodeId(market, (int)period, 0);
+
+            var firstFrame = await priceHistoryCollection
+                .Find(Builders<PriceHistoryFrameModel>.Filter.Gte(f => f.Id, firstId))
+                .FirstOrDefaultAsync();
+
+            if (firstFrame == null)
+                return 0;
+
+            return PriceHistoryExtesnions.DecodeId(firstFrame.Id).timestamp;
         }
 
         #region Updates
@@ -447,25 +446,17 @@ namespace Centaurus.DAL.Mongo
             }
         }
 
-        public async Task SaveAnalytics(List<OHLCFrameModel> frames)
+        public async Task SaveAnalytics(List<PriceHistoryFrameModel> frames)
         {
-            await framesCollection.BulkWriteAsync(PrepareFramesUpdateBatch(frames));
+            await priceHistoryCollection.BulkWriteAsync(PrepareFramesUpdateBatch(frames));
         }
 
-        private List<ReplaceOneModel<OHLCFrameModel>> PrepareFramesUpdateBatch(List<OHLCFrameModel> frames)
+        private List<ReplaceOneModel<PriceHistoryFrameModel>> PrepareFramesUpdateBatch(List<PriceHistoryFrameModel> frames)
         {
-            var updates = new List<ReplaceOneModel<OHLCFrameModel>>();
-            var filter = Builders<OHLCFrameModel>.Filter;
+            var updates = new List<ReplaceOneModel<PriceHistoryFrameModel>>();
+            var filter = Builders<PriceHistoryFrameModel>.Filter;
             foreach (var frame in frames)
-            {
-                var frameFilter = filter.And(
-                    filter.Eq(s => s.TimeStamp, frame.TimeStamp),
-                    filter.Eq(f => f.Period, frame.Period),
-                    filter.Eq(f => f.Market, frame.Market)
-                    );
-                var update = new ReplaceOneModel<OHLCFrameModel>(frameFilter, frame) { IsUpsert = true };
-                updates.Add(update);
-            }
+                updates.Add(new ReplaceOneModel<PriceHistoryFrameModel>(filter.Eq(f => f.Id, frame.Id), frame) { IsUpsert = true });
             return updates;
         }
 

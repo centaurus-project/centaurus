@@ -1,4 +1,4 @@
-﻿using Centaurus.Analytics;
+﻿using Centaurus.Models;
 using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
@@ -43,16 +43,16 @@ namespace Centaurus.Exchange
         private int maxPricesCount;
         private IOrderMap orderMap;
 
-        public void OnOrderUpdates(List<OrderUpdate> orderUpdates)
+        public void OnOrderUpdates(List<OrderInfo> orders)
         {
-            if (orderUpdates == null)
-                throw new ArgumentNullException(nameof(orderUpdates));
+            if (orders == null)
+                throw new ArgumentNullException(nameof(orders));
             var updatedSides = new List<OrderSide>();
-            foreach (var orderUpdate in orderUpdates)
+            foreach (var order in orders)
             {
-                if (((!orderUpdate.IsDeleted && AddOrder(orderUpdate.Order)) || RemoveOrder(orderUpdate.Order))
-                    && !updatedSides.Contains(orderUpdate.Order.Side))
-                    updatedSides.Add(orderUpdate.Order.Side);
+                if (((!order.IsDeleted && AddOrder(order)) || RemoveOrder(order))
+                    && !updatedSides.Contains(order.Side))
+                    updatedSides.Add(order.Side);
             }
 
             if (updatedSides.Count > 0)

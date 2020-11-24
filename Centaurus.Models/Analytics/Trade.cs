@@ -2,9 +2,9 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Centaurus.DAL.Models.Analytics
+namespace Centaurus.Models
 {
-    public class TradeModel
+    public class Trade
     {
         public int Asset { get; set; }
 
@@ -14,6 +14,9 @@ namespace Centaurus.DAL.Models.Analytics
 
         public double BaseAmount { get; set; }
 
+        /// <summary>
+        /// TimeStamp in ticks. We need it for sorting
+        /// </summary>
         public long Timestamp { get; set; }
     }
 }

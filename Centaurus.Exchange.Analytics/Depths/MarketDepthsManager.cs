@@ -1,4 +1,4 @@
-﻿using Centaurus.Analytics;
+﻿using Centaurus.Models;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -40,7 +40,7 @@ namespace Centaurus.Exchange.Analytics
                 }
         }
 
-        public void OnOrderUpdates(int market, List<OrderUpdate> orderUpdates)
+        public void OnOrderUpdates(int market, List<OrderInfo> orderUpdates)
         {
             if (!marketDepths.ContainsKey(market))
                 throw new ArgumentException($"Market {market} is not supported.");

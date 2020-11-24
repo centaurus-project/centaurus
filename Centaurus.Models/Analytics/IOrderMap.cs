@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Centaurus.Analytics
+namespace Centaurus.Models
 {
     public interface IOrderMap
     {

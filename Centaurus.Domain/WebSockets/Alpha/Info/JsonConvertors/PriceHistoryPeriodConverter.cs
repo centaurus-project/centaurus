@@ -1,4 +1,4 @@
-﻿using Centaurus.Analytics;
+﻿using Centaurus.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -8,20 +8,20 @@ using System.Text.Json.Serialization;
 
 namespace Centaurus.Domain
 {
-    public class OHLCFramePeriodConverter : JsonConverter<OHLCFramePeriod>
+    public class PriceHistoryPeriodConverter : JsonConverter<PriceHistoryPeriod>
     {
         public override bool CanConvert(Type typeToConvert)
         {
-            var val = typeof(OHLCFramePeriod) == typeToConvert;
+            var val = typeof(PriceHistoryPeriod) == typeToConvert;
             return val;
         }
 
-        public override OHLCFramePeriod Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        public override PriceHistoryPeriod Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             if (reader.TokenType == JsonTokenType.String)
             {
                 reader.Read();
-                if (!Enum.TryParse<OHLCFramePeriod>(reader.GetString(), out var value))
+                if (!Enum.TryParse<PriceHistoryPeriod>(reader.GetString(), out var value))
                     throw new JsonException($"Unable to parse \"{reader.GetString()}\" as OHLCFramePeriod.");
                 return value;
             }
@@ -29,14 +29,14 @@ namespace Centaurus.Domain
             {
                 reader.Read();
                 var intVal = reader.GetInt32();
-                if (!EnumExtensions.GetValues<OHLCFramePeriod, int>().Any(v => v == intVal))
+                if (!Enum.GetValues(typeof(PriceHistoryPeriod)).Cast<PriceHistoryPeriod>().Any(v => v == (PriceHistoryPeriod)intVal))
                     throw new JsonException($"Unable to parse \"{intVal}\" as OHLCFramePeriod.");
-                return (OHLCFramePeriod)intVal;
+                return (PriceHistoryPeriod)intVal;
             }
             throw new JsonException($"{reader.TokenType} is not valid type for OHLCFramePeriod.");
         }
 
-        public override void Write(Utf8JsonWriter writer, OHLCFramePeriod value, JsonSerializerOptions options)
+        public override void Write(Utf8JsonWriter writer, PriceHistoryPeriod value, JsonSerializerOptions options)
         {
             writer.WriteStringValue(value.ToString());
         }

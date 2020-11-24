@@ -24,7 +24,8 @@ namespace Centaurus.Domain
         public string Ip { get; }
         public string ConnectionId { get; }
 
-        private ConcurrentDictionary<BaseSubscription, DateTime> Subscriptions { get; } = new ConcurrentDictionary<BaseSubscription, DateTime>();
+        private ConcurrentDictionary<BaseSubscription, DateTime> Subscriptions = new ConcurrentDictionary<BaseSubscription, DateTime>();
+        private ConcurrentDictionary<BaseSubscription, SemaphoreSlim> locks = new ConcurrentDictionary<BaseSubscription, SemaphoreSlim>();
 
         public void AddSubscription(BaseSubscription baseSubscription)
         {
@@ -43,10 +44,22 @@ namespace Centaurus.Domain
 
         public async Task SendSubscriptionUpdate(BaseSubscription baseSubscription, SubscriptionUpdateBase update)
         {
-            if (Subscriptions.TryGetValue(baseSubscription, out var lastUpdate) 
-                && Subscriptions.TryUpdate(baseSubscription, lastUpdate, update.UpdateDate)) //assume that UpdateDate will be always greater than subscriptions last updated date
+            if (Subscriptions.TryGetValue(baseSubscription, out var lastUpdate))
             {
-                await SendMessage(update);
+                var @lock = locks.GetOrAdd(baseSubscription, (_) => new SemaphoreSlim(1));
+                await @lock.WaitAsync();
+                try
+                {
+                    var updateOfInterest = update.GetUpdateForDate(lastUpdate);
+                    if (updateOfInterest == null)
+                        return;
+                    Subscriptions[baseSubscription] = updateOfInterest.UpdateDate;
+                    await SendMessage(updateOfInterest);
+                }
+                finally
+                {
+                    @lock.Release();
+                }
             }
         }
 
@@ -151,6 +164,14 @@ namespace Centaurus.Domain
         {
             webSocket?.Dispose();
             webSocket = null;
+            if (locks != null)
+            {
+                foreach (var @lock in locks)
+                {
+                    @lock.Value.Dispose();
+                }
+                locks = null;
+            }
         }
     }
 }

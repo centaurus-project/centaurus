@@ -1,15 +1,10 @@
-﻿using Centaurus.Domain;
-using Centaurus.Models;
-using NLog;
+﻿using NLog;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net.WebSockets;
 using System.Threading.Tasks;
 using System.Linq;
-using Centaurus.Exchange.Analytics;
-using Centaurus.Analytics;
-using System.Threading;
 
 namespace Centaurus.Domain
 {

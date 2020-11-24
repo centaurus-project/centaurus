@@ -1,4 +1,4 @@
-﻿using Centaurus.Analytics;
+﻿using Centaurus.Models;
 using Centaurus.DAL.Models.Analytics;
 using System;
 using System.Collections.Generic;
@@ -17,10 +17,10 @@ namespace Centaurus.DAL
         /// <param name="asset"></param>
         /// <param name="period"></param>
         /// <returns></returns>
-        Task<List<OHLCFrameModel>> GetFrames(int cursorTimeStamp, int toUnixTimeStamp, int asset, OHLCFramePeriod period);
+        Task<List<PriceHistoryFrameModel>> GetPriceHistory(int cursorTimeStamp, int toUnixTimeStamp, int asset, PriceHistoryPeriod period);
 
-        Task SaveAnalytics(List<OHLCFrameModel> frames);
+        Task SaveAnalytics(List<PriceHistoryFrameModel> frames);
 
-        Task<int> GetFirstFrameDate(OHLCFramePeriod period);
+        Task<int> GetFirstPriceHistoryFrameDate(int market, PriceHistoryPeriod period);
     }
 }

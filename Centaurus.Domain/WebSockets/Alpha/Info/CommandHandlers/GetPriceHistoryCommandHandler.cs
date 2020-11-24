@@ -15,7 +15,7 @@ namespace Centaurus.Domain
             if (asset == null && asset.IsXlm)
                 throw new BadRequestException("Invalid market.");
 
-            var res = await Global.AnalyticsManager.OHLCManager.GetFrames(command.Cursor, command.Market, command.Period);
+            var res = await Global.AnalyticsManager.PriceHistoryManager.GetPriceHistory(command.Cursor, command.Market, command.Period);
             return new PriceHistoryResponse  { 
                 RequestId = command.RequestId,
                 PriceHistory  = res.frames,

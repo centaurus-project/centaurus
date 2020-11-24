@@ -1,42 +1,40 @@
-﻿using Centaurus.Analytics;
+﻿using Centaurus.Models;
 using System;
 using System.Collections.Generic;
 using System.Text;
 
 namespace Centaurus.Exchange.Analytics
 {
-    public static class OHLCPeriodHelper
+    public static class PriceHistoryPeriodHelper
     {
         const long TicksPerWeek = TimeSpan.TicksPerDay * 7;
 
-        public static long TicksPerPeriod(OHLCFramePeriod period)
+        public static long TicksPerPeriod(PriceHistoryPeriod period)
         {
                 switch (period)
                 {
-                    case OHLCFramePeriod.Minute:
-                        return TimeSpan.TicksPerMinute;
-                    case OHLCFramePeriod.Minutes15:
+                    case PriceHistoryPeriod.Minutes15:
                         return TimeSpan.TicksPerMinute * 15;
-                    case OHLCFramePeriod.Minutes30:
+                    case PriceHistoryPeriod.Minutes30:
                         return TimeSpan.TicksPerMinute * 30;
-                    case OHLCFramePeriod.Hour:
+                    case PriceHistoryPeriod.Hour:
                         return TimeSpan.TicksPerHour;
-                    case OHLCFramePeriod.Hours4:
+                    case PriceHistoryPeriod.Hours4:
                         return TimeSpan.TicksPerHour * 4;
-                    case OHLCFramePeriod.Day:
+                    case PriceHistoryPeriod.Day:
                         return TimeSpan.TicksPerDay;
-                    case OHLCFramePeriod.Week:
+                    case PriceHistoryPeriod.Week:
                         return TicksPerWeek;
                     default:
                         throw new InvalidOperationException($"{period} doesn't support ticks.");
                 }
         }
 
-        public static DateTime Trim(this DateTime dateTime, OHLCFramePeriod period)
+        public static DateTime Trim(this DateTime dateTime, PriceHistoryPeriod period)
         {
             switch (period)
             {
-                case OHLCFramePeriod.Month:
+                case PriceHistoryPeriod.Month:
                     return new DateTime(dateTime.Year, dateTime.Month, 1, 0, 0, 0, dateTime.Kind).Date;
                 default:
                     var trimmed = dateTime.Ticks - dateTime.Ticks % TicksPerPeriod(period);
@@ -44,11 +42,11 @@ namespace Centaurus.Exchange.Analytics
             }
         }
 
-        public static DateTime GetNextFrameDate(this DateTime dateTime, OHLCFramePeriod period)
+        public static DateTime GetNextFrameDate(this DateTime dateTime, PriceHistoryPeriod period)
         {
             switch (period)
             {
-                case OHLCFramePeriod.Month:
+                case PriceHistoryPeriod.Month:
                     return dateTime.AddMonths(1);
                 default:
                     return dateTime.AddTicks(TicksPerPeriod(period));
@@ -62,7 +60,7 @@ namespace Centaurus.Exchange.Analytics
         /// <param name="periodDateTime"></param>
         /// <param name="period"></param>
         /// <returns></returns>
-        public static int GetDiff(this DateTime dateFrom, DateTime dateTo, OHLCFramePeriod period)
+        public static int GetDiff(this DateTime dateFrom, DateTime dateTo, PriceHistoryPeriod period)
         {
             if (dateFrom > dateTo)
             {
@@ -71,7 +69,7 @@ namespace Centaurus.Exchange.Analytics
 
             switch (period)
             {
-                case OHLCFramePeriod.Month:
+                case PriceHistoryPeriod.Month:
                     var totalDiff = 0;
                     while ((dateTo - dateFrom).TotalDays > 0)
                     {

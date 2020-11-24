@@ -1,4 +1,4 @@
-﻿using Centaurus.Analytics;
+﻿using Centaurus.Models;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -7,9 +7,10 @@ using System.Text;
 
 namespace Centaurus.Domain
 {
-    [Subscription(SubscriptionType.DepthsSubscription)]
     public class DepthsSubscription : BaseMarketSubscription
     {
+        public override string Name => $"DepthsSubscription@{Market}-{Side}-{Precision}";
+
         public const double VeryHigh = 0.01;
         public const double High = 0.1;
         public const double Exact = 1;
@@ -36,24 +37,23 @@ namespace Centaurus.Domain
             return HashCode.Combine(Market, Side, Precision);
         }
 
-        public override void SetValues(string[] values)
+        public override void SetValues(string rawValues)
         {
-            base.SetValues(values);
+            var values = rawValues.Split('-', StringSplitOptions.RemoveEmptyEntries);
+
+
             if (values.Length != 3) //Market, Side and Precision
                 throw new ArgumentException("Market, Side or Precision property is not specified.");
+
+            SetMarket(values[0]);
+
             if (!Enum.TryParse<DepthsSide>(values[1], out var side))
                 throw new ArgumentException($"{values[1]} is not valid Side value.");
             Side = side;
             if (!double.TryParse(values[2], NumberStyles.Any, CultureInfo.InvariantCulture, out var precision) || !Precisions.Contains(precision))
                 throw new ArgumentException($"{values[2]} is not valid precision value.");
             Precision = precision;
-            Name = GetNameBuilder().ToString();
-        }
-        protected override StringBuilder GetNameBuilder()
-        {
-            return base.GetNameBuilder()
-                .Append("_").Append(Side)
-                .Append("_").Append(Precision.ToString(CultureInfo.InvariantCulture));
+
         }
     }
 }

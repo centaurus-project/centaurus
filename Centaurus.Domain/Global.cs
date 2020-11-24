@@ -5,7 +5,6 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Timers;
-using Centaurus.Analytics;
 using Centaurus.DAL;
 using Centaurus.DAL.Mongo;
 using Centaurus.Exchange.Analytics;
@@ -238,53 +237,52 @@ namespace Centaurus.Domain
 
         private static Timer snapshotRunTimer;
 
+
         #region Analytics
 
         private static async void AnalyticsManager_OnUpdate()
         {
             var updates = new Dictionary<BaseSubscription, SubscriptionUpdateBase>();
-            foreach (var subs in InfoConnectionManager.GetActiveSubscriptions())
+            foreach (var subscription in InfoConnectionManager.GetActiveSubscriptions())
             {
-                switch (subs)
+                var update = default(SubscriptionUpdateBase);
+                switch (subscription)
                 {
                     case DepthsSubscription depthsSubscription:
                         {
                             var depth = AnalyticsManager.MarketDepthsManager.GetDepth(depthsSubscription.Market, depthsSubscription.Precision);
-
-                            if (depth != null)
-                                updates.Add(depthsSubscription, new MarketDepthUpdate { MarketDepth = depth, UpdateDate = depth.UpdatedAt });
+                            update = MarketDepthUpdate.Generate(depth, depthsSubscription.Name);
                         }
                         break;
                     case PriceHistorySubscription priceHistorySubscription:
                         {
-                            var frames = await AnalyticsManager.OHLCManager.GetFrames(0, priceHistorySubscription.Market, priceHistorySubscription.FramePeriod);
-                            if (frames.frames.Count > 0)
-                                updates.Add(priceHistorySubscription, new PriceHistoryUpdate { Prices = frames.frames, UpdateDate = frames.frames.Max(f => f.UpdatedAt) });
+                            var priceFrames = await AnalyticsManager.PriceHistoryManager.GetPriceHistory(0, priceHistorySubscription.Market, priceHistorySubscription.FramePeriod);
+                            update = PriceHistoryUpdate.Generate(priceFrames.frames, priceHistorySubscription.Name);
                         }
                         break;
                     case TradesFeedSubscription tradesFeedSubscription:
                         {
                             var trades = AnalyticsManager.TradesHistoryManager.GetTrades(tradesFeedSubscription.Market);
-                            updates.Add(tradesFeedSubscription, new TradesFeedUpdate { Trades = trades, UpdateDate = new DateTime(trades.FirstOrDefault()?.Timestamp ?? 0, DateTimeKind.Utc) });
+                            update = TradesFeedUpdate.Generate(trades, tradesFeedSubscription.Name);
                         }
                         break;
                     case AllMarketTickersSubscription allMarketTickersSubscription:
                         {
                             var allTickers = AnalyticsManager.MarketTickersManager.GetAllTickers();
-                            if (allTickers.Count > 0)
-                                updates.Add(allMarketTickersSubscription, new AllTickersUpdate { Tickers = allTickers, UpdateDate = allTickers.Max(t => t.UpdatedAt) });
+                            update = AllTickersUpdate.Generate(allTickers, allMarketTickersSubscription.Name);
                         }
                         break;
                     case MarketTickerSubscription marketTickerSubscription:
                         {
                             var marketTicker = AnalyticsManager.MarketTickersManager.GetMarketTicker(marketTickerSubscription.Market);
-                            if (marketTicker != null)
-                            updates.Add(marketTickerSubscription, new MarketTickerUpdate { MarketTicker = marketTicker, UpdateDate = marketTicker.UpdatedAt });
+                            update = MarketTickerUpdate.Generate(marketTicker, marketTickerSubscription.Name);
                         }
                         break;
                     default:
-                        break;
+                        throw new Exception($"{subscription.Name} subscription is not supported.");
                 }
+                if (update != null)
+                    updates.Add(subscription, update);
             }
             InfoConnectionManager.SendSubscriptionUpdates(updates);
         }

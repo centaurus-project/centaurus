@@ -1,4 +1,4 @@
-﻿using Centaurus.Analytics;
+﻿using Centaurus.Models;
 using System.Collections.Generic;
 
 namespace Centaurus.Domain

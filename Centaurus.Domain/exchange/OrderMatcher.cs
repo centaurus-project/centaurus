@@ -1,8 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Text;
-using Centaurus.Analytics;
 using Centaurus.Models;
 
 namespace Centaurus.Domain
@@ -83,7 +79,7 @@ namespace Centaurus.Domain
             {
                 PlaceReminderOrder();
 
-                updates.OrderUpdates.Add(new OrderUpdate(takerOrder.ToOrderInfo()));
+                updates.OrderUpdates.Add(takerOrder.ToOrderInfo());
             }
             return updates;
         }
@@ -139,7 +135,7 @@ namespace Centaurus.Domain
             /// <summary>
             /// Process matching.
             /// </summary>
-            public (Trade trade, OrderUpdate removedOrder) ProcessOrderMatch()
+            public (Trade trade, OrderInfo removedOrder) ProcessOrderMatch()
             {
                 //trade assets
                 if (matcher.side == OrderSide.Buy)
@@ -171,12 +167,14 @@ namespace Centaurus.Domain
 
                 //record trade effects
                 var trade = RecordTrade();
-                var removedOrder = default(OrderUpdate);
+                var removedOrder = default(OrderInfo);
                 if (makerOrder.Amount == 0)
                 { //schedule removal for the fully executed counter order
                     //matcher.orderbook.RemoveEmptyHeadOrder();
                     RecordOrderRemoved();
-                    removedOrder = new OrderUpdate(makerOrder.ToOrderInfo(), true);
+                    var removedOrderInfo = makerOrder.ToOrderInfo();
+                    removedOrderInfo.IsDeleted = true;
+                    removedOrder = removedOrderInfo;
                 }
 
                 return (trade, removedOrder);

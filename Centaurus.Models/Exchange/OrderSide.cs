@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Centaurus
+namespace Centaurus.Models
 {
     public enum OrderSide
     {

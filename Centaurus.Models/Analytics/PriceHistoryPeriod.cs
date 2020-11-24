@@ -2,11 +2,10 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Centaurus.Analytics
+namespace Centaurus.Models
 {
-    public enum OHLCFramePeriod
+    public enum PriceHistoryPeriod
     {
-        Minute = 60,
         Minutes15 = 900,
         Minutes30 = 1_800,
         Hour = 3_600,

@@ -1,14 +1,15 @@
-﻿using Centaurus.Analytics;
+﻿using Centaurus.Models;
 using Centaurus.Exchange.Analytics;
 using NUnit.Framework;
 using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
+using System.Linq;
 
 namespace Centaurus.Test.Exchange.Analytics
 {
-    public class OHLCManagerTest : BaseAnalyticsTest
+    public class PriceHistoryManagerTest : BaseAnalyticsTest
     {
         [Test]
         public async Task GetPeriodTest()
@@ -17,13 +18,13 @@ namespace Centaurus.Test.Exchange.Analytics
 
             foreach (var market in markets)
             {
-                foreach (var period in EnumExtensions.GetValues<OHLCFramePeriod>())
+                foreach (var period in Enum.GetValues(typeof(PriceHistoryPeriod)).Cast<PriceHistoryPeriod>())
                 {
-                    var prevFrame = default(OHLCFrame);
+                    var prevFrame = default(PriceHistoryFrame);
                     var cursor = 0;
                     do
                     {
-                        var periodResponse = await analyticsManager.OHLCManager.GetFrames(cursor, market, period);
+                        var periodResponse = await analyticsManager.PriceHistoryManager.GetPriceHistory(cursor, market, period);
 
                         for (var i = 0; i < periodResponse.frames.Count; i++)
                         {
@@ -32,16 +33,16 @@ namespace Centaurus.Test.Exchange.Analytics
                             Assert.GreaterOrEqual(frame.High, frame.Low, "Frame High price is greater than Low price.");
                             if (frame.HadTrades)
                             {
-                                Assert.Greater(frame.BaseAssetVolume, 0, "Base asset volume must be greater than 0.");
-                                Assert.Greater(frame.MarketAssetVolume, 0, "Market asset volume must be greater than 0.");
+                                Assert.Greater(frame.BaseVolume, 0, "Base asset volume must be greater than 0.");
+                                Assert.Greater(frame.CounterVolume, 0, "Market asset volume must be greater than 0.");
 
                                 Assert.Greater(frame.High, 0, "High price must be greater than 0.");
                                 Assert.Greater(frame.Low, 0, "Low price must be greater than 0.");
                             }
                             else
                             {
-                                Assert.AreEqual(frame.BaseAssetVolume, 0, "Base asset volume must be equal to 0, if frame has no trades.");
-                                Assert.AreEqual(frame.MarketAssetVolume, 0, "Market asset volume must be equal to 0, if frame has no trades.");
+                                Assert.AreEqual(frame.BaseVolume, 0, "Base asset volume must be equal to 0, if frame has no trades.");
+                                Assert.AreEqual(frame.CounterVolume, 0, "Market asset volume must be equal to 0, if frame has no trades.");
 
                                 Assert.AreEqual(frame.High, 0, "High price must be equal to 0, if frame has no trades.");
                                 Assert.AreEqual(frame.Low, 0, "Low price must be equal to 0, if frame has no trades.");
