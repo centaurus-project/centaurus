@@ -21,13 +21,13 @@ namespace Centaurus.Exchange.Analytics
         private int maxSize;
         private LinkedList<Trade> trades = new LinkedList<Trade>();
 
-        public void OnTrade(List<Trade> newTrades)
+        public void OnTrade(List<Trade> newTrades, DateTime updateDate)
         {
             foreach (var trade in newTrades)
                 trades.AddFirst(trade);
             if (trades.Count > maxSize)
                 trades.RemoveLast();
-            LastUpdated = DateTime.UtcNow;
+            LastUpdated = updateDate;
         }
 
         public List<Trade> GetLastTrades(int limit = 0)

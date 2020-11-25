@@ -31,24 +31,24 @@ namespace Centaurus.Exchange.Analytics
             }
         }
 
-        /// <summary>
-        /// Records all trades.
-        /// </summary>
-        /// <param name="trades"></param>
-        /// <returns>Returns updated frames.</returns>
-        public async Task OnTrade(int market, List<Trade> trades)
+        public async Task OnTrade(ExchangeUpdate exchangeUpdate)
         {
+            if (exchangeUpdate == null)
+                throw new ArgumentNullException(nameof(exchangeUpdate));
+
+            var trades = exchangeUpdate.Trades;
             if (trades == null || trades.Count < 1)
                 return;
+
             syncRoot.Wait();
             try
             {
-                UpdateManagerFrames(new DateTime(trades.Max(t => t.Timestamp), DateTimeKind.Utc));
+                UpdateManagerFrames(exchangeUpdate.UpdateDate);
                 foreach (var period in periods)
                 {
-                    var managerId = EncodeAssetTradesResolution(market, period);
+                    var managerId = EncodeAssetTradesResolution(exchangeUpdate.Market, period);
                     var frameManager = managers[managerId];
-                    await frameManager.OnTrade(trades);
+                    await frameManager.OnTrade(exchangeUpdate);
                 }
             }
             finally

@@ -19,20 +19,21 @@ namespace Centaurus.Exchange.Analytics
 
         public int HistorySize { get; }
 
-        /// <summary>
-        /// Records all trades.
-        /// </summary>
-        /// <param name="trades"></param>
-        /// <returns>Last trades</returns>
-        public void OnTrade(int market, List<Trade> trades)
+        public void OnTrade(ExchangeUpdate exchangeUpdate)
         {
+            if (exchangeUpdate == null)
+                throw new ArgumentNullException(nameof(exchangeUpdate));
+
+            var market = exchangeUpdate.Market;
+            var trades = exchangeUpdate.Trades;
+            var updateDate = exchangeUpdate.UpdateDate;
             if (!managers.ContainsKey(market))
                 throw new ArgumentException($"Market {market} is not supported.");
             if (trades == null)
                 throw new ArgumentNullException(nameof(trades));
 
             lock (managers)
-                managers[market].OnTrade(trades);
+                managers[market].OnTrade(trades, updateDate);
         }
 
         public List<Trade> GetTrades(int market)

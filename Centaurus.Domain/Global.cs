@@ -104,7 +104,7 @@ namespace Centaurus.Domain
                     {
                         throw new Exception("Unable to save trades history.");
                     }
-                    Exchange.OnUpdates -= Exchange_OnTrade;
+                    Exchange.OnUpdates -= Exchange_OnUpdates;
                     AnalyticsManager.OnError -= AnalyticsManager_OnError;
                     AnalyticsManager.OnUpdate -= AnalyticsManager_OnUpdate;
                     AnalyticsManager.Dispose();
@@ -113,7 +113,7 @@ namespace Centaurus.Domain
                 AnalyticsManager.Restore(DateTime.UtcNow).Wait();
                 AnalyticsManager.OnError += AnalyticsManager_OnError;
                 AnalyticsManager.OnUpdate += AnalyticsManager_OnUpdate;
-                Exchange.OnUpdates += Exchange_OnTrade;
+                Exchange.OnUpdates += Exchange_OnUpdates;
             }
 
             ExtensionsManager?.Dispose(); ExtensionsManager = new ExtensionsManager();
@@ -240,51 +240,61 @@ namespace Centaurus.Domain
 
         #region Analytics
 
+        private static System.Threading.SemaphoreSlim analyticsUpdateSyncRoot = new System.Threading.SemaphoreSlim(1);
+
         private static async void AnalyticsManager_OnUpdate()
         {
-            var updates = new Dictionary<BaseSubscription, SubscriptionUpdateBase>();
-            foreach (var subscription in InfoConnectionManager.GetActiveSubscriptions())
+            await analyticsUpdateSyncRoot.WaitAsync();
+            try
             {
-                var update = default(SubscriptionUpdateBase);
-                switch (subscription)
+                var updates = new Dictionary<BaseSubscription, SubscriptionUpdateBase>();
+                foreach (var subscription in InfoConnectionManager.GetActiveSubscriptions())
                 {
-                    case DepthsSubscription depthsSubscription:
-                        {
-                            var depth = AnalyticsManager.MarketDepthsManager.GetDepth(depthsSubscription.Market, depthsSubscription.Precision);
-                            update = MarketDepthUpdate.Generate(depth, depthsSubscription.Name);
-                        }
-                        break;
-                    case PriceHistorySubscription priceHistorySubscription:
-                        {
-                            var priceFrames = await AnalyticsManager.PriceHistoryManager.GetPriceHistory(0, priceHistorySubscription.Market, priceHistorySubscription.FramePeriod);
-                            update = PriceHistoryUpdate.Generate(priceFrames.frames, priceHistorySubscription.Name);
-                        }
-                        break;
-                    case TradesFeedSubscription tradesFeedSubscription:
-                        {
-                            var trades = AnalyticsManager.TradesHistoryManager.GetTrades(tradesFeedSubscription.Market);
-                            update = TradesFeedUpdate.Generate(trades, tradesFeedSubscription.Name);
-                        }
-                        break;
-                    case AllMarketTickersSubscription allMarketTickersSubscription:
-                        {
-                            var allTickers = AnalyticsManager.MarketTickersManager.GetAllTickers();
-                            update = AllTickersUpdate.Generate(allTickers, allMarketTickersSubscription.Name);
-                        }
-                        break;
-                    case MarketTickerSubscription marketTickerSubscription:
-                        {
-                            var marketTicker = AnalyticsManager.MarketTickersManager.GetMarketTicker(marketTickerSubscription.Market);
-                            update = MarketTickerUpdate.Generate(marketTicker, marketTickerSubscription.Name);
-                        }
-                        break;
-                    default:
-                        throw new Exception($"{subscription.Name} subscription is not supported.");
+                    var update = default(SubscriptionUpdateBase);
+                    switch (subscription)
+                    {
+                        case DepthsSubscription depthsSubscription:
+                            {
+                                var depth = AnalyticsManager.MarketDepthsManager.GetDepth(depthsSubscription.Market, depthsSubscription.Precision);
+                                update = MarketDepthUpdate.Generate(depth, depthsSubscription.Name);
+                            }
+                            break;
+                        case PriceHistorySubscription priceHistorySubscription:
+                            {
+                                var priceFrames = await AnalyticsManager.PriceHistoryManager.GetPriceHistory(0, priceHistorySubscription.Market, priceHistorySubscription.FramePeriod);
+                                update = PriceHistoryUpdate.Generate(priceFrames.frames, priceHistorySubscription.Name);
+                            }
+                            break;
+                        case TradesFeedSubscription tradesFeedSubscription:
+                            {
+                                var trades = AnalyticsManager.TradesHistoryManager.GetTrades(tradesFeedSubscription.Market);
+                                update = TradesFeedUpdate.Generate(trades, tradesFeedSubscription.Name);
+                            }
+                            break;
+                        case AllMarketTickersSubscription allMarketTickersSubscription:
+                            {
+                                var allTickers = AnalyticsManager.MarketTickersManager.GetAllTickers();
+                                update = AllTickersUpdate.Generate(allTickers, allMarketTickersSubscription.Name);
+                            }
+                            break;
+                        case MarketTickerSubscription marketTickerSubscription:
+                            {
+                                var marketTicker = AnalyticsManager.MarketTickersManager.GetMarketTicker(marketTickerSubscription.Market);
+                                update = MarketTickerUpdate.Generate(marketTicker, marketTickerSubscription.Name);
+                            }
+                            break;
+                        default:
+                            throw new Exception($"{subscription.Name} subscription is not supported.");
+                    }
+                    if (update != null)
+                        updates.Add(subscription, update);
                 }
-                if (update != null)
-                    updates.Add(subscription, update);
+                InfoConnectionManager.SendSubscriptionUpdates(updates);
             }
-            InfoConnectionManager.SendSubscriptionUpdates(updates);
+            finally
+            {
+                analyticsUpdateSyncRoot.Release();
+            }
         }
 
         private static void AnalyticsManager_OnError(Exception exc)
@@ -293,7 +303,7 @@ namespace Centaurus.Domain
             AppState.State = ApplicationState.Failed;
         }
 
-        private static async void Exchange_OnTrade(ExchangeUpdate updates)
+        private static async void Exchange_OnUpdates(ExchangeUpdate updates)
         {
             if (updates == null)
                 return;

@@ -38,12 +38,17 @@ namespace Centaurus.Exchange
             this.orderMap = orderMap;
         }
 
-        private Dictionary<OrderSide, List<MarketDepthPrice>> prices = new Dictionary<OrderSide, List<MarketDepthPrice>>();
+        private Dictionary<OrderSide, List<MarketDepthPrice>> prices = new Dictionary<OrderSide, List<MarketDepthPrice>>
+        {
+            { OrderSide.Buy, new List<MarketDepthPrice>() },
+            { OrderSide.Sell, new List<MarketDepthPrice>() }
+        };
+
         private int decimalsCount;
         private int maxPricesCount;
         private IOrderMap orderMap;
 
-        public void OnOrderUpdates(List<OrderInfo> orders)
+        public void OnOrderUpdates(List<OrderInfo> orders, DateTime updateDate)
         {
             if (orders == null)
                 throw new ArgumentNullException(nameof(orders));
@@ -76,8 +81,12 @@ namespace Centaurus.Exchange
                     Fill(lastOrderId, updatedSides);
             }
 
-            UpdatedAt = DateTime.UtcNow;
+            UpdatedAt = updateDate;
         }
+
+        public List<MarketDepthPrice> Asks => prices[OrderSide.Buy];
+
+        public List<MarketDepthPrice> Bids => prices[OrderSide.Sell];
 
         public int Market { get; }
 
@@ -85,12 +94,14 @@ namespace Centaurus.Exchange
 
         public DateTime UpdatedAt { get; private set; }
 
-        public void Restore()
+        public void Restore(DateTime updateDate)
         {
             Fill(0, new List<OrderSide> { OrderSide.Buy, OrderSide.Sell });
+
+            UpdatedAt = updateDate;
         }
 
-        public void Fill(ulong orderId, List<OrderSide> sides)
+        private void Fill(ulong orderId, List<OrderSide> sides)
         {
             while (true)
             {

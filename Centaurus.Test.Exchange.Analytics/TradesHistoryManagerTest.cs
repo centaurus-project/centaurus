@@ -21,7 +21,7 @@ namespace Centaurus.Test.Exchange.Analytics
                 foreach (var trade in trades)
                 {
                     if (lastTrade != null)
-                        Assert.Greater(lastTrade.Timestamp, trade.Timestamp, "New trades should always be on top of the history.");
+                        Assert.GreaterOrEqual(lastTrade.TradeDate, trade.TradeDate, "New trades should always be on top of the history.");
                     lastTrade = trade;
                 }
             }

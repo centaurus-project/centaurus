@@ -14,11 +14,11 @@ namespace Centaurus.Test.Exchange.Analytics
         protected MockStorage storage;
         protected List<int> markets;
         protected int historyLength;
-        protected long now;
+        protected DateTime now;
 
         public BaseAnalyticsTest()
         {
-            now = DateTime.UtcNow.Ticks;
+            now = DateTime.UtcNow;
         }
 
         [SetUp]
@@ -38,6 +38,7 @@ namespace Centaurus.Test.Exchange.Analytics
                 var minPrice = 1;
                 var trades = new List<Trade>();
                 var tradesCount = r.Next(1, 20);
+                var market = markets[r.Next(0, markets.Count)];
                 for (var c = 0; c < tradesCount; c++)
                 {
                     var amount = r.Next(1, 1000);
@@ -45,25 +46,20 @@ namespace Centaurus.Test.Exchange.Analytics
                     trades.Add(new Trade
                     {
                         Amount = amount,
-                        Asset = markets[r.Next(0, markets.Count)],
+                        Asset = market,
                         Price = price,
                         BaseAmount = amount * price,
-                        Timestamp = now
+                        TradeDate = now
                     });
                     if (minPrice == 0)
                         minPrice = price;
                     else
                         minPrice = Math.Min(minPrice, price);
-                    now += 1;
                 }
-                var groupedTrades = trades.GroupBy(t => t.Asset);
-                foreach (var g in groupedTrades)
-                {
-                    var updates = new ExchangeUpdate(g.Key);
-                    updates.Trades.AddRange(g);
-                    analyticsManager.OnUpdates(updates).Wait();
-                }    
-                now += TimeSpan.TicksPerSecond * 20;
+                var updates = new ExchangeUpdate(market, now);
+                updates.Trades.AddRange(trades);
+                analyticsManager.OnUpdates(updates).Wait();
+                now = now.AddSeconds(20);
             }
         }
     }

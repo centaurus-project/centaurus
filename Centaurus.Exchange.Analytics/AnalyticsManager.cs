@@ -32,7 +32,7 @@ namespace Centaurus.Exchange.Analytics
         public async Task Restore(DateTime dateTime)
         {
             await PriceHistoryManager.Restore(dateTime);
-            MarketDepthsManager.Restore();
+            MarketDepthsManager.Restore(dateTime);
         }
 
         public async Task SaveUpdates(IAnalyticsStorage analyticsStorage, int numberOfTries = 5)
@@ -140,9 +140,9 @@ namespace Centaurus.Exchange.Analytics
 
         public async Task OnUpdates(ExchangeUpdate updates)
         {
-            await PriceHistoryManager.OnTrade(updates.Market, updates.Trades);
-            TradesHistoryManager.OnTrade(updates.Market, updates.Trades);
-            MarketDepthsManager.OnOrderUpdates(updates.Market, updates.OrderUpdates);
+            await PriceHistoryManager.OnTrade(updates);
+            TradesHistoryManager.OnTrade(updates);
+            MarketDepthsManager.OnOrderUpdates(updates);
         }
 
         private IAnalyticsStorage analyticsStorage;

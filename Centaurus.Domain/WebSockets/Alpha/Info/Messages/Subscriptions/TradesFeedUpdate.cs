@@ -15,10 +15,10 @@ namespace Centaurus.Domain
             if (lastUpdateDate >= UpdateDate || Trades == null || Trades.Count < 1)
                 return null;
 
-            if (Trades.All(t => t.Timestamp > lastUpdateDate.Ticks))
+            if (Trades.All(t => t.TradeDate > lastUpdateDate))
                 return this;
 
-            var tradesOfInterest = Trades.Where(t => t.Timestamp > lastUpdateDate.Ticks).ToList();
+            var tradesOfInterest = Trades.Where(t => t.TradeDate > lastUpdateDate).ToList();
             return new TradesFeedUpdate { ChannelName = ChannelName, Trades = tradesOfInterest, UpdateDate = UpdateDate };
         }
 
@@ -26,7 +26,7 @@ namespace Centaurus.Domain
         {
             if (trades == null || trades.Count < 1)
                 return null;
-            return new TradesFeedUpdate { Trades = trades, UpdateDate = new DateTime(trades.FirstOrDefault().Timestamp, DateTimeKind.Utc), ChannelName = channelName };
+            return new TradesFeedUpdate { Trades = trades, UpdateDate = trades.FirstOrDefault().TradeDate, ChannelName = channelName };
         }
     }
 }

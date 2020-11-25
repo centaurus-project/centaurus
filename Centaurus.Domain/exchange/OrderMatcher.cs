@@ -53,7 +53,7 @@ namespace Centaurus.Domain
         {
             var counterOrder = orderbook.Head;
 
-            var updates = new ExchangeUpdate(asset);
+            var updates = new ExchangeUpdate(asset, new DateTime(resultEffects.Quantum.Timestamp, DateTimeKind.Utc));
 
             //orders in the orderbook are already sorted by price and age, so we can iterate through them in natural order
             while (counterOrder != null)
@@ -208,7 +208,7 @@ namespace Centaurus.Domain
                     Asset = matcher.asset,
                     BaseAmount = xlmAmount,
                     Price = makerOrder.Price,
-                    Timestamp = DateTime.UtcNow.Ticks
+                    TradeDate = new DateTime(matcher.resultEffects.Quantum.Timestamp, DateTimeKind.Utc)
                 };
             }
 

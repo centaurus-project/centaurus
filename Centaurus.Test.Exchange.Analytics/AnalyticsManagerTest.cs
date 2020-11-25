@@ -29,7 +29,7 @@ namespace Centaurus.Test.Exchange.Analytics
             await analyticsManager.SaveUpdates(storage);
 
             var restoredAnalyticsManager = new AnalyticsManager(storage, new List<double> { 1 }, new MockOrderMap(), markets, historyLength);
-            await restoredAnalyticsManager.Restore(new DateTime(now, DateTimeKind.Utc));
+            await restoredAnalyticsManager.Restore(now);
 
             foreach (var market in markets)
             {

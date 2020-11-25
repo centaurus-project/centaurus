@@ -9,7 +9,7 @@ namespace Centaurus.Domain.WebSockets.Alpha.Info.CommandHandlers
     {
         public override Task<BaseResponse> Handle(InfoWebSocketConnection infoWebSocket, SubscribeCommand command)
         {
-            if (command.Subscriptions.Count < 1)
+            if (command.Subscriptions == null || command.Subscriptions.Count < 1)
                 throw new BadRequestException("At least one subscription must be specified.");
 
             foreach (var subsName in command.Subscriptions)

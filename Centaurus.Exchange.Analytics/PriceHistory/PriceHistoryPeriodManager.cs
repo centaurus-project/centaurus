@@ -84,17 +84,16 @@ namespace Centaurus.Exchange.Analytics
             }
         }
 
-        public async Task OnTrade(List<Trade> trades)
+        public async Task OnTrade(ExchangeUpdate exchangeUpdate)
         {
-            var frame = default(PriceHistoryFrame);
-            foreach (var trade in trades)
+            var tradeDate = exchangeUpdate.UpdateDate.Trim(Period);
+            var frame = await GetFrame(tradeDate);
+            if (frame == null)
+                throw new Exception($"Unable to find frame for date time {tradeDate}.");
+
+            foreach (var trade in exchangeUpdate.Trades)
             {
-                var tradeDate = new DateTime(trade.Timestamp, DateTimeKind.Utc).Trim(Period);
-                if (frame == null || frame.IsExpired(tradeDate))
-                    frame = await GetFrame(tradeDate);
-                if (frame == null)
-                    throw new Exception($"Unable to find frame for date time {tradeDate}.");
-                frame.OnTrade(trade);
+                frame.OnTrade(trade, tradeDate);
                 updates.AddUpdate(frame.StartTime, frame);
             }
         }

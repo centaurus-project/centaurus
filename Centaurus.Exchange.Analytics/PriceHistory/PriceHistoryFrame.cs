@@ -70,11 +70,11 @@ namespace Centaurus.Exchange.Analytics
 
         public double CounterVolume { get; set; }
 
-        public void OnTrade(Trade trade)
+        public void OnTrade(Trade trade, DateTime updateDate)
         {
             if (trade == null)
                 throw new ArgumentNullException(nameof(trade));
-            UpdatedAt = new DateTime(Math.Max(trade.Timestamp, DateTime.UtcNow.Ticks), DateTimeKind.Utc);
+            UpdatedAt = updateDate;
             if (!HadTrades) //register first trade
             {
                 Open = High = Low = Close = trade.Price;

@@ -25,11 +25,13 @@ namespace Centaurus.Exchange.Analytics
                 await syncRoot.WaitAsync();
                 foreach (var market in markets)
                 {
-                    var currentTicker = tickers.ContainsKey(market) ? tickers[market] : default;
-                    var updateTicker = await GenerateTicker(market);
-                    if (currentTicker.Equals(updateTicker))
-                        updateTicker.UpdatedAt = updateDate;
-                    tickers.Add(market, updateTicker);
+                    if (!tickers.ContainsKey(market))
+                        tickers.Add(market, null);
+
+                    var currentTicker = tickers[market];
+                    var updateTicker = await GenerateTicker(market, updateDate);
+                    if (!(updateTicker == null || updateTicker.Equals(currentTicker)))
+                        tickers[market] = updateTicker;
                 }
             }
             finally
@@ -44,7 +46,7 @@ namespace Centaurus.Exchange.Analytics
         private PriceHistoryManager framesManager;
         private Dictionary<int, MarketTicker> tickers = new Dictionary<int, MarketTicker>();
 
-        private async Task<MarketTicker> GenerateTicker(int market)
+        private async Task<MarketTicker> GenerateTicker(int market, DateTime updateDate)
         {
             var frames = await framesManager.GetPriceHistory(0, market, period);
             var fromDate = DateTime.UtcNow.AddDays(-1);
@@ -59,6 +61,7 @@ namespace Centaurus.Exchange.Analytics
             marketTicker.Low = framesFor24Hours.Select(f => f.Low).Min();
             marketTicker.BaseVolume = framesFor24Hours.Sum(f => f.BaseVolume);
             marketTicker.CounterVolume = framesFor24Hours.Sum(f => f.CounterVolume);
+            marketTicker.UpdatedAt = updateDate;
             return marketTicker;
         }
 

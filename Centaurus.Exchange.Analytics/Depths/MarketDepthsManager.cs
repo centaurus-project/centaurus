@@ -31,22 +31,28 @@ namespace Centaurus.Exchange.Analytics
 
         private ImmutableDictionary<int, Dictionary<double, MarketDepth>> marketDepths;
 
-        public void Restore()
+        public void Restore(DateTime updateDate)
         {
             foreach (var market in marketDepths.Keys)
                 foreach (var depthManager in marketDepths[market].Values)
                 {
-                    depthManager.Restore();
+                    depthManager.Restore(updateDate);
                 }
         }
 
-        public void OnOrderUpdates(int market, List<OrderInfo> orderUpdates)
+        public void OnOrderUpdates(ExchangeUpdate exchangeUpdate)
         {
+            if (exchangeUpdate == null)
+                throw new ArgumentNullException(nameof(exchangeUpdate));
+
+            var market = exchangeUpdate.Market;
+            var orderUpdates = exchangeUpdate.OrderUpdates;
+            var updateDate = exchangeUpdate.UpdateDate;
             if (!marketDepths.ContainsKey(market))
                 throw new ArgumentException($"Market {market} is not supported.");
             foreach (var depthManager in marketDepths[market].Values)
             {
-                depthManager.OnOrderUpdates(orderUpdates);
+                depthManager.OnOrderUpdates(orderUpdates, updateDate);
             }
         }
 

@@ -20,7 +20,6 @@ namespace Centaurus.Domain
                 WriteIndented = true
             };
             SerializeOptions.Converters.Add(new CommandWrapperConverter());
-            //SerializeOptions.Converters.Add(new OHLCFramePeriodConverter());
             SerializeOptions.Converters.Add(new JsonStringEnumConverter());
         }
 
@@ -29,12 +28,6 @@ namespace Centaurus.Domain
         public string Command { get; set; }
 
         public static BaseCommand Deserialize(byte[] request)
-        {
-            var stringifiedRequest = Encoding.UTF8.GetString(request);
-            return Deserialize(stringifiedRequest);
-        }
-
-        public static BaseCommand Deserialize(string request)
         {
             var obj = JsonSerializer.Deserialize<CommandWrapper>(request, SerializeOptions);
             return obj.CommandObject;

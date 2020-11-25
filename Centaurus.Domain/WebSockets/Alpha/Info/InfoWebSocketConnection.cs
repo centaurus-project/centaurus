@@ -1,5 +1,4 @@
-﻿using Newtonsoft.Json;
-using NLog;
+﻿using NLog;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -8,6 +7,8 @@ using System.Linq;
 using System.Net.WebSockets;
 using System.Reflection;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -108,7 +109,7 @@ namespace Centaurus.Domain
         {
             try
             {
-                var reader = await webSocket.GetString();
+                var reader = await webSocket.GetInputByteArray();
                 while (true)
                 {
                     BaseCommand command = null;
@@ -133,7 +134,7 @@ namespace Centaurus.Domain
                         if (statusCode == ResultStatusCodes.InternalError || !Global.IsAlpha)
                             logger.Error(exc);
                     }
-                    reader = await webSocket.GetString();
+                    reader = await webSocket.GetInputByteArray();
                 }
             }
             catch (ConnectionCloseException e)
@@ -157,7 +158,7 @@ namespace Centaurus.Domain
 
         public async Task SendMessage(object message)
         {
-            await webSocket.SendAsync(Encoding.UTF8.GetBytes(JsonConvert.SerializeObject(message)), WebSocketMessageType.Text, true, CancellationToken.None);
+            await webSocket.SendAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(message)), WebSocketMessageType.Text, true, CancellationToken.None);
         }
 
         public void Dispose()
