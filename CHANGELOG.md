@@ -8,3 +8,4 @@ All notable changes to this project will be documented in this file.
 -   Removed unnecessary projects and solutions.
 -   Added changelog file for release notes.
 -   Centaurus.Alpha and Centaurus.Auditor are merged into single Centaurus executable.
+-   Aggregated exchange analytics.
