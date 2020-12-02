@@ -33,8 +33,8 @@ jobs:
     - name: Get version
       run: | 
         V=${GITHUB_REF//refs\/tags\/r/}
-        echo "::set-env name=VERSION::$V"
-        echo "::set-env name=VERSION_WITH_SUFFIX::v$V"
+        echo "VERSION=$V" >> $GITHUB_ENV
+        echo "VERSION_WITH_SUFFIX=v$V" >> $GITHUB_ENV
     - run: echo ${{env.VERSION_WITH_SUFFIX}}
     - name: Update changelog
       uses: thomaseizinger/keep-a-changelog-new-release@master
@@ -84,7 +84,7 @@ jobs:
         iex $command
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    - uses: oleksiyrudenko/gha-git-credentials@v1
+    - uses: oleksiyrudenko/gha-git-credentials@v2-latest
       with:
         token: '${{ secrets.GITHUB_TOKEN }}'
     - name: Amend last commit

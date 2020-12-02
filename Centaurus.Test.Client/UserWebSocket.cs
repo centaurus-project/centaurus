@@ -107,7 +107,7 @@ namespace Centaurus.Test.Client
                     Nonce = DateTime.Now.Ticks,
                     Account = new RawPubKey() { Data = Global.Settings.KeyPair.PublicKey },
                     Price = price,
-                    Side = (OrderSides)side
+                    Side = (OrderSide)side
                 };
 
                 var response = await SendMessage(order);

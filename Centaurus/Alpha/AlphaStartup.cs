@@ -16,6 +16,8 @@ using Centaurus.DAL.Mongo;
 using Microsoft.Extensions.Logging;
 using NLog.Web;
 using System.IO;
+using Microsoft.AspNetCore.Http;
+using System.Collections.Generic;
 
 namespace Centaurus
 {
@@ -35,6 +37,7 @@ namespace Centaurus
         public void Shutdown()
         {
             ConnectionManager.CloseAllConnections();
+            InfoConnectionManager.CloseAllConnections();
             host.StopAsync().Wait();
         }
 
@@ -113,6 +116,34 @@ namespace Centaurus
 
             static ApplicationState[] ValidApplicationStates = new ApplicationState[] { ApplicationState.Rising, ApplicationState.Running, ApplicationState.Ready };
 
+            const string centaurusWebSocketEndPoint = "/centaurus";
+            const string infoWebSocketEndPoint = "/info";
+
+            static Dictionary<string, Func<HttpContext, Func<Task>, Task>> webSocketHandlers = new Dictionary<string, Func<HttpContext, Func<Task>, Task>>
+            {
+                { centaurusWebSocketEndPoint, CentaurusWebSocketHandler },
+                { infoWebSocketEndPoint, InfoWebSocketHandler }
+            };
+
+            static async Task CentaurusWebSocketHandler(HttpContext context, Func<Task> next)
+            {
+                if (Global.AppState == null || ValidApplicationStates.Contains(Global.AppState.State))
+                {
+                    var webSocket = await context.WebSockets.AcceptWebSocketAsync();
+                    await ConnectionManager.OnNewConnection(webSocket, context.Connection.RemoteIpAddress.ToString());
+                }
+                else
+                {
+                    context.Abort();
+                }
+            }
+
+            static async Task InfoWebSocketHandler(HttpContext context, Func<Task> next)
+            {
+                var webSocket = await context.WebSockets.AcceptWebSocketAsync();
+                await InfoConnectionManager.OnNewConnection(webSocket, context.Connection.Id, context.Connection.RemoteIpAddress.ToString());
+            }
+
             // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
             public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
             {
@@ -131,22 +162,11 @@ namespace Centaurus
 
                 app.Use(async (context, next) =>
                 {
-                    if (context.WebSockets.IsWebSocketRequest && context.Request.Path == "/centaurus")
-                    {
-                        if (Global.AppState == null || ValidApplicationStates.Contains(Global.AppState.State))
-                        {
-                            WebSocket webSocket = await context.WebSockets.AcceptWebSocketAsync();
-                            await ConnectionManager.OnNewConnection(webSocket, context.Connection.RemoteIpAddress.ToString());
-                        }
-                        else
-                        {
-                            context.Abort();
-                        }
-                    }
+                    var path = context.Request.Path.ToString();
+                    if (context.WebSockets.IsWebSocketRequest && webSocketHandlers.Keys.Contains(path))
+                        await webSocketHandlers[path].Invoke(context, next);
                     else
-                    {
                         await next();
-                    }
                 });
 
                 app.UseMvc(routes =>

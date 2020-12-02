@@ -8,7 +8,24 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="WebSockets\Alpha\Info\Subscriptions\**" />
+    <EmbeddedResource Remove="WebSockets\Alpha\Info\Subscriptions\**" />
+    <None Remove="WebSockets\Alpha\Info\Subscriptions\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile Remove="Catchups\AuditorCatchup.cs" />
+    <Compile Remove="WebSockets\Alpha\Info\Messages\MarketUpdate.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="WebSockets\Alpha\Info\Subscriptions\AllMarketTickersSubscription.cs" />
+    <Compile Include="WebSockets\Alpha\Info\Subscriptions\BaseSubscription.cs" />
+    <Compile Include="WebSockets\Alpha\Info\Subscriptions\DepthsSubscription.cs" />
+    <Compile Include="WebSockets\Alpha\Info\Subscriptions\MarketTickerSubscription.cs" />
+    <Compile Include="WebSockets\Alpha\Info\Subscriptions\PriceHistorySubscription.cs" />
+    <Compile Include="WebSockets\Alpha\Info\Subscriptions\SubscriptionsManager.cs" />
+    <Compile Include="WebSockets\Alpha\Info\Subscriptions\TradesFeedSubscription.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -19,6 +36,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Centaurus.DAL\Centaurus.DAL.csproj" />
     <ProjectReference Include="..\Centaurus.DynamicSerializers\Centaurus.DynamicSerializers.csproj" />
+    <ProjectReference Include="..\Centaurus.Exchange.Analytics\Centaurus.Exchange.Analytics.csproj" />
     <ProjectReference Include="..\Centaurus.Models.Extensions\Centaurus.Models.Extensions.csproj" />
     <ProjectReference Include="..\Centaurus.Models\Centaurus.Models.csproj" />
   </ItemGroup>

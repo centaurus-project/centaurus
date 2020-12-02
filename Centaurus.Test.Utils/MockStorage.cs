@@ -1,17 +1,18 @@
-﻿using Centaurus.DAL;
+﻿using Centaurus.Models;
+using Centaurus.DAL;
 using Centaurus.DAL.Models;
-using Centaurus.Domain;
-using Centaurus.Models;
+using Centaurus.DAL.Models.Analytics;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Centaurus.DAL.Mongo;
 
 namespace Centaurus.Test
 {
-    public class MockStorage : BaseStorage
+    public class MockStorage : IStorage
     {
 
         private List<OrderModel> ordersCollection = new List<OrderModel>();
@@ -21,30 +22,31 @@ namespace Centaurus.Test
         private List<EffectModel> effectsCollection = new List<EffectModel>();
         private List<SettingsModel> settingsCollection = new List<SettingsModel>();
         private List<AssetModel> assetSettings = new List<AssetModel>();
+        private List<PriceHistoryFrameModel> frames = new List<PriceHistoryFrameModel>();
         private ConstellationState constellationState;
 
-        public override Task OpenConnection(string connectionString)
+        public Task OpenConnection(string connectionString)
         {
             return Task.CompletedTask;
         }
 
-        public override Task CloseConnection()
+        public Task CloseConnection()
         {
             return Task.CompletedTask;
         }
 
-        public override Task<long> GetLastApex()
+        public Task<long> GetLastApex()
         {
             var res = quantaCollection.LastOrDefault()?.Apex ?? -1;
             return Task.FromResult(res);
         }
 
-        public override Task<QuantumModel> LoadQuantum(long apex)
+        public Task<QuantumModel> LoadQuantum(long apex)
         {
             return Task.FromResult(quantaCollection.First(q => q.Apex == apex));
         }
 
-        public override Task<List<QuantumModel>> LoadQuanta(params long[] apexes)
+        public Task<List<QuantumModel>> LoadQuanta(params long[] apexes)
         {
             List<QuantumModel> res = quantaCollection;
             if (apexes.Length > 0)
@@ -54,7 +56,7 @@ namespace Centaurus.Test
             return Task.FromResult(res);
         }
 
-        public override Task<List<QuantumModel>> LoadQuantaAboveApex(long apex, int count = 0)
+        public Task<List<QuantumModel>> LoadQuantaAboveApex(long apex, int count = 0)
         {
             var query = quantaCollection.Where(q => q.Apex > apex);
             if (count > 0)
@@ -63,7 +65,7 @@ namespace Centaurus.Test
             return Task.FromResult(res);
         }
 
-        public override Task<long> GetFirstEffectApex()
+        public Task<long> GetFirstEffectApex()
         {
             var firstEffect = effectsCollection
                    .OrderBy(e => e.Apex)
@@ -73,29 +75,29 @@ namespace Centaurus.Test
             return Task.FromResult(firstApex);
         }
 
-        public override Task<List<EffectModel>> LoadEffectsAboveApex(long apex)
+        public Task<List<EffectModel>> LoadEffectsAboveApex(long apex)
         {
             var effects = effectsCollection.Where(e => e.Apex > apex).ToList();
             return Task.FromResult(effects);
         }
 
-        public override Task<List<EffectModel>> LoadEffectsForApex(long apex)
+        public Task<List<EffectModel>> LoadEffectsForApex(long apex)
         {
             var effects = effectsCollection.Where(e => e.Apex == apex).ToList();
             return Task.FromResult(effects);
         }
 
-        public override Task<List<AccountModel>> LoadAccounts()
+        public Task<List<AccountModel>> LoadAccounts()
         {
             return Task.FromResult(accountsCollection);
         }
 
-        public override Task<List<BalanceModel>> LoadBalances()
+        public Task<List<BalanceModel>> LoadBalances()
         {
             return Task.FromResult(balancesCollection);
         }
 
-        public override Task<SettingsModel> LoadSettings(long apex)
+        public Task<SettingsModel> LoadSettings(long apex)
         {
             var settings = settingsCollection
                 .OrderByDescending(s => s.Apex)
@@ -103,7 +105,7 @@ namespace Centaurus.Test
             return Task.FromResult(settings);
         }
 
-        public override Task<List<AssetModel>> LoadAssets(long apex)
+        public Task<List<AssetModel>> LoadAssets(long apex)
         {
             var assets = assetSettings
                 .Where(s => s.Apex <= apex)
@@ -112,7 +114,7 @@ namespace Centaurus.Test
             return Task.FromResult(assets);
         }
 
-        public override Task<List<QuantumModel>> LoadWithdrawals()
+        public Task<List<QuantumModel>> LoadWithdrawals()
         {
             var allAccounts = effectsCollection.Select(e => e.Account).Distinct().ToList();
 
@@ -134,17 +136,17 @@ namespace Centaurus.Test
             return Task.FromResult(withdrawals);
         }
 
-        public override Task<List<OrderModel>> LoadOrders()
+        public Task<List<OrderModel>> LoadOrders()
         {
             return Task.FromResult(ordersCollection);
         }
 
-        public override Task<ConstellationState> LoadConstellationState()
+        public Task<ConstellationState> LoadConstellationState()
         {
             return Task.FromResult(constellationState);
         }
 
-        public override Task Update(DiffObject update)
+        public Task Update(DiffObject update)
         {
             UpdateSettings(update.Settings, update.Assets);
 
@@ -283,7 +285,7 @@ namespace Centaurus.Test
             }
         }
 
-        public override Task<List<EffectModel>> LoadEffects(byte[] cursor, bool isDesc, int limit, byte[] account)
+        public Task<List<EffectModel>> LoadEffects(byte[] cursor, bool isDesc, int limit, byte[] account)
         {
             if (account == null)
                 throw new ArgumentNullException(nameof(account));
@@ -308,6 +310,45 @@ namespace Centaurus.Test
                 .ToList();
 
             return Task.FromResult(effects);
+        }
+
+        public Task<List<PriceHistoryFrameModel>> GetPriceHistory(int cursorTimeStamp, int toUnixTimeStamp, int asset, PriceHistoryPeriod period)
+        {
+            var cursorId = PriceHistoryExtesnions.EncodeId(asset, (int)period, cursorTimeStamp);
+            var toId = PriceHistoryExtesnions.EncodeId(asset, (int)period, toUnixTimeStamp);
+
+            var result = frames
+                .Where(f => f.Id >= cursorId && f.Id < toId)
+                .OrderByDescending(f => f.Id)
+                .ToList();
+
+            return Task.FromResult(result);
+        }
+
+        public Task<int> GetFirstPriceHistoryFrameDate(int market, PriceHistoryPeriod period)
+        {
+            var firstId = PriceHistoryExtesnions.EncodeId(market, (int)period, 0);
+            var firstFrame = frames
+                .OrderByDescending(f => f.Id)
+                .FirstOrDefault(f => f.Id >= firstId);
+
+            if (firstFrame == null)
+                return Task.FromResult(0);
+
+            return Task.FromResult(PriceHistoryExtesnions.DecodeId(firstFrame.Id).timestamp);
+        }
+
+        public Task SaveAnalytics(List<PriceHistoryFrameModel> update)
+        {
+            foreach (var frame in update)
+            {
+                var frameIndex = frames.FindIndex(f => f.Id == frame.Id);
+                if (frameIndex >= 0)
+                    frames[frameIndex] = frame;
+                else
+                    frames.Add(frame);
+            }
+            return Task.CompletedTask;
         }
     }
 }

@@ -311,7 +311,7 @@ namespace Centaurus.Domain
         private static async Task<Exchange> GetRestoredExchange(List<Order> orders)
         {
             var assets = await Global.PermanentStorage.LoadAssets(long.MaxValue);//we need to load all assets, otherwise errors could occur during exchange restore
-            return Exchange.RestoreExchange(assets.Select(a => a.ToAssetSettings()).ToList(), orders);
+            return Exchange.RestoreExchange(assets.Select(a => a.ToAssetSettings()).ToList(), orders, false);
         }
 
         private static async Task<List<Account>> GetAccounts()

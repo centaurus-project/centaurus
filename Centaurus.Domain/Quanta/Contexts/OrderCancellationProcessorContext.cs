@@ -34,7 +34,7 @@ namespace Centaurus.Domain.Quanta.Contexts
             }
         }
 
-        public OrderSides OrderSide { get; private set; }
+        public OrderSide OrderSide { get; private set; }
 
         public int Asset { get; private set; }
     }

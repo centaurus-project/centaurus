@@ -4,9 +4,10 @@ using System.Text;
 
 namespace Centaurus.Models
 {
-    public enum OrderSides
+    public enum DepthsSide
     {
-        Sell = 0,
-        Buy = 1
+        Both = 0,
+        Sell = 1,
+        Buy = 2
     }
 }

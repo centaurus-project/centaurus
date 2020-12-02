@@ -10,7 +10,7 @@ namespace Centaurus.Models
         public override EffectTypes EffectType => EffectTypes.OrderPlaced;
 
         [XdrField(0)]
-        public OrderSides OrderSide { get; set; }
+        public OrderSide OrderSide { get; set; }
 
         [XdrField(1)]
         public long Amount { get; set; }

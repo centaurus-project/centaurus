@@ -7,8 +7,8 @@ namespace Centaurus.Domain
         public Market(int asset, OrderMap orderMap)
         {
             Asset = asset;
-            Asks = new Orderbook(orderMap) { Side = OrderSides.Sell };
-            Bids = new Orderbook(orderMap) { Side = OrderSides.Buy };
+            Asks = new Orderbook(orderMap) { Side = OrderSide.Sell };
+            Bids = new Orderbook(orderMap) { Side = OrderSide.Buy };
         }
 
         public int Asset { get; }

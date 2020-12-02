@@ -7,23 +7,23 @@ using Centaurus.DAL.Models;
 
 namespace Centaurus.DAL
 {
-    public abstract class BaseStorage
+    public interface IStorage: IAnalyticsStorage
     {
-        public abstract Task OpenConnection(string connectionString);
+        public Task OpenConnection(string connectionString);
 
-        public abstract Task CloseConnection();
+        public Task CloseConnection();
 
         /// <summary>
         /// Fetches last apex presented in DB. Returns -1 if no apex in DB.
         /// </summary>
-        public abstract Task<long> GetLastApex();
+        public Task<long> GetLastApex();
 
         /// <summary>
         /// Loads quantum with specified apex
         /// </summary>
         /// <param name="apex"></param>
         /// <returns></returns>
-        public abstract Task<QuantumModel> LoadQuantum(long apex);
+        public Task<QuantumModel> LoadQuantum(long apex);
 
         //TODO: return cursor
         /// <summary>
@@ -31,7 +31,7 @@ namespace Centaurus.DAL
         /// </summary>
         /// <param name="apexes"></param>
         /// <returns></returns>
-        public abstract Task<List<QuantumModel>> LoadQuanta(params long[] apexes);
+        public Task<List<QuantumModel>> LoadQuanta(params long[] apexes);
 
         //TODO: return cursor
         /// <summary>
@@ -40,17 +40,17 @@ namespace Centaurus.DAL
         /// <param name="apex"></param>
         /// <param name="count">Count of quanta to load. Loads all if equal or less than 0</param>
         /// <returns></returns>
-        public abstract Task<List<QuantumModel>> LoadQuantaAboveApex(long apex, int count = 0);
+        public Task<List<QuantumModel>> LoadQuantaAboveApex(long apex, int count = 0);
 
         /// <summary>
         /// Returns first effect apex. If it's -1 than there is no effects at all.
         /// </summary>
         /// <returns></returns>
-        public abstract Task<long> GetFirstEffectApex();
+        public Task<long> GetFirstEffectApex();
 
-        public abstract Task<List<EffectModel>> LoadEffectsForApex(long apex);
+        public Task<List<EffectModel>> LoadEffectsForApex(long apex);
 
-        public abstract Task<List<EffectModel>> LoadEffectsAboveApex(long apex);
+        public Task<List<EffectModel>> LoadEffectsAboveApex(long apex);
 
         /// <summary>
         /// Fetches effects
@@ -59,32 +59,32 @@ namespace Centaurus.DAL
         /// <param name="isDesc">Is reverse ordering.</param>
         /// <param name="limit">Item per request.</param>
         /// <returns></returns>
-        public abstract Task<List<EffectModel>> LoadEffects(byte[] cursor, bool isDesc, int limit, byte[] account);
+        public Task<List<EffectModel>> LoadEffects(byte[] cursor, bool isDesc, int limit, byte[] account);
 
-        public abstract Task<List<AccountModel>> LoadAccounts();
+        public Task<List<AccountModel>> LoadAccounts();
 
-        public abstract Task<List<BalanceModel>> LoadBalances();
+        public Task<List<BalanceModel>> LoadBalances();
 
         /// <summary>
         /// Fetches settings where apex is equal to or lower than specified one. 
         /// </summary>
         /// <param name="apex"></param>
         /// <returns></returns>
-        public abstract Task<SettingsModel> LoadSettings(long apex);
+        public Task<SettingsModel> LoadSettings(long apex);
 
         /// <summary>
         /// Fetches assets where apex is equal to or lower than specified one. 
         /// </summary>
         /// <param name="apex"></param>
         /// <returns></returns>
-        public abstract Task<List<AssetModel>> LoadAssets(long apex);
+        public Task<List<AssetModel>> LoadAssets(long apex);
 
-        public abstract Task<List<QuantumModel>> LoadWithdrawals();
+        public Task<List<QuantumModel>> LoadWithdrawals();
 
-        public abstract Task<List<OrderModel>> LoadOrders();
+        public Task<List<OrderModel>> LoadOrders();
 
-        public abstract Task<ConstellationState> LoadConstellationState();
+        public Task<ConstellationState> LoadConstellationState();
 
-        public abstract Task Update(DiffObject update);
+        public Task Update(DiffObject update);
     }
 }

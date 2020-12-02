@@ -43,7 +43,7 @@ namespace Centaurus
 
         public HandshakeData HandshakeData { get; }
 
-        public AccountWrapper Account { get; set; } 
+        public AccountWrapper Account { get; set; }
 
         private QuantumSyncWorker quantumWorker;
         private readonly object apexCursorSyncRoot = new { };

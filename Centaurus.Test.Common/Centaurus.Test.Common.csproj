@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Centaurus.Common\Centaurus.Common.csproj" />
+    <ProjectReference Include="..\Centaurus.Exchange.Analytics\Centaurus.Exchange.Analytics.csproj" />
   </ItemGroup>
 
 </Project>

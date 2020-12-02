@@ -15,7 +15,7 @@ namespace Centaurus.Domain
             this.orderMap = orderMap;
         }
 
-        public OrderSides Side { get; set; }
+        public OrderSide Side { get; set; }
 
         public Order Head { get; set; }
 
@@ -57,8 +57,8 @@ namespace Centaurus.Domain
             }
             //find position to insert the order
             var cursor = Head;
-            while ((Side == OrderSides.Sell && price >= cursor.Price)
-                || (Side == OrderSides.Buy && price <= cursor.Price))
+            while ((Side == OrderSide.Sell && price >= cursor.Price)
+                || (Side == OrderSide.Buy && price <= cursor.Price))
             {
                 cursor = cursor.Next;
                 if (cursor == null) break; //the last record
