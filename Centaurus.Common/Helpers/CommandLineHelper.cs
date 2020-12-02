@@ -153,7 +153,7 @@ namespace Centaurus
             //override config by env variables
             var merged = OverrideValues(configFileArgsDict, envArgsDict);
             //override config and env variables by passed arguments
-            merged = OverrideValues(merged, passedArgsDict);
+            merged = OverrideValues(passedArgsDict, merged);
 
             return merged
                 .SelectMany(a => new string[] { a.Key.FullArgumentName, a.Value })
