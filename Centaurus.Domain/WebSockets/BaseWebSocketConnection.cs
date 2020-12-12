@@ -122,6 +122,8 @@ namespace Centaurus
                     envelope.Sign(Global.Settings.KeyPair);
 
                 var serializedData = XdrConverter.Serialize(envelope);
+                if (webSocket == null)
+                    throw new ObjectDisposedException(nameof(webSocket));
                 await webSocket.SendAsync(serializedData, WebSocketMessageType.Binary, true, (ct == default ? CancellationToken.None : ct));
                 Global.ExtensionsManager.AfterSendMessage(this, envelope);
             }

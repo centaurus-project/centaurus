@@ -4,6 +4,13 @@ using System.Text;
 
 namespace Centaurus.Models
 {
+    public enum OrderState
+    { 
+        New = 0,
+        Updated = 1,
+        Deleted = 2
+    }
+
     public class OrderInfo
     {
         public ulong OrderId { get; set; }
@@ -16,6 +23,6 @@ namespace Centaurus.Models
 
         public long Amount { get; set; }
 
-        public bool IsDeleted { get; set; }
+        public OrderState State { get; set; }
     }
 }

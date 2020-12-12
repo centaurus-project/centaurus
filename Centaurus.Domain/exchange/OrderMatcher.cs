@@ -65,7 +65,7 @@ namespace Centaurus.Domain
                 var match = new OrderMatch(this, counterOrder);
                 var matchUpdates = match.ProcessOrderMatch();
                 updates.Trades.Add(matchUpdates.trade);
-                updates.OrderUpdates.Add(matchUpdates.removedOrder);
+                updates.OrderUpdates.Add(matchUpdates.counterOrder);
 
                 //stop if incoming order has been executed in full
                 if (takerOrder.Amount == 0)
@@ -77,18 +77,17 @@ namespace Centaurus.Domain
 
             if (timeInForce == TimeInForce.GoodTillExpire)
             {
-                PlaceReminderOrder();
-
-                updates.OrderUpdates.Add(takerOrder.ToOrderInfo());
+                if (PlaceReminderOrder())
+                    updates.OrderUpdates.Add(takerOrder.ToOrderInfo());
             }
             return updates;
         }
 
-        private void PlaceReminderOrder()
+        private bool PlaceReminderOrder()
         {
-            if (takerOrder.Amount <= 0) return;
+            if (takerOrder.Amount <= 0) return false;
             var xmlAmount = EstimateTradedXlmAmount(takerOrder.Amount, takerOrder.Price);
-            if (xmlAmount <= 0) return;
+            if (xmlAmount <= 0) return false;
             //lock order reserve
             if (side == OrderSide.Buy)
             {
@@ -103,6 +102,7 @@ namespace Centaurus.Domain
             var reminderOrderbook = market.GetOrderbook(side);
             //record maker trade effect
             resultEffects.AddOrderPlaced(reminderOrderbook, takerOrder, takerOrder.Amount, asset, side);
+            return true;
         }
 
         /// <summary>
@@ -135,7 +135,7 @@ namespace Centaurus.Domain
             /// <summary>
             /// Process matching.
             /// </summary>
-            public (Trade trade, OrderInfo removedOrder) ProcessOrderMatch()
+            public (Trade trade, OrderInfo counterOrder) ProcessOrderMatch()
             {
                 //trade assets
                 if (matcher.side == OrderSide.Buy)
@@ -167,17 +167,16 @@ namespace Centaurus.Domain
 
                 //record trade effects
                 var trade = RecordTrade();
-                var removedOrder = default(OrderInfo);
+                var counterOrder = makerOrder.ToOrderInfo();
                 if (makerOrder.Amount == 0)
                 { //schedule removal for the fully executed counter order
-                    //matcher.orderbook.RemoveEmptyHeadOrder();
                     RecordOrderRemoved();
-                    var removedOrderInfo = makerOrder.ToOrderInfo();
-                    removedOrderInfo.IsDeleted = true;
-                    removedOrder = removedOrderInfo;
+                    counterOrder.State = OrderState.Deleted;
                 }
+                else
+                    counterOrder.State = OrderState.Updated;
 
-                return (trade, removedOrder);
+                return (trade, counterOrder);
             }
 
             private Trade RecordTrade()

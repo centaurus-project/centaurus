@@ -55,8 +55,22 @@ namespace Centaurus.Exchange
             var updatedSides = new List<OrderSide>();
             foreach (var order in orders)
             {
-                if (((!order.IsDeleted && AddOrder(order)) || RemoveOrder(order))
-                    && !updatedSides.Contains(order.Side))
+                var isUpdated = false;
+                switch (order.State)
+                {
+                    case OrderState.New:
+                        isUpdated = AddOrder(order);
+                        break;
+                    case OrderState.Updated:
+                        isUpdated = UpdateOrder(order);
+                        break;
+                    case OrderState.Deleted:
+                        isUpdated = RemoveOrder(order);
+                        break;
+                    default:
+                        throw new InvalidOperationException($"Unsupported order state {order.State}.");
+                }
+                if (!updatedSides.Contains(order.Side))
                     updatedSides.Add(order.Side);
             }
 
@@ -165,6 +179,20 @@ namespace Centaurus.Exchange
             currentPrice.Orders.Remove(order.OrderId);
             if (currentPrice.Amount == 0)
                 source.Remove(currentPrice);
+            return true;
+        }
+
+        private bool UpdateOrder(OrderInfo order)
+        {
+            if (order == null)
+                throw new ArgumentNullException(nameof(order));
+
+            var price = NormalizePrice(order.Price);
+            var source = prices[order.Side];
+            var currentPrice = source.FirstOrDefault(p => p.Price == price);
+            if (currentPrice == null)
+                return false;
+            currentPrice.Amount -= order.Amount;
             return true;
         }
     }

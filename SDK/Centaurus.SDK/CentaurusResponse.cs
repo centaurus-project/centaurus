@@ -36,7 +36,7 @@ namespace Centaurus.SDK
             if (resultMessage.Status == ResultStatusCodes.Success)
                 completionSource.TrySetResult(envelope);
             else
-                SetException(new RequestException(envelope));
+                SetException(new RequestException(envelope, resultMessage.Status.ToString()));
         }
 
         public Task<MessageEnvelope> AcknowledgmentSource => acknowledgmentSource.Task;
@@ -80,8 +80,10 @@ namespace Centaurus.SDK
             }
             else if (envelope.Signatures.Count > 1
                 && envelope.HasMajority(Auditors.Length)
-                && envelope.Signatures.All(s => Auditors.Contains(s.Signer) || s.Signer.Equals(AlphaPubkey))
-                && envelope.AreSignaturesValid())
+                && envelope.Signatures.Distinct().Count() == envelope.Signatures.Count
+                && envelope.Signatures.All(s => Auditors.Any(a => s.Signer.Equals(a)) || s.Signer.Equals(AlphaPubkey))
+                && (resultMessage is ITransactionResultMessage //TODO: remove it after ITransactionResultMessage refactoring
+                    || envelope.AreSignaturesValid()))
             {
                 AssignResponseToSource(finalizeSource, envelope);
             }

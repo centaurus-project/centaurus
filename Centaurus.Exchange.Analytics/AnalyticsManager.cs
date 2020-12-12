@@ -26,7 +26,8 @@ namespace Centaurus.Exchange.Analytics
             TradesHistoryManager = new TradesHistoryManager(markets, tradesHistorySize);
             MarketDepthsManager = new MarketDepthsManager(markets, precisions, orders);
             MarketTickersManager = new MarketTickersManager(markets, PriceHistoryManager);
-            InitTimer();
+            if (!EnvironmentHelper.IsTest)
+                InitTimer();
         }
 
         public async Task Restore(DateTime dateTime)
@@ -117,7 +118,7 @@ namespace Centaurus.Exchange.Analytics
                 updateTimer?.Start();
                 OnUpdate?.Invoke();
             }
-            catch(Exception exc)
+            catch (Exception exc)
             {
                 OnError?.Invoke(exc);
             }

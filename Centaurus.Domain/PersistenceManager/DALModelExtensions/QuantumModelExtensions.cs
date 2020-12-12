@@ -29,7 +29,7 @@ namespace Centaurus.Domain
                 Account = account,
                 RawQuantum = XdrConverter.Serialize(quantum),
                 Type = (int)quantumMessage.MessageType,
-                TimeStamp = DateTime.UtcNow
+                TimeStamp = quantumMessage.Timestamp
             };
         }
 

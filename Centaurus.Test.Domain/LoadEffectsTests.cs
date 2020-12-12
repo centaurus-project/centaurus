@@ -1,4 +1,5 @@
-﻿using Centaurus.Domain;
+﻿using Centaurus.DAL;
+using Centaurus.Domain;
 using Centaurus.Models;
 using NUnit.Framework;
 using stellar_dotnet_sdk;
@@ -31,9 +32,9 @@ namespace Centaurus.Test
         public async Task LoadEffectsTest(KeyPair accountKey, bool isDesc)
         {
             var allLimit = 1000;
-            var allEffectsResult = (await Global.SnapshotManager.LoadEffects(null, isDesc, allLimit, accountKey.PublicKey)).Items;
+            var allEffectsResult = (await Global.PersistenceManager.LoadEffects(null, isDesc, allLimit, accountKey.PublicKey)).Items;
 
-            var opositeOrderedResult = (await Global.SnapshotManager.LoadEffects(null, !isDesc, allLimit, accountKey.PublicKey)).Items;
+            var opositeOrderedResult = (await Global.PersistenceManager.LoadEffects(null, !isDesc, allLimit, accountKey.PublicKey)).Items;
 
             //check ordering
             for (int i = 0, opI = allEffectsResult.Count - 1; i < allEffectsResult.Count; i++, opI--)
@@ -44,12 +45,14 @@ namespace Centaurus.Test
                 Assert.AreEqual(true, areEqual, "Ordering doesn't work as expected.");
             }
 
+            var zeroId = EffectModelIdConverter.EncodeId(0, 0);
+            var zeroHexCursor = zeroId.Value.ToByteArray().ToHex();
             //check fetching
             var limit = 1;
-            await TestFetching(allEffectsResult, new byte[12].ToHex(), isDesc, limit, accountKey);
+            await TestFetching(allEffectsResult, zeroHexCursor, isDesc, limit, accountKey);
 
             //check reverse fetching
-            await TestFetching(allEffectsResult, new byte[12].ToHex(), !isDesc, limit, accountKey, true);
+            await TestFetching(allEffectsResult, zeroHexCursor, !isDesc, limit, accountKey, true);
         }
 
         private async Task TestFetching(List<Effect> allEffects, string cursor, bool isDesc, int limit, KeyPair account, bool isReverseDirection = false)
@@ -60,7 +63,7 @@ namespace Centaurus.Test
             var totalCount = 0;
             while (nextCursor != null)
             {
-                var currentEffectsResult = await Global.SnapshotManager.LoadEffects(nextCursor, isDesc, limit, account?.PublicKey);
+                var currentEffectsResult = await Global.PersistenceManager.LoadEffects(nextCursor, isDesc, limit, account?.PublicKey);
                 if (totalCount == allEffects.Count)
                 {
                     Assert.AreEqual(0, currentEffectsResult.Items.Count, "Some extra effects were loaded.");

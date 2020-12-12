@@ -27,17 +27,18 @@ namespace Centaurus
 
         private CancellationTokenSource cancellationTokenSource;
 
-        private const int batchSize = 100_000;
+        private const int batchSize = 100;
 
         private void SendQuantums()
         {
             Task.Factory.StartNew(async () =>
             {
-                while (!cancellationTokenSource.Token.IsCancellationRequested)
+                while (cancellationTokenSource != null && 
+                    !cancellationTokenSource.Token.IsCancellationRequested)
                 {
                     if (auditor.ConnectionState != ConnectionState.Ready
                         && Global.QuantumStorage.CurrentApex - apexCursor <= 100 //the auditor is less than 100 quanta behind
-                        && apexCursor != 0) //the auditor is not in init state
+                        ) //the auditor is not in init state
                         auditor.ConnectionState = ConnectionState.Ready;
 
                     if (apexCursor == Global.QuantumStorage.CurrentApex)
@@ -49,7 +50,10 @@ namespace Centaurus
                     {
                         List<MessageEnvelope> quanta = null;
                         if (!Global.QuantumStorage.GetQuantaBacth(apexCursor + 1, batchSize, out quanta))
-                            quanta = await SnapshotManager.GetQuantaAboveApex(apexCursor, batchSize); //quanta are not found in the in-memory storage
+                            quanta = await PersistenceManager.GetQuantaAboveApex(apexCursor, batchSize); //quanta are not found in the in-memory storage
+
+                        quanta = quanta.OrderBy(q => ((Quantum)q.Message).Apex).ToList();
+                        logger.Info(() => $"Batch request from {apexCursor + 1}. Batch content: [{string.Join(',', quanta.Select(q => ((Quantum)q.Message).Apex.ToString()))}]");
 
                         var lastQuantum = quanta.LastOrDefault();
                         if (lastQuantum == null) //it can be null if there is only one quantum in the in-memory quantum storage and it's in progress
@@ -58,12 +62,13 @@ namespace Centaurus
                         var batchMessage = new QuantaBatch { Quanta = quanta };
                         await auditor.SendMessage(batchMessage, cancellationTokenSource.Token);
  
-                        if (apexCursor == 0) //if apex cursor is set to 0 than the auditor is in init state, and it will send new set apex cursor message after init 
-                            break;
                         apexCursor = ((Quantum)lastQuantum.Message).Apex;
                     }
                     catch (Exception exc)
                     {
+                        if (exc is ObjectDisposedException 
+                        || exc.GetBaseException() is ObjectDisposedException)
+                            throw;
                         logger.Error(exc);
                     }
                 }

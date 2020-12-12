@@ -23,9 +23,16 @@ namespace Centaurus.Domain
 
             logger.Info($"Alpha state is {alphaState.State}");
 
+            connection.ConnectionState = ConnectionState.Ready;
             //send apex cursor message to start receive quanta
             _ = connection.SendMessage(new SetApexCursor() { Apex = Global.QuantumStorage.CurrentApex });
-            connection.ConnectionState = ConnectionState.Ready;
+
+            //will receive Ready state after init
+            if (Global.AppState.State != ApplicationState.WaitingForInit)
+            {
+                //register new listener
+                TxListener.RegisterListener(alphaState.TxCursor);
+            }
             return Task.CompletedTask;
         }
     }

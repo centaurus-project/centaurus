@@ -10,5 +10,8 @@ namespace Centaurus.Models
 
         [XdrField(0)]
         public ApplicationState State { get; set; }
+
+        [XdrField(1)]
+        public long TxCursor { get; set; }
     }
 }

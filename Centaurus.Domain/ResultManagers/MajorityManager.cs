@@ -122,6 +122,11 @@ namespace Centaurus.Domain
             return Task.CompletedTask;
         }
 
+        protected virtual byte[] GetHash(MessageEnvelope envelope)
+        {
+            return envelope.Message.ComputeHash();
+        }
+
         public class ConsensusAggregate
         {
             public ConsensusAggregate(MajorityManager majorityManager)
@@ -147,7 +152,7 @@ namespace Centaurus.Domain
                 {
                     if (AlreadyHasResult)
                         return;
-                    var envelopeHash = envelope.ComputeMessageHash();
+                    var envelopeHash = majorityManager.GetHash(envelope);
                     if (!storage.ContainsKey(envelopeHash))//first result with such hash
                         storage[envelopeHash] = envelope;
                     else

@@ -37,12 +37,9 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
         {
             Message message;
             if (Global.AppState.State == ApplicationState.Rising)
-                message = new AuditorStateRequest { TargetApex = await SnapshotManager.GetLastApex() };
+                message = new AuditorStateRequest { TargetApex = await PersistenceManager.GetLastApex() };
             else
-            {
-                var alphaStateManager = (AlphaStateManager)Global.AppState;
-                message = alphaStateManager.GetCurrentAlphaState();
-            }
+                message = AlphaStateHelper.GetCurrentState();
             await connection.SendMessage(message);
         }
 

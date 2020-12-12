@@ -44,13 +44,5 @@ namespace Centaurus.Domain
                     State = ApplicationState.Running;
             }
         }
-
-        public AlphaState GetCurrentAlphaState()
-        {
-            return new AlphaState
-            {
-                State = State
-            };
-        }
     }
 }

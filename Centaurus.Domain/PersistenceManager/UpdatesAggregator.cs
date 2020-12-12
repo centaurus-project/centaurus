@@ -51,7 +51,7 @@ namespace Centaurus.Domain
                 {
                     var effect = quatumEffects[c];
 
-                    effects.Add(effect.FromEffect(c));
+                    effects.Add(effect.FromEffect(c, quantumMessage.Timestamp));
 
                     switch (effect)
                     {
@@ -142,7 +142,7 @@ namespace Centaurus.Domain
                                 var orderId = tradeEffect.OrderId;
                                 if (!orders.ContainsKey(orderId))
                                     orders.Add(orderId, new DiffObject.Order { OrderId = orderId });
-                                orders[orderId].Amount += tradeEffect.AssetAmount;
+                                orders[orderId].Amount -= tradeEffect.AssetAmount;
                             }
                             break;
                         case TxCursorUpdateEffect cursorUpdateEffect:

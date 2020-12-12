@@ -4,9 +4,9 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Centaurus.DAL.Mongo
+namespace Centaurus.DAL
 {
-    public static class PriceHistoryExtesnions
+    public static class PriceHistoryExtensions
     {
 
         public static BsonObjectId EncodeId(int market, int period, int timestamp)

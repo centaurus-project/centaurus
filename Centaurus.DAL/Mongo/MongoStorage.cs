@@ -37,6 +37,16 @@ namespace Centaurus.DAL.Mongo
                  new CreateIndexModel<AccountModel>(Builders<AccountModel>.IndexKeys.Ascending(a => a.PubKey),
                  new CreateIndexOptions { Unique = true, Background = true })
             );
+
+            await quantaCollection.Indexes.CreateOneAsync(
+                 new CreateIndexModel<QuantumModel>(Builders<QuantumModel>.IndexKeys.Ascending(e => e.TimeStamp),
+                 new CreateIndexOptions { Unique = true, Background = true })
+            );
+
+            await effectsCollection.Indexes.CreateOneAsync(
+                 new CreateIndexModel<EffectModel>(Builders<EffectModel>.IndexKeys.Ascending(e => e.Id).Ascending(e => e.EffectType),
+                 new CreateIndexOptions { Unique = true, Background = true })
+            );
         }
 
         public async Task OpenConnection(string connectionString)
@@ -52,7 +62,7 @@ namespace Centaurus.DAL.Mongo
             ordersCollection = database.GetCollection<OrderModel>("orders");
             accountsCollection = database.GetCollection<AccountModel>("accounts");
             balancesCollection = database.GetCollection<BalanceModel>("balances");
-            quantaCollection = database.GetCollection<QuantumModel>("quanta");
+            quantaCollection = database.GetCollection<QuantumModel>("quanta", new MongoCollectionSettings { AssignIdOnInsert = false });
             constellationStateCollection = database.GetCollection<ConstellationState>("constellationState");
 
             effectsCollection = database.GetCollection<EffectModel>("effects", new MongoCollectionSettings { AssignIdOnInsert = false });
@@ -73,22 +83,41 @@ namespace Centaurus.DAL.Mongo
 
         public async Task<List<QuantumModel>> LoadWithdrawals()
         {
-            var allAccounts = await effectsCollection.Distinct(e => e.Account, FilterDefinition<EffectModel>.Empty).ToListAsync();
+            var lastQuantum = await GetLastQuantum();
+            if (lastQuantum == null) //no quanta no withdrawals
+                return new List<QuantumModel>();
 
-            var withdrawals = new List<QuantumModel>();
+            var timestampFrom = (new DateTime(lastQuantum.TimeStamp, DateTimeKind.Utc) - TimeSpan.FromMinutes(120)).Ticks;
+            var fromQuantum = await quantaCollection.Find(q => q.TimeStamp <= timestampFrom).SortByDescending(q => q.Apex).FirstOrDefaultAsync();
+
+            var fromId = EffectModelIdConverter.EncodeId(fromQuantum?.Apex ?? 0, 0);
+
             var effectTypes = new int[] { (int)EffectTypes.WithdrawalCreate, (int)EffectTypes.WithdrawalRemove };
-            foreach (var acc in allAccounts)
-            {
-                var filter = Builders<EffectModel>.Filter.And(Builders<EffectModel>.Filter.Eq(e => e.Account, acc), Builders<EffectModel>.Filter.In(e => e.EffectType, effectTypes));
-                var lastEffect = await effectsCollection.Find(filter).SortByDescending(e => e.Id).FirstOrDefaultAsync();
-                if (lastEffect?.EffectType == (int)EffectTypes.WithdrawalCreate)
+
+            var eFilter = Builders<EffectModel>.Filter;
+
+            var withdrawalEffects = await effectsCollection.Aggregate()
+                .Match(eFilter.And(eFilter.Gte(e => e.Id, fromId), eFilter.In(e => e.EffectType, effectTypes)))
+                .SortByDescending(e => e.Id)
+                .Group(new BsonDocument {
+                    { "_id", "$Account" },
+                    { "effectId", new BsonDocument { { "$first", "$_id" } } },
+                    { "lastEffectType", new BsonDocument { { "$first", "$EffectType" } } }
+                })
+                .Match(new BsonDocument { { "lastEffectType", (int)EffectTypes.WithdrawalCreate } })
+                .ToListAsync();
+
+            var quantumIds = withdrawalEffects
+                .Select(q =>
                 {
-                    var quantum = await quantaCollection.Find(q => q.Apex == lastEffect.Apex).FirstOrDefaultAsync();
-                    if (quantum == null)
-                        throw new Exception($"Unable to find quantum with apex {lastEffect.Apex}");
-                    withdrawals.Add(quantum);
-                }
-            }
+                    var effectId = q["effectId"].AsObjectId;
+                    var decoded = EffectModelIdConverter.DecodeId(effectId);
+                    return decoded.apex;
+                });
+
+            var withdrawals = await quantaCollection
+                .Find(Builders<QuantumModel>.Filter.In(q => q.Apex, quantumIds))
+                .ToListAsync();
             return withdrawals;
         }
 
@@ -193,12 +222,15 @@ namespace Centaurus.DAL.Mongo
 
         public async Task<long> GetLastApex()
         {
-            var quanta = await quantaCollection
+            return (await GetLastQuantum())?.Apex ?? -1;
+        }
+
+        private async Task<QuantumModel> GetLastQuantum()
+        {
+            return await quantaCollection
                    .Find(FilterDefinition<QuantumModel>.Empty)
                    .SortByDescending(e => e.Apex)
                    .FirstOrDefaultAsync();
-
-            return quanta?.Apex ?? -1;
         }
 
         public async Task<List<EffectModel>> LoadEffects(byte[] cursor, bool isDesc, int limit, byte[] account)
@@ -215,12 +247,13 @@ namespace Centaurus.DAL.Mongo
 
             if (cursor != null && cursor.Any(x => x != 0))
             {
+                var c = new BsonObjectId(new ObjectId(cursor));
                 if (isDesc)
                     query = effectsCollection
-                        .Find(Builders<EffectModel>.Filter.Lt(e => e.Id, cursor));
+                        .Find(Builders<EffectModel>.Filter.Lt(e => e.Id, c));
                 else
                     query = effectsCollection
-                        .Find(Builders<EffectModel>.Filter.Gt(e => e.Id, cursor));
+                        .Find(Builders<EffectModel>.Filter.Gt(e => e.Id, c));
             }
 
             var effects = await query
@@ -233,8 +266,8 @@ namespace Centaurus.DAL.Mongo
 
         public async Task<List<PriceHistoryFrameModel>> GetPriceHistory(int cursorTimeStamp, int toUnixTimeStamp, int asset, PriceHistoryPeriod period)
         {
-            var cursorId = PriceHistoryExtesnions.EncodeId(asset, (int)period, cursorTimeStamp);
-            var toId = PriceHistoryExtesnions.EncodeId(asset, (int)period, toUnixTimeStamp);
+            var cursorId = PriceHistoryExtensions.EncodeId(asset, (int)period, cursorTimeStamp);
+            var toId = PriceHistoryExtensions.EncodeId(asset, (int)period, toUnixTimeStamp);
             var query = priceHistoryCollection.Find(
                    Builders<PriceHistoryFrameModel>.Filter.And(
                        Builders<PriceHistoryFrameModel>.Filter.Gte(f => f.Id, cursorId),
@@ -247,7 +280,7 @@ namespace Centaurus.DAL.Mongo
 
         public async Task<int> GetFirstPriceHistoryFrameDate(int market, PriceHistoryPeriod period)
         {
-            var firstId = PriceHistoryExtesnions.EncodeId(market, (int)period, 0);
+            var firstId = PriceHistoryExtensions.EncodeId(market, (int)period, 0);
 
             var firstFrame = await priceHistoryCollection
                 .Find(Builders<PriceHistoryFrameModel>.Filter.Gte(f => f.Id, firstId))
@@ -256,7 +289,7 @@ namespace Centaurus.DAL.Mongo
             if (firstFrame == null)
                 return 0;
 
-            return PriceHistoryExtesnions.DecodeId(firstFrame.Id).timestamp;
+            return PriceHistoryExtensions.DecodeId(firstFrame.Id).timestamp;
         }
 
         #region Updates

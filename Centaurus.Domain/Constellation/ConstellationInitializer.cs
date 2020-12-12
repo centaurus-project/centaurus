@@ -3,6 +3,7 @@ using stellar_dotnet_sdk;
 using stellar_dotnet_sdk.requests;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -126,10 +127,12 @@ namespace Centaurus.Domain
                     .SetMediumThreshold(majority)
                     .SetHighThreshold(majority);
 
-            foreach (var signer in constellationInitInfo.Auditors)
-                optionOperationBuilder.SetSigner(Signer.Ed25519PublicKey(signer), 1);
-
             transactionBuilder.AddOperation(optionOperationBuilder.Build());
+
+            foreach (var signer in constellationInitInfo.Auditors)
+            {
+                transactionBuilder.AddOperation(new SetOptionsOperation.Builder().SetSigner(Signer.Ed25519PublicKey(signer), 1).Build());
+            }
 
             var transaction = transactionBuilder.Build();
             transaction.Sign(Global.Settings.KeyPair);

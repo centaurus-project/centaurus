@@ -9,7 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="NUnit" Version="3.12.0"/>
+    <PackageReference Include="NUnit" Version="3.12.0" />
     <PackageReference Include="NUnit3TestAdapter" Version="3.16.1">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -17,8 +17,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Centaurus.Domain\Centaurus.Domain.csproj"/>
-    <ProjectReference Include="..\Centaurus.Models\Centaurus.Models.csproj"/>
+    <ProjectReference Include="..\Centaurus.Domain\Centaurus.Domain.csproj" />
+    <ProjectReference Include="..\Centaurus.Models\Centaurus.Models.csproj" />
   </ItemGroup>
 
 </Project>

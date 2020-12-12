@@ -97,7 +97,7 @@ namespace Centaurus.Domain
         private void InitTimer()
         {
             submitTimer = new System.Timers.Timer();
-            submitTimer.Interval = 10 * 1000;
+            submitTimer.Interval = 60 * 1000;
             submitTimer.AutoReset = false;
             submitTimer.Elapsed += SubmitTimer_Elapsed;
             submitTimer.Start();
@@ -113,7 +113,7 @@ namespace Centaurus.Domain
             }
             catch (Exception exc)
             {
-                logger.Error(exc);
+                logger.Error(exc, "Error on withdrawal cleanup.");
                 Global.AppState.State = ApplicationState.Failed;
             }
         }
@@ -127,7 +127,7 @@ namespace Centaurus.Domain
                 expiredTransactions = withdrawals.Where(w => w.Value.IsExpired(currentTimeSeconds)).Select(w => w.Key).ToArray();
             }
 
-            //we must ignore all txs that was submitted. TxManager will handle submitted txs.
+            //we must ignore all txs that was submitted. TxListener will handle submitted txs.
             var limit = 200;
             var unhandledTxs = new List<byte[]>();
             var pageResult = await Global.StellarNetwork.Server.GetTransactionsRequestBuilder(Global.Constellation.Vault.ToString(), Global.TxManager.TxCursor, limit).Execute();

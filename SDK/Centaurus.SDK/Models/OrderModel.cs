@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Text;
 
 namespace Centaurus.SDK.Models
@@ -18,7 +19,7 @@ namespace Centaurus.SDK.Models
                 if (orderId != default)
                 {
                     var decoded = OrderIdConverter.Decode(orderId);
-                    Asset = decoded.Asset;
+                    AssetId = decoded.Asset;
                     Side = decoded.Side;
                 }
             }
@@ -32,18 +33,23 @@ namespace Centaurus.SDK.Models
 
         public string AmountXdr => stellar_dotnet_sdk.Amount.FromXdr(Amount);
 
-        public int Asset { get; set; }
+        public int AssetId { get; set; }
 
-        public OrderSides Side { get; set; }
+        public string Asset { get; set; }
 
-        public static OrderModel FromOrder(Order order)
+        public OrderSide Side { get; set; }
+
+        public static OrderModel FromOrder(Order order, ConstellationInfo constellation)
         {
-            return new OrderModel
+            var orderModel = new OrderModel
             {
                 OrderId = order.OrderId,
                 Price = order.Price,
                 Amount = order.Amount
             };
+
+            orderModel.Asset = constellation.Assets.FirstOrDefault(a => a.Id == orderModel.AssetId)?.DisplayName ?? orderModel.AssetId.ToString();
+            return orderModel;
         }
     }
 }

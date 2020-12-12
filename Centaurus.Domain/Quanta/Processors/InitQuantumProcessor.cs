@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -13,18 +14,19 @@ namespace Centaurus.Domain
 
         public override async Task<ResultMessage> Process(ProcessorContext context)
         {
-            var initEffects = await SnapshotManager.ApplyInitUpdates(context.Envelope);
+            var initEffects = await PersistenceManager.ApplyInitUpdates(context.Envelope);
 
-            var snapshot = await SnapshotManager.GetSnapshot();
+            var snapshot = await PersistenceManager.GetSnapshot();
 
             Global.Setup(snapshot);
 
             Global.AppState.State = ApplicationState.Running;
             if (!Global.IsAlpha) //set auditor to Ready state after init
             {
-                Global.AppState.State = ApplicationState.Ready;
                 //send new apex cursor message to notify Alpha that the auditor was initialized
                 OutgoingMessageStorage.EnqueueMessage(new SetApexCursor { Apex = 1 });
+                TxListener.RegisterListener(snapshot.TxCursor);
+                Global.AppState.State = ApplicationState.Ready;
             }
 
             return context.Envelope.CreateResult(ResultStatusCodes.Success, new List<Effect>(initEffects));

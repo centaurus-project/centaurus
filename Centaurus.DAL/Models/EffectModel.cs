@@ -1,4 +1,5 @@
-﻿using System;
+﻿using MongoDB.Bson;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -6,7 +7,7 @@ namespace Centaurus.DAL.Models
 {
     public class EffectModel
     {
-        public byte[] Id { get; set; }
+        public BsonObjectId Id { get; set; }
 
         public long Apex { get; set; }
 
@@ -16,13 +17,14 @@ namespace Centaurus.DAL.Models
 
         public byte[] RawEffect { get; set; }
 
-        public DateTime Timestamp { get; set; }
+        public long Timestamp { get; set; }
 
         public override string ToString()
         {
             if (Id == null) 
                 return null;
-            return $"{{Effect apex: {BitConverter.ToInt64(Id, 0)}, index: {BitConverter.ToInt32(Id, 8)}, effectType: {EffectType} }}";
+            var decodedId = EffectModelIdConverter.DecodeId(Id);
+            return $"{{Effect apex: {decodedId.apex}, index: {decodedId.index}, effectType: {EffectType} }}";
         }
     }
 }

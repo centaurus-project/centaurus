@@ -20,9 +20,12 @@ namespace Centaurus
         private bool isAborted = false;
 
         private Logger logger = LogManager.GetCurrentClassLogger();
+        private ManualResetEvent resetEvent;
 
-        public void Run(AuditorSettings settings)
+        public void Run(AuditorSettings settings, ManualResetEvent resetEvent)
         {
+            this.resetEvent = resetEvent;
+
             Global.Init(settings, new MongoStorage());
 
             Global.AppState.StateChanged += StateChanged;
@@ -36,7 +39,7 @@ namespace Centaurus
         {
             try
             {
-                while (auditor == null)
+                while (auditor == null && !isAborted)
                 {
                     var _auditor = new AuditorWebSocketConnection(new ClientWebSocket(), null);
                     try
@@ -50,14 +53,14 @@ namespace Centaurus
                         Unsubscribe(_auditor);
                         await CloseConnection(_auditor);
 
-                        logger.Error(exc, "Unable establish connection. Retry in 5000ms");
+                        logger.Info(exc, "Unable establish connection. Retry in 5000ms");
                         Thread.Sleep(5000);
                     }
                 }
             }
             catch (Exception exc)
             {
-                logger.Error(exc);
+                logger.Error(exc, "Auditor startup error.");
                 Global.AppState.State = ApplicationState.Failed;
             }
         }
@@ -66,11 +69,8 @@ namespace Centaurus
         {
             if (state == ApplicationState.Failed)
             {
-                Shutdown();
-
                 Thread.Sleep(10000);//sleep for 10 sec to make sure that pending updates are saved
-
-                //TODO: restart after some timeout
+                resetEvent.Set();
             }
         }
 
