@@ -18,6 +18,7 @@ using NLog.Web;
 using System.IO;
 using Microsoft.AspNetCore.Http;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace Centaurus
 {
@@ -25,9 +26,11 @@ namespace Centaurus
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
         private IHost host;
+        private ManualResetEvent resetEvent;
 
-        public void Run(AlphaSettings settings)
+        public void Run(AlphaSettings settings, ManualResetEvent resetEvent)
         {
+            this.resetEvent = resetEvent;
             ConfigureConstellation(settings);
 
             host = CreateHostBuilder(settings).Build();
@@ -36,9 +39,13 @@ namespace Centaurus
 
         public void Shutdown()
         {
-            ConnectionManager.CloseAllConnections();
-            InfoConnectionManager.CloseAllConnections();
-            host.StopAsync().Wait();
+            if (host != null)
+            {
+                ConnectionManager.CloseAllConnections();
+                InfoConnectionManager.CloseAllConnections();
+                host.StopAsync().Wait();
+                host = null;
+            }
         }
 
         #region Private Members
@@ -57,8 +64,7 @@ namespace Centaurus
             if (e == ApplicationState.Failed)
             {
                 logger.Error("Application failed");
-
-                Shutdown();
+                resetEvent.Set();
             }
         }
 
@@ -112,6 +118,7 @@ namespace Centaurus
                         Type.GetType("Microsoft.AspNetCore.Mvc.Infrastructure.SystemTextJsonResultExecutor, Microsoft.AspNetCore.Mvc.Core"),
                         ServiceLifetime.Singleton)
                 );
+                services.AddOptions<HostOptions>().Configure(opts => opts.ShutdownTimeout = TimeSpan.FromDays(365));
             }
 
             static ApplicationState[] ValidApplicationStates = new ApplicationState[] { ApplicationState.Rising, ApplicationState.Running, ApplicationState.Ready };

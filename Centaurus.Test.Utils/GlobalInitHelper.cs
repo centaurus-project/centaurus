@@ -143,7 +143,6 @@ namespace Centaurus.Test
 
             Global.QuantumHandler.HandleAsync(depositeQuantum.CreateEnvelope()).Wait();
 
-
             //save all effects
             SnapshotHelper.ApplyUpdates().Wait();
         }

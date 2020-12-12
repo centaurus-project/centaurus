@@ -13,7 +13,7 @@ using System.Diagnostics;
 namespace Centaurus.Domain
 {
     //TODO: rename and separate it.
-    public class SnapshotManager
+    public class PersistenceManager
     {
         private static Logger logger = LogManager.GetCurrentClassLogger();
 
@@ -22,7 +22,7 @@ namespace Centaurus.Domain
         /// </summary>
         /// <param name="_onSnapshotSuccess">The delegate that is called when the snapshot is successful</param>
         /// <param name="_onSnapshotFailed">The delegate that is called when the snapshot is failed</param>
-        public SnapshotManager(Action _onSnapshotSuccess, Action<string> _onSnapshotFailed)
+        public PersistenceManager(Action _onSnapshotSuccess, Action<string> _onSnapshotFailed)
         {
             onSnapshotSuccess = _onSnapshotSuccess;
             onSnapshotFailed = _onSnapshotFailed;
@@ -52,7 +52,7 @@ namespace Centaurus.Domain
             var updates = new PendingUpdates();
             updates.Add(envelope, initEffects);
 
-            await SaveSnapshotInternal(updates);
+            await ApplyUpdatesInternal(updates);
 
             return initEffects;
         }
@@ -62,7 +62,7 @@ namespace Centaurus.Domain
         {
             try
             {
-                await SaveSnapshotInternal(updates);
+                await ApplyUpdatesInternal(updates);
                 onSnapshotSuccess();
             }
             catch (Exception exc)
@@ -86,8 +86,8 @@ namespace Centaurus.Domain
                 CurrentPagingToken = rawCursor,
                 Order = isDesc ? EffectsRequest.Desc : EffectsRequest.Asc,
                 Items = effectModels.Select(e => e.ToEffect()).ToList(),
-                NextPageToken = (effectModels.LastOrDefault()?.Id).ToHex(),
-                PrevPageToken = (effectModels.FirstOrDefault()?.Id).ToHex(),
+                NextPageToken = (effectModels.LastOrDefault()?.Id.Value.ToByteArray()).ToHex(),
+                PrevPageToken = (effectModels.FirstOrDefault()?.Id.Value.ToByteArray()).ToHex(),
                 Limit = limit
             };
         }
@@ -98,7 +98,7 @@ namespace Centaurus.Domain
 
         private static SemaphoreSlim saveSnapshotSemaphore = new SemaphoreSlim(1);
 
-        private static async Task SaveSnapshotInternal(PendingUpdates updates)
+        private static async Task ApplyUpdatesInternal(PendingUpdates updates)
         {
             await saveSnapshotSemaphore.WaitAsync();
             try
@@ -126,17 +126,6 @@ namespace Centaurus.Domain
         {
             var quantaModels = await Global.PermanentStorage.LoadQuantaAboveApex(apex, count);
             return quantaModels.Select(q => XdrConverter.Deserialize<MessageEnvelope>(q.RawQuantum)).ToList();
-        }
-
-        /// <summary>
-        /// Builds updates based on the snapshot, and saves it to DB
-        /// </summary>
-        public static async Task InitFromSnapshot(Snapshot snapshot)
-        {
-            if (Global.AppState.State != ApplicationState.WaitingForInit)
-                throw new InvalidOperationException("This operation is only permitted when the app is in WaitingForInit state");
-            var aggregatedUpdates = UpdatesAggregator.Aggregate(snapshot);
-            await Global.PermanentStorage.Update(aggregatedUpdates);
         }
 
         public static async Task<long> GetLastApex()

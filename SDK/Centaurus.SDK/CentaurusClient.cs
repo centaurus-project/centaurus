@@ -45,13 +45,13 @@ namespace Centaurus.SDK
 
                 await UpdateAccountData();
             }
-            catch
+            catch (Exception exc)
             {
                 UnsubscribeFromEvents(connection);
                 if (connection != null)
                     await connection.CloseConnection();
                 connection = null;
-                throw new Exception("Login failed.");
+                throw new Exception("Login failed.", exc);
             }
             finally
             {
@@ -97,8 +97,8 @@ namespace Centaurus.SDK
             var rawMessage = (AccountDataResponse)data.Message;
             return new AccountDataModel
             {
-                Balances = rawMessage.Balances.Select(x => BalanceModel.FromBalance(x)).ToDictionary(k => k.Asset, v => v),
-                Orders = rawMessage.Orders.Select(x => OrderModel.FromOrder(x)).ToDictionary(k => k.OrderId, v => v)
+                Balances = rawMessage.Balances.Select(x => BalanceModel.FromBalance(x, constellation)).ToDictionary(k => k.AssetId, v => v),
+                Orders = rawMessage.Orders.Select(x => OrderModel.FromOrder(x, constellation)).ToDictionary(k => k.OrderId, v => v)
             };
         }
 
@@ -129,7 +129,7 @@ namespace Centaurus.SDK
             return result;
         }
 
-        public async Task<MessageEnvelope> CreateOrder(long amount, double price, OrderSides side, ConstellationInfo.Asset asset)
+        public async Task<MessageEnvelope> CreateOrder(long amount, double price, OrderSide side, ConstellationInfo.Asset asset)
         {
             var order = new OrderRequest { Amount = amount, Price = price, Side = side, Asset = asset.Id };
             var result = await connection.SendMessage(order.CreateEnvelope());
@@ -186,7 +186,10 @@ namespace Centaurus.SDK
                             AccountData.Nonce = nonceUpdateEffect.Nonce;
                             break;
                         case BalanceCreateEffect balanceCreateEffect:
-                            AccountData.Balances[balanceCreateEffect.Asset] = new BalanceModel { Asset = balanceCreateEffect.Asset };
+                            AccountData.Balances[balanceCreateEffect.Asset] = new BalanceModel { 
+                                AssetId = balanceCreateEffect.Asset,
+                                Asset = (constellation.Assets.FirstOrDefault(a => a.Id == balanceCreateEffect.Asset)?.DisplayName ?? balanceCreateEffect.Asset.ToString())
+                            };
                             break;
                         case BalanceUpdateEffect balanceUpdateEffect:
                             AccountData.Balances[balanceUpdateEffect.Asset].Amount += balanceUpdateEffect.Amount;
@@ -195,7 +198,13 @@ namespace Centaurus.SDK
                             AccountData.Balances[updateLiabilitiesEffect.Asset].Liabilities += updateLiabilitiesEffect.Amount;
                             break;
                         case OrderPlacedEffect orderPlacedEffect:
-                            AccountData.Orders[orderPlacedEffect.OrderId] = new OrderModel { Amount = orderPlacedEffect.Amount, Price = orderPlacedEffect.Price, OrderId = orderPlacedEffect.OrderId };
+                            var orderModel = new OrderModel { 
+                                Amount = orderPlacedEffect.Amount, 
+                                Price = orderPlacedEffect.Price, 
+                                OrderId = orderPlacedEffect.OrderId 
+                            };
+                            orderModel.Asset = constellation.Assets.FirstOrDefault(a => a.Id == orderModel.AssetId)?.DisplayName ?? orderModel.AssetId.ToString();
+                            AccountData.Orders[orderPlacedEffect.OrderId] = orderModel;
                             break;
                         case OrderRemovedEffect orderRemoveEffect:
                             AccountData.Orders.Remove(orderRemoveEffect.OrderId);
@@ -331,9 +340,8 @@ namespace Centaurus.SDK
                 //we don't need to create and sign heartbeat message on every sending
                 hearbeatMessage = new Heartbeat().CreateEnvelope();
                 hearbeatMessage.Sign(_clientKeyPair);
-#if !DEBUG
+
                 InitTimer();
-#endif
             }
 
             public event Action<MessageEnvelope> OnMessage;
@@ -346,9 +354,6 @@ namespace Centaurus.SDK
 
             public async Task EstablishConnection()
             {
-                //var payload = DateTime.UtcNow.Ticks;
-                //var signature = Convert.ToBase64String(BitConverter.GetBytes(payload).Sign(clientKeyPair).Signature);
-                //webSocket.Options.SetRequestHeader("Authorization", $"ed25519 {clientKeyPair.AccountId}.{payload}.{signature}");
                 await webSocket.ConnectAsync(websocketAddress, CancellationToken.None);
                 _ = Listen();
             }
@@ -402,8 +407,7 @@ namespace Centaurus.SDK
 
                     _ = Task.Factory.StartNew(() => OnSend?.Invoke(envelope));
 
-                    if (heartbeatTimer != null)
-                        heartbeatTimer.Reset();
+                    heartbeatTimer?.Reset();
                 }
                 catch (Exception exc)
                 {

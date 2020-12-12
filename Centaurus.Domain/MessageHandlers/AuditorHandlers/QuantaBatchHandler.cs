@@ -28,7 +28,7 @@ namespace Centaurus.Domain
 
                 if (quantum.Apex != Global.QuantumHandler.LastAddedQuantumApex + 1)
                 {
-                    logger.Info("Batch has invalid quantum apexes. New apex cursor request will be send.");
+                    logger.Info($"Batch has invalid quantum apexes (current: {Global.QuantumHandler.LastAddedQuantumApex}, received: {quantum.Apex}). New apex cursor request will be send.");
                     await connection.SendMessage(new SetApexCursor { Apex = Global.QuantumHandler.LastAddedQuantumApex });
                     return;
                 }

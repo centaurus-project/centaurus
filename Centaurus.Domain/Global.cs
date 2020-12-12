@@ -43,17 +43,19 @@ namespace Centaurus.Domain
             StellarNetwork = new StellarNetwork(Settings.NetworkPassphrase, Settings.HorizonUrl);
             QuantumProcessor = new QuantumProcessorsStorage();
 
+            PendingUpdatesManager = new PendingUpdatesManager();
+
             AppState = IsAlpha ? new AlphaStateManager() : (StateManager)new AuditorStateManager();
 
             //try to load last settings, we need it to know current auditors
             var lastHash = new byte[] { };
-            var lastApex = SnapshotManager.GetLastApex().Result;
+            var lastApex = PersistenceManager.GetLastApex().Result;
             if (lastApex >= 0)
             {
-                var lastQuantum = SnapshotManager.GetQuantum(lastApex).Result;
+                var lastQuantum = PersistenceManager.GetQuantum(lastApex).Result;
                 lastHash = lastQuantum.Message.ComputeHash();
                 logger.Trace($"Last hash is {Convert.ToBase64String(lastHash)}");
-                var snapshot = SnapshotManager.GetSnapshot(lastApex).Result;
+                var snapshot = PersistenceManager.GetSnapshot(lastApex).Result;
                 Setup(snapshot);
                 if (IsAlpha)
                     AppState.State = ApplicationState.Rising;//Alpha should ensure that it has all quanta from auditors
@@ -67,16 +69,11 @@ namespace Centaurus.Domain
             QuantumStorage = new QuantumStorage(lastApex < 0 ? 0 : lastApex, lastHash);
 
             QuantumHandler = new QuantumHandler(QuantumStorage.CurrentApex);
-
-            pendingUpdates = new PendingUpdates();
-
-            if (!EnvironmentHelper.IsTest)
-                InitTimers();
         }
 
         public static void Setup(Snapshot snapshot)
         {
-            SnapshotManager = new SnapshotManager(OnSnapshotSuccess, OnSnapshotFailed);
+            PersistenceManager = new PersistenceManager(PendingUpdatesManager.OnSaveSuccess, PendingUpdatesManager.OnSaveFailed);
 
             Constellation = snapshot.Settings;
 
@@ -90,7 +87,7 @@ namespace Centaurus.Domain
 
             WithdrawalStorage?.Dispose(); WithdrawalStorage = new WithdrawalStorage(snapshot.Withdrawals, (!EnvironmentHelper.IsTest && IsAlpha));
 
-            TxManager?.Dispose(); TxManager = new TxManager(snapshot.TxCursor);
+            TxManager = new TxManager(snapshot.TxCursor);
 
             if (IsAlpha)
             {
@@ -121,7 +118,9 @@ namespace Centaurus.Domain
         }
 
         public static Exchange Exchange { get; private set; }
-        public static SnapshotManager SnapshotManager { get; private set; }
+        public static PersistenceManager PersistenceManager { get; private set; }
+
+        public static PendingUpdatesManager PendingUpdatesManager { get; set; }
 
         private static ConstellationSettings constellation;
         public static ConstellationSettings Constellation
@@ -153,89 +152,7 @@ namespace Centaurus.Domain
         public static IStorage PermanentStorage { get; private set; }
         public static BaseSettings Settings { get; private set; }
         public static StellarNetwork StellarNetwork { get; private set; }
-
         public static HashSet<int> AssetIds { get; private set; }
-
-        private static PendingUpdates pendingUpdates;
-
-        public static void AddEffects(MessageEnvelope quantum, Effect[] effects)
-        {
-            pendingUpdates.Add(quantum, effects);
-        }
-
-        static void InitTimers()
-        {
-            //TODO: move interval to config
-            snapshotRunTimer = new Timer();
-            snapshotRunTimer.Interval = 5 * 1000;
-            snapshotRunTimer.AutoReset = false;
-            snapshotRunTimer.Elapsed += SnapshotTimer_Elapsed;
-            snapshotRunTimer.Start();
-
-            snapshotTimoutTimer = new Timer();
-            snapshotTimoutTimer.Interval = 10 * 1000;
-            snapshotTimoutTimer.AutoReset = false;
-            snapshotTimoutTimer.Elapsed += (s, e) => OnSnapshotFailed("Snapshot save timed out.");
-        }
-
-        private static bool snapshotIsInProgress = false;
-
-        private static object timerSyncRoot = new { };
-
-        private static void OnSnapshotSuccess()
-        {
-            lock (timerSyncRoot)
-            {
-                snapshotIsInProgress = false;
-
-                snapshotTimoutTimer?.Stop();
-                snapshotRunTimer?.Start();
-            }
-        }
-
-        private static void OnSnapshotFailed(string reason)
-        {
-            lock (timerSyncRoot)
-            {
-                snapshotIsInProgress = false;
-
-                snapshotTimoutTimer?.Stop();
-                snapshotRunTimer?.Stop();
-
-                logger.Error($"Snapshot failed. {reason}");
-                AppState.State = ApplicationState.Failed;
-            }
-        }
-
-        private static void SnapshotTimer_Elapsed(object sender, ElapsedEventArgs e)
-        {
-            lock (timerSyncRoot)
-            {
-                if (AppState.State != ApplicationState.Ready)
-                {
-                    if (!snapshotIsInProgress)
-                        snapshotRunTimer.Start();
-                    return;
-                }
-
-                snapshotIsInProgress = true;
-
-                _ = ApplyUpdates();
-
-                snapshotTimoutTimer?.Start();
-            }
-        }
-
-        private static async Task ApplyUpdates()
-        {
-            var updates = pendingUpdates;
-            pendingUpdates = new PendingUpdates();
-            await SnapshotManager.ApplyUpdates(updates);
-        }
-
-        private static Timer snapshotTimoutTimer;
-
-        private static Timer snapshotRunTimer;
 
 
         #region Analytics
@@ -299,7 +216,7 @@ namespace Centaurus.Domain
 
         private static void AnalyticsManager_OnError(Exception exc)
         {
-            logger.Error(exc);
+            logger.Error(exc, "Analytics manager error.");
             AppState.State = ApplicationState.Failed;
         }
 

@@ -4,17 +4,17 @@
     <TargetFramework>netcoreapp3.1</TargetFramework>
     <RootNamespace>Centaurus.Models</RootNamespace>
     <AssemblyVersion>0.1.21</AssemblyVersion>
-    <FileVersion>0.1.21</FileVersion>
-    <Version>0.1.21</Version>
+    <FileVersion>0.0.17</FileVersion>
+    <Version>0.0.17</Version>
   </PropertyGroup>
 
   <ItemGroup>
-    <Folder Include="Serializers\"/>
+    <Folder Include="Serializers\" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Centaurus.Models\Centaurus.Models.csproj"/>
-    <ProjectReference Include="..\Centaurus.Xdr\Centaurus.Xdr.csproj"/>
+    <ProjectReference Include="..\Centaurus.Models\Centaurus.Models.csproj" />
+    <ProjectReference Include="..\Centaurus.Xdr\Centaurus.Xdr.csproj" />
   </ItemGroup>
 
 </Project>

@@ -4,17 +4,17 @@
     <TargetFramework>netcoreapp3.1</TargetFramework>
     <RootNamespace>Centaurus.Test</RootNamespace>
     <AssemblyVersion>0.1.21</AssemblyVersion>
-    <FileVersion>0.1.21</FileVersion>
-    <Version>0.1.21</Version>
+    <FileVersion>0.0.17</FileVersion>
+    <Version>0.0.17</Version>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Centaurus.Xdr.ContractGenerator\Centaurus.Xdr.ContractGenerator.csproj"/>
-    <ProjectReference Include="..\Centaurus.Test.Contracts\Centaurus.Test.Contracts.csproj"/>
+    <ProjectReference Include="..\Centaurus.Xdr.ContractGenerator\Centaurus.Xdr.ContractGenerator.csproj" />
+    <ProjectReference Include="..\Centaurus.Test.Contracts\Centaurus.Test.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Serializers\"/>
+    <Folder Include="Serializers\" />
   </ItemGroup>
 
 </Project>

@@ -5,16 +5,16 @@
     <AssemblyName>Centaurus.Test.Contracts</AssemblyName>
     <RootNamespace>Centaurus.Test</RootNamespace>
     <AssemblyVersion>0.1.21</AssemblyVersion>
-    <FileVersion>0.1.21</FileVersion>
-    <Version>0.1.21</Version>
+    <FileVersion>0.0.17</FileVersion>
+    <Version>0.0.17</Version>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Centaurus.Xdr\Centaurus.Xdr.csproj"/>
+    <ProjectReference Include="..\Centaurus.Xdr\Centaurus.Xdr.csproj" />
   </ItemGroup>
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <Exec Command="dotnet run -c $(ConfigurationName) -p ../Centaurus.Xdr.ContractGenerator -- -c -l cs -d ../Centaurus.Test.DynamicSerializers/Serializers -a $(OutDir)Centaurus.Test.Contracts.dll"/>
+    <Exec Command="dotnet run -c $(ConfigurationName) -p ../Centaurus.Xdr.ContractGenerator -- -c -l cs -d ../Centaurus.Test.DynamicSerializers/Serializers -a $(OutDir)Centaurus.Test.Contracts.dll" />
   </Target>
 
 </Project>

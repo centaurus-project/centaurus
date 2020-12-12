@@ -48,5 +48,9 @@ namespace Centaurus.Domain
             if (requestMessage != null)
                 Notifier.Notify(requestMessage.Account, confirmation);
         }
+        protected override byte[] GetHash(MessageEnvelope envelope)
+        {
+            return ((ResultMessage)envelope.Message).OriginalMessage.ComputeHash();
+        }
     }
 }

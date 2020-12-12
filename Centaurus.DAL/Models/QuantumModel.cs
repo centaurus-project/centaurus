@@ -1,4 +1,5 @@
-﻿using System;
+﻿using MongoDB.Bson.Serialization.Attributes;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -6,6 +7,7 @@ namespace Centaurus.DAL.Models
 {
     public class QuantumModel
     {
+        [BsonId]
         public long Apex { get; set; }
 
         public byte[] Account { get; set; }
@@ -14,6 +16,6 @@ namespace Centaurus.DAL.Models
 
         public byte[] RawQuantum { get; set; }
 
-        public DateTime TimeStamp { get; set; }
+        public long TimeStamp { get; set; }
     }
 }

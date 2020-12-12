@@ -7,8 +7,8 @@
 
     <RootNamespace>Centaurus.Test</RootNamespace>
     <AssemblyVersion>0.1.21</AssemblyVersion>
-    <FileVersion>0.1.21</FileVersion>
-    <Version>0.1.21</Version>
+    <FileVersion>0.0.17</FileVersion>
+    <Version>0.0.17</Version>
   </PropertyGroup>
 
   <ItemGroup>

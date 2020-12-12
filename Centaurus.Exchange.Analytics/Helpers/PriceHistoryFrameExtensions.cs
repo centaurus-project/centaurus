@@ -1,7 +1,7 @@
 ﻿using Centaurus.Models;
 using Centaurus.DAL.Models.Analytics;
 using System;
-using Centaurus.DAL.Mongo;
+using Centaurus.DAL;
 
 namespace Centaurus.Exchange.Analytics
 {
@@ -12,7 +12,7 @@ namespace Centaurus.Exchange.Analytics
             if (frameModel is null)
                 throw new ArgumentNullException(nameof(frameModel));
 
-            var decodedId = PriceHistoryExtesnions.DecodeId(frameModel.Id);
+            var decodedId = PriceHistoryExtensions.DecodeId(frameModel.Id);
             return new PriceHistoryFrame(DateTimeOffset.FromUnixTimeSeconds(decodedId.timestamp).UtcDateTime, (PriceHistoryPeriod)decodedId.period, decodedId.market, frameModel.Open)
             {
                 Open = frameModel.Open,
@@ -29,7 +29,7 @@ namespace Centaurus.Exchange.Analytics
             if (frame is null)
                 throw new ArgumentNullException(nameof(frame));
 
-            var id = PriceHistoryExtesnions.EncodeId(frame.Market, (int)frame.Period, (int)((DateTimeOffset)frame.StartTime).ToUnixTimeSeconds());
+            var id = PriceHistoryExtensions.EncodeId(frame.Market, (int)frame.Period, (int)((DateTimeOffset)frame.StartTime).ToUnixTimeSeconds());
             return new PriceHistoryFrameModel
             {
                 Id = id,

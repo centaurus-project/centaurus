@@ -44,6 +44,7 @@ namespace Centaurus.Domain
                     logger.Error(e, "Unable to close connection");
                 }
             });
+            connections.Clear();
         }
 
         #region Private members

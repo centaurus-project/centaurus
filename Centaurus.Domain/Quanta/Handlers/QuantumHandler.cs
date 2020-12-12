@@ -60,7 +60,7 @@ namespace Centaurus.Domain
             }
             catch (Exception exc)
             {
-                logger.Error(exc);
+                logger.Error(exc, "Quantum worker failed");
                 Global.AppState.State = ApplicationState.Failed;
                 throw;
             }
@@ -194,7 +194,7 @@ namespace Centaurus.Domain
 
         EffectProcessorsContainer GetEffectProcessorsContainer(MessageEnvelope envelope)
         {
-            return new EffectProcessorsContainer(envelope, Global.AddEffects);
+            return new EffectProcessorsContainer(envelope, Global.PendingUpdatesManager.AddEffects);
         }
 
         void SaveEffects(EffectProcessorsContainer effectsContainer)

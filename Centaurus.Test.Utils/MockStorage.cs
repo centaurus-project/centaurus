@@ -9,6 +9,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Centaurus.DAL.Mongo;
+using MongoDB.Bson;
 
 namespace Centaurus.Test
 {
@@ -297,12 +298,13 @@ namespace Centaurus.Test
 
             if (cursor != null && cursor.Any(x => x != 0))
             {
+                var c = new BsonObjectId(new ObjectId(cursor));
                 if (isDesc)
                     query = query
-                        .Where(e => ((IStructuralComparable)e.Id).CompareTo(cursor, Comparer<byte>.Default) < 0);
+                        .Where(e => e.Id < c);
                 else
                     query = query
-                        .Where(e => ((IStructuralComparable)e.Id).CompareTo(cursor, Comparer<byte>.Default) > 0);
+                        .Where(e => e.Id > c);
             }
 
             var effects = query
@@ -314,8 +316,8 @@ namespace Centaurus.Test
 
         public Task<List<PriceHistoryFrameModel>> GetPriceHistory(int cursorTimeStamp, int toUnixTimeStamp, int asset, PriceHistoryPeriod period)
         {
-            var cursorId = PriceHistoryExtesnions.EncodeId(asset, (int)period, cursorTimeStamp);
-            var toId = PriceHistoryExtesnions.EncodeId(asset, (int)period, toUnixTimeStamp);
+            var cursorId = PriceHistoryExtensions.EncodeId(asset, (int)period, cursorTimeStamp);
+            var toId = PriceHistoryExtensions.EncodeId(asset, (int)period, toUnixTimeStamp);
 
             var result = frames
                 .Where(f => f.Id >= cursorId && f.Id < toId)
@@ -327,7 +329,7 @@ namespace Centaurus.Test
 
         public Task<int> GetFirstPriceHistoryFrameDate(int market, PriceHistoryPeriod period)
         {
-            var firstId = PriceHistoryExtesnions.EncodeId(market, (int)period, 0);
+            var firstId = PriceHistoryExtensions.EncodeId(market, (int)period, 0);
             var firstFrame = frames
                 .OrderByDescending(f => f.Id)
                 .FirstOrDefault(f => f.Id >= firstId);
@@ -335,7 +337,7 @@ namespace Centaurus.Test
             if (firstFrame == null)
                 return Task.FromResult(0);
 
-            return Task.FromResult(PriceHistoryExtesnions.DecodeId(firstFrame.Id).timestamp);
+            return Task.FromResult(PriceHistoryExtensions.DecodeId(firstFrame.Id).timestamp);
         }
 
         public Task SaveAnalytics(List<PriceHistoryFrameModel> update)

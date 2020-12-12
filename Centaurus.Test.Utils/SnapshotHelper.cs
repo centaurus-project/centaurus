@@ -13,13 +13,13 @@ namespace Centaurus.Test
 
         static SnapshotHelper()
         {
-            var globalType = typeof(Global);
-            applyUpdatesMethod = globalType.GetMethod("ApplyUpdates", BindingFlags.NonPublic | BindingFlags.Static);
+            var updatesManagerType = typeof(PendingUpdatesManager);
+            applyUpdatesMethod = updatesManagerType.GetMethod("ApplyUpdates", BindingFlags.NonPublic | BindingFlags.Instance);
         }
 
         public static async Task ApplyUpdates()
         {
-            await (Task)applyUpdatesMethod.Invoke(null, null);
+            await (Task)applyUpdatesMethod.Invoke(Global.PendingUpdatesManager, null);
         }
     }
 }

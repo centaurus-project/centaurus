@@ -7,24 +7,24 @@
 
     <RootNamespace>Centaurus.Test</RootNamespace>
     <AssemblyVersion>0.1.21</AssemblyVersion>
-    <FileVersion>0.1.21</FileVersion>
-    <Version>0.1.21</Version>
+    <FileVersion>0.0.17</FileVersion>
+    <Version>0.0.17</Version>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="nunit" Version="3.12.0"/>
+    <PackageReference Include="nunit" Version="3.12.0" />
     <PackageReference Include="NUnit3TestAdapter" Version="3.16.1">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.4.0"/>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.4.0" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Centaurus.Common\Centaurus.Common.csproj"/>
-    <ProjectReference Include="..\Centaurus.Domain\Centaurus.Domain.csproj"/>
-    <ProjectReference Include="..\Centaurus.Models\Centaurus.Models.csproj"/>
-    <ProjectReference Include="..\Centaurus.Test.Utils\Centaurus.Test.Utils.csproj"/>
+    <ProjectReference Include="..\Centaurus.Common\Centaurus.Common.csproj" />
+    <ProjectReference Include="..\Centaurus.Domain\Centaurus.Domain.csproj" />
+    <ProjectReference Include="..\Centaurus.Models\Centaurus.Models.csproj" />
+    <ProjectReference Include="..\Centaurus.Test.Utils\Centaurus.Test.Utils.csproj" />
   </ItemGroup>
 
 </Project>

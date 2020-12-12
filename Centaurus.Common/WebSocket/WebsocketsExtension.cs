@@ -14,10 +14,10 @@ namespace Centaurus
     public static class WebSocketExtension
     {
         const int chunkSize = 512;
-        const int maxMessageSize = 10240;
+        const int maxMessageSize = 20480;
 
         //TODO: add cancellation token
-
+        //TODO: validate msg size
         public static async Task<byte[]> GetInputByteArray(this WebSocket webSocket)
         {
             var buffer = WebSocket.CreateClientBuffer(chunkSize, chunkSize);
@@ -30,8 +30,8 @@ namespace Centaurus
                     if (result.CloseStatus.HasValue)
                         throw new ConnectionCloseException(result.CloseStatus.Value, result.CloseStatusDescription);
                     ms.Write(buffer.Array, buffer.Offset, result.Count);
-                    if (ms.Length > maxMessageSize) 
-                        throw new OutOfMemoryException("Suspiciously large message");
+                    //if (checkLength && ms.Length > maxMessageSize) 
+                    //    throw new OutOfMemoryException("Suspiciously large message");
                 } while (!result.EndOfMessage);
                 return ms.ToArray();
             }

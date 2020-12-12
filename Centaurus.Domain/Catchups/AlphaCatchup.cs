@@ -46,14 +46,14 @@ namespace Centaurus.Domain
                 }
                 else if (possibleConsensusCount < majority)
                 {
-                    Global.AppState.State = ApplicationState.Failed;
                     logger.Error("Majority of auditors are connected, but there is no consensus");
+                    Global.AppState.State = ApplicationState.Failed;
                 }
             }
             catch (Exception exc)
             {
-                Global.AppState.State = ApplicationState.Failed;
                 logger.Error(exc, "Error on adding auditors state");
+                Global.AppState.State = ApplicationState.Failed;
             }
             finally
             {
@@ -80,7 +80,7 @@ namespace Centaurus.Domain
 
             alphaStateManager.AlphaRised();
 
-            Notifier.NotifyAuditors(alphaStateManager.GetCurrentAlphaState().CreateEnvelope());
+            Notifier.NotifyAuditors(AlphaStateHelper.GetCurrentState().CreateEnvelope());
         }
 
         private static async Task ApplyQuanta(List<MessageEnvelope> quanta)
@@ -118,7 +118,7 @@ namespace Centaurus.Domain
             if (quanta.Count() == 0)
                 return new List<MessageEnvelope>();
 
-            var lastQuantumApex = await SnapshotManager.GetLastApex();
+            var lastQuantumApex = await PersistenceManager.GetLastApex();
             var validQuanta = new List<MessageEnvelope>();
 
             foreach (var currentQuantaGroup in quanta)

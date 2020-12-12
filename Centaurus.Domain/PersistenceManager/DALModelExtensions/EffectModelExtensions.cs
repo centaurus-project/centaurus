@@ -1,4 +1,5 @@
-﻿using Centaurus.DAL.Models;
+﻿using Centaurus.DAL;
+using Centaurus.DAL.Models;
 using Centaurus.Models;
 using Centaurus.Xdr;
 using System;
@@ -10,16 +11,16 @@ namespace Centaurus.Domain
 {
     public static class EffectModelExtensions
     {
-        public static EffectModel FromEffect(this Effect effect, int index)
+        public static EffectModel FromEffect(this Effect effect, int index, long timestamp)
         {
             return new EffectModel
             {
-                Id = BitConverter.GetBytes(effect.Apex).Concat(BitConverter.GetBytes(index)).ToArray(),
+                Id = EffectModelIdConverter.EncodeId(effect.Apex, index),
                 Apex = effect.Apex,
                 Account = effect.Pubkey?.Data,
                 EffectType = (int)effect.EffectType,
                 RawEffect = XdrConverter.Serialize(effect),
-                Timestamp = DateTime.UtcNow
+                Timestamp = timestamp
             };
         }
 

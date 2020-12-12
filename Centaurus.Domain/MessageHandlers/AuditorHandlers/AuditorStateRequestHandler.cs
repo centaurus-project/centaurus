@@ -23,9 +23,9 @@ namespace Centaurus.Domain
             };
 
             //get snapshot for specified Apex
-            var hasDataForApex = stateRequestMessage.TargetApex >= await SnapshotManager.GetMinRevertApex();
+            var hasDataForApex = stateRequestMessage.TargetApex >= await PersistenceManager.GetMinRevertApex();
             if (hasDataForApex)
-                state.PendingQuantums = await SnapshotManager.GetQuantaAboveApex(stateRequestMessage.TargetApex);
+                state.PendingQuantums = await PersistenceManager.GetQuantaAboveApex(stateRequestMessage.TargetApex);
             _ = connection.SendMessage(state);
         }
     }
