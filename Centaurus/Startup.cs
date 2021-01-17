@@ -9,7 +9,7 @@ namespace Centaurus
     interface IStartup<T>
         where T: BaseSettings
     {
-        void Run(T settings, ManualResetEvent resetEvent);
-        void Shutdown();
+        Task Run(T settings, ManualResetEvent resetEvent);
+        Task Shutdown();
     }
 }

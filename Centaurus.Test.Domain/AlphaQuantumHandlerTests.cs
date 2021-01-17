@@ -15,7 +15,7 @@ namespace Centaurus.Test
         public void Setup()
         {
             EnvironmentHelper.SetTestEnvironmentVariable();
-            GlobalInitHelper.DefaultAlphaSetup();
+            GlobalInitHelper.DefaultAlphaSetup().Wait();
         }
 
         static object[] AccountRequestRateLimitsCases =

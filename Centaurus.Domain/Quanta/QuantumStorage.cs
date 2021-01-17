@@ -8,11 +8,22 @@ using System.Timers;
 
 namespace Centaurus.Domain
 {
-    //TODO: add save method, add cleanup method
-    public class QuantumStorage
+    public abstract class QuantumStorageBase
     {
-        static Logger logger = LogManager.GetCurrentClassLogger();
+        public long CurrentApex { get; protected set; }
+        public byte[] LastQuantumHash { get; protected set; }
 
+        public QuantumStorageBase(long currentApex, byte[] lastQuantumHash)
+        {
+            CurrentApex = currentApex;
+            LastQuantumHash = lastQuantumHash;
+        }
+
+        public abstract void AddQuantum(MessageEnvelope envelope);
+    }
+
+    public class AlphaQuantumStorage : QuantumStorageBase
+    {
         private List<long> apexes = new List<long>();
 
         private List<MessageEnvelope> quanta = new List<MessageEnvelope>();
@@ -20,32 +31,20 @@ namespace Centaurus.Domain
         private int QuantaCacheCapacity = 1_000_000;
         private int capacityThreshold = 1000;
 
-        public long CurrentApex { get; private set; }
-        public byte[] LastQuantumHash { get; private set; }
-
-        public QuantumStorage(long currentApex, byte[] lastQuantumHash)
+        public AlphaQuantumStorage(long currentApex, byte[] lastQuantumHash)
+            : base(currentApex, lastQuantumHash)
         {
-            CurrentApex = currentApex;
-            LastQuantumHash = lastQuantumHash;
         }
 
-        public void AddQuantum(MessageEnvelope envelope)
+        public override void AddQuantum(MessageEnvelope envelope)
         {
             lock (this)
             {
                 var quantum = (Quantum)envelope.Message;
-                if (Global.IsAlpha)
-                {
-                    quantum.Apex = ++CurrentApex;
-                    quantum.PrevHash = LastQuantumHash;
-                    if (quantum.Timestamp == default) //it could be assigned, if this quantum was handled already
-                        quantum.Timestamp = DateTime.UtcNow.Ticks;
-                }
-                else if (quantum.Apex == default) //when auditor receives quantum, the quantum should already contain apex
+                if (quantum.Apex < 1)
                     throw new Exception("Quantum has no apex");
-                else
-                    CurrentApex = quantum.Apex;
 
+                CurrentApex = quantum.Apex;
                 LastQuantumHash = quantum.ComputeHash();
                 apexes.Add(quantum.Apex);
                 quanta.Add(envelope);
@@ -73,12 +72,28 @@ namespace Centaurus.Domain
                 if (apexIndex == -1)
                     return false;
                 messageEnvelopes = quanta.Skip(apexIndex).Take(maxCount).ToList();
-
-                var lastItem = messageEnvelopes.LastOrDefault();
-                if (lastItem != null && !((Quantum)lastItem.Message).IsProcessed) //last item can still be processed
-                    messageEnvelopes.RemoveAt(messageEnvelopes.Count - 1);
-
                 return true;
+            }
+        }
+    }
+
+    public class AuditorQuantumStorage : QuantumStorageBase
+    {
+        public AuditorQuantumStorage(long currentApex, byte[] lastQuantumHash)
+            : base(currentApex, lastQuantumHash)
+        {
+
+        }
+
+        public override void AddQuantum(MessageEnvelope envelope)
+        {
+            lock (this)
+            {
+                var quantum = (Quantum)envelope.Message;
+                if (quantum.Apex < 1) //when auditor receives quantum, the quantum should already contain apex
+                    throw new Exception("Quantum has no apex");
+                CurrentApex = quantum.Apex;
+                LastQuantumHash = quantum.ComputeHash();
             }
         }
     }

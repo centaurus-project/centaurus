@@ -10,7 +10,7 @@ namespace Centaurus.DAL.Models
         [BsonId]
         public long Apex { get; set; }
 
-        public byte[] Account { get; set; }
+        public int Account { get; set; }
 
         public int Type { get; set; }
 

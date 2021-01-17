@@ -22,7 +22,7 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
         {
             var resultMessage = (ResultMessage)envelope.Message;
             if (resultMessage.OriginalMessage.Message is Quantum) //we need majority only for quanta
-                _ = Global.AuditResultManager.Add(envelope);
+                Global.AuditResultManager.Add(envelope);
             else if (resultMessage.Status != ResultStatusCodes.Success)
                 logger.Error("Auditor message handling failed. " + StringifyResult(connection, resultMessage));
             else

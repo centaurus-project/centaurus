@@ -18,6 +18,7 @@ namespace Centaurus
             this.auditor = auditor;
             this.apexCursor = apexCursor;
             cancellationTokenSource = new CancellationTokenSource();
+            cancellationToken = cancellationTokenSource.Token;
             SendQuantums();
         }
 
@@ -26,18 +27,19 @@ namespace Centaurus
         private long apexCursor;
 
         private CancellationTokenSource cancellationTokenSource;
+        private CancellationToken cancellationToken;
 
         private const int batchSize = 100;
 
         private void SendQuantums()
         {
+            var quantumStorage = (AlphaQuantumStorage)Global.QuantumStorage;
             Task.Factory.StartNew(async () =>
             {
-                while (cancellationTokenSource != null && 
-                    !cancellationTokenSource.Token.IsCancellationRequested)
+                while (!cancellationToken.IsCancellationRequested)
                 {
                     if (auditor.ConnectionState != ConnectionState.Ready
-                        && Global.QuantumStorage.CurrentApex - apexCursor <= 100 //the auditor is less than 100 quanta behind
+                        && quantumStorage.CurrentApex - apexCursor <= 100 //the auditor is less than 100 quanta behind
                         ) //the auditor is not in init state
                         auditor.ConnectionState = ConnectionState.Ready;
 
@@ -49,20 +51,16 @@ namespace Centaurus
                     try
                     {
                         List<MessageEnvelope> quanta = null;
-                        if (!Global.QuantumStorage.GetQuantaBacth(apexCursor + 1, batchSize, out quanta))
-                            quanta = await PersistenceManager.GetQuantaAboveApex(apexCursor, batchSize); //quanta are not found in the in-memory storage
+                        if (!quantumStorage.GetQuantaBacth(apexCursor + 1, batchSize, out quanta))
+                            quanta = await Global.PersistenceManager.GetQuantaAboveApex(apexCursor, batchSize); //quanta are not found in the in-memory storage
 
                         quanta = quanta.OrderBy(q => ((Quantum)q.Message).Apex).ToList();
                         logger.Info(() => $"Batch request from {apexCursor + 1}. Batch content: [{string.Join(',', quanta.Select(q => ((Quantum)q.Message).Apex.ToString()))}]");
 
-                        var lastQuantum = quanta.LastOrDefault();
-                        if (lastQuantum == null) //it can be null if there is only one quantum in the in-memory quantum storage and it's in progress
-                            continue;
-
                         var batchMessage = new QuantaBatch { Quanta = quanta };
-                        await auditor.SendMessage(batchMessage, cancellationTokenSource.Token);
+                        await auditor.SendMessage(batchMessage);
  
-                        apexCursor = ((Quantum)lastQuantum.Message).Apex;
+                        apexCursor = ((Quantum)quanta.Last().Message).Apex;
                     }
                     catch (Exception exc)
                     {
@@ -77,14 +75,9 @@ namespace Centaurus
 
         public void Dispose()
         {
+            cancellationTokenSource?.Cancel();
             cancellationTokenSource?.Dispose();
             cancellationTokenSource = null;
-        }
-
-        public void CancelAndDispose()
-        {
-            cancellationTokenSource?.Cancel();
-            Dispose();
         }
     }
 }

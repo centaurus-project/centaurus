@@ -10,15 +10,6 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Test.Exchange.Analytics
 {
-
-    public class MockOrderMap : IOrderMap
-    {
-        public OrderInfo GetNextOrder(ulong currentOrderId)
-        {
-            return null;
-        }
-    }
-
     public class AnalyticsManagerTest : BaseAnalyticsTest
     {
 
@@ -28,7 +19,7 @@ namespace Centaurus.Test.Exchange.Analytics
             GenerateTrades(10_000);
             await analyticsManager.SaveUpdates(storage);
 
-            var restoredAnalyticsManager = new AnalyticsManager(storage, new List<double> { 1 }, new MockOrderMap(), markets, historyLength);
+            var restoredAnalyticsManager = new AnalyticsManager(storage, new List<double> { 1 }, markets, new List<OrderInfo>(), historyLength);
             await restoredAnalyticsManager.Restore(now);
 
             foreach (var market in markets)

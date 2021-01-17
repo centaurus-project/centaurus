@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Centaurus.Models;
 using Centaurus.Xdr;
 using System.Diagnostics;
+using Centaurus.DAL.Mongo;
 
 namespace Centaurus.Domain
 {
@@ -17,70 +18,29 @@ namespace Centaurus.Domain
     {
         private static Logger logger = LogManager.GetCurrentClassLogger();
 
-        /// <summary>
-        /// Initiates snapshot manager
-        /// </summary>
-        /// <param name="_onSnapshotSuccess">The delegate that is called when the snapshot is successful</param>
-        /// <param name="_onSnapshotFailed">The delegate that is called when the snapshot is failed</param>
-        public PersistenceManager(Action _onSnapshotSuccess, Action<string> _onSnapshotFailed)
+        private SemaphoreSlim saveSnapshotSemaphore = new SemaphoreSlim(1);
+        private IStorage storage;
+
+        public object Stop { get; internal set; }
+
+        public PersistenceManager(IStorage storage)
         {
-            onSnapshotSuccess = _onSnapshotSuccess;
-            onSnapshotFailed = _onSnapshotFailed;
+            this.storage = storage ?? throw new ArgumentNullException(nameof(storage));
         }
 
-        /// <summary>
-        /// Makes initial save to DB
-        /// </summary>
-        /// <param name="envelope">Envelope that contains constellation init quantum.</param>
-        public static async Task<Effect[]> ApplyInitUpdates(MessageEnvelope envelope)
+        public async Task<EffectsResponse> LoadEffects(string rawCursor, bool isDesc, int limit, int account)
         {
-
-            var initQuantum = (ConstellationInitQuantum)envelope.Message;
-
-            var initEffects = new Effect[] {
-                new ConstellationInitEffect {
-                    Apex = initQuantum.Apex,
-                    Assets = initQuantum.Assets,
-                    Auditors = initQuantum.Auditors,
-                    MinAccountBalance = initQuantum.MinAccountBalance,
-                    MinAllowedLotSize = initQuantum.MinAllowedLotSize,
-                    Vault = initQuantum.Vault,
-                    RequestRateLimits = initQuantum.RequestRateLimits
-                }
-            };
-
-            var updates = new PendingUpdates();
-            updates.Add(envelope, initEffects);
-
-            await ApplyUpdatesInternal(updates);
-
-            return initEffects;
-        }
-
-        //only one thread can save snapshots. We need make sure that previous snapshot is permanent
-        public async Task ApplyUpdates(PendingUpdates updates)
-        {
-            try
-            {
-                await ApplyUpdatesInternal(updates);
-                onSnapshotSuccess();
-            }
-            catch (Exception exc)
-            {
-                logger.Error(exc, "Unable to save snapshot");
-                onSnapshotFailed?.Invoke("Unable to save snapshot");
-            }
-        }
-
-        public async Task<EffectsResponse> LoadEffects(string rawCursor, bool isDesc, int limit, byte[] account)
-        {
-            if (account == null)
+            if (account == default)
                 throw new ArgumentNullException(nameof(account));
 
             var cursor = ByteArrayExtensions.FromHexString(rawCursor);
             if (cursor != null && cursor.Length != 12)
                 throw new ArgumentException("Cursor is invalid.");
-            var effectModels = await Global.PermanentStorage.LoadEffects(cursor, isDesc, limit, account);
+            var effectModels = (await storage.LoadEffects(cursor, isDesc, limit, account));
+            if (isDesc)
+                effectModels = effectModels.OrderByDescending(e => e.Id).ToList();
+            else
+                effectModels = effectModels.OrderBy(o => o.Id).ToList();
             return new EffectsResponse
             {
                 CurrentPagingToken = rawCursor,
@@ -92,23 +52,12 @@ namespace Centaurus.Domain
             };
         }
 
-        private Action onSnapshotSuccess;
-        private Action<string> onSnapshotFailed;
-
-
-        private static SemaphoreSlim saveSnapshotSemaphore = new SemaphoreSlim(1);
-
-        private static async Task ApplyUpdatesInternal(PendingUpdates updates)
+        public async Task ApplyUpdates(DiffObject updates)
         {
             await saveSnapshotSemaphore.WaitAsync();
             try
             {
-                var updateItems = updates.GetAll();
-                if (updateItems.Count > 0)
-                {
-                    var aggregatedUpdates = await UpdatesAggregator.Aggregate(updateItems);
-                    await Global.PermanentStorage.Update(aggregatedUpdates);
-                }
+                await storage.Update(updates);
             }
             finally
             {
@@ -122,20 +71,20 @@ namespace Centaurus.Domain
         /// <param name="apex"></param>
         /// <param name="count">Count of quanta to load. Loads all if equal or less than 0</param>
         /// <returns></returns>
-        public static async Task<List<MessageEnvelope>> GetQuantaAboveApex(long apex, int count = 0)
+        public async Task<List<MessageEnvelope>> GetQuantaAboveApex(long apex, int count = 0)
         {
-            var quantaModels = await Global.PermanentStorage.LoadQuantaAboveApex(apex, count);
-            return quantaModels.Select(q => XdrConverter.Deserialize<MessageEnvelope>(q.RawQuantum)).ToList();
+            var quantaModels = await storage.LoadQuantaAboveApex(apex, count);
+            return quantaModels.OrderBy(q => q.Apex).Select(q => XdrConverter.Deserialize<MessageEnvelope>(q.RawQuantum)).ToList();
         }
 
-        public static async Task<long> GetLastApex()
+        public async Task<long> GetLastApex()
         {
-            return await Global.PermanentStorage.GetLastApex();
+            return await storage.GetLastApex();
         }
 
-        public static async Task<MessageEnvelope> GetQuantum(long apex)
+        public async Task<MessageEnvelope> GetQuantum(long apex)
         {
-            var quantumModel = await Global.PermanentStorage.LoadQuantum(apex);
+            var quantumModel = await storage.LoadQuantum(apex);
             return XdrConverter.Deserialize<MessageEnvelope>(quantumModel.RawQuantum);
         }
 
@@ -143,7 +92,7 @@ namespace Centaurus.Domain
         /// Fetches current snapshot
         /// </summary>
         /// <returns></returns>
-        public static async Task<Snapshot> GetSnapshot()
+        public async Task<Snapshot> GetSnapshot()
         {
             var lastApex = await GetLastApex();
             if (lastApex < 0)
@@ -152,17 +101,47 @@ namespace Centaurus.Domain
         }
 
         /// <summary>
+        /// Creates snapshot from effect
+        /// </summary>
+        /// <returns></returns>
+        public static Snapshot GetSnapshot(ConstellationInitEffect constellationInitEffect, byte[] quantumHash)
+        {
+            var assets = new List<AssetSettings> { new AssetSettings() };
+            assets.AddRange(constellationInitEffect.Assets);
+
+            var snapshot = new Snapshot
+            {
+                Apex = constellationInitEffect.Apex,
+                Accounts = new List<Account>(),
+                Orders = new List<Order>(),
+                Withdrawals = new List<Withdrawal>(),
+                Settings = new ConstellationSettings
+                {
+                    Apex = constellationInitEffect.Apex,
+                    Assets = assets,
+                    Auditors = constellationInitEffect.Auditors,
+                    MinAccountBalance = constellationInitEffect.MinAccountBalance,
+                    MinAllowedLotSize = constellationInitEffect.MinAllowedLotSize,
+                    Vault = constellationInitEffect.Vault,
+                    RequestRateLimits = constellationInitEffect.RequestRateLimits
+                },
+                LastHash = quantumHash
+            };
+            return snapshot;
+        }
+
+        /// <summary>
         /// Fetches settings for the specified apex
         /// </summary>
         /// <param name="apex"></param>
         /// <returns></returns>
-        public static async Task<ConstellationSettings> GetConstellationSettings(long apex)
+        public async Task<ConstellationSettings> GetConstellationSettings(long apex)
         {
-            var settingsModel = await Global.PermanentStorage.LoadSettings(apex);
+            var settingsModel = await storage.LoadSettings(apex);
             if (settingsModel == null)
                 return null;
 
-            var assets = await Global.PermanentStorage.LoadAssets(apex);
+            var assets = await storage.LoadAssets(apex);
 
             return settingsModel.ToSettings(assets);
         }
@@ -172,7 +151,7 @@ namespace Centaurus.Domain
         /// </summary>
         /// <param name="apex"></param>
         /// <returns></returns>
-        public static async Task<Snapshot> GetSnapshot(long apex)
+        public async Task<Snapshot> GetSnapshot(long apex)
         {
             if (apex < 0)
                 throw new ArgumentException("Apex cannot be less than zero.");
@@ -186,13 +165,11 @@ namespace Centaurus.Domain
             if (minRevertApex == -1 && apex != lastApex || apex < minRevertApex)
                 throw new InvalidOperationException($"Lack of data to revert to {apex} apex.");
 
-            var lastQuantum = (await Global.PermanentStorage.LoadQuantum(apex)).ToMessageEnvelope();
-
             var settings = await GetConstellationSettings(apex);
             if (settings == null)
                 return null;
 
-            var stellarData = await Global.PermanentStorage.LoadConstellationState();
+            var stellarData = await storage.LoadConstellationState();
 
             var accounts = await GetAccounts();
 
@@ -206,12 +183,12 @@ namespace Centaurus.Domain
 
             var withdrawalsStorage = new WithdrawalStorage(withdrawals, false);
 
-            var effectModels = await Global.PermanentStorage.LoadEffectsAboveApex(apex);
+            var effectModels = await storage.LoadEffectsAboveApex(apex);
             for (var i = effectModels.Count - 1; i >= 0; i--)
             {
-                var currentEffect = XdrConverter.Deserialize<Effect>(effectModels[i].RawEffect);
-                var pubKey = currentEffect.Pubkey;
-                var account = new Lazy<AccountWrapper>(() => accountStorage.GetAccount(pubKey));
+                var currentEffect = effectModels[i].ToEffect();
+                var accountId = currentEffect.Account;
+                var account = new Lazy<AccountWrapper>(() => accountStorage.GetAccount(accountId));
                 IEffectProcessor<Effect> processor = null;
                 switch (currentEffect)
                 {
@@ -249,6 +226,8 @@ namespace Centaurus.Domain
                     case TradeEffect tradeEffect:
                         {
                             var order = exchange.OrderMap.GetOrder(tradeEffect.OrderId);
+                            if (order == null) //no need to revert trade if no order was created
+                                continue;
                             processor = new TradeEffectProcessor(tradeEffect, order);
                         }
                         break;
@@ -271,14 +250,16 @@ namespace Centaurus.Domain
                 processor.RevertEffect();
             }
 
+            var lastQuantum = (await storage.LoadQuantum(apex)).ToMessageEnvelope();
+
             return new Snapshot
             {
                 Apex = apex,
-                Accounts = accountStorage.GetAll().Select(a => a.Account).ToList(),
+                Accounts = accountStorage.GetAll().OrderBy(a => a.Account.Id).Select(a => a.Account).ToList(),
                 TxCursor = stellarData?.TxCursor ?? 0,
-                Orders = exchange.OrderMap.GetAllOrders().ToList(),
+                Orders = exchange.OrderMap.GetAllOrders().OrderBy(o => o.OrderId).ToList(),
                 Settings = settings,
-                Withdrawals = withdrawals,
+                Withdrawals = withdrawalsStorage.GetAll().OrderBy(w => w.Apex).ToList(),
                 LastHash = lastQuantum.Message.ComputeHash()
             };
         }
@@ -287,62 +268,59 @@ namespace Centaurus.Domain
         /// Returns minimal apex a snapshot can be reverted to
         /// </summary>
         /// <returns></returns>
-        public static async Task<long> GetMinRevertApex()
+        public async Task<long> GetMinRevertApex()
         {
             //obtain min apex we can revert to
-            var minApex = await Global.PermanentStorage.GetFirstEffectApex();
+            var minApex = await storage.GetFirstEffectApex();
             if (minApex == -1) //we can't revert at all
                 return -1;
 
             return minApex - 1; //we can revert effect for that apex, so the minimal apex is first effect apex - 1
         }
 
-        private static async Task<Exchange> GetRestoredExchange(List<Order> orders)
+        private async Task<Exchange> GetRestoredExchange(List<Order> orders)
         {
-            var assets = await Global.PermanentStorage.LoadAssets(long.MaxValue);//we need to load all assets, otherwise errors could occur during exchange restore
-            return Exchange.RestoreExchange(assets.Select(a => a.ToAssetSettings()).ToList(), orders, false);
+            var assets = await storage.LoadAssets(long.MaxValue);//we need to load all assets, otherwise errors could occur during exchange restore
+            return Exchange.RestoreExchange(assets.Select(a => a.ToAssetSettings()).OrderBy(a => a.Id).ToList(), orders, false);
         }
 
-        private static async Task<List<Account>> GetAccounts()
+        private async Task<List<Account>> GetAccounts()
         {
-            var accountModels = await Global.PermanentStorage.LoadAccounts();
-            var balanceModels = await Global.PermanentStorage.LoadBalances();
+            var accountModels = await storage.LoadAccounts();
+            var balanceModels = await storage.LoadBalances();
 
-            var groupedBalances = balanceModels.GroupBy(b => b.Account, ByteArrayComparer.Default).ToDictionary(g => g.Key, g => g, ByteArrayComparer.Default);
             var accountsCount = accountModels.Count;
             var accounts = new List<Account>();
-            for (var i = 0; i < accountsCount; i++)
+            foreach (var account in accountModels)
             {
-                var acc = accountModels[i];
-                var balances = new BalanceModel[] { };
-                if (groupedBalances.ContainsKey(acc.PubKey))
-                {
-                    balances = groupedBalances[acc.PubKey].ToArray();
-                }
-                accounts.Add(acc.ToAccount(balances));
+                var currentAccountBalanceFromCursor = BalanceModelIdConverter.EncodeId(account.Id, 0);
+                var currentAccountBalanceToCursor = BalanceModelIdConverter.EncodeId(account.Id + 1, 0);
+                var balances = balanceModels
+                    .SkipWhile(b => b.Id < currentAccountBalanceFromCursor)
+                    .TakeWhile(b => b.Id < currentAccountBalanceToCursor).ToArray();
+                accounts.Add(account.ToAccount(balances));
             }
-
             return accounts;
         }
 
-        private static async Task<List<Withdrawal>> GetWithdrawals(AccountStorage accountStorage, ConstellationSettings constellationSettings)
+        private async Task<List<Withdrawal>> GetWithdrawals(AccountStorage accountStorage, ConstellationSettings constellationSettings)
         {
-            var withdrawalQuanta = await Global.PermanentStorage.LoadWithdrawals();
+            var withdrawalQuanta = await storage.LoadWithdrawals();
             var withdrawals = withdrawalQuanta
                 .Select(w =>
                 {
                     var withdrawalQuantum = XdrConverter.Deserialize<MessageEnvelope>(w.RawQuantum);
                     var withdrawalRequest = ((WithdrawalRequest)((RequestQuantum)withdrawalQuantum.Message).RequestMessage);
-                    withdrawalRequest.AccountWrapper = accountStorage.GetAccount(w.Account);
+                    withdrawalQuantum.TryAssignAccountWrapper();
                     return Withdrawal.GetWithdrawal(withdrawalQuantum, constellationSettings);
                 });
 
-            return withdrawals.ToList();
+            return withdrawals.OrderBy(w => w.Apex).ToList();
         }
 
-        private static async Task<List<Order>> GetOrders(AccountStorage accountStorage)
+        private async Task<List<Order>> GetOrders(AccountStorage accountStorage)
         {
-            var orderModels = await Global.PermanentStorage.LoadOrders();
+            var orderModels = await storage.LoadOrders();
 
             var orders = new List<Order>();
             var orderLength = orderModels.Count;

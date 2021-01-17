@@ -17,9 +17,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="CommandLineParser" Version="2.7.82" />
-    <PackageReference Include="NLog" Version="4.6.7" />
-    <PackageReference Include="stellar-dotnet-sdk" Version="5.0.0" />
+    <PackageReference Include="CommandLineParser" Version="2.8.0" />
+    <PackageReference Include="NLog" Version="4.7.6" />
+    <PackageReference Include="stellar-dotnet-sdk" Version="6.0.31" />
     <PackageReference Include="System.Data.HashFunction.FarmHash" Version="2.0.0" />
   </ItemGroup>
 

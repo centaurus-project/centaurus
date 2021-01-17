@@ -23,7 +23,7 @@ namespace Centaurus.Domain
         public override void RevertEffect()
         {
             MarkAsProcessed();
-            Account.GetBalance(Effect.Asset).UpdateLiabilities(Effect.Amount);
+            Account.GetBalance(Effect.Asset).UpdateLiabilities(-Effect.Amount);
         }
     }
 }

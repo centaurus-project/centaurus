@@ -21,6 +21,7 @@ namespace Centaurus.Test
         {
             var settings = new AlphaSettings();
             SetCommonSettings(settings, TestEnvironment.AlphaKeyPair.SecretSeed);
+            settings.ConnectionString = "mongodb://localhost:27001/alphaDBTest?replicaSet=centaurus";
             settings.Build();
             return settings;
         }
@@ -34,6 +35,7 @@ namespace Centaurus.Test
         {
             var settings = new AuditorSettings();
             SetCommonSettings(settings, TestEnvironment.Auditor1KeyPair.SecretSeed);
+            settings.ConnectionString = "mongodb://localhost:27001/auditorDBTest?replicaSet=centaurus";
             settings.AlphaPubKey = TestEnvironment.AlphaKeyPair.AccountId;
             settings.GenesisQuorum = new string[] { TestEnvironment.Auditor1KeyPair.AccountId };
             settings.Build();
@@ -58,20 +60,33 @@ namespace Centaurus.Test
             return new List<KeyPair> { TestEnvironment.Auditor1KeyPair };
         }
 
-        /// <summary>
-        /// Setups Global with predefined settings
-        /// </summary>
-        public static void DefaultAlphaSetup()
+        private static async Task<IStorage> GetStorage(string connectionString)
         {
-            Setup(GetPredefinedClients(), GetPredefinedAuditors(), GetAlphaSettings(), new MockStorage());
+            var storage = new MockStorage();
+            await storage.OpenConnection(connectionString);
+            await storage.DropDatabase();
+            await storage.CloseConnection();
+            return storage;
         }
 
         /// <summary>
         /// Setups Global with predefined settings
         /// </summary>
-        public static void DefaultAuditorSetup()
+        public static async Task DefaultAlphaSetup()
         {
-            Setup(GetPredefinedClients(), GetPredefinedAuditors(), GetAuditorSettings(), new MockStorage());
+            var settings = GetAlphaSettings();
+            var storage = await GetStorage(settings.ConnectionString);
+            await Setup(GetPredefinedClients(), GetPredefinedAuditors(), settings, storage);
+        }
+
+        /// <summary>
+        /// Setups Global with predefined settings
+        /// </summary>
+        public static async Task DefaultAuditorSetup()
+        {
+            var settings = GetAuditorSettings();
+            var storage = await GetStorage(settings.ConnectionString);
+            await Setup(GetPredefinedClients(), GetPredefinedAuditors(), settings, storage);
         }
 
         /// <summary>
@@ -80,9 +95,9 @@ namespace Centaurus.Test
         /// <param name="clients">Clients to add to constellation</param>
         /// <param name="auditors">Auditors to add to constellation</param>
         /// <param name="settings">Settings that will be used to init Global</param>
-        public static void Setup(List<KeyPair> clients, List<KeyPair> auditors, BaseSettings settings, IStorage storage)
+        public static async Task Setup(List<KeyPair> clients, List<KeyPair> auditors, BaseSettings settings, IStorage storage)
         {
-            Global.Init(settings, storage);
+            await Global.Setup(settings, storage);
 
             var assets = new List<AssetSettings> { new AssetSettings { Id = 1, Code = "X", Issuer = KeyPair.Random() } };
 
@@ -98,6 +113,9 @@ namespace Centaurus.Test
                 RequestRateLimits = new RequestRateLimits { HourLimit = 1000, MinuteLimit = 100 }
             };
 
+            if (!Global.IsAlpha)
+                initQuantum.Timestamp = DateTime.UtcNow.Ticks;
+
             var envelope = initQuantum.CreateEnvelope();
             if (!Global.IsAlpha)
             {
@@ -105,8 +123,7 @@ namespace Centaurus.Test
                 envelope.Sign(alphaKeyPair);
             }
 
-            Global.QuantumHandler.HandleAsync(envelope).Wait();
-
+            await Global.QuantumHandler.HandleAsync(envelope);
 
             var deposits = new List<PaymentBase>();
             Action<byte[], int> addAssetsFn = (acc, asset) =>
@@ -141,10 +158,10 @@ namespace Centaurus.Test
 
             depositeQuantum.Source.Sign(TestEnvironment.Auditor1KeyPair);
 
-            Global.QuantumHandler.HandleAsync(depositeQuantum.CreateEnvelope()).Wait();
+            await Global.QuantumHandler.HandleAsync(depositeQuantum.CreateEnvelope());
 
             //save all effects
-            SnapshotHelper.ApplyUpdates().Wait();
+            await SnapshotHelper.ApplyUpdates();
         }
     }
 }

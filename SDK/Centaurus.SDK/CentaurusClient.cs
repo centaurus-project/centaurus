@@ -23,7 +23,7 @@ namespace Centaurus.SDK
 
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        const int timeout = 5000;
+        const int timeout = 15000;
         public CentaurusClient(Uri alphaWebSocketAddress, KeyPair keyPair, ConstellationInfo constellationInfo)
         {
             this.alphaWebSocketAddress = alphaWebSocketAddress ?? throw new ArgumentNullException(nameof(alphaWebSocketAddress));
@@ -37,6 +37,9 @@ namespace Centaurus.SDK
             {
                 await connectionSemaphore.WaitAsync();
 
+                if (IsConnected)
+                    return;
+
                 connection = new CentaurusConnection(alphaWebSocketAddress, keyPair, constellation);
                 SubscribeToEvents(connection);
                 await connection.EstablishConnection();
@@ -44,6 +47,8 @@ namespace Centaurus.SDK
                 await handshakeResult.Task;
 
                 await UpdateAccountData();
+
+                IsConnected = true;
             }
             catch (Exception exc)
             {
@@ -91,25 +96,29 @@ namespace Centaurus.SDK
 
         public event Action<WebSocketCloseStatus> OnClosed;
 
-        public async Task<AccountDataModel> GetAccountData()
+        public async Task<AccountDataModel> GetAccountData(bool waitForFinalize = true)
         {
-            var data = await connection.SendMessage(new AccountDataRequest().CreateEnvelope());
+            var response = (CentaurusResponse)await connection.SendMessage(new AccountDataRequest().CreateEnvelope());
+            var data = await (waitForFinalize ? response.ResponseTask : response.AcknowledgmentTask);
             var rawMessage = (AccountDataResponse)data.Message;
+            var balances = rawMessage.Balances.Select(x => BalanceModel.FromBalance(x, constellation)).ToDictionary(k => k.AssetId, v => v);
+            var orders = rawMessage.Orders.Select(x => OrderModel.FromOrder(x, constellation)).ToDictionary(k => k.OrderId, v => v);
             return new AccountDataModel
             {
-                Balances = rawMessage.Balances.Select(x => BalanceModel.FromBalance(x, constellation)).ToDictionary(k => k.AssetId, v => v),
-                Orders = rawMessage.Orders.Select(x => OrderModel.FromOrder(x, constellation)).ToDictionary(k => k.OrderId, v => v)
+                Balances = balances,
+                Orders = orders
             };
         }
 
-        public async Task<MessageEnvelope> Withdrawal(KeyPair destination, string amount, ConstellationInfo.Asset asset)
+        public async Task<MessageEnvelope> Withdrawal(KeyPair destination, string amount, ConstellationInfo.Asset asset, bool waitForFinalize = true)
         {
             var paymentMessage = new WithdrawalRequest();
             var tx = await TransactionHelper.GetPaymentTx(keyPair, constellation, destination, amount, asset);
 
             paymentMessage.TransactionXdr = tx.ToArray();
 
-            var result = await connection.SendMessage(paymentMessage.CreateEnvelope());
+            var response = (CentaurusResponse)await connection.SendMessage(paymentMessage.CreateEnvelope());
+            var result = await (waitForFinalize ? response.ResponseTask : response.AcknowledgmentTask);
             var txResultMessage = result.Message as ITransactionResultMessage;
             if (txResultMessage is null)
                 throw new Exception($"Unexpected result type '{result.Message.MessageType}'");
@@ -129,24 +138,28 @@ namespace Centaurus.SDK
             return result;
         }
 
-        public async Task<MessageEnvelope> CreateOrder(long amount, double price, OrderSide side, ConstellationInfo.Asset asset)
+        public async Task<MessageEnvelope> CreateOrder(long amount, double price, OrderSide side, ConstellationInfo.Asset asset, bool waitForFinalize = true)
         {
             var order = new OrderRequest { Amount = amount, Price = price, Side = side, Asset = asset.Id };
-            var result = await connection.SendMessage(order.CreateEnvelope());
+
+            var response = (CentaurusResponse)await connection.SendMessage(order.CreateEnvelope());
+            var result = await (waitForFinalize ? response.ResponseTask : response.AcknowledgmentTask);
             return result;
         }
 
-        public async Task<MessageEnvelope> CancelOrder(ulong orderId)
+        public async Task<MessageEnvelope> CancelOrder(ulong orderId, bool waitForFinalize = true)
         {
             var order = new OrderCancellationRequest { OrderId = orderId };
-            var result = await connection.SendMessage(order.CreateEnvelope());
+            var response = (CentaurusResponse)await connection.SendMessage(order.CreateEnvelope());
+            var result = await (waitForFinalize ? response.ResponseTask : response.AcknowledgmentTask);
             return result;
         }
 
-        public async Task<MessageEnvelope> MakePayment(KeyPair destination, long amount, ConstellationInfo.Asset asset)
+        public async Task<MessageEnvelope> MakePayment(KeyPair destination, long amount, ConstellationInfo.Asset asset, bool waitForFinalize = true)
         {
             var paymentMessage = new PaymentRequest { Amount = amount, Destination = destination, Asset = asset.Id };
-            var result = await connection.SendMessage(paymentMessage.CreateEnvelope());
+            var response = (CentaurusResponse)await connection.SendMessage(paymentMessage.CreateEnvelope());
+            var result = await (waitForFinalize ? response.ResponseTask : response.AcknowledgmentTask);
             return result;
         }
 
@@ -169,7 +182,7 @@ namespace Centaurus.SDK
         private Uri alphaWebSocketAddress;
         private KeyPair keyPair;
         private ConstellationInfo constellation;
-        private TaskCompletionSource<bool> handshakeResult = new TaskCompletionSource<bool>();
+        private TaskCompletionSource<int> handshakeResult = new TaskCompletionSource<int>();
 
         private void ResultMessageHandler(MessageEnvelope envelope)
         {
@@ -186,32 +199,22 @@ namespace Centaurus.SDK
                             AccountData.Nonce = nonceUpdateEffect.Nonce;
                             break;
                         case BalanceCreateEffect balanceCreateEffect:
-                            AccountData.Balances[balanceCreateEffect.Asset] = new BalanceModel { 
-                                AssetId = balanceCreateEffect.Asset,
-                                Asset = (constellation.Assets.FirstOrDefault(a => a.Id == balanceCreateEffect.Asset)?.DisplayName ?? balanceCreateEffect.Asset.ToString())
-                            };
+                            AccountData.AddBalance(balanceCreateEffect.Asset, constellation);
                             break;
                         case BalanceUpdateEffect balanceUpdateEffect:
-                            AccountData.Balances[balanceUpdateEffect.Asset].Amount += balanceUpdateEffect.Amount;
+                            AccountData.UpdateBalance(balanceUpdateEffect.Asset, balanceUpdateEffect.Amount);
                             break;
                         case UpdateLiabilitiesEffect updateLiabilitiesEffect:
-                            AccountData.Balances[updateLiabilitiesEffect.Asset].Liabilities += updateLiabilitiesEffect.Amount;
+                            AccountData.UpdateLiabilities(updateLiabilitiesEffect.Asset, updateLiabilitiesEffect.Amount);
                             break;
                         case OrderPlacedEffect orderPlacedEffect:
-                            var orderModel = new OrderModel { 
-                                Amount = orderPlacedEffect.Amount, 
-                                Price = orderPlacedEffect.Price, 
-                                OrderId = orderPlacedEffect.OrderId 
-                            };
-                            orderModel.Asset = constellation.Assets.FirstOrDefault(a => a.Id == orderModel.AssetId)?.DisplayName ?? orderModel.AssetId.ToString();
-                            AccountData.Orders[orderPlacedEffect.OrderId] = orderModel;
+                            AccountData.AddOrder(orderPlacedEffect.OrderId, orderPlacedEffect.Amount, orderPlacedEffect.Price, constellation);
                             break;
                         case OrderRemovedEffect orderRemoveEffect:
-                            AccountData.Orders.Remove(orderRemoveEffect.OrderId);
+                            AccountData.RemoveOrder(orderRemoveEffect.OrderId);
                             break;
                         case TradeEffect tradeEffect:
-                            if (AccountData.Orders.TryGetValue(tradeEffect.OrderId, out var order)) //trade could occur without adding the order to orderbook
-                                order.Amount -= tradeEffect.AssetAmount;
+                            AccountData.UpdateOrder(tradeEffect.OrderId, tradeEffect.AssetAmount);
                             break;
                         default:
                             break;
@@ -252,15 +255,16 @@ namespace Centaurus.SDK
                 logger.Trace("Handshake: isConnecting is set to true.");
                 try
                 {
-                    var resultTask = connection.SendMessage(envelope.Message.CreateEnvelope());
+                    var responseTask = (CentaurusResponse)connection.SendMessage(envelope.Message.CreateEnvelope()).Result;
                     logger.Trace("Handshake: message is sent.");
-                    var result = (ResultMessage)resultTask.Result.Message;
+                    var result = (HandshakeResult)responseTask.ResponseTask.Result.Message;
                     logger.Trace("Handshake: response awaited.");
                     if (result.Status != ResultStatusCodes.Success)
                         throw new Exception();
-                    handshakeResult.SetResult(true);
+                    connection.AssignAccountId(result.AccountId);
+                    handshakeResult.SetResult(result.AccountId);
                     logger.Trace("Handshake: result is set to true.");
-                    isConnected = true;
+                    IsConnected = true;
                     logger.Trace("Handshake: isConnected is set.");
                 }
                 catch (Exception exc)
@@ -275,14 +279,14 @@ namespace Centaurus.SDK
             return false;
         }
 
-        private bool isConnected = false;
+        public bool IsConnected { get; private set; }
 
         private bool isConnecting = false;
 
         private AccountDataModel accountData;
-        public AccountDataModel AccountData 
+        public AccountDataModel AccountData
         {
-            get => accountData; 
+            get => accountData;
             private set
             {
                 accountData = value;
@@ -292,7 +296,7 @@ namespace Centaurus.SDK
 
         private void Connection_OnSend(MessageEnvelope envelope)
         {
-            if (isConnected)
+            if (IsConnected)
                 OnSend?.Invoke(envelope);
         }
 
@@ -301,7 +305,7 @@ namespace Centaurus.SDK
             logger.Trace($"OnMessage: {envelope.Message.MessageType}");
             if (!isConnecting)
             {
-                if (!isConnected)
+                if (!IsConnected)
                 {
                     logger.Trace($"OnMessage: no connected.");
                     HandleHandshake(envelope);
@@ -326,6 +330,7 @@ namespace Centaurus.SDK
 
         private void Connection_OnClosed(WebSocketCloseStatus status)
         {
+            IsConnected = false;
             OnClosed?.Invoke(status);
         }
 
@@ -341,8 +346,14 @@ namespace Centaurus.SDK
                 hearbeatMessage = new Heartbeat().CreateEnvelope();
                 hearbeatMessage.Sign(_clientKeyPair);
 
+                cancellationTokenSource = new CancellationTokenSource();
+                cancellationToken = cancellationTokenSource.Token;
+
                 InitTimer();
             }
+
+            private CancellationTokenSource cancellationTokenSource;
+            private CancellationToken cancellationToken;
 
             public event Action<MessageEnvelope> OnMessage;
 
@@ -354,7 +365,7 @@ namespace Centaurus.SDK
 
             public async Task EstablishConnection()
             {
-                await webSocket.ConnectAsync(websocketAddress, CancellationToken.None);
+                await webSocket.ConnectAsync(websocketAddress, cancellationToken);
                 _ = Listen();
             }
 
@@ -365,13 +376,20 @@ namespace Centaurus.SDK
                 try
                 {
                     if (webSocket.State == WebSocketState.Open || webSocket.State == WebSocketState.Connecting)
+                    {
+                        cancellationTokenSource?.Cancel();
                         await webSocket.CloseAsync(status, desc, CancellationToken.None);
+                    }
                 }
                 catch (WebSocketException exc)
                 {
                     //ignore "closed-without-completing-handshake" error
                     if (exc.WebSocketErrorCode != WebSocketError.ConnectionClosedPrematurely)
                         throw;
+                }
+                finally
+                {
+                    _ = Task.Factory.StartNew(() => OnClosed?.Invoke(status));
                 }
                 var allPendingRequests = Requests.Values;
                 var closeException = new ConnectionCloseException(status, desc);
@@ -380,11 +398,14 @@ namespace Centaurus.SDK
 
                 if (status != WebSocketCloseStatus.NormalClosure)
                     _ = Task.Factory.StartNew(() => OnException?.Invoke(closeException));
-
-                _ = Task.Factory.StartNew(() => OnClosed?.Invoke(status));
             }
 
-            public async Task<MessageEnvelope> SendMessage(MessageEnvelope envelope, CancellationToken ct = default)
+            public void AssignAccountId(int accountId)
+            {
+                this.accountId = accountId;
+            }
+
+            public async Task<CentaurusResponseBase> SendMessage(MessageEnvelope envelope)
             {
                 AssignRequestId(envelope);
                 AssignAccountId(envelope);
@@ -401,13 +422,18 @@ namespace Centaurus.SDK
                 try
                 {
                     var serializedData = XdrConverter.Serialize(envelope);
-                    Debug.WriteLine($"Message before sent: {envelope.Message.GetType().Name}_{envelope.Message.MessageId}");
-                    await webSocket.SendAsync(serializedData, WebSocketMessageType.Binary, true, (ct == default ? CancellationToken.None : ct));
-                    Debug.WriteLine($"Message after sent: {envelope.Message.GetType().Name}_{envelope.Message.MessageId}");
+                    await webSocket.SendAsync(serializedData, WebSocketMessageType.Binary, true, cancellationToken);
 
                     _ = Task.Factory.StartNew(() => OnSend?.Invoke(envelope));
 
                     heartbeatTimer?.Reset();
+                }
+                catch (WebSocketException e)
+                {
+                    if (resultTask != null)
+                        resultTask.SetException(e);
+
+                    await CloseConnection(WebSocketCloseStatus.ProtocolError, e.Message);
                 }
                 catch (Exception exc)
                 {
@@ -416,7 +442,7 @@ namespace Centaurus.SDK
                     resultTask.SetException(exc);
                 }
 
-                return await (resultTask?.ResponseTask ?? Task.FromResult<MessageEnvelope>(null));
+                return resultTask ?? (CentaurusResponseBase)new VoidResponse();
             }
 
             public async Task CloseAndDispose(WebSocketCloseStatus status = WebSocketCloseStatus.NormalClosure, string desc = null)
@@ -427,6 +453,9 @@ namespace Centaurus.SDK
 
             public void Dispose()
             {
+                cancellationTokenSource?.Dispose();
+                cancellationTokenSource = null;
+
                 webSocket?.Dispose();
                 webSocket = null;
             }
@@ -444,6 +473,7 @@ namespace Centaurus.SDK
             }
 
             private KeyPair clientKeyPair;
+            private int accountId;
             private Uri websocketAddress;
             private ConstellationInfo constellationInfo;
             private MessageEnvelope hearbeatMessage;
@@ -467,9 +497,9 @@ namespace Centaurus.SDK
             private void AssignAccountId(MessageEnvelope envelope)
             {
                 var request = envelope.Message as RequestMessage;
-                if (request == null || request.Account != null)
+                if (request == null || request.Account > 0)
                     return;
-                request.Account = clientKeyPair;
+                request.Account = accountId;
             }
 
             private CentaurusResponse RegisterRequest(MessageEnvelope envelope)
@@ -477,7 +507,7 @@ namespace Centaurus.SDK
                 lock (Requests)
                 {
                     var messageId = envelope.Message.MessageId;
-                    var response = envelope.Message is NonceRequestMessage ? new CentaurusQuantumResponse(constellationInfo, timeout) : new CentaurusResponse(constellationInfo, timeout);
+                    var response = envelope.Message is NonceRequestMessage ? new CentaurusQuantumResponse(constellationInfo.VaultPubKey, constellationInfo.AuditorPubKeys, timeout) : new CentaurusResponse(constellationInfo.VaultPubKey, constellationInfo.AuditorPubKeys, timeout);
                     if (!Requests.TryAdd(messageId, response))
                         throw new Exception("Unable to add request to pending requests.");
                     return response;
@@ -532,13 +562,13 @@ namespace Centaurus.SDK
             {
                 try
                 {
-                    var reader = await webSocket.GetInputStreamReader();
+                    var reader = await webSocket.GetInputStreamReader(cancellationToken);
                     while (true)
                     {
                         try
                         {
                             HandleMessage(DeserializeMessage(reader));
-                            reader = await webSocket.GetInputStreamReader();
+                            reader = await webSocket.GetInputStreamReader(cancellationToken);
                         }
                         catch (UnexpectedMessageException e)
                         {
@@ -560,7 +590,7 @@ namespace Centaurus.SDK
                 }
             }
 
-            private ConcurrentDictionary<long, CentaurusResponse> Requests { get; } = new ConcurrentDictionary<long, CentaurusResponse>();
+            private ConcurrentDictionary<long, CentaurusResponse> Requests = new ConcurrentDictionary<long, CentaurusResponse>();
 
             private void HandleMessage(MessageEnvelope envelope)
             {

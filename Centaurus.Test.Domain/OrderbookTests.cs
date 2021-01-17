@@ -1,4 +1,5 @@
-﻿using Centaurus.DAL.Mongo;
+﻿using Centaurus.DAL;
+using Centaurus.DAL.Mongo;
 using Centaurus.Domain;
 using Centaurus.Models;
 using NUnit.Framework;
@@ -20,30 +21,38 @@ namespace Centaurus.Test
         public void Setup()
         {
             EnvironmentHelper.SetTestEnvironmentVariable();
-            var settings = new AlphaSettings { 
-                HorizonUrl = "https://horizon-testnet.stellar.org", 
+            var settings = new AlphaSettings
+            {
+                HorizonUrl = "https://horizon-testnet.stellar.org",
                 NetworkPassphrase = "Test SDF Network ; September 2015",
                 CWD = "AppData"
             };
-            Global.Init(settings, new MockStorage());
+            Global.Setup(settings, new MockStorage()).Wait();
 
             account1 = new Models.Account()
             {
+                Id = 1,
                 Pubkey = new RawPubKey() { Data = KeyPair.Random().PublicKey },
                 Balances = new List<Balance>()
             };
 
-            account1.Balances.Add(new Balance() { Asset = 0, Amount = 10000000000, Account = account1 });
-            account1.Balances.Add(new Balance() { Asset = 1, Amount = 10000000000, Account = account1 });
+            account1.CreateBalance(0);
+            account1.GetBalance(0).UpdateBalance(10000000000);
+            account1.CreateBalance(1);
+            account1.GetBalance(1).UpdateBalance(10000000000);
 
             account2 = new Models.Account()
             {
+                Id = 2,
                 Pubkey = new RawPubKey() { Data = KeyPair.Random().PublicKey },
                 Balances = new List<Balance>()
             };
 
-            account2.Balances.Add(new Balance() { Asset = 0, Amount = 10000000000, Account = account2 });
-            account2.Balances.Add(new Balance() { Asset = 1, Amount = 10000000000, Account = account2 });
+            account2.CreateBalance(0);
+            account2.GetBalance(0).UpdateBalance(10000000000);
+            account2.CreateBalance(1);
+            account2.GetBalance(1).UpdateBalance(10000000000);
+
             Global.Setup(new Snapshot
             {
                 Accounts = new List<Models.Account> { account1, account2 },
@@ -56,7 +65,7 @@ namespace Centaurus.Test
                     Assets = new List<AssetSettings> { new AssetSettings { Id = 1, Code = "X", Issuer = new RawPubKey() } },
                     RequestRateLimits = new RequestRateLimits { HourLimit = 1000, MinuteLimit = 100 }
                 },
-            });
+            }).Wait();
         }
 
         [TearDown]
@@ -81,15 +90,17 @@ namespace Centaurus.Test
             var acc2AssetLiabilities = account2.Balances[1].Liabilities;
             var acc2AssetAmount = account2.Balances[1].Amount;
 
+            var account = Global.AccountStorage.GetAccount(account1.Pubkey);
+
             var orderRequest1 = new OrderRequest
             {
-                Account = account1.Pubkey,
+                Account = account.Account.Id,
                 Nonce = 1,
                 Amount = 10,
                 Asset = 1,
                 Price = 2.5,
                 Side = side,
-                AccountWrapper = Global.AccountStorage.GetAccount(account1.Pubkey)
+                AccountWrapper = account
             };
 
             var order = new RequestQuantum
@@ -97,14 +108,18 @@ namespace Centaurus.Test
                 Apex = 1,
                 RequestEnvelope = new MessageEnvelope
                 {
-                    Message = orderRequest1
-                }
+                    Message = orderRequest1,
+                    Signatures = new List<Ed25519Signature>()
+                },
+                Timestamp = DateTime.UtcNow.Ticks
             };
 
-            var orderEffectsContainer = new EffectProcessorsContainer(order.CreateEnvelope(), (env, effs) => { });
+            var diffObject = new DiffObject();
+
+            var orderEffectsContainer = new EffectProcessorsContainer(order.CreateEnvelope(), diffObject);
             Global.Exchange.ExecuteOrder(orderEffectsContainer);
-            var effects = orderEffectsContainer.GetEffects();
-            Assert.AreEqual(effects.Length, 2);
+            var effects = orderEffectsContainer.Effects;
+            Assert.AreEqual(effects.Count, 2);
             Assert.AreEqual(effects[0].EffectType, EffectTypes.UpdateLiabilities);
             Assert.AreEqual(effects[1].EffectType, EffectTypes.OrderPlaced);
             if (side == OrderSide.Sell)
@@ -118,15 +133,17 @@ namespace Centaurus.Test
                 Assert.AreEqual(account1.Balances[0].Amount, acc1XlmAmount);
             }
 
+            account = Global.AccountStorage.GetAccount(account2.Pubkey);
+
             var orderRequest2 = new OrderRequest
             {
-                Account = account2.Pubkey,
+                Account = account.Account.Id,
                 Nonce = 2,
                 Amount = 20,
                 Asset = 1,
                 Price = 2,
                 Side = side.Inverse(),
-                AccountWrapper = Global.AccountStorage.GetAccount(account2.Pubkey)
+                AccountWrapper = account
             };
 
             var conterOrder = new RequestQuantum
@@ -134,11 +151,13 @@ namespace Centaurus.Test
                 Apex = 2,
                 RequestEnvelope = new MessageEnvelope
                 {
-                    Message = orderRequest2
-                }
+                    Message = orderRequest2,
+                    Signatures = new List<Ed25519Signature>()
+                },
+                Timestamp = DateTime.UtcNow.Ticks
             };
 
-            var conterOrderEffectsContainer = new EffectProcessorsContainer(conterOrder.CreateEnvelope(), (env, effs) => { });
+            var conterOrderEffectsContainer = new EffectProcessorsContainer(conterOrder.CreateEnvelope(), diffObject);
             Global.Exchange.ExecuteOrder(conterOrderEffectsContainer);
             if (orderRequest2.Side == OrderSide.Sell)
             {
@@ -160,6 +179,7 @@ namespace Centaurus.Test
         public void OrderbookPerformanceTest(int iterations, bool useNormalDistribution = false)
         {
             var rnd = new Random();
+            var account = Global.AccountStorage.GetAccount(account2.Pubkey);
 
             var testTradeResults = new Dictionary<RequestQuantum, EffectProcessorsContainer>();
             for (var i = 1; i < iterations; i++)
@@ -172,18 +192,20 @@ namespace Centaurus.Test
                     {
                         Message = new OrderRequest
                         {
-                            Account = account1.Pubkey,
+                            Account = account.Account.Id,
                             Nonce = i,
                             Amount = rnd.Next(1, 20),
                             Asset = 1,
                             Price = Math.Round(price * 10) / 10,
                             Side = rnd.NextDouble() >= 0.5 ? OrderSide.Buy : OrderSide.Sell,
-                            AccountWrapper = Global.AccountStorage.GetAccount(account1.Pubkey)
-                        }
-                    }
+                            AccountWrapper = account
+                        },
+                        Signatures = new List<Ed25519Signature>()
+                    },
+                    Timestamp = DateTime.UtcNow.Ticks
                 };
-
-                var conterOrderEffectsContainer = new EffectProcessorsContainer(trade.CreateEnvelope(), (env, effs) => { });
+                var diffObject = new DiffObject();
+                var conterOrderEffectsContainer = new EffectProcessorsContainer(trade.CreateEnvelope(), diffObject);
                 testTradeResults.Add(trade, conterOrderEffectsContainer);
             }
 

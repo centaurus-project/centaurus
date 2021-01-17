@@ -19,6 +19,7 @@ using System.IO;
 using Microsoft.AspNetCore.Http;
 using System.Collections.Generic;
 using System.Threading;
+using System.Diagnostics;
 
 namespace Centaurus
 {
@@ -28,31 +29,42 @@ namespace Centaurus
         private IHost host;
         private ManualResetEvent resetEvent;
 
-        public void Run(AlphaSettings settings, ManualResetEvent resetEvent)
+        public async Task Run(AlphaSettings settings, ManualResetEvent resetEvent)
         {
-            this.resetEvent = resetEvent;
-            ConfigureConstellation(settings);
+            try
+            {
+                this.resetEvent = resetEvent;
+                await ConfigureConstellation(settings);
 
-            host = CreateHostBuilder(settings).Build();
-            _ = host.RunAsync();
+                host = CreateHostBuilder(settings).Build();
+                _ = host.RunAsync();
+            }
+            catch (Exception exc)
+            {
+                logger.Error(exc);
+                if (Global.AppState != null)
+                    Global.AppState.State = ApplicationState.Failed;
+                resetEvent.Set();
+            }
         }
 
-        public void Shutdown()
+        public async Task Shutdown()
         {
             if (host != null)
             {
-                ConnectionManager.CloseAllConnections();
-                InfoConnectionManager.CloseAllConnections();
-                host.StopAsync().Wait();
+                await ConnectionManager.CloseAllConnections();
+                await InfoConnectionManager.CloseAllConnections();
+                await Global.TearDown();
+                await host.StopAsync(CancellationToken.None);
                 host = null;
             }
         }
 
         #region Private Members
 
-        private void ConfigureConstellation(AlphaSettings settings)
+        private async Task ConfigureConstellation(AlphaSettings settings)
         {
-            Global.Init(settings, new MongoStorage());
+            await Global.Setup(settings, new MongoStorage());
 
             Global.AppState.StateChanged += Current_StateChanged;
 
@@ -63,7 +75,8 @@ namespace Centaurus
         {
             if (e == ApplicationState.Failed)
             {
-                logger.Error("Application failed");
+                Console.WriteLine("Application failed. Saving pending updates...");
+                Thread.Sleep(PendingUpdatesManager.SaveInterval);
                 resetEvent.Set();
             }
         }

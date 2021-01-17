@@ -18,7 +18,7 @@ namespace Centaurus.Domain
         public override void CommitEffect()
         {
             MarkAsProcessed();
-            order.Amount -= Effect.AssetAmount;
+            order.Amount += -(Effect.AssetAmount);
         }
 
         public override void RevertEffect()

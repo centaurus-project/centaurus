@@ -6,13 +6,12 @@ namespace Centaurus.DAL.Models
 {
     public class OrderModel
     {
-        //it stores ulong
-        public long OrderId { get; set; }
+        public long Id { get; set; }
 
         public double Price { get; set; }
 
         public long Amount { get; set; }
 
-        public byte[] Pubkey { get; set; }
+        public int Account { get; set; }
     }
 }

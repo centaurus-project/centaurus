@@ -23,8 +23,9 @@ namespace Centaurus.Domain
             var account = requestMessage.AccountWrapper.Account;
 
             var resultMessage = context.Envelope.CreateResult<AccountDataResponse>(ResultStatusCodes.Success, accountEffects);
-            resultMessage.Balances = account.Balances.OrderBy(b => b.Asset).ToList();
-            resultMessage.Orders = Global.Exchange.OrderMap.GetAllAccountOrders(account).OrderBy(b => b.OrderId).ToList();
+            resultMessage.Balances = account.Balances;
+            //TODO: create property in Account object
+            resultMessage.Orders = Global.Exchange.OrderMap.GetAllAccountOrders(account).OrderBy(o => o.OrderId).ToList();
 
             return Task.FromResult((ResultMessage)resultMessage);
         }

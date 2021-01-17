@@ -31,19 +31,19 @@ namespace Centaurus.Domain
         /// <summary>
         /// Closes all connection
         /// </summary>
-        public static void CloseAllConnections()
+        public static async Task CloseAllConnections()
         {
-            Parallel.ForEach(connections, async (c) =>
+            foreach (var connection in connections)
             {
                 try
                 {
-                    await UnsubscribeAndClose(c.Value);
+                    await UnsubscribeAndClose(connection.Value);
                 }
                 catch (Exception e)
                 {
                     logger.Error(e, "Unable to close connection");
                 }
-            });
+            }
             connections.Clear();
         }
 

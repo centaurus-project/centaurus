@@ -14,22 +14,33 @@ namespace Centaurus.Domain
 
         public override async Task<ResultMessage> Process(ProcessorContext context)
         {
-            var initEffects = await PersistenceManager.ApplyInitUpdates(context.Envelope);
+            var initQuantum = (ConstellationInitQuantum)context.Envelope.Message;
 
-            var snapshot = await PersistenceManager.GetSnapshot();
+            var effect = new ConstellationInitEffect
+            {
+                Apex = initQuantum.Apex,
+                Assets = initQuantum.Assets,
+                Auditors = initQuantum.Auditors,
+                MinAccountBalance = initQuantum.MinAccountBalance,
+                MinAllowedLotSize = initQuantum.MinAllowedLotSize,
+                Vault = initQuantum.Vault,
+                RequestRateLimits = initQuantum.RequestRateLimits
+            };
 
-            Global.Setup(snapshot);
+            context.EffectProcessors.Add(new ConstellationInitEffectProcessor(effect));
+            var initSnapshot = PersistenceManager.GetSnapshot(effect, context.Envelope.ComputeHash());
+            await Global.Setup(initSnapshot);
 
             Global.AppState.State = ApplicationState.Running;
             if (!Global.IsAlpha) //set auditor to Ready state after init
             {
                 //send new apex cursor message to notify Alpha that the auditor was initialized
                 OutgoingMessageStorage.EnqueueMessage(new SetApexCursor { Apex = 1 });
-                TxListener.RegisterListener(snapshot.TxCursor);
+                TxListener.RegisterListener(initSnapshot.TxCursor);
                 Global.AppState.State = ApplicationState.Ready;
             }
 
-            return context.Envelope.CreateResult(ResultStatusCodes.Success, new List<Effect>(initEffects));
+            return context.Envelope.CreateResult(ResultStatusCodes.Success, context.EffectProcessors.Effects);
         }
 
         public override Task Validate(ProcessorContext context)

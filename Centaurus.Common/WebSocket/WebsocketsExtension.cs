@@ -16,9 +16,8 @@ namespace Centaurus
         const int chunkSize = 512;
         const int maxMessageSize = 20480;
 
-        //TODO: add cancellation token
         //TODO: validate msg size
-        public static async Task<byte[]> GetInputByteArray(this WebSocket webSocket)
+        public static async Task<byte[]> GetInputByteArray(this WebSocket webSocket, CancellationToken cancellationToken)
         {
             var buffer = WebSocket.CreateClientBuffer(chunkSize, chunkSize);
             using (var ms = new MemoryStream())
@@ -26,7 +25,7 @@ namespace Centaurus
                 var result = default(WebSocketReceiveResult);
                 do
                 {
-                    result = await webSocket.ReceiveAsync(buffer, CancellationToken.None);
+                    result = await webSocket.ReceiveAsync(buffer, cancellationToken);
                     if (result.CloseStatus.HasValue)
                         throw new ConnectionCloseException(result.CloseStatus.Value, result.CloseStatusDescription);
                     ms.Write(buffer.Array, buffer.Offset, result.Count);
@@ -37,9 +36,9 @@ namespace Centaurus
             }
         }
 
-        public static async Task<XdrReader> GetInputStreamReader(this WebSocket webSocket)
+        public static async Task<XdrReader> GetInputStreamReader(this WebSocket webSocket, CancellationToken cancellationToken)
         {
-            var res = await GetInputByteArray(webSocket);
+            var res = await GetInputByteArray(webSocket, cancellationToken);
             return new XdrReader(res, res.Length);
         }
     }

@@ -14,15 +14,11 @@ namespace Centaurus.Domain
         {
             if (quantum == null)
                 throw new ArgumentNullException(nameof(quantum));
-            byte[] account = null;
             var quantumMessage = (Quantum)quantum.Message;
-            if (quantumMessage is RequestQuantum)
-            {
-                var request = ((RequestQuantum)quantumMessage).RequestEnvelope;
-                if (request.Signatures.Count < 1)
-                    throw new Exception("A quantum lack signatures.");
-                account = request.Signatures.First().Signer.Data;
-            }
+            var account = 0;
+            if (quantumMessage is RequestQuantum requestQuantum)
+                account = requestQuantum.RequestMessage.Account;
+
             return new QuantumModel
             {
                 Apex = quantumMessage.Apex,

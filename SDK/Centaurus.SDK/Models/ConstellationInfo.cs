@@ -13,9 +13,40 @@ namespace Centaurus.SDK.Models
 
         public ApplicationStateModel State { get; set; }
 
-        public string Vault { get; set; }
+        private string vault;
+        public string Vault 
+        {
+            get => vault;
+            set {
+                if (!StrKey.IsValidEd25519PublicKey(value))
+                    throw new ArgumentException($"Invalid ed25519 public key {value}");
+                vault = value;
+                VaultPubKey = StrKey.DecodeStellarAccountId(Vault);
+            }
+        }
 
-        public string[] Auditors { get; set; }
+        public RawPubKey VaultPubKey { get; private set; }
+
+        private string[] auditors;
+        public string[] Auditors 
+        {
+            get => auditors;
+            set {
+                if (value == null)
+                    throw new ArgumentNullException("Auditors");
+                auditors = value;
+                var auditorKeys = new List<RawPubKey>();
+                foreach (var auditor in value)
+                {
+                    if (!StrKey.IsValidEd25519PublicKey(auditor))
+                        throw new ArgumentException($"Invalid ed25519 public key {auditor}");
+                    auditorKeys.Add(StrKey.DecodeStellarAccountId(auditor));
+                }
+                AuditorPubKeys = auditorKeys.ToArray();
+            }
+        }
+
+        public RawPubKey[] AuditorPubKeys { get; private set; }
 
         public long MinAccountBalance { get; set; }
 

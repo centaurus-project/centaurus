@@ -9,14 +9,14 @@ namespace Centaurus.Domain
 {
     public class AuditLedgerManager : MajorityManager
     {
-        public async Task Add(MessageEnvelope envelope)
+        public void Add(MessageEnvelope envelope)
         {
-            await Aggregate(envelope);
+            Aggregate(envelope);
         }
 
-        protected override async Task OnResult(MajorityResults majorityResult, MessageEnvelope result)
+        protected override void OnResult(MajorityResults majorityResult, MessageEnvelope result)
         {
-            await base.OnResult(majorityResult, result);
+            base.OnResult(majorityResult, result);
             if (majorityResult != MajorityResults.Success)
             {
                 logger.Info($"Majority result received ({majorityResult}).");
@@ -25,8 +25,19 @@ namespace Centaurus.Domain
             {
                 Source = result
             };
-            var ledgerCommitEnvelope = quantum.CreateEnvelope();
-            await Global.QuantumHandler.HandleAsync(ledgerCommitEnvelope);
+            Task.Factory.StartNew(async () =>
+            {
+                try
+                {
+                    var ledgerCommitEnvelope = quantum.CreateEnvelope();
+                    await Global.QuantumHandler.HandleAsync(ledgerCommitEnvelope);
+                }
+                catch (Exception exc)
+                {
+                    logger.Error(exc, "Error on TxCommitQuantum handling.");
+                    Global.AppState.State = ApplicationState.Failed;
+                }
+            });
         }
     }
 }

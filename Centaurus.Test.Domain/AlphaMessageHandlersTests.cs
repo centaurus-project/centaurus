@@ -16,7 +16,7 @@ namespace Centaurus.Test
         public void Setup()
         {
             EnvironmentHelper.SetTestEnvironmentVariable();
-            GlobalInitHelper.DefaultAlphaSetup();
+            GlobalInitHelper.DefaultAlphaSetup().Wait();
             MessageHandlers<AlphaWebSocketConnection>.Init();
         }
 
@@ -190,9 +190,11 @@ namespace Centaurus.Test
                 ConnectionState = state
             };
 
+            var account = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
+
             var envelope = new OrderRequest
             {
-                Account = TestEnvironment.Client1KeyPair,
+                Account = account.Account.Id,
                 Nonce = 1
             }.CreateEnvelope();
             envelope.Sign(TestEnvironment.Client1KeyPair);
@@ -218,9 +220,11 @@ namespace Centaurus.Test
                 ConnectionState = state
             };
 
+            var account = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
+
             var envelope = new AccountDataRequest
             {
-                Account = TestEnvironment.Client1KeyPair,
+                Account = account.Account.Id,
                 Nonce = 1
             }.CreateEnvelope();
             envelope.Sign(TestEnvironment.Client1KeyPair);
@@ -244,7 +248,7 @@ namespace Centaurus.Test
             {
                 //TODO: replace it with quantum
                 var effect = new RequestRateLimitUpdateEffect { 
-                    Pubkey = clientKeyPair, 
+                    Account = account.Account.Id, 
                     RequestRateLimits = new RequestRateLimits { 
                         HourLimit = (uint)requestLimit.Value, 
                         MinuteLimit = (uint)requestLimit.Value }
@@ -265,7 +269,7 @@ namespace Centaurus.Test
             {
                 var envelope = new AccountDataRequest
                 {
-                    Account = clientKeyPair,
+                    Account = account.Account.Id,
                     Nonce = i + 1
                 }.CreateEnvelope();
                 envelope.Sign(clientKeyPair);
@@ -299,7 +303,7 @@ namespace Centaurus.Test
                 Account = account
             };
 
-            var envelope = new EffectsRequest { Account = client, AccountWrapper = account }.CreateEnvelope();
+            var envelope = new EffectsRequest { Account = account.Account.Id, AccountWrapper = account }.CreateEnvelope();
             envelope.Sign(client);
 
             await AssertMessageHandling(clientConnection, envelope, excpectedException);

@@ -14,7 +14,7 @@ namespace Centaurus.Domain
             if (request == null)
                 throw new BadRequestException("Message of RequestMessage was expected");
             await base.Validate(connection, envelope);
-            if (!envelope.IsSignedBy(request.Account))
+            if (!envelope.IsSignedBy(request.AccountWrapper.Account.Pubkey))
                 throw new UnauthorizedException();
         }
     }

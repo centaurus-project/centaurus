@@ -22,7 +22,7 @@ namespace Centaurus.Domain
 
             if (payments == null)
                 return;
-            foreach (var payment in payments.OrderBy(p => p.Apex))
+            foreach (var payment in payments)
                 Add(payment);
             if (startSubmitTimer)
                 InitTimer();
@@ -127,20 +127,42 @@ namespace Centaurus.Domain
                 expiredTransactions = withdrawals.Where(w => w.Value.IsExpired(currentTimeSeconds)).Select(w => w.Key).ToArray();
             }
 
-            //we must ignore all txs that was submitted. TxListener will handle submitted txs.
-            var limit = 200;
-            var unhandledTxs = new List<byte[]>();
-            var pageResult = await Global.StellarNetwork.Server.GetTransactionsRequestBuilder(Global.Constellation.Vault.ToString(), Global.TxManager.TxCursor, limit).Execute();
-            while (pageResult.Records.Count > 0)
-            {
-                unhandledTxs.AddRange(pageResult.Records.Select(r => ByteArrayExtensions.FromHexString(r.Hash)));
-                if (pageResult.Records.Count != limit)
-                    break;
-                pageResult = await pageResult.NextPage();
-            }
+            if (expiredTransactions.Length < 1)
+                return;
 
+            //we must ignore all txs that was submitted. TxListener will handle submitted txs.
+            var unhandledTxs = await GetUnhandledTx();
             foreach (var expiredTransaction in expiredTransactions.Where(tx => !unhandledTxs.Contains(tx, ByteArrayComparer.Default)))
                 _ = Global.QuantumHandler.HandleAsync(new WithrawalsCleanupQuantum { ExpiredWithdrawal = expiredTransaction }.CreateEnvelope());
+        }
+
+        private async Task<List<byte[]>> GetUnhandledTx()
+        {
+            var tries = 1;
+            while (true)
+            {
+                try
+                {
+                    var limit = 200;
+                    var unhandledTxs = new List<byte[]>();
+                    var pageResult = await Global.StellarNetwork.Server.GetTransactionsRequestBuilder(Global.Constellation.Vault.ToString(), Global.TxManager.TxCursor, limit).Execute();
+                    while (pageResult.Records.Count > 0)
+                    {
+                        unhandledTxs.AddRange(pageResult.Records.Select(r => ByteArrayExtensions.FromHexString(r.Hash)));
+                        if (pageResult.Records.Count != limit)
+                            break;
+                        pageResult = await pageResult.NextPage();
+                    }
+                    return unhandledTxs;
+                }
+                catch
+                {
+                    if (tries == 5)
+                        throw;
+                    await Task.Delay(tries * 1000); 
+                    tries++;
+                }
+            }
         }
 
         #endregion

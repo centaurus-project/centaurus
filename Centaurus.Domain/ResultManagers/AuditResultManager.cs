@@ -10,14 +10,14 @@ namespace Centaurus.Domain
 {
     public class AuditResultManager : MajorityManager
     {
-        public async Task Add(MessageEnvelope envelope)
+        public void Add(MessageEnvelope envelope)
         {
-            await Aggregate(envelope);
+            Aggregate(envelope);
         }
 
-        protected override async Task OnResult(MajorityResults majorityResult, MessageEnvelope confirmation)
+        protected override void OnResult(MajorityResults majorityResult, MessageEnvelope confirmation)
         {
-            await base.OnResult(majorityResult, confirmation);
+            base.OnResult(majorityResult, confirmation);
             if (majorityResult != MajorityResults.Success)
             {
                 logger.Info($"Majority result received ({majorityResult}).");
@@ -46,7 +46,10 @@ namespace Centaurus.Domain
                 requestMessage = ((RequestQuantum)originalEnvelope.Message).RequestEnvelope.Message as NonceRequestMessage;
 
             if (requestMessage != null)
-                Notifier.Notify(requestMessage.Account, confirmation);
+            {
+                var aPubKey = Global.AccountStorage.GetAccount(requestMessage.Account).Account.Pubkey;
+                Notifier.Notify(aPubKey, confirmation);
+            }
         }
         protected override byte[] GetHash(MessageEnvelope envelope)
         {

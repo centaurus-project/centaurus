@@ -2,6 +2,7 @@
 using NLog;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -93,11 +94,7 @@ namespace Centaurus.Domain
 
                 //try to unwrap for Alpha
                 if (currentQuantum is RequestQuantum)
-                {
                     currentQuantumEnvelope = ((RequestQuantum)currentQuantum).RequestEnvelope;
-                    var requestMessage = (RequestMessage)currentQuantumEnvelope.Message;
-                    requestMessage.AccountWrapper = Global.AccountStorage.GetAccount(requestMessage.Account);
-                }
 
                 var resultMessage = await Global.QuantumHandler.HandleAsync(currentQuantumEnvelope, currentQuantum.Timestamp);
                 var processedQuantum = (Quantum)resultMessage.OriginalMessage.Message;
@@ -118,13 +115,13 @@ namespace Centaurus.Domain
             if (quanta.Count() == 0)
                 return new List<MessageEnvelope>();
 
-            var lastQuantumApex = await PersistenceManager.GetLastApex();
+            var lastQuantumApex = await Global.PersistenceManager.GetLastApex();
             var validQuanta = new List<MessageEnvelope>();
 
             foreach (var currentQuantaGroup in quanta)
             {
                 //check if all quanta are the same
-                if (currentQuantaGroup.GroupBy(q => q.ComputeHash()).Count() > 1)
+                if (currentQuantaGroup.GroupBy(q => q.ComputeHash(), ByteArrayComparer.Default).Count() > 1)
                     throw new Exception("Alpha's private key is compromised");
 
                 if (lastQuantumApex + 1 != currentQuantaGroup.Key)

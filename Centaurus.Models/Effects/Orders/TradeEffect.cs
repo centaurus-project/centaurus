@@ -12,18 +12,6 @@ namespace Centaurus.Models
         public ulong OrderId { get; set; }
 
         [XdrField(1)]
-        public OrderSide OrderSide { get; set; }
-
-        [XdrField(2)]
-        public int Asset { get; set; }
-
-        [XdrField(3)]
         public long AssetAmount { get; set; }
-
-        [XdrField(4)]
-        public long XlmAmount { get; set; }
-
-        [XdrField(5)]
-        public double Price { get; set; }
     }
 }

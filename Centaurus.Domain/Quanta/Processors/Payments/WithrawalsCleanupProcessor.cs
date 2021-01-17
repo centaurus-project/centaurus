@@ -23,7 +23,7 @@ namespace Centaurus.Domain
             {
                 context.EffectProcessors.AddUpdateLiabilities(context.Withdrawal.Source.Account, withdrawalItem.Asset, -withdrawalItem.Amount);
             }
-            return Task.FromResult(context.Envelope.CreateResult(ResultStatusCodes.Success, context.EffectProcessors.GetEffects().ToList()));
+            return Task.FromResult(context.Envelope.CreateResult(ResultStatusCodes.Success, context.EffectProcessors.Effects));
         }
 
         public override Task Validate(WithdrawalCleanupProcessorContext context)

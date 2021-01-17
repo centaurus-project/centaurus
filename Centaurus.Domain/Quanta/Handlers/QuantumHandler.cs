@@ -3,6 +3,7 @@ using NLog;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -10,9 +11,9 @@ using System.Threading.Tasks;
 namespace Centaurus.Domain
 {
     //TODO: add Stop method
-    public class QuantumHandler
+    public class QuantumHandler : IDisposable
     {
-        protected class HandleItem
+        class HandleItem
         {
             public HandleItem(MessageEnvelope quantum, long timestamp = 0)
             {
@@ -33,7 +34,7 @@ namespace Centaurus.Domain
             Start();
         }
 
-        protected BlockingCollection<HandleItem> awaitedQuanta = new BlockingCollection<HandleItem>();
+        BlockingCollection<HandleItem> awaitedQuanta = new BlockingCollection<HandleItem>();
 
         /// <summary>
         /// Handles the quantum and returns Task.
@@ -109,6 +110,7 @@ namespace Centaurus.Domain
 
         async Task<ResultMessage> HandleQuantum(MessageEnvelope quantumEnvelope, long timestamp)
         {
+            quantumEnvelope.TryAssignAccountWrapper();
             return Global.IsAlpha
                 ? await AlphaHandleQuantum(quantumEnvelope, timestamp)
                 : await AuditorHandleQuantum(quantumEnvelope);
@@ -122,38 +124,46 @@ namespace Centaurus.Domain
 
             var quantum = (Quantum)quantumEnvelope.Message;
 
-            quantum.IsProcessed = false;
-
-            var effectsContainer = GetEffectProcessorsContainer(quantumEnvelope);
-
-            var context = processor.GetContext(effectsContainer);
-
-            await processor.Validate(context);
-
-            quantum.Timestamp = timestamp;
-
-            //we must add it before processing, otherwise the quantum that we are processing here will be different from the quantum that will come to the auditor
-            Global.QuantumStorage.AddQuantum(quantumEnvelope);
+            quantum.Apex = Global.QuantumStorage.CurrentApex + 1;
+            quantum.PrevHash = Global.QuantumStorage.LastQuantumHash;
+            quantum.Timestamp = timestamp == default ? DateTime.UtcNow.Ticks : timestamp;//it could be assigned, if this quantum was handled already and we handle it during the server rising
 
             //we need to sign the quantum here to prevent multiple signatures that can occur if we sign it when sending
             quantumEnvelope.Sign(Global.Settings.KeyPair);
 
-            var resultMessage = await processor.Process(context);
+            try
+            {
+                await Global.PendingUpdatesManager.UpdatesSyncRoot.WaitAsync();
+                var effectsContainer = GetEffectProcessorsContainer(quantumEnvelope);
 
-            quantum.IsProcessed = true;
+                var context = processor.GetContext(effectsContainer);
 
-            SaveEffects(effectsContainer);
+                await processor.Validate(context);
 
-            //TODO: create single method for getting result message and all additional messages
-            Notifier.OnMessageProcessResult(resultMessage);
+                var resultMessage = await processor.Process(context);
 
-            var additionalMessages = processor.GetNotificationMessages(context);
-            foreach (var m in additionalMessages)
-                Notifier.Notify(m.Key, m.Value.CreateEnvelope());
+                Global.QuantumStorage.AddQuantum(quantumEnvelope);
 
-            logger.Trace($"Message of type {envelope.Message} with apex {quantum.Apex} is handled.");
+                effectsContainer.Complete();
 
-            return resultMessage;
+                //TODO: create single method for getting result message and all additional messages
+                Notifier.OnMessageProcessResult(resultMessage);
+
+                var additionalMessages = processor.GetNotificationMessages(context);
+                foreach (var m in additionalMessages)
+                {
+                    var aPubKey = Global.AccountStorage.GetAccount(m.Key).Account.Pubkey;
+                    Notifier.Notify(aPubKey, m.Value.CreateEnvelope());
+                }
+
+                logger.Trace($"Message of type {envelope.Message} with apex {quantum.Apex} is handled.");
+
+                return resultMessage;
+            }
+            finally
+            {
+                Global.PendingUpdatesManager.UpdatesSyncRoot.Release();
+            }
         }
 
         async Task<ResultMessage> AuditorHandleQuantum(MessageEnvelope envelope)
@@ -169,39 +179,41 @@ namespace Centaurus.Domain
 
             ValidateAccountRequestRate(envelope);
 
-            var effectsContainer = GetEffectProcessorsContainer(envelope);
+            try
+            {
+                await Global.PendingUpdatesManager.UpdatesSyncRoot.WaitAsync();
 
-            var context = processor.GetContext(effectsContainer);
+                var effectsContainer = GetEffectProcessorsContainer(envelope);
 
-            await processor.Validate(context);
+                var context = processor.GetContext(effectsContainer);
 
-            var result = await processor.Process(context);
+                await processor.Validate(context);
 
-            Global.QuantumStorage.AddQuantum(envelope);
+                var result = await processor.Process(context);
 
-            ProcessTransaction(context, result);
+                Global.QuantumStorage.AddQuantum(envelope);
 
-            SaveEffects(effectsContainer);
+                ProcessTransaction(context, result);
 
-            logger.Trace($"Message of type {messageType} with apex {((Quantum)envelope.Message).Apex} is handled.");
+                effectsContainer.Complete();
 
-            var resultEnvelope = result.CreateEnvelope();
+                logger.Trace($"Message of type {messageType} with apex {((Quantum)envelope.Message).Apex} is handled.");
 
-            OutgoingMessageStorage.EnqueueMessage(resultEnvelope);
+                var resultEnvelope = result.CreateEnvelope();
 
-            return result;
+                OutgoingMessageStorage.EnqueueMessage(resultEnvelope);
+
+                return result;
+            }
+            finally
+            {
+                Global.PendingUpdatesManager.UpdatesSyncRoot.Release();
+            }
         }
 
         EffectProcessorsContainer GetEffectProcessorsContainer(MessageEnvelope envelope)
         {
-            return new EffectProcessorsContainer(envelope, Global.PendingUpdatesManager.AddEffects);
-        }
-
-        void SaveEffects(EffectProcessorsContainer effectsContainer)
-        {
-            //we must ignore init quantum because it will be saved immidiatly
-            if (effectsContainer.Apex > 1)
-                effectsContainer.SaveEffects();
+            return new EffectProcessorsContainer(envelope, Global.PendingUpdatesManager.Current);
         }
 
         void ValidateAccountRequestRate(MessageEnvelope envelope)
@@ -246,6 +258,12 @@ namespace Centaurus.Domain
         void Start()
         {
             Task.Factory.StartNew(RunQuantumWorker, TaskCreationOptions.LongRunning);
+        }
+
+        public void Dispose()
+        {
+            awaitedQuanta?.Dispose();
+            awaitedQuanta = null;
         }
     }
 }

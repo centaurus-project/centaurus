@@ -37,7 +37,7 @@ namespace Centaurus.Domain
                 }
             }
 
-            return Task.FromResult(context.Envelope.CreateResult(ResultStatusCodes.Success, context.EffectProcessors.GetEffects().ToList()));
+            return Task.FromResult(context.Envelope.CreateResult(ResultStatusCodes.Success, context.EffectProcessors.Effects));
         }
 
         public override Task Validate(LedgerCommitProcessorContext context)
@@ -107,8 +107,9 @@ namespace Centaurus.Domain
             var account = Global.AccountStorage.GetAccount(deposite.Destination)?.Account;
             if (account == null)
             {
-                context.EffectProcessors.AddAccountCreate(Global.AccountStorage, deposite.Destination);
-                account = Global.AccountStorage.GetAccount(deposite.Destination).Account;
+                var accId = Global.AccountStorage.GetNextAccountId();
+                context.EffectProcessors.AddAccountCreate(Global.AccountStorage, accId, deposite.Destination);
+                account = Global.AccountStorage.GetAccount(accId).Account;
             }
 
             if (!account.HasBalance(deposite.Asset))

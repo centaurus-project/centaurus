@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 namespace Centaurus.Domain
 {
     //TODO: add validation timeout
-    public abstract class MajorityManager: IDisposable
+    public abstract class MajorityManager : IDisposable
     {
         public MajorityManager()
         {
@@ -20,49 +20,36 @@ namespace Centaurus.Domain
 
         public void Dispose()
         {
-            if (cleanupTimer != null)
-            {
-                cleanupTimer.Stop();
-                cleanupTimer.Dispose();
-                cleanupTimer = null;
-            }
+            cleanupTimer?.Stop();
+            cleanupTimer?.Dispose();
+            cleanupTimer = null;
         }
 
         private void InitCleanupTimer()
         {
             cleanupTimer = new System.Timers.Timer();
-            cleanupTimer.Interval = 60 * 1000;
+            cleanupTimer.Interval = 30 * 1000;
             cleanupTimer.AutoReset = false;
             cleanupTimer.Elapsed += CleanupTimer_Elapsed;
             cleanupTimer.Start();
         }
 
-        private TimeSpan aggregateLifeTime = new TimeSpan(0, 10, 0);
+        private TimeSpan aggregateLifeTime = new TimeSpan(0, 1, 0);
 
         private void CleanupTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
             lock (syncRoot)
             {
-                var itemsToRemove = new List<string>();
-                foreach (var kv in pendingAggregates)
-                {
-                    if (DateTime.UtcNow - kv.Value.CreatedAt > aggregateLifeTime)
-                    {
-                        if (!kv.Value.AlreadyHasResult) //something went wrong
-                        {
-                            logger.Error("Aggregation has expired, but no consensus yet.");
-                            Global.AppState.State = ApplicationState.Failed;
-                            return;
-                        }
-                        itemsToRemove.Add(kv.Key);
-                    }
-                    //all next items will have greater CreateAt time, no need to continue
-                    break;
-                }
+                var now = DateTime.UtcNow;
+                var itemsToRemove = pendingAggregates
+                    .Where(kv => now - kv.Value.CreatedAt > aggregateLifeTime)
+                    .Select(kv => kv.Key)
+                    .ToArray();
+
                 foreach (var itemKey in itemsToRemove)
                     pendingAggregates.Remove(itemKey);
             }
-            cleanupTimer.Start();
+            cleanupTimer?.Start();
         }
 
         private System.Timers.Timer cleanupTimer;
@@ -83,18 +70,18 @@ namespace Centaurus.Domain
             lock (syncRoot)
             {
                 if (!pendingAggregates.ContainsKey(id))
-                    pendingAggregates[id] = new ConsensusAggregate(this);
+                    pendingAggregates[id] = new ConsensusAggregate(id, this);
                 return pendingAggregates[id];
             }
         }
 
-        protected async Task Aggregate(MessageEnvelope envelope)
+        protected void Aggregate(MessageEnvelope envelope)
         {
             var id = GetId(envelope);
             ConsensusAggregate aggregate = GetConsensusAggregate(id);
 
             //add the signature to the aggregate
-            await aggregate.Add(envelope);
+            aggregate.Add(envelope);
         }
 
         /// <summary>
@@ -112,14 +99,15 @@ namespace Centaurus.Domain
             }
         }
 
-        protected virtual Task OnResult(MajorityResults majorityResult, MessageEnvelope confirmation)
+        protected virtual void OnResult(MajorityResults majorityResult, MessageEnvelope confirmation)
         {
             if (majorityResult == MajorityResults.Unreachable)
             {
-                logger.Error("Majority is unreachable. The constellation collapsed.");
+                var exc = new Exception("Majority is unreachable. The constellation collapsed.");
+                logger.Error(exc);
                 Global.AppState.State = ApplicationState.Failed;
+                throw exc;
             }
-            return Task.CompletedTask;
         }
 
         protected virtual byte[] GetHash(MessageEnvelope envelope)
@@ -129,43 +117,56 @@ namespace Centaurus.Domain
 
         public class ConsensusAggregate
         {
-            public ConsensusAggregate(MajorityManager majorityManager)
+            public ConsensusAggregate(string id, MajorityManager majorityManager)
             {
+                this.Id = id;
                 this.majorityManager = majorityManager;
                 this.CreatedAt = DateTime.UtcNow;
             }
 
             public readonly DateTime CreatedAt;
-            public bool AlreadyHasResult { get; private set; }
+            public bool IsProcessed { get; private set; }
 
             private object syncRoot = new { };
+
+            public string Id { get; }
 
             private MajorityManager majorityManager;
 
             private Dictionary<byte[], MessageEnvelope> storage = new Dictionary<byte[], MessageEnvelope>(ByteArrayComparer.Default);
 
-            public async Task Add(MessageEnvelope envelope)
+            public void Add(MessageEnvelope envelope)
             {
                 MessageEnvelope consensus = null;
                 MajorityResults majorityResult = MajorityResults.Unknown;
                 lock (syncRoot)
                 {
-                    if (AlreadyHasResult)
-                        return;
                     var envelopeHash = majorityManager.GetHash(envelope);
+                    var resultStorageEnvelope = envelope;
                     if (!storage.ContainsKey(envelopeHash))//first result with such hash
                         storage[envelopeHash] = envelope;
                     else
                     {
-                        var resultStorageEnvelope = storage[envelopeHash];
+                        resultStorageEnvelope = storage[envelopeHash];
                         resultStorageEnvelope.AggregateEnvelopUnsafe(envelope);//we can use AggregateEnvelopUnsafe, we compute hash for every envelope above
                     }
+
+                    if (IsProcessed)
+                    {
+                        if (resultStorageEnvelope.Signatures.Count == ((AlphaStateManager)Global.AppState).ConnectedAuditorsCount) //remove if all auditors sent results
+                        {
+                            majorityManager?.Remove(Id);
+                        }
+                        return;
+                    }
+
                     majorityResult = CheckMajority(out consensus);
                     if (majorityResult != MajorityResults.Unknown)
-                        AlreadyHasResult = true;
+                    {
+                        majorityManager.OnResult(majorityResult, consensus);
+                        IsProcessed = true;
+                    }
                 }
-                if (majorityResult != MajorityResults.Unknown)
-                    await majorityManager.OnResult(majorityResult, consensus);
             }
 
             private MajorityResults CheckMajority(out MessageEnvelope consensus)

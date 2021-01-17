@@ -1,4 +1,5 @@
-﻿using Centaurus.Models;
+﻿using Centaurus.Exchange.Analytics;
+using Centaurus.Models;
 using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
@@ -25,7 +26,7 @@ namespace Centaurus.Exchange
     public class MarketDepth
     {
 
-        public MarketDepth(int market, double precision, IOrderMap orderMap, int maxLevelCount = 20)
+        public MarketDepth(int market, double precision, AnalyticsOrderMap orderMap, int maxLevelCount = 20)
         {
             if (orderMap == null)
                 throw new ArgumentNullException(nameof(orderMap));
@@ -46,7 +47,7 @@ namespace Centaurus.Exchange
 
         private int decimalsCount;
         private int maxPricesCount;
-        private IOrderMap orderMap;
+        private AnalyticsOrderMap orderMap;
 
         public void OnOrderUpdates(List<OrderInfo> orders, DateTime updateDate)
         {
@@ -76,7 +77,7 @@ namespace Centaurus.Exchange
 
             if (updatedSides.Count > 0)
             {
-                var sourcesToUpdate = updatedSides.Select(s => prices.First(p => p.Key == s));
+                var sourcesToUpdate = updatedSides.Select(s => prices.First(p => p.Key == s)).ToList();
                 var lastOrderId = default(ulong);
                 foreach (var source in sourcesToUpdate)
                 {
@@ -175,7 +176,7 @@ namespace Centaurus.Exchange
             var currentPrice = source.FirstOrDefault(p => p.Price == price);
             if (currentPrice == null)
                 return false;
-            currentPrice.Amount -= order.Amount;
+            currentPrice.Amount += -(order.Amount);
             currentPrice.Orders.Remove(order.OrderId);
             if (currentPrice.Amount == 0)
                 source.Remove(currentPrice);
@@ -192,7 +193,7 @@ namespace Centaurus.Exchange
             var currentPrice = source.FirstOrDefault(p => p.Price == price);
             if (currentPrice == null)
                 return false;
-            currentPrice.Amount -= order.Amount;
+            currentPrice.Amount += -(order.Amount);
             return true;
         }
     }

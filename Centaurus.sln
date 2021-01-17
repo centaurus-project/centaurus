@@ -9,8 +9,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Centaurus.Common", "Centaur
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Centaurus.Models", "Centaurus.Models\Centaurus.Models.csproj", "{DF8642AE-71B9-4600-9258-39BAC9365F5B}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Centaurus.Test.Client", "Centaurus.Test.Client\Centaurus.Test.Client.csproj", "{2AF78799-BBF2-4E52-9284-E88EFF243C60}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Centaurus.Test.Domain", "Centaurus.Test.Domain\Centaurus.Test.Domain.csproj", "{6801D81E-683C-450F-8EB8-00F216A419ED}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Centaurus.Test.Integration", "Centaurus.Test.Integration\Centaurus.Test.Integration.csproj", "{50877E96-277B-45C8-8FEF-EC8AE95ED2D7}"
@@ -63,10 +61,6 @@ Global
 		{DF8642AE-71B9-4600-9258-39BAC9365F5B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{DF8642AE-71B9-4600-9258-39BAC9365F5B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{DF8642AE-71B9-4600-9258-39BAC9365F5B}.Release|Any CPU.Build.0 = Release|Any CPU
-		{2AF78799-BBF2-4E52-9284-E88EFF243C60}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{2AF78799-BBF2-4E52-9284-E88EFF243C60}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{2AF78799-BBF2-4E52-9284-E88EFF243C60}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{2AF78799-BBF2-4E52-9284-E88EFF243C60}.Release|Any CPU.Build.0 = Release|Any CPU
 		{6801D81E-683C-450F-8EB8-00F216A419ED}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{6801D81E-683C-450F-8EB8-00F216A419ED}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6801D81E-683C-450F-8EB8-00F216A419ED}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -136,7 +130,6 @@ Global
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
-		{2AF78799-BBF2-4E52-9284-E88EFF243C60} = {E7AE6334-8F96-4FD7-B7CE-DEE954AA4445}
 		{6801D81E-683C-450F-8EB8-00F216A419ED} = {E7AE6334-8F96-4FD7-B7CE-DEE954AA4445}
 		{50877E96-277B-45C8-8FEF-EC8AE95ED2D7} = {E7AE6334-8F96-4FD7-B7CE-DEE954AA4445}
 		{9AAF521F-06D4-4E93-8C64-C4872FDC4BD9} = {E7AE6334-8F96-4FD7-B7CE-DEE954AA4445}

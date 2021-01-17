@@ -17,22 +17,27 @@ namespace Centaurus.Domain
         {
             if (observeTrades)
             {
+                cancellationTokenSource = new CancellationTokenSource();
+                cancellationToken = cancellationTokenSource.Token;
                 awaitedUpdates = new BlockingCollection<ExchangeUpdate>();
-                Task.Factory.StartNew(ObserveUpdates, cancellationTokenSource.Token, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+                Task.Factory.StartNew(ObserveUpdates, cancellationToken, TaskCreationOptions.LongRunning, TaskScheduler.Default);
             }
         }
 
 
-        private CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
+        private CancellationTokenSource cancellationTokenSource;
+        private CancellationToken cancellationToken;
         private void ObserveUpdates()
         {
             try
             {
-                foreach (var updates in awaitedUpdates.GetConsumingEnumerable(cancellationTokenSource.Token))
+                foreach (var updates in awaitedUpdates.GetConsumingEnumerable(cancellationToken))
                     OnUpdates?.Invoke(updates);
             }
             catch (Exception exc)
             {
+                if (exc is TaskCanceledException || exc is OperationCanceledException)
+                    return;
                 logger.Error(exc);
             }
         }
@@ -95,7 +100,7 @@ namespace Centaurus.Domain
             return GetMarket(asset).GetOrderbook(side);
         }
 
-        public Models.Order GetOrder(ulong offerId)
+        public Order GetOrder(ulong offerId)
         {
             return GetOrderbook(offerId).GetOrder(offerId);
         }
@@ -105,7 +110,7 @@ namespace Centaurus.Domain
             return GetOrderbook(offerId).RemoveOrder(offerId);
         }
 
-        public static Exchange RestoreExchange(List<AssetSettings> assets, List<Models.Order> orders, bool observeTrades)
+        public static Exchange RestoreExchange(List<AssetSettings> assets, List<Order> orders, bool observeTrades)
         {
             var exchange = new Exchange(observeTrades);
             foreach (var asset in assets)
@@ -124,7 +129,9 @@ namespace Centaurus.Domain
         public void Dispose()
         {
             cancellationTokenSource?.Cancel();
+            cancellationTokenSource?.Dispose();
             cancellationTokenSource = null;
+
             awaitedUpdates?.Dispose();
             awaitedUpdates = null;
         }

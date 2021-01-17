@@ -19,10 +19,12 @@ namespace Centaurus.Domain
             if (accounts == null)
                 accounts = new AccountWrapper[] { };
 
-            this.accounts = new Dictionary<RawPubKey, AccountWrapper>(accounts.ToDictionary(m => m.Account.Pubkey));
+            this.accounts = new Dictionary<int, AccountWrapper>(accounts.ToDictionary(m => m.Account.Id));
+            this.accountIds = new Dictionary<RawPubKey, int>(accounts.ToDictionary(m => m.Account.Pubkey, v => v.Account.Id));
         }
 
-        Dictionary<RawPubKey, AccountWrapper> accounts = new Dictionary<RawPubKey, AccountWrapper>();
+        Dictionary<RawPubKey, int> accountIds = new Dictionary<RawPubKey, int>();
+        Dictionary<int, AccountWrapper> accounts = new Dictionary<int, AccountWrapper>();
 
         /// <summary>
         /// Retrieve account record by its public key.
@@ -33,27 +35,49 @@ namespace Centaurus.Domain
         {
             if (pubkey == null)
                 throw new ArgumentNullException(nameof(pubkey));
-            return accounts.GetValueOrDefault(pubkey);
+            var accId = accountIds.GetValueOrDefault(pubkey);
+            if (accId == default)
+                return null;
+            return GetAccount(accId);
         }
 
-        public AccountWrapper CreateAccount(RawPubKey pubkey)
+        /// <summary>
+        /// Retrieve account record by its public id.
+        /// </summary>
+        /// <param name="id">Account id</param>
+        /// <returns>Account record, or null if not found</returns>
+        public AccountWrapper GetAccount(int id)
+        {
+            if (id == default)
+                throw new ArgumentNullException(nameof(id));
+            return accounts.GetValueOrDefault(id);
+        }
+
+        public AccountWrapper CreateAccount(int id, RawPubKey pubkey)
         {
             if (pubkey == null)
                 throw new ArgumentNullException(nameof(pubkey));
 
-            if (accounts.ContainsKey(pubkey))
+            if (accountIds.ContainsKey(pubkey))
                 throw new InvalidOperationException($"Account with public key {pubkey} already exists");
 
             var acc = new AccountWrapper(new Account
                 {
+                    Id = id,
                     Pubkey = pubkey,
                     Balances = new List<Balance>()
                 },
                 Global.Constellation.RequestRateLimits
             );
-            accounts.Add(pubkey, acc);
+            accountIds.Add(pubkey, id);
+            accounts.Add(id, acc);
 
             return acc;
+        }
+
+        public int GetNextAccountId()
+        {
+            return accountIds.Values.LastOrDefault() + 1;
         }
 
         public void RemoveAccount(RawPubKey pubkey)
@@ -61,10 +85,18 @@ namespace Centaurus.Domain
             if (pubkey == null)
                 throw new ArgumentNullException(nameof(pubkey));
 
-            if (!accounts.ContainsKey(pubkey))
+            if (!accountIds.ContainsKey(pubkey))
                 throw new InvalidOperationException($"Account with public key {pubkey} doesn't exist");
 
-            if (!accounts.Remove(pubkey))
+            var id = accountIds[pubkey];
+
+            if (!accounts.ContainsKey(id))
+                throw new InvalidOperationException($"Account with id {id} doesn't exist");
+
+            if (!accounts.Remove(id))
+                throw new Exception($"Unable to remove the account with id {id}");
+
+            if (!accountIds.Remove(pubkey))
                 throw new Exception($"Unable to remove the account with public key {pubkey}");
         }
 

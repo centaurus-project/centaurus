@@ -13,11 +13,11 @@ namespace Centaurus.Domain
         {
             var assets = new List<AssetSettings>();
             assets.Add(new AssetSettings());//add XLM
-            assets.AddRange(assetSettings.Select(a => a.ToAssetSettings()));
+            assets.AddRange(assetSettings.Select(a => a.ToAssetSettings()).OrderBy(a => a.Id));
             var resultSettings = new ConstellationSettings
             {
                 Apex = settings.Apex,
-                Auditors = settings.Auditors.Select(a => (RawPubKey)a).ToList(),
+                Auditors = settings.Auditors.Select(a => (RawPubKey)a).OrderBy(a => a.ToString()).ToList(),
                 MinAccountBalance = settings.MinAccountBalance,
                 MinAllowedLotSize = settings.MinAllowedLotSize,
                 Vault = settings.Vault,

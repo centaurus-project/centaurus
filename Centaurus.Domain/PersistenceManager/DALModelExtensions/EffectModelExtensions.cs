@@ -16,8 +16,7 @@ namespace Centaurus.Domain
             return new EffectModel
             {
                 Id = EffectModelIdConverter.EncodeId(effect.Apex, index),
-                Apex = effect.Apex,
-                Account = effect.Pubkey?.Data,
+                Account = effect.Account,
                 EffectType = (int)effect.EffectType,
                 RawEffect = XdrConverter.Serialize(effect),
                 Timestamp = timestamp
@@ -27,8 +26,7 @@ namespace Centaurus.Domain
         public static Effect ToEffect(this EffectModel effectModel)
         {
             var effect = XdrConverter.Deserialize<Effect>(effectModel.RawEffect);
-            if (effectModel.Account != null)
-                effect.Pubkey = effectModel.Account;
+            effect.Account = effectModel.Account;
             return effect;
         }
     }

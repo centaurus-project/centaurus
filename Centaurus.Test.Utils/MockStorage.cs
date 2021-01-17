@@ -51,7 +51,10 @@ namespace Centaurus.Test
         {
             List<QuantumModel> res = quantaCollection;
             if (apexes.Length > 0)
-                res = quantaCollection.Where(q => apexes.Contains(q.Apex)).ToList();
+                res = quantaCollection
+                    .OrderBy(q => q.Apex)
+                    .Where(q => apexes.Contains(q.Apex))
+                    .ToList();
             if (res.Count != apexes.Length)
                 throw new Exception("Not all quanta were found");
             return Task.FromResult(res);
@@ -59,7 +62,9 @@ namespace Centaurus.Test
 
         public Task<List<QuantumModel>> LoadQuantaAboveApex(long apex, int count = 0)
         {
-            var query = quantaCollection.Where(q => q.Apex > apex);
+            var query = quantaCollection
+                    .OrderBy(q => q.Apex)
+                    .Where(q => q.Apex > apex);
             if (count > 0)
                 query = query.Take(count);
             var res = query.ToList();
@@ -69,33 +74,45 @@ namespace Centaurus.Test
         public Task<long> GetFirstEffectApex()
         {
             var firstEffect = effectsCollection
-                   .OrderBy(e => e.Apex)
+                   .OrderBy(e => e.Id)
                    .FirstOrDefault();
 
-            var firstApex = firstEffect?.Apex ?? -1;
-            return Task.FromResult(firstApex);
+            if (firstEffect == null)
+                return Task.FromResult((long)-1);
+
+            var decodedId = EffectModelIdConverter.DecodeId(firstEffect.Id);
+            return Task.FromResult(decodedId.apex);
         }
 
         public Task<List<EffectModel>> LoadEffectsAboveApex(long apex)
         {
-            var effects = effectsCollection.Where(e => e.Apex > apex).ToList();
+            var cursor = EffectModelIdConverter.EncodeId(apex + 1, 0);
+            var effects = effectsCollection
+                .OrderBy(e => e.Id)
+                .Where(e => e.Id >= cursor)
+                .ToList();
             return Task.FromResult(effects);
         }
 
         public Task<List<EffectModel>> LoadEffectsForApex(long apex)
         {
-            var effects = effectsCollection.Where(e => e.Apex == apex).ToList();
+            var cursorFrom = EffectModelIdConverter.EncodeId(apex, 0);
+            var cursorTo = EffectModelIdConverter.EncodeId(apex + 1, 0);
+            var effects = effectsCollection
+                .OrderBy(e => e.Id)
+                .Where(e => e.Id >= cursorFrom && e.Id < cursorTo)
+                .ToList();
             return Task.FromResult(effects);
         }
 
         public Task<List<AccountModel>> LoadAccounts()
         {
-            return Task.FromResult(accountsCollection);
+            return Task.FromResult(accountsCollection.OrderBy(a => a.Id).ToList());
         }
 
         public Task<List<BalanceModel>> LoadBalances()
         {
-            return Task.FromResult(balancesCollection);
+            return Task.FromResult(balancesCollection.OrderBy(b => b.Id).ToList());
         }
 
         public Task<SettingsModel> LoadSettings(long apex)
@@ -109,7 +126,8 @@ namespace Centaurus.Test
         public Task<List<AssetModel>> LoadAssets(long apex)
         {
             var assets = assetSettings
-                .Where(s => s.Apex <= apex)
+                .Where(a => a.Apex <= apex)
+                .OrderBy(a => a.Id)
                 .ToList();
 
             return Task.FromResult(assets);
@@ -125,21 +143,23 @@ namespace Centaurus.Test
             {
                 var lastEffect = effectsCollection
                     .OrderByDescending(e => e.Id)
-                    .FirstOrDefault(e => ByteArrayPrimitives.Equals(e.Account, acc));
+                    .FirstOrDefault(e => e.Account == acc);
                 if (lastEffect?.EffectType == (int)EffectTypes.WithdrawalCreate)
                 {
-                    var quantum = quantaCollection.FirstOrDefault(q => q.Apex == lastEffect.Apex);
+                    var decodedId = EffectModelIdConverter.DecodeId(lastEffect.Id);
+                    var quantum = quantaCollection
+                        .FirstOrDefault(q => q.Apex == decodedId.apex);
                     if (quantum == null)
-                        throw new Exception($"Unable to find quantum with apex {lastEffect.Apex}");
+                        throw new Exception($"Unable to find quantum with apex {decodedId.apex}");
                     withdrawals.Add(quantum);
                 }
             }
-            return Task.FromResult(withdrawals);
+            return Task.FromResult(withdrawals.OrderBy(w => w.Apex).ToList());
         }
 
         public Task<List<OrderModel>> LoadOrders()
         {
-            return Task.FromResult(ordersCollection);
+            return Task.FromResult(ordersCollection.OrderBy(o => o.Id).ToList());
         }
 
         public Task<ConstellationState> LoadConstellationState()
@@ -149,15 +169,15 @@ namespace Centaurus.Test
 
         public Task Update(DiffObject update)
         {
-            UpdateSettings(update.Settings, update.Assets);
+            UpdateSettings(update.ConstellationSettings, update.Assets);
 
             UpdateStellarData(update.StellarInfoData);
 
-            UpdateAccount(update.Accounts);
+            UpdateAccount(update.Accounts.Values.ToList());
 
-            GetBalanceUpdates(update.Balances);
+            GetBalanceUpdates(update.Balances.Values.ToList());
 
-            UpdateOrders(update.Orders);
+            UpdateOrders(update.Orders.Values.ToList());
 
             UpdateQuanta(update.Quanta);
 
@@ -182,8 +202,8 @@ namespace Centaurus.Test
             {
                 settingsCollection.Add(settings);
 
-                var currentAssets = assetSettings.Select(a => a.AssetId);
-                var newAssets = assets.Where(a => !currentAssets.Contains(a.AssetId));
+                var currentAssets = assetSettings.Select(a => a.Id);
+                var newAssets = assets.Where(a => !currentAssets.Contains(a.Id));
 
                 if (newAssets.Count() > 0)
                     assetSettings.AddRange(newAssets);
@@ -207,16 +227,15 @@ namespace Centaurus.Test
             for (int i = 0; i < accLength; i++)
             {
                 var acc = accounts[i];
-                var pubKey = acc.PubKey;
-                var currentAcc = accountsCollection.FirstOrDefault(a => ByteArrayPrimitives.Equals(a.PubKey, pubKey));
+                var currentAcc = accountsCollection.FirstOrDefault(a => a.Id == acc.Id);
                 if (acc.IsInserted)
-                    accountsCollection.Add(new AccountModel { PubKey = pubKey, Nonce = (long)acc.Nonce, RequestRateLimits = acc.RequestRateLimits });
+                    accountsCollection.Add(new AccountModel { Id = acc.Id, PubKey = acc.PubKey, Nonce = acc.Nonce, RequestRateLimits = acc.RequestRateLimits });
                 else if (acc.IsDeleted)
                     accountsCollection.Remove(currentAcc);
                 else
                 {
                     if (acc.Nonce != 0)
-                        currentAcc.Nonce = (long)acc.Nonce;
+                        currentAcc.Nonce = acc.Nonce;
                     if (acc.RequestRateLimits != null)
                         currentAcc.RequestRateLimits = acc.RequestRateLimits;
                 }
@@ -230,27 +249,22 @@ namespace Centaurus.Test
             for (int i = 0; i < balancesLength; i++)
             {
                 var balance = balances[i];
-                var pubKey = balance.PubKey;
-                var asset = balance.AssetId;
-                var amount = balance.Amount;
-                var liabilities = balance.Liabilities;
 
-                var currentBalance = balancesCollection.FirstOrDefault(b => b.AssetId == asset && ByteArrayPrimitives.Equals(b.Account, pubKey));
+                var currentBalance = balancesCollection.FirstOrDefault(b => b.Id == balance.Id);
 
                 if (balance.IsInserted)
                     balancesCollection.Add(new BalanceModel
                     {
-                        Account = pubKey,
-                        Amount = amount,
-                        AssetId = asset,
-                        Liabilities = liabilities
+                        Id = balance.Id,
+                        Amount = balance.Amount,
+                        Liabilities = balance.Liabilities
                     });
                 else if (balance.IsDeleted)
                     balancesCollection.Remove(currentBalance);
                 else
                 {
-                    currentBalance.Amount += amount;
-                    currentBalance.Liabilities += liabilities;
+                    currentBalance.Amount += balance.Amount;
+                    currentBalance.Liabilities += balance.Liabilities;
                 }
             }
         }
@@ -262,39 +276,37 @@ namespace Centaurus.Test
             for (int i = 0; i < ordersLength; i++)
             {
                 var order = orders[i];
-                var orderId = order.OrderId;
-                var price = order.Price;
-                var amount = order.Amount;
-                var pubKey = order.Pubkey;
 
-                var currentOrder = ordersCollection.FirstOrDefault(s => s.OrderId == (long)orderId);
+                var currentOrder = ordersCollection.FirstOrDefault(s => s.Id == (long)order.OrderId);
 
                 if (order.IsInserted)
                     ordersCollection.Add(new OrderModel
                     {
-                        OrderId = (long)orderId,
-                        Amount = amount,
-                        Price = price,
-                        Pubkey = pubKey
+                        Id = (long)order.OrderId,
+                        Amount = order.Amount,
+                        Price = order.Price,
+                        Account = order.Account
                     });
                 else if (order.IsDeleted)
                     ordersCollection.Remove(currentOrder);
                 else
                 {
-                    currentOrder.Amount += amount;
+                    currentOrder.Amount += order.Amount;
                 }
             }
         }
 
-        public Task<List<EffectModel>> LoadEffects(byte[] cursor, bool isDesc, int limit, byte[] account)
+        public Task<List<EffectModel>> LoadEffects(byte[] cursor, bool isDesc, int limit, int account)
         {
-            if (account == null)
+            if (account == default)
                 throw new ArgumentNullException(nameof(account));
             IEnumerable<EffectModel> query = effectsCollection
-                    .Where(e => ByteArrayPrimitives.Equals(e.Account, account));
+                    .Where(e => e.Account == account);
 
             if (isDesc)
-                query = query.Reverse();
+                query = query.OrderByDescending(e => e.Id);
+            else
+                query = query.OrderBy(e => e.Id);
 
             if (cursor != null && cursor.Any(x => x != 0))
             {
@@ -350,6 +362,20 @@ namespace Centaurus.Test
                 else
                     frames.Add(frame);
             }
+            return Task.CompletedTask;
+        }
+
+        public Task DropDatabase()
+        {
+            ordersCollection.Clear();
+            accountsCollection.Clear();
+            balancesCollection.Clear();
+            quantaCollection.Clear();
+            effectsCollection.Clear();
+            settingsCollection.Clear();
+            assetSettings.Clear();
+            frames.Clear();
+            constellationState = null;
             return Task.CompletedTask;
         }
     }

@@ -16,11 +16,20 @@ namespace Centaurus.Domain
 {
     public class InfoWebSocketConnection : IDisposable
     {
+        public InfoWebSocketConnection()
+        {
+            cancellationTokenSource = new CancellationTokenSource();
+            cancellationToken = cancellationTokenSource.Token;
+        }
+
         static InfoCommandsHandlers commandHandlers = new InfoCommandsHandlers();
 
         static Logger logger = LogManager.GetCurrentClassLogger();
 
         private WebSocket webSocket;
+
+        private CancellationTokenSource cancellationTokenSource;
+        private CancellationToken cancellationToken;
 
         public string Ip { get; }
         public string ConnectionId { get; }
@@ -82,6 +91,7 @@ namespace Centaurus.Domain
                     desc = desc ?? status.ToString();
                     try
                     {
+                        cancellationTokenSource?.Cancel();
                         await webSocket.CloseAsync(status, desc, CancellationToken.None);
                     }
                     catch (WebSocketException exc)
@@ -109,7 +119,7 @@ namespace Centaurus.Domain
         {
             try
             {
-                var reader = await webSocket.GetInputByteArray();
+                var reader = await webSocket.GetInputByteArray(cancellationToken);
                 while (true)
                 {
                     BaseCommand command = null;
@@ -134,7 +144,7 @@ namespace Centaurus.Domain
                         if (statusCode == ResultStatusCodes.InternalError || !Global.IsAlpha)
                             logger.Error(exc);
                     }
-                    reader = await webSocket.GetInputByteArray();
+                    reader = await webSocket.GetInputByteArray(cancellationToken);
                 }
             }
             catch (ConnectionCloseException e)
@@ -152,6 +162,8 @@ namespace Centaurus.Domain
             }
             catch (Exception e)
             {
+                if (e is TaskCanceledException || e is OperationCanceledException)
+                    return;
                 logger.Error(e);
             }
         }
@@ -163,6 +175,9 @@ namespace Centaurus.Domain
 
         public void Dispose()
         {
+            cancellationTokenSource?.Dispose();
+            cancellationTokenSource = null;
+
             webSocket?.Dispose();
             webSocket = null;
             if (locks != null)

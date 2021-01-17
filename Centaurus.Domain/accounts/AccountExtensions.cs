@@ -27,8 +27,9 @@ namespace Centaurus.Domain
         /// <returns>Created balance</returns>
         public static Balance CreateBalance(this Account account, int asset)
         {
-            var balance = new Balance { Asset = asset, Account = account };
+            var balance = new Balance { Asset = asset };
             account.Balances.Add(balance);
+            account.Balances = account.Balances.OrderBy(b => b.Asset).ToList();
             return balance;
         }
 

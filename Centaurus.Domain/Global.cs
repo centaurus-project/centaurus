@@ -23,11 +23,11 @@ namespace Centaurus.Domain
         public const int MaxTxSubmitDelay = 5 * 60; //5 minutes
 
         /// <summary>
-        /// Initializes Global object
+        /// Setups Global object
         /// </summary>
         /// <param name="settings">Application config</param>
         /// <param name="storage">Permanent storage object</param>
-        public static void Init(BaseSettings settings, IStorage storage)
+        public static async Task Setup(BaseSettings settings, IStorage storage)
         {
             ExtensionsManager = new ExtensionsManager();
 
@@ -38,7 +38,9 @@ namespace Centaurus.Domain
             IsAlpha = Settings is AlphaSettings;
 
             PermanentStorage = storage;
-            PermanentStorage.OpenConnection(settings.ConnectionString).Wait();
+            await PermanentStorage.OpenConnection(settings.ConnectionString);
+
+            PersistenceManager = new PersistenceManager(PermanentStorage);
 
             StellarNetwork = new StellarNetwork(Settings.NetworkPassphrase, Settings.HorizonUrl);
             QuantumProcessor = new QuantumProcessorsStorage();
@@ -46,17 +48,18 @@ namespace Centaurus.Domain
             PendingUpdatesManager = new PendingUpdatesManager();
 
             AppState = IsAlpha ? new AlphaStateManager() : (StateManager)new AuditorStateManager();
+            AppState.StateChanged += AppState_StateChanged;
 
             //try to load last settings, we need it to know current auditors
             var lastHash = new byte[] { };
-            var lastApex = PersistenceManager.GetLastApex().Result;
+            var lastApex = await PersistenceManager.GetLastApex();
             if (lastApex >= 0)
             {
-                var lastQuantum = PersistenceManager.GetQuantum(lastApex).Result;
+                var lastQuantum = await PersistenceManager.GetQuantum(lastApex);
                 lastHash = lastQuantum.Message.ComputeHash();
                 logger.Trace($"Last hash is {Convert.ToBase64String(lastHash)}");
-                var snapshot = PersistenceManager.GetSnapshot(lastApex).Result;
-                Setup(snapshot);
+                var snapshot = await PersistenceManager.GetSnapshot(lastApex);
+                await Setup(snapshot);
                 if (IsAlpha)
                     AppState.State = ApplicationState.Rising;//Alpha should ensure that it has all quanta from auditors
                 else
@@ -66,24 +69,43 @@ namespace Centaurus.Domain
                 //if no snapshot, the app is in init state
                 AppState.State = ApplicationState.WaitingForInit;
 
-            QuantumStorage = new QuantumStorage(lastApex < 0 ? 0 : lastApex, lastHash);
+            var lastQuantumApex = lastApex < 0 ? 0 : lastApex;
+            QuantumStorage = IsAlpha
+                ? (QuantumStorageBase)new AlphaQuantumStorage(lastQuantumApex, lastHash)
+                : new AuditorQuantumStorage(lastQuantumApex, lastHash);
 
             QuantumHandler = new QuantumHandler(QuantumStorage.CurrentApex);
         }
 
-        public static void Setup(Snapshot snapshot)
+        private static void AppState_StateChanged(object sender, ApplicationState state)
         {
-            PersistenceManager = new PersistenceManager(PendingUpdatesManager.OnSaveSuccess, PendingUpdatesManager.OnSaveFailed);
+            if (!(PendingUpdatesManager?.IsRunning ?? true) &&
+                (state == ApplicationState.Running 
+                || state == ApplicationState.Ready
+                || state == ApplicationState.WaitingForInit))
+            PendingUpdatesManager?.Start();
+        }
 
+        public static async Task TearDown()
+        {
+            PendingUpdatesManager?.Stop(); PendingUpdatesManager?.Dispose(); 
+            AuditLedgerManager?.Dispose();
+            AuditResultManager?.Dispose();
+            await DisposeAnalyticsManager();
+
+            AuditLedgerManager?.Dispose();
+            AuditResultManager?.Dispose(); 
+            ExtensionsManager?.Dispose(); 
+            WithdrawalStorage?.Dispose();
+        }
+
+        public static async Task Setup(Snapshot snapshot)
+        {
             Constellation = snapshot.Settings;
 
             AccountStorage = new AccountStorage(snapshot.Accounts, Constellation.RequestRateLimits);
 
             Exchange = Exchange.RestoreExchange(snapshot.Settings.Assets, snapshot.Orders, IsAlpha);
-
-            AuditLedgerManager?.Dispose(); AuditLedgerManager = new AuditLedgerManager();
-
-            AuditResultManager?.Dispose(); AuditResultManager = new AuditResultManager();
 
             WithdrawalStorage?.Dispose(); WithdrawalStorage = new WithdrawalStorage(snapshot.Withdrawals, (!EnvironmentHelper.IsTest && IsAlpha));
 
@@ -91,23 +113,22 @@ namespace Centaurus.Domain
 
             if (IsAlpha)
             {
-                if (AnalyticsManager != null)
-                {
-                    try
-                    {
-                        AnalyticsManager.SaveUpdates(PermanentStorage).Wait();
-                    }
-                    catch
-                    {
-                        throw new Exception("Unable to save trades history.");
-                    }
-                    Exchange.OnUpdates -= Exchange_OnUpdates;
-                    AnalyticsManager.OnError -= AnalyticsManager_OnError;
-                    AnalyticsManager.OnUpdate -= AnalyticsManager_OnUpdate;
-                    AnalyticsManager.Dispose();
-                }
-                AnalyticsManager = new AnalyticsManager(PermanentStorage, DepthsSubscription.Precisions.ToList(), Exchange.OrderMap, Constellation.Assets.Where(a => !a.IsXlm).Select(a => a.Id).ToList());
-                AnalyticsManager.Restore(DateTime.UtcNow).Wait();
+                AuditLedgerManager?.Dispose(); AuditLedgerManager = new AuditLedgerManager();
+
+                AuditResultManager?.Dispose(); AuditResultManager = new AuditResultManager();
+
+                await DisposeAnalyticsManager();
+
+                AnalyticsManager = new AnalyticsManager(
+                    PermanentStorage,
+                    DepthsSubscription.Precisions.ToList(),
+                    Constellation.Assets.Where(a => !a.IsXlm).Select(a => a.Id).ToList(),
+                    snapshot.Orders.Select(o => o.ToOrderInfo()).ToList()
+                );
+
+                await AnalyticsManager.Restore(DateTime.UtcNow);
+                AnalyticsManager.StartTimers();
+
                 AnalyticsManager.OnError += AnalyticsManager_OnError;
                 AnalyticsManager.OnUpdate += AnalyticsManager_OnUpdate;
                 Exchange.OnUpdates += Exchange_OnUpdates;
@@ -137,7 +158,7 @@ namespace Centaurus.Domain
                     : new HashSet<int>();
             }
         }
-        public static QuantumStorage QuantumStorage { get; private set; }
+        public static QuantumStorageBase QuantumStorage { get; private set; }
         public static AccountStorage AccountStorage { get; private set; }
         public static WithdrawalStorage WithdrawalStorage { get; private set; }
         public static QuantumHandler QuantumHandler { get; private set; }
@@ -154,7 +175,7 @@ namespace Centaurus.Domain
         public static StellarNetwork StellarNetwork { get; private set; }
         public static HashSet<int> AssetIds { get; private set; }
 
-
+        //TODO: move it to separate class
         #region Analytics
 
         private static System.Threading.SemaphoreSlim analyticsUpdateSyncRoot = new System.Threading.SemaphoreSlim(1);
@@ -211,6 +232,25 @@ namespace Centaurus.Domain
             finally
             {
                 analyticsUpdateSyncRoot.Release();
+            }
+        }
+
+        private static async Task DisposeAnalyticsManager()
+        {
+            if (AnalyticsManager != null)
+            {
+                try
+                {
+                    await AnalyticsManager.SaveUpdates(PermanentStorage);
+                }
+                catch
+                {
+                    throw new Exception("Unable to save trades history.");
+                }
+                Exchange.OnUpdates -= Exchange_OnUpdates;
+                AnalyticsManager.OnError -= AnalyticsManager_OnError;
+                AnalyticsManager.OnUpdate -= AnalyticsManager_OnUpdate;
+                AnalyticsManager.Dispose();
             }
         }
 

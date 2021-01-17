@@ -33,20 +33,22 @@ namespace Centaurus.DAL.Mongo
 
         private async Task CreateIndexes()
         {
-            await accountsCollection.Indexes.CreateOneAsync(
-                 new CreateIndexModel<AccountModel>(Builders<AccountModel>.IndexKeys.Ascending(a => a.PubKey),
-                 new CreateIndexOptions { Unique = true, Background = true })
-            );
-
             await quantaCollection.Indexes.CreateOneAsync(
-                 new CreateIndexModel<QuantumModel>(Builders<QuantumModel>.IndexKeys.Ascending(e => e.TimeStamp),
-                 new CreateIndexOptions { Unique = true, Background = true })
+                 new CreateIndexModel<QuantumModel>(Builders<QuantumModel>.IndexKeys.Ascending(q => q.TimeStamp).Descending(q => q.Apex),
+                 new CreateIndexOptions { Background = true })
             );
 
             await effectsCollection.Indexes.CreateOneAsync(
                  new CreateIndexModel<EffectModel>(Builders<EffectModel>.IndexKeys.Ascending(e => e.Id).Ascending(e => e.EffectType),
-                 new CreateIndexOptions { Unique = true, Background = true })
+                 new CreateIndexOptions { Background = true })
             );
+        }
+
+        private async Task<IMongoCollection<T>> GetCollection<T>(string collectionName)
+        {
+            if (!(await database.ListCollectionNamesAsync(new ListCollectionNamesOptions { Filter = Builders<BsonDocument>.Filter.Eq("name", collectionName) })).Any())
+                await database.CreateCollectionAsync(collectionName);
+            return database.GetCollection<T>(collectionName);
         }
 
         public async Task OpenConnection(string connectionString)
@@ -59,19 +61,19 @@ namespace Centaurus.DAL.Mongo
             client = new MongoClient(mongoUrl);
             database = client.GetDatabase(mongoUrl.DatabaseName);
 
-            ordersCollection = database.GetCollection<OrderModel>("orders");
-            accountsCollection = database.GetCollection<AccountModel>("accounts");
-            balancesCollection = database.GetCollection<BalanceModel>("balances");
-            quantaCollection = database.GetCollection<QuantumModel>("quanta", new MongoCollectionSettings { AssignIdOnInsert = false });
-            constellationStateCollection = database.GetCollection<ConstellationState>("constellationState");
+            ordersCollection = await GetCollection<OrderModel>("orders");
+            accountsCollection = await GetCollection<AccountModel>("accounts");
+            balancesCollection = await GetCollection<BalanceModel>("balances");
+            quantaCollection = await GetCollection<QuantumModel>("quanta");
+            constellationStateCollection = await GetCollection<ConstellationState>("constellationState");
 
-            effectsCollection = database.GetCollection<EffectModel>("effects", new MongoCollectionSettings { AssignIdOnInsert = false });
+            effectsCollection = await GetCollection<EffectModel>("effects");
 
-            settingsCollection = database.GetCollection<SettingsModel>("constellationSettings");
+            settingsCollection = await GetCollection<SettingsModel>("constellationSettings");
 
-            assetsCollection = database.GetCollection<AssetModel>("assets");
+            assetsCollection = await GetCollection<AssetModel>("assets");
 
-            priceHistoryCollection = database.GetCollection<PriceHistoryFrameModel>("priceHistory");
+            priceHistoryCollection = await GetCollection<PriceHistoryFrameModel>("priceHistory");
 
             await CreateIndexes();
         }
@@ -88,7 +90,10 @@ namespace Centaurus.DAL.Mongo
                 return new List<QuantumModel>();
 
             var timestampFrom = (new DateTime(lastQuantum.TimeStamp, DateTimeKind.Utc) - TimeSpan.FromMinutes(120)).Ticks;
-            var fromQuantum = await quantaCollection.Find(q => q.TimeStamp <= timestampFrom).SortByDescending(q => q.Apex).FirstOrDefaultAsync();
+            var fromQuantum = await quantaCollection
+                .Find(q => q.TimeStamp <= timestampFrom)
+                .SortByDescending(q => q.Apex)
+                .FirstOrDefaultAsync();
 
             var fromId = EffectModelIdConverter.EncodeId(fromQuantum?.Apex ?? 0, 0);
 
@@ -117,6 +122,7 @@ namespace Centaurus.DAL.Mongo
 
             var withdrawals = await quantaCollection
                 .Find(Builders<QuantumModel>.Filter.In(q => q.Apex, quantumIds))
+                .SortBy(q => q.Apex)
                 .ToListAsync();
             return withdrawals;
         }
@@ -125,6 +131,7 @@ namespace Centaurus.DAL.Mongo
         {
             return await ordersCollection
                 .Find(FilterDefinition<OrderModel>.Empty)
+                .SortBy(o => o.Id)
                 .ToListAsync();
         }
 
@@ -140,6 +147,7 @@ namespace Centaurus.DAL.Mongo
         {
             return await assetsCollection
                 .Find(a => a.Apex <= apex)
+                .SortBy(a => a.Id)
                 .ToListAsync();
         }
 
@@ -147,6 +155,7 @@ namespace Centaurus.DAL.Mongo
         {
             return await accountsCollection
                 .Find(FilterDefinition<AccountModel>.Empty)
+                .SortBy(a => a.Id)
                 .ToListAsync();
         }
 
@@ -154,6 +163,7 @@ namespace Centaurus.DAL.Mongo
         {
             return await balancesCollection
                 .Find(FilterDefinition<BalanceModel>.Empty)
+                .SortBy(b => b.Id)
                 .ToListAsync();
         }
 
@@ -179,6 +189,7 @@ namespace Centaurus.DAL.Mongo
 
             var res = await quantaCollection
                 .Find(filter)
+                .SortBy(q => q.Apex)
                 .ToListAsync();
 
             if (res.Count != apexes.Length)
@@ -193,30 +204,40 @@ namespace Centaurus.DAL.Mongo
                 .Find(q => q.Apex > apex);
             if (count > 0)
                 query = query.Limit(count);
-            return await query.ToListAsync();
+            return await query
+                .SortBy(q => q.Apex)
+                .ToListAsync();
         }
 
         public async Task<long> GetFirstEffectApex()
         {
             var firstEffect = await effectsCollection
                    .Find(FilterDefinition<EffectModel>.Empty)
-                   .SortBy(e => e.Apex)
+                   .SortBy(e => e.Id)
                    .FirstOrDefaultAsync();
+            if (firstEffect == null)
+                return -1;
 
-            return firstEffect?.Apex ?? -1;
+            var decodedId = EffectModelIdConverter.DecodeId(firstEffect.Id);
+            return decodedId.apex;
         }
 
         public async Task<List<EffectModel>> LoadEffectsForApex(long apex)
         {
+            var fromCursor = EffectModelIdConverter.EncodeId(apex, 0);
+            var toCursor = EffectModelIdConverter.EncodeId(apex + 1, 0);
             return await effectsCollection
-                .Find(e => e.Apex == apex)
+                .Find(e => e.Id >= fromCursor && e.Id < toCursor)
+                .SortBy(e => e.Id)
                 .ToListAsync();
         }
 
         public async Task<List<EffectModel>> LoadEffectsAboveApex(long apex)
         {
+            var fromCursor = EffectModelIdConverter.EncodeId(apex + 1, 0);
             return await effectsCollection
-                .Find(e => e.Apex > apex)
+                .Find(e => e.Id >= fromCursor)
+                .SortBy(e => e.Id)
                 .ToListAsync();
         }
 
@@ -233,28 +254,30 @@ namespace Centaurus.DAL.Mongo
                    .FirstOrDefaultAsync();
         }
 
-        public async Task<List<EffectModel>> LoadEffects(byte[] cursor, bool isDesc, int limit, byte[] account)
+        public async Task<List<EffectModel>> LoadEffects(byte[] cursor, bool isDesc, int limit, int account)
         {
-            if (account == null)
+            if (account == default)
                 throw new ArgumentNullException(nameof(account));
-            IFindFluent<EffectModel, EffectModel> query = effectsCollection
-                    .Find(Builders<EffectModel>.Filter.Eq(e => e.Account, account));
-
-            if (isDesc)
-                query = query
-                    .SortByDescending(e => e.Id);
-
+            var filter = Builders<EffectModel>.Filter.Eq(e => e.Account, account);
 
             if (cursor != null && cursor.Any(x => x != 0))
             {
                 var c = new BsonObjectId(new ObjectId(cursor));
                 if (isDesc)
-                    query = effectsCollection
-                        .Find(Builders<EffectModel>.Filter.Lt(e => e.Id, c));
+                    filter = Builders<EffectModel>.Filter.And(filter, Builders<EffectModel>.Filter.Lt(e => e.Id, c));
                 else
-                    query = effectsCollection
-                        .Find(Builders<EffectModel>.Filter.Gt(e => e.Id, c));
+                    filter = Builders<EffectModel>.Filter.And(filter, Builders<EffectModel>.Filter.Gt(e => e.Id, c));
             }
+
+            var query = effectsCollection
+                    .Find(filter);
+
+            if (isDesc)
+                query = query
+                    .SortByDescending(e => e.Id);
+            else
+                query = query
+                    .SortBy(e => e.Id);
 
             var effects = await query
                 .Limit(limit)
@@ -284,6 +307,7 @@ namespace Centaurus.DAL.Mongo
 
             var firstFrame = await priceHistoryCollection
                 .Find(Builders<PriceHistoryFrameModel>.Filter.Gte(f => f.Id, firstId))
+                .SortBy(e => e.Id)
                 .FirstOrDefaultAsync();
 
             if (firstFrame == null)
@@ -303,26 +327,48 @@ namespace Centaurus.DAL.Mongo
                 try
                 {
                     var updateTasks = new List<Task>();
-
-                    if (update.Settings != null)
+                    if (update.ConstellationSettings != null)
                     {
-                        updateTasks.Add(settingsCollection.InsertOneAsync(update.Settings));
-                        updateTasks.Add(assetsCollection.InsertManyAsync(update.Assets));
+                        updateTasks.Add(settingsCollection.InsertOneAsync(session, update.ConstellationSettings));
+                        updateTasks.Add(assetsCollection.InsertManyAsync(session, update.Assets));
                     }
                     if (update.StellarInfoData != null)
-                        updateTasks.Add(constellationStateCollection.BulkWriteAsync(GetStellarDataUpdate(update.StellarInfoData)));
+                    {
+                        var stellarUpdates = GetStellarDataUpdate(update.StellarInfoData);
+                        updateTasks.Add(constellationStateCollection.BulkWriteAsync(session, new WriteModel<ConstellationState>[] { stellarUpdates }));
+                    }
 
                     if (update.Accounts != null && update.Accounts.Count > 0)
-                        updateTasks.Add(accountsCollection.BulkWriteAsync(GetAccountUpdates(update.Accounts)));
+                    {
+                        var accountUpdates = GetAccountUpdates(update.Accounts.Values.ToList());
+                        if (accountUpdates.Length < 1)
+                            throw new Exception("Unable to get account updates.");
+                        updateTasks.Add(accountsCollection.BulkWriteAsync(session, accountUpdates));
+                    }
 
                     if (update.Balances != null && update.Balances.Count > 0)
-                        updateTasks.Add(balancesCollection.BulkWriteAsync(GetBalanceUpdates(update.Balances)));
+                    {
+                        var balanceUpdates = GetBalanceUpdates(update.Balances.Values.ToList());
+                        if (balanceUpdates.Length < 1)
+                            throw new Exception("Unable to get balance updates.");
+                        updateTasks.Add(balancesCollection.BulkWriteAsync(session, balanceUpdates));
+                    }
 
                     if (update.Orders != null && update.Orders.Count > 0)
-                        updateTasks.Add(ordersCollection.BulkWriteAsync(GetOrderUpdates(update.Orders)));
+                    {
+                        var orderUpdates = GetOrderUpdates(update.Orders.Values.ToList());
+                        if (orderUpdates.Length < 1)
+                            throw new Exception("Unable to get order updates.");
+                        updateTasks.Add(ordersCollection.BulkWriteAsync(session, orderUpdates));
+                    }
 
-                    updateTasks.Add(quantaCollection.InsertManyAsync(update.Quanta));
-                    updateTasks.Add(effectsCollection.InsertManyAsync(update.Effects));
+                    if (update.Quanta.Count < 1)
+                        throw new Exception("Quanta doesn't contain items.");
+                    updateTasks.Add(quantaCollection.InsertManyAsync(session, update.Quanta));
+
+                    if (update.Effects.Count < 1)
+                        throw new Exception("Effects doesn't contain items.");
+                    updateTasks.Add(effectsCollection.InsertManyAsync(session, update.Effects));
 
                     await Task.WhenAll(updateTasks);
 
@@ -336,7 +382,7 @@ namespace Centaurus.DAL.Mongo
             }
         }
 
-        private WriteModel<ConstellationState>[] GetStellarDataUpdate(DiffObject.ConstellationState constellationState)
+        private WriteModel<ConstellationState> GetStellarDataUpdate(DiffObject.ConstellationState constellationState)
         {
             var cursor = constellationState.TxCursor;
 
@@ -353,7 +399,7 @@ namespace Centaurus.DAL.Mongo
                 updateModel = new UpdateOneModel<ConstellationState>(Builders<ConstellationState>.Filter.Empty, Builders<ConstellationState>.Update.Set(s => s.TxCursor, cursor));
             }
 
-            return new WriteModel<ConstellationState>[] { updateModel };
+            return updateModel;
         }
 
         private WriteModel<AccountModel>[] GetAccountUpdates(List<DiffObject.Account> accounts)
@@ -369,13 +415,13 @@ namespace Centaurus.DAL.Mongo
                 for (int i = 0; i < accLength; i++)
                 {
                     var acc = accounts[i];
-                    var pubKey = acc.PubKey;
-                    var currentAccFilter = filter.Eq(a => a.PubKey, pubKey);
+                    var currentAccFilter = filter.Eq(a => a.Id, acc.Id);
                     if (acc.IsInserted)
                         updates[i] = new InsertOneModel<AccountModel>(new AccountModel
                         {
-                            Nonce = (long)acc.Nonce,
-                            PubKey = pubKey,
+                            Id = acc.Id,
+                            Nonce = acc.Nonce,
+                            PubKey = acc.PubKey,
                             RequestRateLimits = acc.RequestRateLimits
                         });
                     else if (acc.IsDeleted)
@@ -384,7 +430,7 @@ namespace Centaurus.DAL.Mongo
                     {
                         UpdateDefinition<AccountModel> currentUpdate = null;
                         if (acc.Nonce != 0)
-                            currentUpdate = update.Set(a => a.Nonce, (long)acc.Nonce);
+                            currentUpdate = update.Set(a => a.Nonce, acc.Nonce);
                         if (acc.RequestRateLimits != null)
                             currentUpdate = currentUpdate == null
                                 ? update.Set(a => a.RequestRateLimits, acc.RequestRateLimits)
@@ -407,20 +453,14 @@ namespace Centaurus.DAL.Mongo
             for (int i = 0; i < balancesLength; i++)
             {
                 var balance = balances[i];
-                var pubKey = balance.PubKey;
-                var asset = balance.AssetId;
-                var amount = balance.Amount;
-                var liabilities = balance.Liabilities;
-
-                var currentBalanceFilter = filter.And(filter.Eq(s => s.Account, pubKey), filter.Eq(b => b.AssetId, asset));
+                var currentBalanceFilter = filter.Eq(s => s.Id, balance.Id);
 
                 if (balance.IsInserted)
                     updates[i] = new InsertOneModel<BalanceModel>(new BalanceModel
                     {
-                        Account = pubKey,
-                        Amount = amount,
-                        AssetId = asset,
-                        Liabilities = liabilities
+                        Id = balance.Id,
+                        Amount = balance.Amount,
+                        Liabilities = balance.Liabilities
                     });
                 else if (balance.IsDeleted)
                     updates[i] = new DeleteOneModel<BalanceModel>(currentBalanceFilter);
@@ -429,8 +469,8 @@ namespace Centaurus.DAL.Mongo
                     updates[i] = new UpdateOneModel<BalanceModel>(
                         currentBalanceFilter,
                         update
-                            .Inc(b => b.Amount, amount)
-                            .Inc(b => b.Liabilities, liabilities)
+                            .Inc(b => b.Amount, balance.Amount)
+                            .Inc(b => b.Liabilities, balance.Liabilities)
                         );
                 }
             }
@@ -450,20 +490,16 @@ namespace Centaurus.DAL.Mongo
                 for (int i = 0; i < ordersLength; i++)
                 {
                     var order = orders[i];
-                    var orderId = order.OrderId;
-                    var price = order.Price;
-                    var amount = order.Amount;
-                    var pubKey = order.Pubkey;
 
-                    var currentOrderFilter = filter.And(filter.Eq(s => s.OrderId, (long)orderId));
+                    var currentOrderFilter = filter.And(filter.Eq(s => s.Id, (long)order.OrderId));
 
                     if (order.IsInserted)
                         updates[i] = new InsertOneModel<OrderModel>(new OrderModel
                         {
-                            OrderId = (long)orderId,
-                            Amount = amount,
-                            Price = price,
-                            Pubkey = pubKey
+                            Id = (long)order.OrderId,
+                            Amount = order.Amount,
+                            Price = order.Price,
+                            Account = order.Account
                         });
                     else if (order.IsDeleted)
                         updates[i] = new DeleteOneModel<OrderModel>(currentOrderFilter);
@@ -471,7 +507,7 @@ namespace Centaurus.DAL.Mongo
                     {
                         updates[i] = new UpdateOneModel<OrderModel>(
                             currentOrderFilter,
-                            update.Inc(b => b.Amount, amount)
+                            update.Inc(b => b.Amount, order.Amount)
                         );
                     }
                 }
@@ -491,6 +527,11 @@ namespace Centaurus.DAL.Mongo
             foreach (var frame in frames)
                 updates.Add(new ReplaceOneModel<PriceHistoryFrameModel>(filter.Eq(f => f.Id, frame.Id), frame) { IsUpsert = true });
             return updates;
+        }
+
+        public async Task DropDatabase()
+        {
+            await client.DropDatabaseAsync(database.DatabaseNamespace.DatabaseName);
         }
 
         #endregion

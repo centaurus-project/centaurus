@@ -9,8 +9,5 @@ namespace Centaurus.Models
     {
         [XdrField(0)]
         public ulong OrderId { get; set; }
-
-        [XdrField(1)]
-        public double Price { get; set; }
     }
 }

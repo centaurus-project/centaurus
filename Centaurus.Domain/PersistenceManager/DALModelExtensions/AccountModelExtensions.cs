@@ -13,6 +13,7 @@ namespace Centaurus.Domain
         {
             var acc = new Account
             {
+                Id = accountModel.Id,
                 Nonce = accountModel.Nonce,
                 Pubkey = new RawPubKey { Data = accountModel.PubKey }
             };
@@ -20,7 +21,7 @@ namespace Centaurus.Domain
             if (accountModel.RequestRateLimits != null)
                 acc.RequestRateLimits = new RequestRateLimits { HourLimit = accountModel.RequestRateLimits.HourLimit, MinuteLimit = accountModel.RequestRateLimits.MinuteLimit };
 
-            acc.Balances = balances.Select(b => b.ToBalance(acc)).ToList();
+            acc.Balances = balances.Select(b => b.ToBalance()).OrderBy(a => a.Asset).ToList();
             return acc;
         }
     }

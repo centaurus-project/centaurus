@@ -59,12 +59,14 @@ namespace Centaurus.Test
                 var txStream = new XdrDataOutputStream();
                 stellar_dotnet_sdk.xdr.Transaction.Encode(txStream, txV1);
 
+                var accountWrapper = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
+
                 var withdrawal = new WithdrawalRequest
                 {
-                    Account = TestEnvironment.Client1KeyPair,
+                    Account = accountWrapper.Account.Id,
                     TransactionXdr = txStream.ToArray(),
                     Nonce = DateTime.UtcNow.Ticks,
-                    AccountWrapper = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair)
+                    AccountWrapper = accountWrapper
                 };
 
                 MessageEnvelope quantum = withdrawal.CreateEnvelope();
@@ -108,7 +110,9 @@ namespace Centaurus.Test
             }.CreateEnvelope();
             if (!Global.IsAlpha)
             {
-                ledgerCommitEnv.Sign(TestEnvironment.AlphaKeyPair);
+                var msg = ((TxCommitQuantum)ledgerCommitEnv.Message);
+                msg.Timestamp = DateTime.UtcNow.Ticks;
+                ledgerCommitEnv = msg.CreateEnvelope().Sign(TestEnvironment.AlphaKeyPair);
             }
 
             await AssertQuantumHandling(ledgerCommitEnv, excpectedException);
@@ -130,15 +134,16 @@ namespace Centaurus.Test
         [TestCase(1, 1, 100, OrderSide.Buy, null)]
         public async Task OrderQuantumTest(int nonce, int asset, int amount, OrderSide side, Type excpectedException)
         {
+            var accountWrapper = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
             var order = new OrderRequest
             {
-                Account = TestEnvironment.Client1KeyPair,
+                Account = accountWrapper.Account.Id,
                 Nonce = nonce,
                 Amount = amount,
                 Asset = asset,
                 Price = 100,
                 Side = side,
-                AccountWrapper = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair)
+                AccountWrapper = accountWrapper
             };
 
             var envelope = order.CreateEnvelope();
@@ -146,7 +151,7 @@ namespace Centaurus.Test
 
             if (!Global.IsAlpha)
             {
-                var quantum = new RequestQuantum { Apex = Global.QuantumStorage.CurrentApex + 1, RequestEnvelope = envelope };
+                var quantum = new RequestQuantum { Apex = Global.QuantumStorage.CurrentApex + 1, RequestEnvelope = envelope, Timestamp = DateTime.UtcNow.Ticks };
                 envelope = quantum.CreateEnvelope();
                 envelope.Sign(TestEnvironment.AlphaKeyPair);
             }
@@ -173,9 +178,11 @@ namespace Centaurus.Test
         [TestCase(1, 100, OrderSide.Buy, 0, false, null)]
         public async Task OrderCancellationQuantumTest(int asset, int amount, OrderSide side, int apexMod, bool useFakeSigner, Type excpectedException)
         {
+            var acc = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
+
             var order = new OrderRequest
             {
-                Account = TestEnvironment.Client1KeyPair,
+                Account = acc.Account.Id,
                 Nonce = 1,
                 Amount = amount,
                 Asset = asset,
@@ -189,7 +196,7 @@ namespace Centaurus.Test
 
             if (!Global.IsAlpha)
             {
-                var quantum = new RequestQuantum { Apex = Global.QuantumStorage.CurrentApex + 1, RequestEnvelope = envelope };
+                var quantum = new RequestQuantum { Apex = Global.QuantumStorage.CurrentApex + 1, RequestEnvelope = envelope, Timestamp = DateTime.UtcNow.Ticks };
                 envelope = quantum.CreateEnvelope();
                 envelope.Sign(TestEnvironment.AlphaKeyPair);
             }
@@ -200,7 +207,7 @@ namespace Centaurus.Test
 
             var orderCancellation = new OrderCancellationRequest
             {
-                Account = TestEnvironment.Client1KeyPair,
+                Account = acc.Account.Id,
                 Nonce = 2,
                 OrderId = OrderIdConverter.Encode((ulong)apex, asset, side),
                 AccountWrapper = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair)
@@ -211,7 +218,7 @@ namespace Centaurus.Test
 
             if (!Global.IsAlpha)
             {
-                var quantum = new RequestQuantum { Apex = Global.QuantumStorage.CurrentApex + 1, RequestEnvelope = envelope };
+                var quantum = new RequestQuantum { Apex = Global.QuantumStorage.CurrentApex + 1, RequestEnvelope = envelope, Timestamp = DateTime.UtcNow.Ticks };
                 envelope = quantum.CreateEnvelope();
                 envelope.Sign(TestEnvironment.AlphaKeyPair);
             }
@@ -255,9 +262,10 @@ namespace Centaurus.Test
             var account = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
             account.HasPendingWithdrawal = hasWithdrawal;
 
+            var acc = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
             var withdrawal = new WithdrawalRequest
             {
-                Account = TestEnvironment.Client1KeyPair,
+                Account = acc.Account.Id,
                 Nonce = 1,
                 TransactionXdr = outputStream.ToArray(),
                 AccountWrapper = account
@@ -268,7 +276,7 @@ namespace Centaurus.Test
 
             if (!Global.IsAlpha)
             {
-                var quantum = new RequestQuantum { Apex = Global.QuantumStorage.CurrentApex + 1, RequestEnvelope = envelope };
+                var quantum = new RequestQuantum { Apex = Global.QuantumStorage.CurrentApex + 1, RequestEnvelope = envelope, Timestamp = DateTime.UtcNow.Ticks };
                 envelope = quantum.CreateEnvelope();
                 envelope.Sign(TestEnvironment.AlphaKeyPair);
             }
@@ -300,9 +308,10 @@ namespace Centaurus.Test
 
             var account = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
 
+            var acc = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
             var withdrawal = new WithdrawalRequest
             {
-                Account = TestEnvironment.Client1KeyPair,
+                Account = acc.Account.Id,
                 Nonce = 1,
                 TransactionXdr = outputStream.ToArray(),
                 AccountWrapper = account
@@ -313,7 +322,7 @@ namespace Centaurus.Test
 
             if (!Global.IsAlpha)
             {
-                var quantum = new RequestQuantum { Apex = Global.QuantumStorage.CurrentApex + 1, RequestEnvelope = envelope };
+                var quantum = new RequestQuantum { Apex = Global.QuantumStorage.CurrentApex + 1, RequestEnvelope = envelope, Timestamp = DateTime.UtcNow.Ticks };
                 envelope = quantum.CreateEnvelope();
                 envelope.Sign(TestEnvironment.AlphaKeyPair);
             }
@@ -333,7 +342,11 @@ namespace Centaurus.Test
 
 
             if (!Global.IsAlpha)
+            {
+                cleanup.Timestamp = DateTime.UtcNow.Ticks;
+                envelope = cleanup.CreateEnvelope();
                 envelope.Sign(TestEnvironment.AlphaKeyPair);
+            }
 
             await AssertQuantumHandling(envelope, excpectedException);
 
@@ -357,7 +370,7 @@ namespace Centaurus.Test
 
             var withdrawal = new PaymentRequest
             {
-                Account = TestEnvironment.Client1KeyPair,
+                Account = account.Account.Id,
                 Nonce = 1,
                 Asset = 0,
                 Destination = TestEnvironment.Client2KeyPair,
@@ -370,7 +383,7 @@ namespace Centaurus.Test
 
             if (!Global.IsAlpha)
             {
-                var quantum = new RequestQuantum { Apex = Global.QuantumStorage.CurrentApex + 1, RequestEnvelope = envelope };
+                var quantum = new RequestQuantum { Apex = Global.QuantumStorage.CurrentApex + 1, RequestEnvelope = envelope, Timestamp = DateTime.UtcNow.Ticks };
                 envelope = quantum.CreateEnvelope();
                 envelope.Sign(TestEnvironment.AlphaKeyPair);
             }
@@ -391,12 +404,12 @@ namespace Centaurus.Test
         public async Task AccountDataRequestTest(int nonce, Type excpectedException)
         {
             Global.AppState.State = ApplicationState.Ready;
-
+            var accountWrapper = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
             var order = new AccountDataRequest
             {
-                Account = TestEnvironment.Client1KeyPair,
+                Account = accountWrapper.Account.Id,
                 Nonce = nonce,
-                AccountWrapper = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair)
+                AccountWrapper = accountWrapper
             };
 
             var envelope = order.CreateEnvelope();
@@ -404,7 +417,7 @@ namespace Centaurus.Test
 
             if (!Global.IsAlpha)
             {
-                var quantum = new RequestQuantum { Apex = Global.QuantumStorage.CurrentApex + 1, RequestEnvelope = envelope };
+                var quantum = new RequestQuantum { Apex = Global.QuantumStorage.CurrentApex + 1, RequestEnvelope = envelope, Timestamp = DateTime.UtcNow.Ticks };
                 envelope = quantum.CreateEnvelope();
                 envelope.Sign(TestEnvironment.AlphaKeyPair);
             }
@@ -430,14 +443,14 @@ namespace Centaurus.Test
             {
                 var envelope = new AccountDataRequest
                 {
-                    Account = clientKeyPair,
+                    Account = account.Account.Id,
                     Nonce = i + 1,
-                    AccountWrapper = Global.AccountStorage.GetAccount(clientKeyPair)
+                    AccountWrapper = account
                 }.CreateEnvelope();
                 envelope.Sign(clientKeyPair);
                 if (!Global.IsAlpha)
                 {
-                    var quantum = new RequestQuantum { Apex = Global.QuantumStorage.CurrentApex + 1, RequestEnvelope = envelope };
+                    var quantum = new RequestQuantum { Apex = Global.QuantumStorage.CurrentApex + 1, RequestEnvelope = envelope, Timestamp = DateTime.UtcNow.Ticks };
                     envelope = quantum.CreateEnvelope();
                     envelope.Sign(TestEnvironment.AlphaKeyPair);
                 }
