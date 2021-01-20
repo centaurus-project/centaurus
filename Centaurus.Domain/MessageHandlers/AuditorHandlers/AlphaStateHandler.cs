@@ -27,12 +27,6 @@ namespace Centaurus.Domain
             //send apex cursor message to start receive quanta
             _ = connection.SendMessage(new SetApexCursor() { Apex = Global.QuantumStorage.CurrentApex });
 
-            //will receive Ready state after init
-            if (Global.AppState.State != ApplicationState.WaitingForInit)
-            {
-                //register new listener
-                TxListener.RegisterListener(alphaState.TxCursor);
-            }
             return Task.CompletedTask;
         }
     }

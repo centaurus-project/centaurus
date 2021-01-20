@@ -3,6 +3,7 @@ using stellar_dotnet_sdk.xdr;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Text;
 using static stellar_dotnet_sdk.xdr.OperationType;
 
@@ -26,11 +27,16 @@ namespace Centaurus.Domain
             return true;
         }
 
-        public static bool FromOperationResponse(stellar_dotnet_sdk.xdr.Operation.OperationBody operation, stellar_dotnet_sdk.KeyPair source, Models.PaymentResults pResult, byte[] transactionHash, out PaymentBase payment)
+        public static OperationTypeEnum[] SupportedDepositeOperations = new OperationTypeEnum[] { OperationTypeEnum.PAYMENT };
+
+        public static bool FromOperationResponse(Operation.OperationBody operation, stellar_dotnet_sdk.KeyPair source, PaymentResults pResult, byte[] transactionHash, out PaymentBase payment)
         {
             payment = null;
             int asset;
+            //check supported deposit operations is overkill, but we need to keep SupportedDepositOperations up to date
             bool result = false;
+            if (!SupportedDepositeOperations.Contains(operation.Discriminant.InnerValue))
+                return false;
             switch (operation.Discriminant.InnerValue)
             {
                 case OperationTypeEnum.PAYMENT:
@@ -51,12 +57,6 @@ namespace Centaurus.Domain
                         var withdrawal = Global.WithdrawalStorage.GetWithdrawal(transactionHash);
                         if (withdrawal == null)
                             throw new Exception("Unable to find withdrawal by hash.");
-                        //if (withdrawal.Asset != asset)
-                        //    throw new Exception("Assets are not equal.");
-                        //if (withdrawal.Amount != amount)
-                        //    throw new Exception("Amounts are not equal.");
-                        //if (ByteArrayPrimitives.Equals(withdrawal.Destination, destKeypair))
-                        //    throw new Exception("Destinations are not equal.");
                         payment = new Models.Withdrawal { TransactionHash = transactionHash  };
                     }
                     if (payment != null)
@@ -64,7 +64,6 @@ namespace Centaurus.Domain
                         payment.PaymentResult = pResult;
                         result = true;
                     }
-
                     break;
                 case OperationTypeEnum.PATH_PAYMENT_STRICT_SEND:
                 case OperationTypeEnum.PATH_PAYMENT_STRICT_RECEIVE:

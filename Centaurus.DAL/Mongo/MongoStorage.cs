@@ -13,11 +13,15 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Text;
 using System.Threading.Tasks;
+using NLog;
+using System.Threading;
 
 namespace Centaurus.DAL.Mongo
 {
     public class MongoStorage : IStorage
     {
+        static Logger logger = LogManager.GetCurrentClassLogger();
+
         private MongoClient client;
         private IMongoDatabase database;
         private IMongoCollection<OrderModel> ordersCollection;
@@ -318,72 +322,126 @@ namespace Centaurus.DAL.Mongo
 
         #region Updates
 
+        private SemaphoreSlim updateSyncRoot = new SemaphoreSlim(1);
+
         public async Task Update(DiffObject update)
         {
-            using (var session = await client.StartSessionAsync())
-            {
-                session.StartTransaction();
+            var stellarUpdates = GetStellarDataUpdate(update.StellarInfoData);
+            var accountUpdates = GetAccountUpdates(update.Accounts.Values.ToList());
+            var balanceUpdates = GetBalanceUpdates(update.Balances.Values.ToList());
+            var orderUpdates = GetOrderUpdates(update.Orders.Values.ToList());
 
+            await updateSyncRoot.WaitAsync();
+            try
+            {
+                var tries = 0;
+                var maxTries = 5;
+                var commitInvoked = false;
+                while (true)
+                {
+                    try
+                    {
+                        using (var session = await client.StartSessionAsync())
+                        {
+                            session.StartTransaction();
+                            try
+                            {
+                                var updateTasks = new List<Task>();
+
+                                if (stellarUpdates != null)
+                                    updateTasks.Add(constellationStateCollection.BulkWriteAsync(session, new WriteModel<ConstellationState>[] { stellarUpdates }));
+
+                                if (update.ConstellationSettings != null)
+                                    updateTasks.Add(settingsCollection.InsertOneAsync(session, update.ConstellationSettings));
+
+                                if (update.Assets != null && update.Assets.Count > 0)
+                                    updateTasks.Add(assetsCollection.InsertManyAsync(session, update.Assets));
+
+                                if (accountUpdates != null)
+                                    updateTasks.Add(accountsCollection.BulkWriteAsync(session, accountUpdates));
+
+                                if (balanceUpdates != null)
+                                    updateTasks.Add(balancesCollection.BulkWriteAsync(session, balanceUpdates));
+
+                                if (orderUpdates != null)
+                                    updateTasks.Add(ordersCollection.BulkWriteAsync(session, orderUpdates));
+
+                                updateTasks.Add(quantaCollection.InsertManyAsync(session, update.Quanta));
+
+                                updateTasks.Add(effectsCollection.InsertManyAsync(session, update.Effects));
+
+                                await Task.WhenAll(updateTasks);
+
+                                commitInvoked = true;
+                                await CommitWithRetry(session);
+
+                                break;
+                            }
+                            catch
+                            {
+                                if (!commitInvoked)
+                                {
+                                    try
+                                    {
+                                        await session.AbortTransactionAsync();
+                                    }
+                                    catch { } //MongoDB best practice ;)
+                                }
+                                throw;
+                            }
+                        }
+                    }
+                    catch (Exception exc)
+                    {
+                        tries++;
+                        if (tries <= maxTries)
+                        {
+                            logger.Warn(exc, $"Error during update. {tries} try.");
+                            continue;
+                        }
+                        new Exception($"Unable to commit transaction after {tries} tries", exc);
+                    }
+                }
+            }
+            finally
+            {
+                updateSyncRoot.Release();
+            }
+        }
+
+        static string[] retriableCommitErrors = new string[] { "UnknownTransactionCommitResult", "TransientTransactionError " };
+
+        private static async Task CommitWithRetry(IClientSessionHandle session)
+        {
+            var maxTries = 5;
+            var tries = 0;
+            while (true)
+            {
                 try
                 {
-                    var updateTasks = new List<Task>();
-                    if (update.ConstellationSettings != null)
-                    {
-                        updateTasks.Add(settingsCollection.InsertOneAsync(session, update.ConstellationSettings));
-                        updateTasks.Add(assetsCollection.InsertManyAsync(session, update.Assets));
-                    }
-                    if (update.StellarInfoData != null)
-                    {
-                        var stellarUpdates = GetStellarDataUpdate(update.StellarInfoData);
-                        updateTasks.Add(constellationStateCollection.BulkWriteAsync(session, new WriteModel<ConstellationState>[] { stellarUpdates }));
-                    }
-
-                    if (update.Accounts != null && update.Accounts.Count > 0)
-                    {
-                        var accountUpdates = GetAccountUpdates(update.Accounts.Values.ToList());
-                        if (accountUpdates.Length < 1)
-                            throw new Exception("Unable to get account updates.");
-                        updateTasks.Add(accountsCollection.BulkWriteAsync(session, accountUpdates));
-                    }
-
-                    if (update.Balances != null && update.Balances.Count > 0)
-                    {
-                        var balanceUpdates = GetBalanceUpdates(update.Balances.Values.ToList());
-                        if (balanceUpdates.Length < 1)
-                            throw new Exception("Unable to get balance updates.");
-                        updateTasks.Add(balancesCollection.BulkWriteAsync(session, balanceUpdates));
-                    }
-
-                    if (update.Orders != null && update.Orders.Count > 0)
-                    {
-                        var orderUpdates = GetOrderUpdates(update.Orders.Values.ToList());
-                        if (orderUpdates.Length < 1)
-                            throw new Exception("Unable to get order updates.");
-                        updateTasks.Add(ordersCollection.BulkWriteAsync(session, orderUpdates));
-                    }
-
-                    if (update.Quanta.Count < 1)
-                        throw new Exception("Quanta doesn't contain items.");
-                    updateTasks.Add(quantaCollection.InsertManyAsync(session, update.Quanta));
-
-                    if (update.Effects.Count < 1)
-                        throw new Exception("Effects doesn't contain items.");
-                    updateTasks.Add(effectsCollection.InsertManyAsync(session, update.Effects));
-
-                    await Task.WhenAll(updateTasks);
-
                     await session.CommitTransactionAsync();
+                    break;
                 }
-                catch
+                catch (MongoException exc)
                 {
-                    await session.AbortTransactionAsync();
-                    throw;
+                    if (!(exc is MongoException mongoException
+                            && mongoException.ErrorLabels.Any(l => retriableCommitErrors.Contains(l))))
+                        throw;
+                    tries++;
+                    if (tries < maxTries)
+                    {
+                        logger.Warn(exc, $"Error on commit. Labels: {string.Join(',', mongoException.ErrorLabels)}. {tries} try.");
+                        continue;
+                    }
+                    throw new UnknownCommitResultException($"UnknownTransactionCommitResult or TransientTransactionError errors occured in {tries} tries", exc);
                 }
             }
         }
 
         private WriteModel<ConstellationState> GetStellarDataUpdate(DiffObject.ConstellationState constellationState)
         {
+            if (constellationState == null)
+                return null;
             var cursor = constellationState.TxCursor;
 
             WriteModel<ConstellationState> updateModel = null;
@@ -404,46 +462,47 @@ namespace Centaurus.DAL.Mongo
 
         private WriteModel<AccountModel>[] GetAccountUpdates(List<DiffObject.Account> accounts)
         {
-            unchecked
+            if (accounts == null || accounts.Count < 1)
+                return null;
+            var filter = Builders<AccountModel>.Filter;
+            var update = Builders<AccountModel>.Update;
+
+            var accLength = accounts.Count;
+            var updates = new WriteModel<AccountModel>[accLength];
+
+            for (int i = 0; i < accLength; i++)
             {
-                var filter = Builders<AccountModel>.Filter;
-                var update = Builders<AccountModel>.Update;
-
-                var accLength = accounts.Count;
-                var updates = new WriteModel<AccountModel>[accLength];
-
-                for (int i = 0; i < accLength; i++)
-                {
-                    var acc = accounts[i];
-                    var currentAccFilter = filter.Eq(a => a.Id, acc.Id);
-                    if (acc.IsInserted)
-                        updates[i] = new InsertOneModel<AccountModel>(new AccountModel
-                        {
-                            Id = acc.Id,
-                            Nonce = acc.Nonce,
-                            PubKey = acc.PubKey,
-                            RequestRateLimits = acc.RequestRateLimits
-                        });
-                    else if (acc.IsDeleted)
-                        updates[i] = new DeleteOneModel<AccountModel>(currentAccFilter);
-                    else
+                var acc = accounts[i];
+                var currentAccFilter = filter.Eq(a => a.Id, acc.Id);
+                if (acc.IsInserted)
+                    updates[i] = new InsertOneModel<AccountModel>(new AccountModel
                     {
-                        UpdateDefinition<AccountModel> currentUpdate = null;
-                        if (acc.Nonce != 0)
-                            currentUpdate = update.Set(a => a.Nonce, acc.Nonce);
-                        if (acc.RequestRateLimits != null)
-                            currentUpdate = currentUpdate == null
-                                ? update.Set(a => a.RequestRateLimits, acc.RequestRateLimits)
-                                : currentUpdate.Set(a => a.RequestRateLimits, acc.RequestRateLimits);
-                        updates[i] = new UpdateOneModel<AccountModel>(currentAccFilter, currentUpdate);
-                    }
+                        Id = acc.Id,
+                        Nonce = acc.Nonce,
+                        PubKey = acc.PubKey,
+                        RequestRateLimits = acc.RequestRateLimits
+                    });
+                else if (acc.IsDeleted)
+                    updates[i] = new DeleteOneModel<AccountModel>(currentAccFilter);
+                else
+                {
+                    UpdateDefinition<AccountModel> currentUpdate = null;
+                    if (acc.Nonce != 0)
+                        currentUpdate = update.Set(a => a.Nonce, acc.Nonce);
+                    if (acc.RequestRateLimits != null)
+                        currentUpdate = currentUpdate == null
+                            ? update.Set(a => a.RequestRateLimits, acc.RequestRateLimits)
+                            : currentUpdate.Set(a => a.RequestRateLimits, acc.RequestRateLimits);
+                    updates[i] = new UpdateOneModel<AccountModel>(currentAccFilter, currentUpdate);
                 }
-                return updates;
             }
+            return updates;
         }
 
         private WriteModel<BalanceModel>[] GetBalanceUpdates(List<DiffObject.Balance> balances)
         {
+            if (balances == null || balances.Count < 1)
+                return null;
             var filter = Builders<BalanceModel>.Filter;
             var update = Builders<BalanceModel>.Update;
 
@@ -479,6 +538,8 @@ namespace Centaurus.DAL.Mongo
 
         private WriteModel<OrderModel>[] GetOrderUpdates(List<DiffObject.Order> orders)
         {
+            if (orders == null || orders.Count < 1)
+                return null;
             unchecked
             {
                 var filter = Builders<OrderModel>.Filter;

@@ -11,9 +11,9 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public class TxManager
+    public class TxCursorManager
     {
-        public TxManager(long txCursor)
+        public TxCursorManager(long txCursor)
         {
             TxCursor = txCursor;
         }

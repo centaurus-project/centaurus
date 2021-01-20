@@ -37,7 +37,7 @@ namespace Centaurus.Domain
             //refresh container to put current updates into the awaited updates
             RefreshUpdatesContainer();
 
-            if (awaitedUpdates != null && !awaitedUpdates.IsAddingCompleted)
+            if (!(awaitedUpdates == null || awaitedUpdates.IsAddingCompleted))
                 awaitedUpdates.CompleteAdding();
             if (IsRunning)
             {
@@ -110,11 +110,7 @@ namespace Centaurus.Domain
             try
             {
                 foreach (var updates in awaitedUpdates.GetConsumingEnumerable(cancellationToken))
-                {
                     await ApplyUpdates(updates);
-                    if (awaitedUpdates.IsCompleted) //adding is completed only on Failed state
-                        break;
-                }
             }
             catch (Exception exc)
             {
@@ -138,19 +134,24 @@ namespace Centaurus.Domain
 
         private void RefreshUpdatesContainer()
         {
+            var pendingUpdates = default(DiffObject);
             UpdatesSyncRoot.Wait();
             try
             {
                 if (Current.Quanta.Count > 0)
                 {
-                    var pendingUpdates = Current;
+                    pendingUpdates = Current;
                     Current = new DiffObject();
-                    awaitedUpdates?.Add(pendingUpdates);
                 }
-                if (awaitedUpdates?.Count > 10)
+                if (awaitedUpdates != null)
                 {
-                    awaitedUpdates.CompleteAdding();
-                    OnSaveFailed($"Delayed updates queue ({awaitedUpdates.Count}) is too long.");
+                    if (pendingUpdates != null)
+                        awaitedUpdates.Add(pendingUpdates);
+                    if (awaitedUpdates.Count > 10)
+                    {
+                        awaitedUpdates.CompleteAdding();
+                        OnSaveFailed($"Delayed updates queue ({awaitedUpdates.Count}) is too long.");
+                    }
                 }
             }
             finally

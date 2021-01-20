@@ -61,7 +61,7 @@ namespace Centaurus.Domain
             if (alphaAccountData == null)
                 throw new InvalidOperationException($"The vault ({Global.Settings.KeyPair.AccountId}) is not yet funded");
 
-            var ledgerId = await BuildAndConfigureVault(alphaAccountData);
+            var txCursor = await BuildAndConfigureVault(alphaAccountData);
 
             SetIdToAssets();
 
@@ -73,7 +73,8 @@ namespace Centaurus.Domain
                 MinAccountBalance = constellationInitInfo.MinAccountBalance,
                 MinAllowedLotSize = constellationInitInfo.MinAllowedLotSize,
                 PrevHash = new byte[] { },
-                RequestRateLimits = constellationInitInfo.RequestRateLimits
+                RequestRateLimits = constellationInitInfo.RequestRateLimits,
+                TxCursor = txCursor
             };
 
             var envelope = initQuantum.CreateEnvelope();
@@ -93,7 +94,7 @@ namespace Centaurus.Domain
         /// <summary>
         /// Builds and configures Centaurus vault
         /// </summary>
-        /// <returns>Ledger id</returns>
+        /// <returns>Transaction cursor</returns>
         private async Task<long> BuildAndConfigureVault(stellar_dotnet_sdk.responses.AccountResponse vaultAccount)
         {
             var majority = MajorityHelper.GetMajorityCount(constellationInitInfo.Auditors.Count());
@@ -144,7 +145,8 @@ namespace Centaurus.Domain
                 throw new Exception($"Transaction failed. Result Xdr: {result.ResultXdr}");
             }
 
-            return result.Ledger.Value;
+            var tx = await Global.StellarNetwork.Server.Transactions.Transaction(result.Hash);
+            return long.Parse(tx.PagingToken);
         }
 
         private async Task<stellar_dotnet_sdk.responses.AccountResponse> DoesAlphaAccountExist()

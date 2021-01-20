@@ -132,7 +132,7 @@ namespace Centaurus.Test
 
             var envelope = new TxNotification
             {
-                TxCursor = Global.TxManager.TxCursor + 1,
+                TxCursor = Global.TxCursorManager.TxCursor + 1,
                 Payments = new List<PaymentBase>()
             }.CreateEnvelope();
             envelope.Sign(clientKeyPair);

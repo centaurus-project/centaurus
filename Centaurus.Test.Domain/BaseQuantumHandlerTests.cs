@@ -118,7 +118,7 @@ namespace Centaurus.Test
             await AssertQuantumHandling(ledgerCommitEnv, excpectedException);
             if (excpectedException == null)
             {
-                Assert.AreEqual(Global.TxManager.TxCursor, ledgerNotification.TxCursor);
+                Assert.AreEqual(Global.TxCursorManager.TxCursor, ledgerNotification.TxCursor);
 
                 Assert.AreEqual(account1.GetBalance(asset).Liabilities, 0);
                 Assert.AreEqual(account1.GetBalance(asset).Amount, client1StartBalanceAmount - amount + depositeAmount); //acc balance + deposit - withdrawal

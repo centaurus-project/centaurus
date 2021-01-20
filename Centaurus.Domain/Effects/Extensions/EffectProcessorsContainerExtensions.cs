@@ -143,7 +143,7 @@ namespace Centaurus.Domain
             ));
         }
 
-        public static void AddCursorUpdate(this EffectProcessorsContainer effectProcessors, TxManager txManager, long newCursor, long prevCursor)
+        public static void AddCursorUpdate(this EffectProcessorsContainer effectProcessors, TxCursorManager txManager, long newCursor, long prevCursor)
         {
             effectProcessors.Add(new TxCursorUpdateEffectProcessor(
                 new TxCursorUpdateEffect
@@ -153,6 +153,22 @@ namespace Centaurus.Domain
                     PrevCursor = prevCursor
                 },
                 txManager
+            ));
+        }
+
+        public static void AddConstellationInit(this EffectProcessorsContainer effectProcessors, ConstellationInitQuantum initQuantum)
+        {
+            effectProcessors.Add(new ConstellationInitEffectProcessor(
+                new ConstellationInitEffect
+                {
+                    Apex = initQuantum.Apex,
+                    Assets = initQuantum.Assets,
+                    Auditors = initQuantum.Auditors,
+                    MinAccountBalance = initQuantum.MinAccountBalance,
+                    MinAllowedLotSize = initQuantum.MinAllowedLotSize,
+                    Vault = initQuantum.Vault,
+                    RequestRateLimits = initQuantum.RequestRateLimits
+                }
             ));
         }
     }

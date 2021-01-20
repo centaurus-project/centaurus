@@ -12,7 +12,7 @@ namespace Centaurus.Domain
             return new AlphaState
             {
                 State = Global.AppState.State,
-                TxCursor = Global.TxManager.TxCursor
+                TxCursor = Global.TxCursorManager.TxCursor
             };
         }
     }

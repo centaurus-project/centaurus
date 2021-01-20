@@ -109,7 +109,9 @@ namespace Centaurus.Domain
 
             WithdrawalStorage?.Dispose(); WithdrawalStorage = new WithdrawalStorage(snapshot.Withdrawals, (!EnvironmentHelper.IsTest && IsAlpha));
 
-            TxManager = new TxManager(snapshot.TxCursor);
+            TxCursorManager = new TxCursorManager(snapshot.TxCursor);
+
+            TxListener?.Dispose(); TxListener = IsAlpha ? (TxListenerBase)new AlphaTxListener(snapshot.TxCursor) : new AuditorTxListener(snapshot.TxCursor);
 
             if (IsAlpha)
             {
@@ -164,7 +166,8 @@ namespace Centaurus.Domain
         public static QuantumHandler QuantumHandler { get; private set; }
         public static AuditLedgerManager AuditLedgerManager { get; private set; }
         public static AuditResultManager AuditResultManager { get; private set; }
-        public static TxManager TxManager { get; private set; }
+        public static TxListenerBase TxListener { get; private set; }
+        public static TxCursorManager TxCursorManager { get; private set; }
         public static ExtensionsManager ExtensionsManager { get; private set; }
         public static StateManager AppState { get; private set; }
         public static QuantumProcessorsStorage QuantumProcessor { get; private set; }

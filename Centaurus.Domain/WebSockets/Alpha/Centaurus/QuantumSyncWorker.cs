@@ -55,7 +55,6 @@ namespace Centaurus
                             quanta = await Global.PersistenceManager.GetQuantaAboveApex(apexCursor, batchSize); //quanta are not found in the in-memory storage
 
                         quanta = quanta.OrderBy(q => ((Quantum)q.Message).Apex).ToList();
-                        logger.Info(() => $"Batch request from {apexCursor + 1}. Batch content: [{string.Join(',', quanta.Select(q => ((Quantum)q.Message).Apex.ToString()))}]");
 
                         var batchMessage = new QuantaBatch { Quanta = quanta };
                         await auditor.SendMessage(batchMessage);

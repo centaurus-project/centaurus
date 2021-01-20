@@ -18,7 +18,7 @@ namespace Centaurus.Domain
             var ledgerQuantum = (TxCommitQuantum)context.Envelope.Message;
             var ledgerNotification = (TxNotification)ledgerQuantum.Source.Message;
 
-            context.EffectProcessors.AddCursorUpdate(Global.TxManager, ledgerNotification.TxCursor, Global.TxManager.TxCursor);
+            context.EffectProcessors.AddCursorUpdate(Global.TxCursorManager, ledgerNotification.TxCursor, Global.TxCursorManager.TxCursor);
 
             for (var i = 0; i < ledgerNotification.Payments.Count; i++)
             {
@@ -54,8 +54,8 @@ namespace Centaurus.Domain
             if (!Global.IsAlpha)
                 CheckSignatures(ledgerSourceEnvelope);
 
-            if (!Global.TxManager.IsValidNewCursor(ledgerInfo.TxCursor))
-                throw new InvalidOperationException($"Cursor is invalid. Current cursor is {Global.TxManager.TxCursor} and received was {ledgerInfo.TxCursor}");
+            if (!Global.TxCursorManager.IsValidNewCursor(ledgerInfo.TxCursor))
+                throw new InvalidOperationException($"Cursor is invalid. Current cursor is {Global.TxCursorManager.TxCursor} and received was {ledgerInfo.TxCursor}");
 
             foreach (var payment in ledgerInfo.Payments)
             {

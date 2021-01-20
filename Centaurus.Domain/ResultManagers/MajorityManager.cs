@@ -18,7 +18,12 @@ namespace Centaurus.Domain
             InitCleanupTimer();
         }
 
-        public void Dispose()
+        public void Add(MessageEnvelope envelope)
+        {
+            Aggregate(envelope);
+        }
+
+        public virtual void Dispose()
         {
             cleanupTimer?.Stop();
             cleanupTimer?.Dispose();

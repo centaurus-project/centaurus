@@ -145,7 +145,7 @@ namespace Centaurus.Domain
                 {
                     var limit = 200;
                     var unhandledTxs = new List<byte[]>();
-                    var pageResult = await Global.StellarNetwork.Server.GetTransactionsRequestBuilder(Global.Constellation.Vault.ToString(), Global.TxManager.TxCursor, limit).Execute();
+                    var pageResult = await Global.StellarNetwork.Server.GetTransactionsRequestBuilder(Global.Constellation.Vault.ToString(), Global.TxCursorManager.TxCursor, limit).Execute();
                     while (pageResult.Records.Count > 0)
                     {
                         unhandledTxs.AddRange(pageResult.Records.Select(r => ByteArrayExtensions.FromHexString(r.Hash)));

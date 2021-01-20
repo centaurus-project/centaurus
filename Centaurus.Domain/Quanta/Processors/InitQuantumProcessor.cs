@@ -16,19 +16,11 @@ namespace Centaurus.Domain
         {
             var initQuantum = (ConstellationInitQuantum)context.Envelope.Message;
 
-            var effect = new ConstellationInitEffect
-            {
-                Apex = initQuantum.Apex,
-                Assets = initQuantum.Assets,
-                Auditors = initQuantum.Auditors,
-                MinAccountBalance = initQuantum.MinAccountBalance,
-                MinAllowedLotSize = initQuantum.MinAllowedLotSize,
-                Vault = initQuantum.Vault,
-                RequestRateLimits = initQuantum.RequestRateLimits
-            };
-
-            context.EffectProcessors.Add(new ConstellationInitEffectProcessor(effect));
-            var initSnapshot = PersistenceManager.GetSnapshot(effect, context.Envelope.ComputeHash());
+            context.EffectProcessors.AddConstellationInit(initQuantum);
+            var initSnapshot = PersistenceManager.GetSnapshot(
+                (ConstellationInitEffect)context.EffectProcessors.Effects[0],
+                context.Envelope.ComputeHash()
+            );
             await Global.Setup(initSnapshot);
 
             Global.AppState.State = ApplicationState.Running;
@@ -36,7 +28,6 @@ namespace Centaurus.Domain
             {
                 //send new apex cursor message to notify Alpha that the auditor was initialized
                 OutgoingMessageStorage.EnqueueMessage(new SetApexCursor { Apex = 1 });
-                TxListener.RegisterListener(initSnapshot.TxCursor);
                 Global.AppState.State = ApplicationState.Ready;
             }
 

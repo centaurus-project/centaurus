@@ -125,6 +125,7 @@ namespace Centaurus.Domain
                     Vault = constellationInitEffect.Vault,
                     RequestRateLimits = constellationInitEffect.RequestRateLimits
                 },
+                TxCursor = constellationInitEffect.TxCursor,
                 LastHash = quantumHash
             };
             return snapshot;

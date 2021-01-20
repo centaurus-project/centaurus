@@ -34,7 +34,7 @@ namespace Centaurus.Domain
                 {
                     case ConstellationInitEffect constellationInit:
                         pendingDiffObject.ConstellationSettings = GetConstellationSettings(constellationInit);
-                        pendingDiffObject.StellarInfoData = GetStellarData(0);
+                        pendingDiffObject.StellarInfoData = GetStellarData(constellationInit.TxCursor);
                         pendingDiffObject.StellarInfoData.IsInserted = true;
                         pendingDiffObject.Assets = GetAssets(constellationInit, null);
                         break;

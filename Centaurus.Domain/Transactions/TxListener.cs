@@ -11,32 +11,85 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public class TxListener
+    public abstract class TxListenerBase
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public TxListener(long txCursor)
+        public TxListenerBase(long txCursor)
         {
             _ = ListenTransactions(txCursor);
-        }
-
-        private IEventSource listener;
-
-        private async Task ListenTransactions(long cursor)
-        {
-            listener = Global.StellarNetwork.Server.GetTransactionsRequestBuilder(Global.Constellation.Vault.ToString(), cursor)
-                .Stream((_, tx) => awaitedTransactions.Add(tx));
-
             _ = Task.Factory.StartNew(() =>
             {
                 foreach (var tx in awaitedTransactions.GetConsumingEnumerable())
                     ProcessTransactionTx(tx);
             }, TaskCreationOptions.LongRunning);
-
-            await listener.Connect();
         }
 
-        private BlockingCollection<TransactionResponse> awaitedTransactions = new BlockingCollection<TransactionResponse>();
+        protected abstract void ProcessTransactionTx(TransactionResponse tx);
+
+        protected async Task ListenTransactions(long cursor)
+        {
+            var failedDates = new List<DateTime>();
+            while (true)
+            {
+                try
+                {
+                    listener = Global.StellarNetwork.Server.GetTransactionsRequestBuilder(Global.Constellation.Vault.ToString(), cursor)
+                        .Stream((_, tx) =>
+                        {
+                            awaitedTransactions.Add(tx);
+                        });
+
+                    await listener.Connect();
+                }
+                catch (Exception exc)
+                {
+                    listener.Shutdown();
+                    listener.Dispose();
+                    //clear if last fail was long ago
+                    if (failedDates.Count > 0 && DateTime.UtcNow - failedDates.LastOrDefault() > new TimeSpan(0, 10, 0))
+                        failedDates.Clear();
+                    failedDates.Add(DateTime.UtcNow);
+                    if (failedDates.Count > 5)
+                    {
+                        var e = exc;
+                        if (exc is AggregateException)
+                            e = exc.GetBaseException();
+                        logger.Error(e, "Failed to start transaction listener.");
+
+                        Global.AppState.State = ApplicationState.Failed;
+                        throw;
+                    }
+                    //TODO: discuss if we should wait
+                    await Task.Delay(new TimeSpan(0, 1, 0));
+                    //continue from last known cursor
+                    cursor = Global.TxCursorManager.TxCursor;
+                }
+            }
+        }
+
+        protected IEventSource listener;
+
+        protected BlockingCollection<TransactionResponse> awaitedTransactions = new BlockingCollection<TransactionResponse>();
+
+        public void Dispose()
+        {
+            listener?.Shutdown();
+            listener?.Dispose();
+            listener = null;
+            awaitedTransactions?.Dispose();
+            awaitedTransactions = null;
+        }
+    }
+
+    public class AuditorTxListener : TxListenerBase
+    {
+        static Logger logger = LogManager.GetCurrentClassLogger();
+
+        public AuditorTxListener(long cursor)
+            :base(cursor)
+        {
+        }
 
         private List<PaymentBase> AddVaultPayments(Transaction transaction, bool isSuccess)
         {
@@ -55,7 +108,7 @@ namespace Centaurus.Domain
             return ledgerPayments;
         }
 
-        private void ProcessTransactionTx(TransactionResponse tx)
+        protected override void ProcessTransactionTx(TransactionResponse tx)
         {
             try
             {
@@ -84,7 +137,7 @@ namespace Centaurus.Domain
                 var e = exc;
                 if (exc is AggregateException)
                     e = exc.GetBaseException();
-                logger.Error(e, "Ledger listener failed.");
+                logger.Error(e, "Transaction listener failed.");
 
                 //if worker is broken, the auditor should quit consensus
                 Global.AppState.State = ApplicationState.Failed;
@@ -94,26 +147,73 @@ namespace Centaurus.Domain
                 throw;
             }
         }
+    }
 
-        public void Dispose()
+    public class AlphaTxListener : TxListenerBase
+    {
+        static Logger logger = LogManager.GetCurrentClassLogger();
+
+        public AlphaTxListener(long cursor)
+            : base(cursor)
         {
-            listener?.Shutdown();
-            listener?.Dispose();
-            listener = null;
-            awaitedTransactions?.Dispose();
-            awaitedTransactions = null;
         }
 
-        static object syncRoot = new { };
+        private Queue<long> pendingTxCursors = new Queue<long>();
 
-        static TxListener currentListener;
-
-        public static void RegisterListener(long cursor)
+        private void RegisterNewCursor(long cursor)
         {
-            lock (syncRoot)
+            lock (pendingTxCursors)
+                pendingTxCursors.Enqueue(cursor);
+            OnNewCursor.Invoke();
+        }
+
+        public long PeekCursor()
+        { 
+            lock (pendingTxCursors)
             {
-                currentListener?.Dispose();
-                currentListener = new TxListener(cursor);
+                pendingTxCursors.TryPeek(out var cursor);
+                return cursor;
+            }
+        }
+
+        public void DequeueCursor()
+        {
+            lock (pendingTxCursors)
+            {
+                if (!pendingTxCursors.TryDequeue(out var cursor))
+                    throw new Exception("Unable to dequeue cursor.");
+            }
+        }
+
+        public event Action OnNewCursor;
+
+        protected override void ProcessTransactionTx(TransactionResponse tx)
+        {
+            try
+            {
+                if (Global.AppState.State == ApplicationState.Failed)
+                {
+                    listener.Shutdown();
+                    return;
+                }
+                var transaction = Transaction.FromEnvelopeXdr(tx.EnvelopeXdr);
+                if (!transaction.Operations.Any(o => PaymentsHelper.SupportedDepositeOperations.Contains(o.ToOperationBody().Discriminant.InnerValue)))
+                    return;
+                RegisterNewCursor(long.Parse(tx.PagingToken));
+            }
+            catch (Exception exc)
+            {
+                var e = exc;
+                if (exc is AggregateException)
+                    e = exc.GetBaseException();
+                logger.Error(e, "Transaction listener failed.");
+
+                //if worker is broken, the auditor should quit consensus
+                Global.AppState.State = ApplicationState.Failed;
+
+                listener?.Shutdown();
+
+                throw;
             }
         }
     }

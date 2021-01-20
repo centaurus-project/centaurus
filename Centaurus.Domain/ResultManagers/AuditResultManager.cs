@@ -10,11 +10,6 @@ namespace Centaurus.Domain
 {
     public class AuditResultManager : MajorityManager
     {
-        public void Add(MessageEnvelope envelope)
-        {
-            Aggregate(envelope);
-        }
-
         protected override void OnResult(MajorityResults majorityResult, MessageEnvelope confirmation)
         {
             base.OnResult(majorityResult, confirmation);
