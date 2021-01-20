@@ -34,7 +34,7 @@ namespace Centaurus.Domain
 
             context.EffectProcessors.AddOrderRemoved(context.Orderbook, context.Order);
 
-            var resultMessage = context.Envelope.CreateResult(ResultStatusCodes.Success, context.EffectProcessors.GetEffects().ToList());
+            var resultMessage = context.Envelope.CreateResult(ResultStatusCodes.Success, context.EffectProcessors.Effects);
             return Task.FromResult(resultMessage);
         }
 
@@ -55,10 +55,10 @@ namespace Centaurus.Domain
             context.Order = context.Orderbook.GetOrder(orderRequest.OrderId);
 
             if (context.Order is null)
-                throw new BadRequestException("Order is not found.");
+                throw new BadRequestException($"Order {orderRequest.OrderId} is not found.{(quantum.Apex != default ? $" Apex {quantum.Apex}": "")}");
 
-            //check that lot size is greater than minimum allowed lot
-            if (!ByteArrayPrimitives.Equals(context.Order.Account.Pubkey, orderRequest.Account)) 
+            //TODO: check that lot size is greater than minimum allowed lot
+            if (context.Order.Account.Id != orderRequest.Account) 
                 throw new ForbiddenException();
 
             return Task.CompletedTask;

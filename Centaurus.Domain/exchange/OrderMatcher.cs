@@ -9,7 +9,7 @@ namespace Centaurus.Domain
         {
             resultEffects = effectsContainer;
 
-            takerOrder = new Order()
+            takerOrder = new Order
             {
                 OrderId = OrderIdConverter.FromRequest(orderRequest, effectsContainer.Apex),
                 Account = orderRequest.AccountWrapper.Account,
@@ -52,15 +52,19 @@ namespace Centaurus.Domain
         public ExchangeUpdate Match()
         {
             var counterOrder = orderbook.Head;
+            var nextOrder = default(Order);
 
             var updates = new ExchangeUpdate(asset, new DateTime(resultEffects.Quantum.Timestamp, DateTimeKind.Utc));
 
             //orders in the orderbook are already sorted by price and age, so we can iterate through them in natural order
             while (counterOrder != null)
             {
+                //we need get next order here, otherwise Next will be null after the counter order removed
+                nextOrder = counterOrder?.Next;
                 //check that counter order price matches our order
-                if (side == OrderSide.Sell && counterOrder.Price < takerOrder.Price) break;
-                if (side == OrderSide.Buy && counterOrder.Price > takerOrder.Price) break;
+                if (side == OrderSide.Sell && counterOrder.Price < takerOrder.Price
+                    || side == OrderSide.Buy && counterOrder.Price > takerOrder.Price) 
+                    break;
 
                 var match = new OrderMatch(this, counterOrder);
                 var matchUpdates = match.ProcessOrderMatch();
@@ -69,10 +73,8 @@ namespace Centaurus.Domain
 
                 //stop if incoming order has been executed in full
                 if (takerOrder.Amount == 0)
-                {
                     break;
-                }
-                counterOrder = counterOrder.Next;
+                counterOrder = nextOrder;
             }
 
             if (timeInForce == TimeInForce.GoodTillExpire)
@@ -101,7 +103,7 @@ namespace Centaurus.Domain
             //select the market to add new order
             var reminderOrderbook = market.GetOrderbook(side);
             //record maker trade effect
-            resultEffects.AddOrderPlaced(reminderOrderbook, takerOrder, takerOrder.Amount, asset, side);
+            resultEffects.AddOrderPlaced(reminderOrderbook, takerOrder);
             return true;
         }
 
@@ -174,7 +176,12 @@ namespace Centaurus.Domain
                     counterOrder.State = OrderState.Deleted;
                 }
                 else
+                {
                     counterOrder.State = OrderState.Updated;
+                    //TODO: add diff field for this purpose
+                    //it's not amount but difference with existing amount 
+                    counterOrder.Amount = trade.Amount; 
+                }
 
                 return (trade, counterOrder);
             }
@@ -184,21 +191,13 @@ namespace Centaurus.Domain
                 //record maker trade effect
                 matcher.resultEffects.AddTrade(
                          makerOrder,
-                         matcher.asset,
-                         AssetAmount,
-                         xlmAmount,
-                         makerOrder.Price,
-                         matcher.side.Inverse() //opposite the matched order
+                         AssetAmount
                      );
 
                 //record taker trade effect
                 matcher.resultEffects.AddTrade(
                          matcher.takerOrder,
-                         matcher.asset,
-                         AssetAmount,
-                         xlmAmount,
-                         makerOrder.Price,
-                         matcher.side
+                         AssetAmount
                      );
 
                 return new Trade

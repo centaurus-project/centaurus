@@ -24,10 +24,5 @@ namespace Centaurus.Models
         /// </summary>
         [XdrField(2)]
         public long Timestamp { get; set; }
-
-        /// <summary>
-        /// If this property is set to false, then sync worker (thread that sends quantum to auditors) shouldn't send it yet
-        /// </summary>
-        public bool IsProcessed { get; set; } = true;
     }
 }

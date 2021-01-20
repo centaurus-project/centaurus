@@ -30,30 +30,27 @@ namespace Centaurus.Domain
 
         object IQuantumRequestProcessor.GetContext(EffectProcessorsContainer container) => GetContext(container);
 
-        public Dictionary<RawPubKey, Message> GetNotificationMessages(T context)
+        public Dictionary<int, Message> GetNotificationMessages(T context)
         {
-            RawPubKey requestAccount;
+            var requestAccount = 0;
             if (context.Envelope.Message is RequestQuantum request)
                 requestAccount = request.RequestMessage.Account;
-            else
-                requestAccount = new RawPubKey { Data = new byte[32] };
 
-            var result = new Dictionary<byte[], EffectsNotification>(ByteArrayComparer.Default);
-            var effects = context.EffectProcessors.GetEffects();
+            var result = new Dictionary<int, EffectsNotification>();
+            var effects = context.EffectProcessors.Effects;
             foreach (var effect in effects)
             {
-                if (effect.Pubkey == null 
-                    || effect.Pubkey.Equals(requestAccount) 
-                    || Global.Constellation.Auditors.Any(a => a.Equals(effect.Pubkey)))
+                if (effect.Account == default
+                    || effect.Account == requestAccount)
                     continue;
-                if (!result.ContainsKey(effect.Pubkey.Data))
-                    result[effect.Pubkey] = new EffectsNotification { Effects = new List<Effect>() };
-                result[effect.Pubkey].Effects.Add(effect);
+                if (!result.ContainsKey(effect.Account))
+                    result[effect.Account] = new EffectsNotification { Effects = new List<Effect>() };
+                result[effect.Account].Effects.Add(effect);
             }
-            return result.ToDictionary(k => (RawPubKey)k.Key, v => (Message)v.Value);
+            return result.ToDictionary(k => k.Key, v => (Message)v.Value);
         }
 
-        public Dictionary<RawPubKey, Message> GetNotificationMessages(object context)
+        public Dictionary<int, Message> GetNotificationMessages(object context)
         {
             return GetNotificationMessages((T)context);
         }

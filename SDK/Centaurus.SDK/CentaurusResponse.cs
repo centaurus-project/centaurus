@@ -9,12 +9,24 @@ using System.Threading.Tasks;
 
 namespace Centaurus.SDK
 {
-    public class CentaurusResponse
+    public abstract class CentaurusResponseBase
     {
-        public CentaurusResponse(ConstellationInfo constellationInfo, int requestTimeout)
+        public abstract Task<MessageEnvelope> ResponseTask { get; }
+
+        public bool IsCompleted => ResponseTask.IsCompleted;
+    }
+
+    public class VoidResponse : CentaurusResponseBase
+    {
+        public override Task<MessageEnvelope> ResponseTask => Task.FromResult(default(MessageEnvelope));
+    }
+
+    public class CentaurusResponse: CentaurusResponseBase
+    {
+        public CentaurusResponse(RawPubKey alphaPubKey, RawPubKey[] auditors, int requestTimeout)
         {
-            AlphaPubkey = new RawPubKey(constellationInfo.Vault);
-            Auditors = constellationInfo.Auditors.Select(a => new RawPubKey(a)).ToArray();
+            AlphaPubkey = alphaPubKey;
+            Auditors = auditors;
             _ = StartRequestTimer(requestTimeout);
         }
 
@@ -39,11 +51,9 @@ namespace Centaurus.SDK
                 SetException(new RequestException(envelope, resultMessage.Status.ToString()));
         }
 
-        public Task<MessageEnvelope> AcknowledgmentSource => acknowledgmentSource.Task;
+        public Task<MessageEnvelope> AcknowledgmentTask => acknowledgmentSource.Task;
 
-        public virtual Task<MessageEnvelope> ResponseTask => AcknowledgmentSource;
-
-        public bool IsCompleted => ResponseTask.IsCompleted;
+        public override Task<MessageEnvelope> ResponseTask => AcknowledgmentTask;
 
         public virtual void AssignResponse(MessageEnvelope envelope)
         {
@@ -55,13 +65,16 @@ namespace Centaurus.SDK
 
         public virtual void SetException(Exception exc)
         {
+            if (IsCompleted)
+                return;
             acknowledgmentSource.TrySetException(exc);
         }
     }
+
     public class CentaurusQuantumResponse : CentaurusResponse
     {
-        public CentaurusQuantumResponse(ConstellationInfo constellationInfo, int requestTimeout)
-            : base(constellationInfo, requestTimeout)
+        public CentaurusQuantumResponse(RawPubKey alphaPubKey, RawPubKey[] auditors, int requestTimeout)
+            : base(alphaPubKey, auditors, requestTimeout)
         {
         }
 
@@ -97,6 +110,8 @@ namespace Centaurus.SDK
 
         public override void SetException(Exception exc)
         {
+            if (IsCompleted)
+                return;
             acknowledgmentSource.TrySetException(exc);
             finalizeSource.TrySetException(exc);
         }

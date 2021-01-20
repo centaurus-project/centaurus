@@ -18,7 +18,8 @@ namespace Centaurus
             var layout = "${longdate} " +
                 "| ${uppercase:${level}} " +
                 "| ${message} " +
-                "${exception:format=Message,Stacktrace:innerFormat=Message,Stacktrace:separator=\n}";
+                "${when:when=length('${exception}')>0:Inner=\n}" +
+                "${exception:format=toString}";
 
             var logfile = new FileTarget("logfile")
             {
@@ -37,8 +38,8 @@ namespace Centaurus
             }
             else if (silent)
             {
-                config.AddRule(LogLevel.Error, LogLevel.Fatal, logconsole);
-                config.AddRule(LogLevel.Error, LogLevel.Fatal, logfile);
+                config.AddRule(LogLevel.Warn, LogLevel.Fatal, logconsole);
+                config.AddRule(LogLevel.Warn, LogLevel.Fatal, logfile);
             }
             else
             {

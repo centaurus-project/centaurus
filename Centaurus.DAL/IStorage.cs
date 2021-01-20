@@ -59,7 +59,7 @@ namespace Centaurus.DAL
         /// <param name="isDesc">Is reverse ordering.</param>
         /// <param name="limit">Item per request.</param>
         /// <returns></returns>
-        public Task<List<EffectModel>> LoadEffects(byte[] cursor, bool isDesc, int limit, byte[] account);
+        public Task<List<EffectModel>> LoadEffects(byte[] cursor, bool isDesc, int limit, int account);
 
         public Task<List<AccountModel>> LoadAccounts();
 
@@ -81,10 +81,13 @@ namespace Centaurus.DAL
 
         public Task<List<QuantumModel>> LoadWithdrawals();
 
+        //returns sorted by id orders
         public Task<List<OrderModel>> LoadOrders();
 
         public Task<ConstellationState> LoadConstellationState();
 
         public Task Update(DiffObject update);
+
+        public Task DropDatabase();
     }
 }

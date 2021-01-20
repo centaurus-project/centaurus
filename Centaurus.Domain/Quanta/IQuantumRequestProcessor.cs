@@ -34,7 +34,7 @@ namespace Centaurus.Domain
         /// </summary>
         /// <param name="context"></param>
         /// <returns></returns>
-        public Dictionary<RawPubKey, Message> GetNotificationMessages(T context);
+        public Dictionary<int, Message> GetNotificationMessages(T context);
     }
 
     public interface IQuantumRequestProcessor
@@ -64,6 +64,6 @@ namespace Centaurus.Domain
         /// </summary>
         /// <param name="context"></param>
         /// <returns></returns>
-        public Dictionary<RawPubKey, Message> GetNotificationMessages(object context);
+        public Dictionary<int, Message> GetNotificationMessages(object context);
     }
 }

@@ -7,15 +7,18 @@ namespace Centaurus.Models
     public class Account
     {
         [XdrField(0)]
-        public RawPubKey Pubkey { get; set; }
+        public int Id { get; set; }
 
         [XdrField(1)]
-        public long Nonce { get; set; }
+        public RawPubKey Pubkey { get; set; }
 
         [XdrField(2)]
+        public long Nonce { get; set; }
+
+        [XdrField(3)]
         public List<Balance> Balances { get; set; }
 
-        [XdrField(3, Optional = true)]
+        [XdrField(4, Optional = true)]
         public RequestRateLimits RequestRateLimits { get; set; }
     }
 }

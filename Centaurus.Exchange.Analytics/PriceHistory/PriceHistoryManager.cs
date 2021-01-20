@@ -10,6 +10,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Diagnostics;
 
 namespace Centaurus.Exchange.Analytics
 {
@@ -75,7 +76,8 @@ namespace Centaurus.Exchange.Analytics
             foreach (var manager in managers.Values)
             {
                 var trimmedDate = currentDate.Trim(manager.Period);
-                while (manager.LastAddedFrame is null || manager.LastAddedFrame.IsExpired(trimmedDate))
+                while (manager.LastAddedFrame is null 
+                    || manager.LastAddedFrame.IsExpired(trimmedDate))
                 {
                     var nextFrameStartDate = manager.LastAddedFrame?.StartTime.GetNextFrameDate(manager.Period) ?? trimmedDate;
                     var closePrice = manager.LastAddedFrame?.Close ?? 0;

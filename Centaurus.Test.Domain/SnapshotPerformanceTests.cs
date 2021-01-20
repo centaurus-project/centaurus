@@ -24,13 +24,14 @@ namespace Centaurus.Test
             { 
                 CWD = "AppData"
             };
-            Global.Init(settings, new MongoStorage());
+            Global.Setup(settings, new MongoStorage()).Wait();
         }
 
         [TearDown]
         public void TearDown()
         {
             Global.Exchange.Clear();
+            Global.TearDown().Wait();
             //AccountStorage.Clear();
         }
 

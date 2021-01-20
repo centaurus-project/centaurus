@@ -7,9 +7,9 @@ namespace Centaurus.Domain
 {
     public class TxCursorUpdateEffectProcessor : EffectProcessor<TxCursorUpdateEffect>
     {
-        private TxManager txManager;
+        private TxCursorManager txManager;
 
-        public TxCursorUpdateEffectProcessor(TxCursorUpdateEffect effect, TxManager txManager)
+        public TxCursorUpdateEffectProcessor(TxCursorUpdateEffect effect, TxCursorManager txManager)
             : base(effect)
         {
             this.txManager = txManager;

@@ -1,7 +1,9 @@
 ﻿using Centaurus.DAL;
 using Centaurus.DAL.Models;
+using Centaurus.DAL.Mongo;
 using Centaurus.Models;
 using Centaurus.Xdr;
+using MongoDB.Bson;
 using MongoDB.Driver;
 using System;
 using System.Collections.Generic;
@@ -13,264 +15,133 @@ namespace Centaurus.Domain
 {
     public static class UpdatesAggregator
     {
-        /// <summary>
-        /// Builds update with all changes based ob effects
-        /// </summary>
-        /// <param name="update"></param>
-        /// <returns></returns>
-        public static async Task<DiffObject> Aggregate(List<PendingUpdates.PendingUpdatesItem> update)
+        public static void Aggregate(this DiffObject pendingDiffObject, MessageEnvelope quantumEnvelope, Effect quatumEffect, int effectIndex)
         {
-            if (update == null)
-                throw new ArgumentNullException(nameof(update));
+            if (pendingDiffObject == null)
+                throw new ArgumentNullException(nameof(pendingDiffObject));
 
-            SettingsModel constellationSettings = null;
+            if (quantumEnvelope == null)
+                throw new ArgumentNullException(nameof(quantumEnvelope));
 
-            DiffObject.ConstellationState stellarData = null;
+            if (quatumEffect == null)
+                throw new ArgumentNullException(nameof(quatumEffect));
 
-            var accounts = new Dictionary<byte[], DiffObject.Account>(ByteArrayComparer.Default);
-            var balances = new Dictionary<byte[], Dictionary<int, DiffObject.Balance>>(ByteArrayComparer.Default);
+            var quantum = (Quantum)quantumEnvelope.Message;
 
-            var orders = new Dictionary<ulong, DiffObject.Order>();
+                pendingDiffObject.Effects.Add(quatumEffect.FromEffect(effectIndex, quantum.Timestamp));
 
-            var assets = new List<AssetModel>();
-
-            var updateLength = update.Count;
-            var quanta = new List<QuantumModel>();
-            var effects = new List<EffectModel>();
-
-            for (int i = 0; i < updateLength; i++)
-            {
-                var currentUpdateItem = update[i];
-
-                quanta.Add(QuantumModelExtensions.FromQuantum(currentUpdateItem.Quantum));
-                var quantumMessage = (Quantum)currentUpdateItem.Quantum.Message;
-
-                var quatumEffects = currentUpdateItem.Effects;
-                var quatumEffectsLength = quatumEffects.Length;
-                for (var c = 0; c < quatumEffectsLength; c++)
+                switch (quatumEffect)
                 {
-                    var effect = quatumEffects[c];
-
-                    effects.Add(effect.FromEffect(c, quantumMessage.Timestamp));
-
-                    switch (effect)
-                    {
-                        case ConstellationInitEffect constellationInit:
-                            constellationSettings = GetConstellationSettings(constellationInit);
-                            stellarData = GetStellarData(0);
-                            stellarData.IsInserted = true;
-                            assets = GetAssets(constellationInit, null);
-                            break;
-                        case ConstellationUpdateEffect constellationUpdate:
-                            constellationSettings = GetConstellationSettings(constellationUpdate);
-                            assets = GetAssets(constellationUpdate, (await Global.PermanentStorage.LoadAssets(long.MaxValue)));
-                            break;
-                        case AccountCreateEffect accountCreateEffect:
+                    case ConstellationInitEffect constellationInit:
+                        pendingDiffObject.ConstellationSettings = GetConstellationSettings(constellationInit);
+                        pendingDiffObject.StellarInfoData = GetStellarData(constellationInit.TxCursor);
+                        pendingDiffObject.StellarInfoData.IsInserted = true;
+                        pendingDiffObject.Assets = GetAssets(constellationInit, null);
+                        break;
+                    case ConstellationUpdateEffect constellationUpdate:
+                        throw new NotImplementedException();
+                        pendingDiffObject.ConstellationSettings = GetConstellationSettings(constellationUpdate);
+                        pendingDiffObject.Assets = GetAssets(constellationUpdate, Global.PermanentStorage.LoadAssets(long.MaxValue).Result);
+                        break;
+                    case AccountCreateEffect accountCreateEffect:
+                        {
+                            var pubKey = accountCreateEffect.Pubkey;
+                            var accId = accountCreateEffect.Account;
+                            pendingDiffObject.Accounts.Add(accId, new DiffObject.Account { PubKey = pubKey, Id = accId, IsInserted = true });
+                        }
+                        break;
+                    case NonceUpdateEffect nonceUpdateEffect:
+                        {
+                            var accId = nonceUpdateEffect.Account;
+                            EnsureAccountRecordExists(pendingDiffObject.Accounts, accId);
+                            pendingDiffObject.Accounts[accId].Nonce = nonceUpdateEffect.Nonce;
+                        }
+                        break;
+                    case BalanceCreateEffect balanceCreateEffect:
+                        {
+                            var accId = balanceCreateEffect.Account;
+                            var balanceId = BalanceModelIdConverter.EncodeId(accId, balanceCreateEffect.Asset);
+                            EnsureBalanceRecordExists(pendingDiffObject.Balances, balanceId);
+                            pendingDiffObject.Balances[balanceId].IsInserted = true;
+                        }
+                        break;
+                    case BalanceUpdateEffect balanceUpdateEffect:
+                        {
+                            var accId = balanceUpdateEffect.Account;
+                            var balanceId = BalanceModelIdConverter.EncodeId(accId, balanceUpdateEffect.Asset);
+                            EnsureBalanceRecordExists(pendingDiffObject.Balances, balanceId);
+                            pendingDiffObject.Balances[balanceId].Amount += balanceUpdateEffect.Amount;
+                        }
+                        break;
+                    case UpdateLiabilitiesEffect lockLiabilitiesEffect:
+                        {
+                            var accId = lockLiabilitiesEffect.Account;
+                            var balanceId = BalanceModelIdConverter.EncodeId(accId, lockLiabilitiesEffect.Asset);
+                            EnsureBalanceRecordExists(pendingDiffObject.Balances, balanceId);
+                            pendingDiffObject.Balances[balanceId].Liabilities += lockLiabilitiesEffect.Amount;
+                        }
+                        break;
+                    case RequestRateLimitUpdateEffect requestRateLimitUpdateEffect:
+                        {
+                            var accId = requestRateLimitUpdateEffect.Account;
+                            EnsureAccountRecordExists(pendingDiffObject.Accounts, accId);
+                            pendingDiffObject.Accounts[accId].RequestRateLimits = new RequestRateLimitsModel
                             {
-                                var pubKey = accountCreateEffect.Pubkey.Data;
-                                accounts.Add(pubKey, new DiffObject.Account { PubKey = pubKey, IsInserted = true });
-                            }
-                            break;
-                        case NonceUpdateEffect nonceUpdateEffect:
+                                HourLimit = requestRateLimitUpdateEffect.RequestRateLimits.HourLimit,
+                                MinuteLimit = requestRateLimitUpdateEffect.RequestRateLimits.MinuteLimit
+                            };
+                        }
+                        break;
+                    case OrderPlacedEffect orderPlacedEffect:
+                        {
+                            var orderId = orderPlacedEffect.OrderId;
+                            pendingDiffObject.Orders[orderId] = new DiffObject.Order
                             {
-                                var pubKey = nonceUpdateEffect.Pubkey.Data;
-                                EnsureAccountRecordExists(accounts, pubKey);
-                                accounts[pubKey].Nonce = nonceUpdateEffect.Nonce;
-                            }
-                            break;
-                        case BalanceCreateEffect balanceCreateEffect:
-                            {
-                                var pubKey = balanceCreateEffect.Pubkey.Data;
-                                var asset = balanceCreateEffect.Asset;
-                                EnsureBalanceRowExists(balances, pubKey);
-                                balances[pubKey].Add(asset, new DiffObject.Balance { IsInserted = true, AssetId = asset, PubKey = pubKey });
-                            }
-                            break;
-                        case BalanceUpdateEffect balanceUpdateEffect:
-                            {
-                                var pubKey = balanceUpdateEffect.Pubkey.Data;
-                                var asset = balanceUpdateEffect.Asset;
-                                EnsureBalanceExists(balances, pubKey, asset);
-                                balances[pubKey][asset].Amount += balanceUpdateEffect.Amount;
-                            }
-                            break;
-                        case UpdateLiabilitiesEffect lockLiabilitiesEffect:
-                            {
-                                var pubKey = lockLiabilitiesEffect.Pubkey.Data;
-                                var asset = lockLiabilitiesEffect.Asset;
-                                EnsureBalanceExists(balances, pubKey, asset);
-                                balances[pubKey][asset].Liabilities += lockLiabilitiesEffect.Amount;
-                            }
-                            break;
-                        case RequestRateLimitUpdateEffect requestRateLimitUpdateEffect:
-                            {
-                                var pubKey = requestRateLimitUpdateEffect.Pubkey.Data;
-                                EnsureAccountRecordExists(accounts, pubKey);
-                                accounts[pubKey].RequestRateLimits = new RequestRateLimitsModel
+                                Amount = orderPlacedEffect.Amount,
+                                IsInserted = true,
+                                OrderId = orderId,
+                                Price = orderPlacedEffect.Price,
+                                Account = orderPlacedEffect.Account
+                            };
+                        }
+                        break;
+                    case OrderRemovedEffect orderRemovedEffect:
+                        {
+                            var orderId = orderRemovedEffect.OrderId;
+                            if (!pendingDiffObject.Orders.ContainsKey(orderId))
+                                pendingDiffObject.Orders.Add(orderId, new DiffObject.Order
                                 {
-                                    HourLimit = requestRateLimitUpdateEffect.RequestRateLimits.HourLimit,
-                                    MinuteLimit = requestRateLimitUpdateEffect.RequestRateLimits.MinuteLimit
-                                };
-                            }
-                            break;
-                        case OrderPlacedEffect orderPlacedEffect:
-                            {
-                                var orderId = orderPlacedEffect.OrderId;
-                                orders[orderId] = new DiffObject.Order
-                                {
-                                    Amount = orderPlacedEffect.Amount,
-                                    IsInserted = true,
-                                    OrderId = orderId,
-                                    Price = orderPlacedEffect.Price,
-                                    Pubkey = orderPlacedEffect.Pubkey.Data
-                                };
-                            }
-                            break;
-                        case OrderRemovedEffect orderRemovedEffect:
-                            {
-                                var orderId = orderRemovedEffect.OrderId;
-                                if (!orders.ContainsKey(orderId))
-                                    orders.Add(orderId, new DiffObject.Order
-                                    {
-                                        OrderId = orderId
-                                    });
-                                orders[orderId].IsDeleted = true;
-                            }
-                            break;
-                        case TradeEffect tradeEffect:
-                            {
-                                var orderId = tradeEffect.OrderId;
-                                if (!orders.ContainsKey(orderId))
-                                    orders.Add(orderId, new DiffObject.Order { OrderId = orderId });
-                                orders[orderId].Amount -= tradeEffect.AssetAmount;
-                            }
-                            break;
-                        case TxCursorUpdateEffect cursorUpdateEffect:
-                            stellarData = GetStellarData(cursorUpdateEffect.Cursor);
-                            break;
-                        default:
-                            break;
-                    }
+                                    OrderId = orderId
+                                });
+                            pendingDiffObject.Orders[orderId].IsDeleted = true;
+                        }
+                        break;
+                    case TradeEffect tradeEffect:
+                        {
+                            var orderId = tradeEffect.OrderId;
+                            if (!pendingDiffObject.Orders.ContainsKey(orderId))
+                                pendingDiffObject.Orders.Add(orderId, new DiffObject.Order { OrderId = orderId });
+                            pendingDiffObject.Orders[orderId].Amount += -(tradeEffect.AssetAmount);
+                        }
+                        break;
+                    case TxCursorUpdateEffect cursorUpdateEffect:
+                        pendingDiffObject.StellarInfoData = GetStellarData(cursorUpdateEffect.Cursor);
+                        break;
+                    default:
+                        break;
                 }
-                //TODO: find more elegant way to handle this scenario
-                //we mustn't save orders that were closed immediately without adding to order-book
-                if (quantumMessage is RequestQuantum request
-                    && request.RequestMessage is OrderRequest orderRequest
-                    && !quatumEffects.Any(e => e.EffectType == EffectTypes.OrderPlaced))
-                {
-                    orders.Remove(OrderIdConverter.FromRequest(orderRequest, quantumMessage.Apex));
-                }
-            }
-
-            return new DiffObject
-            {
-                Accounts = accounts.Values.ToList(),
-                Balances = balances.Values.SelectMany(b => b.Values).ToList(),
-                Effects = effects,
-                Quanta = quanta,
-                Assets = assets,
-                Orders = orders.Values.ToList(),
-                Settings = constellationSettings,
-                StellarInfoData = stellarData
-            };
         }
 
-        /// <summary>
-        /// Builds an update based on the snapshot. All objects will be marked as new.
-        /// </summary>
-        /// <param name="snapshot"></param>
-        public static DiffObject Aggregate(Snapshot snapshot)
+        private static void EnsureAccountRecordExists(Dictionary<int, DiffObject.Account> accounts, int accountId)
         {
-            var apex = snapshot.Apex;
-
-            var diffObject = new DiffObject();
-
-            //get account diff objects
-            diffObject.Accounts = snapshot.Accounts
-                .Select(a => new DiffObject.Account
-                {
-                    IsInserted = true,
-                    Nonce = a.Nonce,
-                    PubKey = a.Pubkey.Data
-                }).ToList();
-
-            //get account diff objects
-            diffObject.Balances = snapshot.Accounts.SelectMany(bs =>
-            {
-                return bs.Balances.Select(b => new DiffObject.Balance
-                {
-                    IsInserted = true,
-                    Amount = b.Amount,
-                    AssetId = b.Asset,
-                    Liabilities = b.Liabilities,
-                    PubKey = bs.Pubkey.Data
-                });
-            }).ToList();
-
-            diffObject.Settings = new SettingsModel
-            {
-                Apex = apex,
-                Auditors = snapshot.Settings.Auditors.Select(s => s.Data).ToArray(),
-                MinAccountBalance = snapshot.Settings.MinAccountBalance,
-                MinAllowedLotSize = snapshot.Settings.MinAllowedLotSize,
-                Vault = snapshot.Settings.Vault.Data
-            };
-            if (snapshot.Settings.RequestRateLimits != null)
-                diffObject.Settings.RequestRateLimits = new RequestRateLimitsModel
-                {
-                    HourLimit = snapshot.Settings.RequestRateLimits.HourLimit,
-                    MinuteLimit = snapshot.Settings.RequestRateLimits.MinuteLimit
-                };
-
-
-            diffObject.Assets = snapshot.Settings.Assets.Select(a => new AssetModel
-            {
-                Apex = apex,
-                AssetId = a.Id,
-                Code = a.Code,
-                Issuer = a.Issuer?.Data
-            }).ToList();
-
-            diffObject.Orders = snapshot.Orders.Select(o => new DiffObject.Order
-            {
-                IsInserted = true,
-                OrderId = o.OrderId,
-                Amount = o.Amount,
-                Price = o.Price,
-                Pubkey = o.Account.Pubkey.Data
-            }).ToList();
-
-            diffObject.StellarInfoData = new DiffObject.ConstellationState
-            {
-                IsInserted = true,
-                TxCursor = snapshot.TxCursor
-            };
-
-            diffObject.Quanta = new List<QuantumModel>();
-
-            diffObject.Effects = new List<EffectModel>();
-
-            return diffObject;
+            if (!accounts.ContainsKey(accountId))
+                accounts.Add(accountId, new DiffObject.Account { Id = accountId });
         }
 
-        private static void EnsureAccountRecordExists(Dictionary<byte[], DiffObject.Account> accounts, byte[] pubKey)
+        private static void EnsureBalanceRecordExists(Dictionary<BsonObjectId, DiffObject.Balance> balances, BsonObjectId balanceId)
         {
-            if (!accounts.ContainsKey(pubKey))
-                accounts.Add(pubKey, new DiffObject.Account { PubKey = pubKey });
-        }
-
-        private static void EnsureBalanceRowExists(Dictionary<byte[], Dictionary<int, DiffObject.Balance>> balances, byte[] pubKey)
-        {
-            if (!balances.ContainsKey(pubKey))
-                balances.Add(pubKey, new Dictionary<int, DiffObject.Balance>());
-        }
-
-
-        private static void EnsureBalanceExists(Dictionary<byte[], Dictionary<int, DiffObject.Balance>> balances, byte[] pubKey, int asset)
-        {
-            EnsureBalanceRowExists(balances, pubKey);
-            if (!balances[pubKey].ContainsKey(asset))
-                balances[pubKey].Add(asset, new DiffObject.Balance { AssetId = asset, PubKey = pubKey });
+            if (!balances.ContainsKey(balanceId))
+                balances.Add(balanceId, new DiffObject.Balance { Id = balanceId });
         }
 
         private static DiffObject.ConstellationState GetStellarData(long cursor)
@@ -306,7 +177,7 @@ namespace Centaurus.Domain
             var newAssets = constellationEffect.Assets;
             if (permanentAssets != null && permanentAssets.Count > 0)
             {
-                var permanentAssetsIds = permanentAssets.Select(a => a.AssetId);
+                var permanentAssetsIds = permanentAssets.Select(a => a.Id);
                 newAssets = constellationEffect.Assets.Where(a => !permanentAssetsIds.Contains(a.Id)).ToList();
             }
 
@@ -315,7 +186,7 @@ namespace Centaurus.Domain
             for (var i = 0; i < assetsLength; i++)
             {
                 var currentAsset = newAssets[i];
-                var assetModel = new AssetModel { AssetId = currentAsset.Id, Code = currentAsset.Code, Issuer = currentAsset.Issuer.Data };
+                var assetModel = new AssetModel { Id = currentAsset.Id, Code = currentAsset.Code, Issuer = currentAsset.Issuer.Data };
                 assets.Add(assetModel);
             }
 

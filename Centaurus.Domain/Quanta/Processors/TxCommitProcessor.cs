@@ -18,7 +18,7 @@ namespace Centaurus.Domain
             var ledgerQuantum = (TxCommitQuantum)context.Envelope.Message;
             var ledgerNotification = (TxNotification)ledgerQuantum.Source.Message;
 
-            context.EffectProcessors.AddCursorUpdate(Global.TxManager, ledgerNotification.TxCursor, Global.TxManager.TxCursor);
+            context.EffectProcessors.AddCursorUpdate(Global.TxCursorManager, ledgerNotification.TxCursor, Global.TxCursorManager.TxCursor);
 
             for (var i = 0; i < ledgerNotification.Payments.Count; i++)
             {
@@ -37,7 +37,7 @@ namespace Centaurus.Domain
                 }
             }
 
-            return Task.FromResult(context.Envelope.CreateResult(ResultStatusCodes.Success, context.EffectProcessors.GetEffects().ToList()));
+            return Task.FromResult(context.Envelope.CreateResult(ResultStatusCodes.Success, context.EffectProcessors.Effects));
         }
 
         public override Task Validate(LedgerCommitProcessorContext context)
@@ -54,8 +54,8 @@ namespace Centaurus.Domain
             if (!Global.IsAlpha)
                 CheckSignatures(ledgerSourceEnvelope);
 
-            if (!Global.TxManager.IsValidNewCursor(ledgerInfo.TxCursor))
-                throw new InvalidOperationException($"Cursor is invalid. Current cursor is {Global.TxManager.TxCursor} and received was {ledgerInfo.TxCursor}");
+            if (!Global.TxCursorManager.IsValidNewCursor(ledgerInfo.TxCursor))
+                throw new InvalidOperationException($"Cursor is invalid. Current cursor is {Global.TxCursorManager.TxCursor} and received was {ledgerInfo.TxCursor}");
 
             foreach (var payment in ledgerInfo.Payments)
             {
@@ -107,8 +107,9 @@ namespace Centaurus.Domain
             var account = Global.AccountStorage.GetAccount(deposite.Destination)?.Account;
             if (account == null)
             {
-                context.EffectProcessors.AddAccountCreate(Global.AccountStorage, deposite.Destination);
-                account = Global.AccountStorage.GetAccount(deposite.Destination).Account;
+                var accId = Global.AccountStorage.GetNextAccountId();
+                context.EffectProcessors.AddAccountCreate(Global.AccountStorage, accId, deposite.Destination);
+                account = Global.AccountStorage.GetAccount(accId).Account;
             }
 
             if (!account.HasBalance(deposite.Asset))

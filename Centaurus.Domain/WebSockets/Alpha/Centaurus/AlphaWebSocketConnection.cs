@@ -19,7 +19,6 @@ namespace Centaurus
             HandshakeData = hd;
             _ = SendMessage(new HandshakeInit { HandshakeData = hd });
 
-
 #if !DEBUG
             InitTimer();
 #endif
@@ -38,6 +37,7 @@ namespace Centaurus
 
         private async void InvalidationTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
+
             await CloseConnection(WebSocketCloseStatus.PolicyViolation, "Connection is inactive");
         }
 
@@ -53,7 +53,7 @@ namespace Centaurus
             lock (apexCursorSyncRoot)
             {
                 //cancel current quantum worker
-                quantumWorker?.CancelAndDispose();
+                quantumWorker?.Dispose();
 
                 //set new apex cursor, and start quantum worker
                 quantumWorker = new QuantumSyncWorker(newApexCursor, this);
@@ -67,22 +67,21 @@ namespace Centaurus
 
         protected override async Task<bool> HandleMessage(MessageEnvelope envelope)
         {
-            if (Account != null && envelope.Message is NonceRequestMessage) //if Account prop is not null than it's client connection and it's already validated
-            {
-                ((NonceRequestMessage)envelope.Message).AccountWrapper = Account;
-            }
-
             var isHandled = await MessageHandlers<AlphaWebSocketConnection>.HandleMessage(this, envelope);
 
             //reset invalidation timer only if message has been handled
-            if (isHandled && invalidationTimer != null)
-                invalidationTimer.Reset();
+            if (isHandled)
+                invalidationTimer?.Reset();
             return isHandled;
         }
 
         public override void Dispose()
         {
-            quantumWorker?.CancelAndDispose();
+            invalidationTimer?.Stop();
+            invalidationTimer?.Dispose();
+            invalidationTimer = null;
+
+            quantumWorker?.Dispose();
             base.Dispose();
         }
     }

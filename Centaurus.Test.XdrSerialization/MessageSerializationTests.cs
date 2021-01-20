@@ -26,7 +26,7 @@ namespace Centaurus.Test
             Array.Fill(signature, (byte)64);
             var original = new OrderRequest()
             {
-                Account = pubkey,
+                Account = 1,
                 Amount = 2131231,
                 Nonce = 1,
                 TimeInForce = TimeInForce.ImmediateOrCancel,
@@ -40,8 +40,9 @@ namespace Centaurus.Test
             };
             var deserializedMessage = XdrConverter.Deserialize<MessageEnvelope>(XdrConverter.Serialize(message));
             var deserialized = deserializedMessage.Message as OrderRequest;
+            Assert.AreEqual(pubkey, deserializedMessage.Signatures[0].Signer.Data);
             Assert.AreEqual(signature, deserializedMessage.Signatures[0].Signature);
-            Assert.IsTrue(original.Account.Data.SequenceEqual(deserialized.Account.Data));
+            Assert.AreEqual(original.Account, deserialized.Account);
             Assert.AreEqual(original.Amount, deserialized.Amount);
             Assert.AreEqual(original.TimeInForce, deserialized.TimeInForce);
             Assert.AreEqual(original.Asset, deserialized.Asset);

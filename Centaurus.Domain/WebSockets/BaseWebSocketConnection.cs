@@ -39,6 +39,9 @@ namespace Centaurus
         {
             this.webSocket = webSocket;
             this.Ip = ip;
+
+            cancellationTokenSource = new CancellationTokenSource();
+            cancellationToken = cancellationTokenSource.Token;
         }
         public string Ip { get; }
 
@@ -67,6 +70,9 @@ namespace Centaurus
             }
         }
 
+        protected CancellationTokenSource cancellationTokenSource;
+        protected CancellationToken cancellationToken;
+
         public event EventHandler<ConnectionState> OnConnectionStateChanged;
 
         public async Task CloseConnection(WebSocketCloseStatus status = WebSocketCloseStatus.NormalClosure, string desc = null)
@@ -80,22 +86,24 @@ namespace Centaurus
                 {
                     var connectionPubKey = "no public key";
                     if (ClientPubKey != null)
-                        connectionPubKey = $"public key {ClientPubKey.ToString()}";
+                        connectionPubKey = $"public key {ClientPubKey}";
                     desc = desc ?? status.ToString();
-                    logger.Info($"Connection with {connectionPubKey} is closed. Status: {status.ToString()}, description: {desc}");
+                    logger.Trace($"Connection with {connectionPubKey} is closed. Status: {status}, description: {desc}");
 
                     try
                     {
+                        cancellationTokenSource?.Cancel();
                         await webSocket.CloseAsync(status, desc, CancellationToken.None);
                     }
                     catch (WebSocketException exc)
                     {
                         //ignore client disconnection
-                        if (exc.WebSocketErrorCode != WebSocketError.ConnectionClosedPrematurely)
+                        if (exc.WebSocketErrorCode != WebSocketError.ConnectionClosedPrematurely
+                            && exc.WebSocketErrorCode != WebSocketError.InvalidState)
                             throw;
                     }
+                    catch (OperationCanceledException) { }
                 }
-                Dispose();
             }
             catch (Exception e)
             {
@@ -103,18 +111,22 @@ namespace Centaurus
             }
             finally
             {
+                Dispose();
                 ConnectionState = ConnectionState.Closed;
             }
         }
 
-        public virtual async Task SendMessage(Message message, CancellationToken ct = default)
+        public virtual async Task SendMessage(Message message)
         {
             var envelope = message.CreateEnvelope();
-            await SendMessage(envelope, ct);
+            await SendMessage(envelope);
         }
 
-        public virtual async Task SendMessage(MessageEnvelope envelope, CancellationToken ct = default)
+        private SemaphoreSlim sendMessageSemaphore = new SemaphoreSlim(1);
+
+        public virtual async Task SendMessage(MessageEnvelope envelope)
         {
+            await sendMessageSemaphore.WaitAsync();
             try
             {
                 Global.ExtensionsManager.BeforeSendMessage(this, envelope);
@@ -124,30 +136,56 @@ namespace Centaurus
                 var serializedData = XdrConverter.Serialize(envelope);
                 if (webSocket == null)
                     throw new ObjectDisposedException(nameof(webSocket));
-                await webSocket.SendAsync(serializedData, WebSocketMessageType.Binary, true, (ct == default ? CancellationToken.None : ct));
+                await webSocket.SendAsync(serializedData, WebSocketMessageType.Binary, true, cancellationToken);
                 Global.ExtensionsManager.AfterSendMessage(this, envelope);
             }
             catch (Exception exc)
             {
+                if (exc is TaskCanceledException 
+                    || exc is OperationCanceledException
+                    || exc is WebSocketException socketException && (socketException.WebSocketErrorCode == WebSocketError.InvalidState))
+                    return;
                 Global.ExtensionsManager.SendMessageFailed(this, envelope, exc);
                 throw;
+            }
+            finally
+            {
+                sendMessageSemaphore.Release();
+            }
+        }
+
+
+        private SemaphoreSlim receiveMessageSemaphore = new SemaphoreSlim(1);
+        public async Task<XdrReader> GetReader()
+        {
+            await receiveMessageSemaphore.WaitAsync();
+            try
+            {
+                return await webSocket.GetInputStreamReader(cancellationToken);
+            }
+            finally
+            {
+                receiveMessageSemaphore.Release();
             }
         }
 
         public async Task Listen()
         {
+            var readerTask = GetReader();
             try
             {
-                var reader = await webSocket.GetInputStreamReader();
-                while (true)
+                do
                 {
+                    var reader = await readerTask;
+                    //get next message reader
+                    readerTask = GetReader();
                     MessageEnvelope envelope = null;
                     try
                     {
                         envelope = XdrConverter.Deserialize<MessageEnvelope>(reader);
 
                         if (!await HandleMessage(envelope))
-                            throw new UnexpectedMessageException($"No handler registered for message type {envelope.Message.MessageType.ToString()}.");
+                            throw new UnexpectedMessageException($"No handler registered for message type {envelope.Message.MessageType}.");
                     }
                     catch (Exception exc)
                     {
@@ -164,8 +202,8 @@ namespace Centaurus
                         if (statusCode == ResultStatusCodes.InternalError || !Global.IsAlpha)
                             logger.Error(exc);
                     }
-                    reader = await webSocket.GetInputStreamReader();
                 }
+                while (true);
             }
             catch (ConnectionCloseException e)
             {
@@ -183,6 +221,8 @@ namespace Centaurus
             }
             catch (Exception e)
             {
+                if (e is TaskCanceledException || e is OperationCanceledException)
+                    return;
                 Global.ExtensionsManager.HandleMessageFailed(this, null, e);
                 logger.Error(e);
             }
@@ -192,6 +232,9 @@ namespace Centaurus
 
         public virtual void Dispose()
         {
+            cancellationTokenSource?.Dispose();
+            cancellationTokenSource = null;
+
             webSocket?.Dispose();
             webSocket = null;
         }

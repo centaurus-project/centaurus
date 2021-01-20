@@ -1,4 +1,6 @@
-﻿using Centaurus.Models;
+﻿using Centaurus.DAL;
+using Centaurus.DAL.Models;
+using Centaurus.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -8,16 +10,18 @@ namespace Centaurus.Domain
 {
     public class EffectProcessorsContainer
     {
-        List<IEffectProcessor<Effect>> container = new List<IEffectProcessor<Effect>>();
 
-        public EffectProcessorsContainer(MessageEnvelope quantum, Action<MessageEnvelope, Effect[]> saveEffectsFn)
+        public EffectProcessorsContainer(MessageEnvelope quantum, DiffObject pendingDiffObject)
         {
             Envelope = quantum ?? throw new ArgumentNullException(nameof(quantum));
-            this.saveEffectsFn = saveEffectsFn ?? throw new ArgumentNullException(nameof(saveEffectsFn));
+            this.pendingDiffObject = pendingDiffObject ?? throw new ArgumentNullException(nameof(pendingDiffObject));
         }
 
-        private readonly Action<MessageEnvelope, Effect[]> saveEffectsFn;
         public MessageEnvelope Envelope { get; }
+
+        public List<Effect> Effects { get; } = new List<Effect>();
+
+        private readonly DiffObject pendingDiffObject;
 
         public Quantum Quantum => (Quantum)Envelope.Message;
 
@@ -28,184 +32,39 @@ namespace Centaurus.Domain
         /// <summary>
         /// Adds effect processor to container
         /// </summary>
-        /// <param name="effect"></param>
-        public void Add(IEffectProcessor<Effect> effect, bool immediateCommit = true)
+        /// <param name="effectProcessor"></param>
+        public void Add(IEffectProcessor<Effect> effectProcessor)
         {
-            container.Add(effect);
-            if (immediateCommit)
-                effect.CommitEffect();
+            Effects.Add(effectProcessor.Effect);
+            effectProcessor.CommitEffect();
+            pendingDiffObject.Aggregate(Envelope, effectProcessor.Effect, Effects.Count - 1);
         }
 
         /// <summary>
         /// Unwraps and returns effects for specified account.
         /// </summary>
         /// <returns></returns>
-        public Effect[] GetEffects(RawPubKey pubKey)
+        public Effect[] GetEffects(int account)
         {
-            return GetEffectsInternal()
-                .Where(e => e.Pubkey.Equals(pubKey))
+            return Effects
+                .Where(e => e.Account == account)
                 .ToArray();
-        }
-
-        /// <summary>
-        /// Unwraps and returns effects
-        /// </summary>
-        /// <returns></returns>
-        public Effect[] GetEffects()
-        {
-            return GetEffectsInternal().ToArray();
-        }
-
-        private IEnumerable<Effect> GetEffectsInternal()
-        {
-            return container.Select(ep => ep.Effect);
-        }
-
-        /// <summary>
-        /// Iterates over the effect processors and commits each.
-        /// </summary>
-        public void CommitAll()
-        {
-            var effectsLength = container.Count;
-            for (var i = 0; i < effectsLength; i++)
-            {
-                var currentEffect = container[i];
-                currentEffect.CommitEffect();
-            }
         }
 
         /// <summary>
         /// Sends envelope and all effects to specified callback
         /// </summary>
-        public void SaveEffects()
+        public void Complete()
         {
-            saveEffectsFn.Invoke(Envelope, GetEffects());
-        }
-
-        /// <summary>
-        /// Iterates over the effect processors and reverts each
-        /// </summary>
-        public void Revert()
-        {
-            for (var i = container.Count - 1; i >= 0; i--)
+            //TODO: find more elegant way to handle this scenario
+            //we mustn't save orders that were closed immediately without adding to order-book
+            if (Quantum is RequestQuantum request
+                && request.RequestMessage is OrderRequest orderRequest
+                && !Effects.Any(e => e.EffectType == EffectTypes.OrderPlaced))
             {
-                var currentEffect = container[i];
-                currentEffect.RevertEffect();
+                pendingDiffObject.Orders.Remove(OrderIdConverter.FromRequest(orderRequest, Quantum.Apex));
             }
-        }
-
-        public void AddWithdrawalCreate(Withdrawal withdrawal, WithdrawalStorage withdrawalStorage)
-        {
-            var effect = new WithdrawalCreateEffect
-            {
-                Apex = Apex,
-                Pubkey = withdrawal.Source.Account.Pubkey
-            };
-            Add(new WithdrawalCreateEffectProcessor(effect, withdrawal, withdrawalStorage));
-        }
-
-        public void AddWithdrawalRemove(Withdrawal withdrawal, WithdrawalStorage withdrawalStorage)
-        {
-            var effect = new WithdrawalRemoveEffect
-            {
-                Apex = Apex,
-                Pubkey = withdrawal.Source.Account.Pubkey
-            };
-            Add(new WithdrawalRemoveEffectProcessor(effect, withdrawal, withdrawalStorage));
-        }
-
-        public void AddAccountCreate(AccountStorage accountStorage, RawPubKey publicKey)
-        {
-            Add(new AccountCreateEffectProcessor(
-                new AccountCreateEffect { Pubkey = publicKey, Apex = Apex },
-                accountStorage
-            ));
-        }
-
-        public void AddBalanceCreate(Account account, int asset)
-        {
-            Add(new BalanceCreateEffectProcessor(
-                new BalanceCreateEffect { Pubkey = account.Pubkey, Asset = asset, Apex = Apex },
-                account
-            ));
-        }
-
-        public void AddBalanceUpdate(Account account, int asset, long amount)
-        {
-            Add(new BalanceUpdateEffectProcesor(
-                new BalanceUpdateEffect { Pubkey = account.Pubkey, Amount = amount, Asset = asset, Apex = Apex },
-                account
-            ));
-        }
-
-        public void AddUpdateLiabilities(Account account, int asset, long amount)
-        {
-            Add(new UpdateLiabilitiesEffectProcessor(
-                new UpdateLiabilitiesEffect { Amount = amount, Asset = asset, Pubkey = account.Pubkey, Apex = Apex },
-                account
-            ));
-        }
-
-        public void AddOrderPlaced(Orderbook orderBook, Order order, long orderAmount, int asset, OrderSide side)
-        {
-            var effect = new OrderPlacedEffect
-            {
-                Apex = Apex,
-                Pubkey = order.Account.Pubkey,
-                Asset = asset,
-                Amount = orderAmount,
-                Price = order.Price,
-                OrderId = order.OrderId,
-                OrderSide = side
-            };
-
-            Add(new OrderPlacedEffectProcessor(effect, orderBook, order));
-        }
-
-
-        public void AddTrade(Order order, int asset, long assetAmount, long xlmAmount, double price, OrderSide side)
-        {
-            var trade = new TradeEffect
-            {
-                Apex = Apex,
-                Pubkey = order.Account.Pubkey,
-                Asset = asset,
-                AssetAmount = assetAmount,
-                XlmAmount = xlmAmount,
-                Price = price,
-                OrderId = order.OrderId,
-                OrderSide = side
-            };
-
-            Add(new TradeEffectProcessor(trade, order));
-        }
-
-
-        public void AddOrderRemoved(Orderbook orderbook, Order order)
-        {
-            Add(new OrderRemovedEffectProccessor(
-                new OrderRemovedEffect { Apex = Apex, OrderId = order.OrderId, Price = order.Price, Pubkey = order.Account.Pubkey },
-                orderbook,
-                order.Account
-                ));
-        }
-
-
-
-        public void AddNonceUpdate(Account account, long newNonce, long currentNonce)
-        {
-            Add(new NonceUpdateEffectProcessor(
-                new NonceUpdateEffect { Nonce = newNonce, PrevNonce = currentNonce, Pubkey = account.Pubkey, Apex = Apex },
-                account
-            ));
-        }
-
-        public void AddCursorUpdate(TxManager txManager, long newCursor, long prevCursor)
-        {
-            Add(new TxCursorUpdateEffectProcessor(
-                new TxCursorUpdateEffect {  Apex = Apex, Cursor = newCursor, PrevCursor = prevCursor },
-                txManager
-            ));
+            this.pendingDiffObject.Quanta.Add(QuantumModelExtensions.FromQuantum(Envelope));
         }
     }
 }

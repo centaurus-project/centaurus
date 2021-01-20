@@ -5,6 +5,7 @@ using stellar_dotnet_sdk;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Net.WebSockets;
 using System.Threading;
@@ -16,8 +17,6 @@ namespace Centaurus.Domain
     {
 
         static Logger logger = LogManager.GetCurrentClassLogger();
-
-        CancellationTokenSource cancellationToken = new CancellationTokenSource();
 
         public AuditorWebSocketConnection(WebSocket webSocket, string ip)
             : base(webSocket, ip)
@@ -45,58 +44,53 @@ namespace Centaurus.Domain
 
         private async void HeartbeatTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
-            await SendMessage(hearbeatMessage);
+            try
+            {
+                await SendMessage(hearbeatMessage);
+            }
+            catch (Exception exc)
+            {
+                logger.Error(exc, "Unable to send hearbeat message.");
+                heartbeatTimer?.Reset();
+            }
         }
 
         protected ClientWebSocket clientWebSocket => webSocket as ClientWebSocket;
 
         public async Task EstablishConnection()
         {
-            await clientWebSocket.ConnectAsync(new Uri(((AuditorSettings)Global.Settings).AlphaAddress), CancellationToken.None);
+            await clientWebSocket.ConnectAsync(new Uri(((AuditorSettings)Global.Settings).AlphaAddress), cancellationToken);
             _ = Listen();
             _ = ProcessOutgoingMessageQueue();
         }
 
-        public override async Task SendMessage(MessageEnvelope envelope, CancellationToken ct = default)
+        public override async Task SendMessage(MessageEnvelope envelope)
         {
-            await base.SendMessage(envelope, ct);
-            if (heartbeatTimer != null)
-                heartbeatTimer.Reset();
+            await base.SendMessage(envelope);
+            heartbeatTimer?.Reset();
         }
 
         protected override async Task<bool> HandleMessage(MessageEnvelope envelope)
         {
-            TryAssignAccountWrapper(envelope);
             return await MessageHandlers<AuditorWebSocketConnection>.HandleMessage(this, envelope);
-        }
-
-        private void TryAssignAccountWrapper(MessageEnvelope envelope)
-        {
-            if (envelope.Message is QuantaBatch)
-                ((QuantaBatch)envelope.Message).Quanta.ForEach(e => TryAssignAccountWrapper(e));
-            else if (envelope.Message is RequestQuantum)
-            {
-                var clientRequest = ((RequestQuantum)envelope.Message);
-                clientRequest.RequestMessage.AccountWrapper = Global.AccountStorage.GetAccount(clientRequest.RequestMessage.Account);
-            }
         }
 
         private async Task ProcessOutgoingMessageQueue()
         {
             await Task.Factory.StartNew(async () =>
             {
-                while (!cancellationToken.Token.IsCancellationRequested)
+                while (!cancellationToken.IsCancellationRequested)
                 {
                     try
                     {
                         if (ConnectionState == ConnectionState.Ready
-                            && !cancellationToken.Token.IsCancellationRequested
+                            && !cancellationToken.IsCancellationRequested
                             && OutgoingMessageStorage.TryPeek(out MessageEnvelope message)
                             )
                         {
                             try
                             {
-                                await base.SendMessage(message, cancellationToken.Token);
+                                await base.SendMessage(message);
                                 if (!OutgoingMessageStorage.TryDequeue(out message))
                                 {
                                     logger.Error("Unable to dequeue");
@@ -117,12 +111,15 @@ namespace Centaurus.Domain
                         logger.Error(e);
                     }
                 }
-            }, cancellationToken.Token);
+            }, cancellationToken);
         }
 
         public override void Dispose()
         {
-            cancellationToken?.Cancel();
+            heartbeatTimer?.Stop();
+            heartbeatTimer?.Dispose();
+            heartbeatTimer = null;
+
             base.Dispose();
         }
     }

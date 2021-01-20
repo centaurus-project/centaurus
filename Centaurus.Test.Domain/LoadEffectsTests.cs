@@ -17,7 +17,7 @@ namespace Centaurus.Test
         public void Setup()
         {
             EnvironmentHelper.SetTestEnvironmentVariable();
-            GlobalInitHelper.DefaultAlphaSetup();
+            GlobalInitHelper.DefaultAlphaSetup().Wait();
             MessageHandlers<AlphaWebSocketConnection>.Init();
         }
 
@@ -31,10 +31,12 @@ namespace Centaurus.Test
         [TestCaseSource(nameof(EffectsLoadTestCases))]
         public async Task LoadEffectsTest(KeyPair accountKey, bool isDesc)
         {
-            var allLimit = 1000;
-            var allEffectsResult = (await Global.PersistenceManager.LoadEffects(null, isDesc, allLimit, accountKey.PublicKey)).Items;
+            var account = Global.AccountStorage.GetAccount(accountKey);
 
-            var opositeOrderedResult = (await Global.PersistenceManager.LoadEffects(null, !isDesc, allLimit, accountKey.PublicKey)).Items;
+            var allLimit = 1000;
+            var allEffectsResult = (await Global.PersistenceManager.LoadEffects(null, isDesc, allLimit, account.Account.Id)).Items;
+
+            var opositeOrderedResult = (await Global.PersistenceManager.LoadEffects(null, !isDesc, allLimit, account.Account.Id)).Items;
 
             //check ordering
             for (int i = 0, opI = allEffectsResult.Count - 1; i < allEffectsResult.Count; i++, opI--)
@@ -49,13 +51,13 @@ namespace Centaurus.Test
             var zeroHexCursor = zeroId.Value.ToByteArray().ToHex();
             //check fetching
             var limit = 1;
-            await TestFetching(allEffectsResult, zeroHexCursor, isDesc, limit, accountKey);
+            await TestFetching(allEffectsResult, zeroHexCursor, isDesc, limit, account.Account.Id);
 
             //check reverse fetching
-            await TestFetching(allEffectsResult, zeroHexCursor, !isDesc, limit, accountKey, true);
+            await TestFetching(allEffectsResult, zeroHexCursor, !isDesc, limit, account.Account.Id, true);
         }
 
-        private async Task TestFetching(List<Effect> allEffects, string cursor, bool isDesc, int limit, KeyPair account, bool isReverseDirection = false)
+        private async Task TestFetching(List<Effect> allEffects, string cursor, bool isDesc, int limit, int account, bool isReverseDirection = false)
         {
             var nextCursor = cursor;
             var increment = isReverseDirection ? -1 : 1;
@@ -63,7 +65,7 @@ namespace Centaurus.Test
             var totalCount = 0;
             while (nextCursor != null)
             {
-                var currentEffectsResult = await Global.PersistenceManager.LoadEffects(nextCursor, isDesc, limit, account?.PublicKey);
+                var currentEffectsResult = await Global.PersistenceManager.LoadEffects(nextCursor, isDesc, limit, account);
                 if (totalCount == allEffects.Count)
                 {
                     Assert.AreEqual(0, currentEffectsResult.Items.Count, "Some extra effects were loaded.");

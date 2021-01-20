@@ -31,10 +31,10 @@ namespace Centaurus.Domain
 
             var currentUser = requestMessage.AccountWrapper.Account;
             if (currentUser == null)
-                throw new Exception($"Account with public key '{requestMessage.ToString()}' is not found.");
+                throw new Exception($"Account with public key '{requestMessage}' is not found.");
 
             if (requestMessage.Nonce < 1 || currentUser.Nonce >= requestMessage.Nonce)
-                throw new UnauthorizedException();
+                throw new UnauthorizedException($"Specified nonce is invalid. Current nonce: {currentUser.Nonce}; request nonce: {requestMessage.Nonce}.");
         }
     }
 }

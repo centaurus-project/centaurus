@@ -14,22 +14,24 @@ namespace Centaurus.Domain
 
         public override async Task<ResultMessage> Process(ProcessorContext context)
         {
-            var initEffects = await PersistenceManager.ApplyInitUpdates(context.Envelope);
+            var initQuantum = (ConstellationInitQuantum)context.Envelope.Message;
 
-            var snapshot = await PersistenceManager.GetSnapshot();
-
-            Global.Setup(snapshot);
+            context.EffectProcessors.AddConstellationInit(initQuantum);
+            var initSnapshot = PersistenceManager.GetSnapshot(
+                (ConstellationInitEffect)context.EffectProcessors.Effects[0],
+                context.Envelope.ComputeHash()
+            );
+            await Global.Setup(initSnapshot);
 
             Global.AppState.State = ApplicationState.Running;
             if (!Global.IsAlpha) //set auditor to Ready state after init
             {
                 //send new apex cursor message to notify Alpha that the auditor was initialized
                 OutgoingMessageStorage.EnqueueMessage(new SetApexCursor { Apex = 1 });
-                TxListener.RegisterListener(snapshot.TxCursor);
                 Global.AppState.State = ApplicationState.Ready;
             }
 
-            return context.Envelope.CreateResult(ResultStatusCodes.Success, new List<Effect>(initEffects));
+            return context.Envelope.CreateResult(ResultStatusCodes.Success, context.EffectProcessors.Effects);
         }
 
         public override Task Validate(ProcessorContext context)

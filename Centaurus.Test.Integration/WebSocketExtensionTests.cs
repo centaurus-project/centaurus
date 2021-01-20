@@ -15,9 +15,9 @@ namespace Centaurus.Test
         [Test]
         public async Task GetInputStreamReaderTest()
         {
-            var res = await new FakeWebSocket(Enumerable.Repeat((byte)1, 10240).ToArray()).GetInputStreamReader();
+            var res = await new FakeWebSocket(Enumerable.Repeat((byte)1, 10240).ToArray()).GetInputStreamReader(CancellationToken.None);
             Assert.IsTrue(res.ToArray().All(v => v == 1));
-            res = await new FakeWebSocket(Enumerable.Repeat((byte)1, 20480).ToArray()).GetInputStreamReader();
+            res = await new FakeWebSocket(Enumerable.Repeat((byte)1, 20480).ToArray()).GetInputStreamReader(CancellationToken.None);
             Assert.IsTrue(res.ToArray().All(v => v == 1));
             //Assert.ThrowsAsync<OutOfMemoryException>(async () => await new FakeWebSocket(Enumerable.Repeat((byte)1, 25000).ToArray()).GetInputStreamReader());
         }

@@ -29,9 +29,9 @@ namespace Centaurus.Domain
             foreach (var withdrawalItem in context.WithdrawalItems)
                 context.EffectProcessors.AddUpdateLiabilities(context.WithdrawalRequest.AccountWrapper.Account, withdrawalItem.Asset, withdrawalItem.Amount);
 
-            var effects = context.EffectProcessors.GetEffects();
+            var effects = context.EffectProcessors.Effects;
 
-            var accountEffects = effects.Where(e => ByteArrayPrimitives.Equals(e.Pubkey.Data, context.WithdrawalRequest.Account.Data)).ToList();
+            var accountEffects = effects.Where(e => e.Account == context.WithdrawalRequest.Account).ToList();
             return Task.FromResult(context.Envelope.CreateResult(ResultStatusCodes.Success, accountEffects));
         }
 

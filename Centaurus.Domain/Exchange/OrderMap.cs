@@ -6,7 +6,7 @@ using System.Text;
 
 namespace Centaurus.Domain
 {
-    public class OrderMap : IOrderMap
+    public class OrderMap
     {
 
         private Dictionary<ulong, Order> map = new Dictionary<ulong, Order>();
@@ -40,34 +40,6 @@ namespace Centaurus.Domain
         public IEnumerable<Order> GetAllAccountOrders(Account account)
         {
             return map.Values.Where(o => o.Account == account);
-        }
-
-        public OrderInfo GetNextOrder(ulong currentOrderId)
-        {
-            var currentDecodedOrderId = OrderIdConverter.Decode(currentOrderId);
-
-            var order = currentOrderId > 0 ? GetOrder(currentOrderId)?.Next : map.Values.FirstOrDefault();
-            while (true)
-            {
-                if (order == null)
-                    return null;
-
-                var decodedOrderId = OrderIdConverter.Decode(order.OrderId);
-                if (decodedOrderId.Side != currentDecodedOrderId.Side)
-                {
-                    order = order.Next;
-                    continue;
-                }
-
-                return new OrderInfo
-                {
-                    OrderId = order.OrderId,
-                    Side = decodedOrderId.Side,
-                    Amount = order.Amount,
-                    Price = order.Price,
-                    Market = decodedOrderId.Asset
-                };
-            }
         }
     }
 }

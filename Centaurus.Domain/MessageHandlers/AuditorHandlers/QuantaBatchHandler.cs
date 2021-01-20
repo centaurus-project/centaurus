@@ -22,17 +22,18 @@ namespace Centaurus.Domain
             var quantaBatchCount = quanta.Count;
             for (var i = 0; i < quantaBatchCount; i++)
             {
-                var quantum = (Quantum)quanta[i].Message;
+                var quantumEnvelope = quanta[i];
+                var quantum = (Quantum)quantumEnvelope.Message;
                 if (quantum.Apex <= Global.QuantumHandler.LastAddedQuantumApex)
                     continue;
 
                 if (quantum.Apex != Global.QuantumHandler.LastAddedQuantumApex + 1)
                 {
-                    logger.Info($"Batch has invalid quantum apexes (current: {Global.QuantumHandler.LastAddedQuantumApex}, received: {quantum.Apex}). New apex cursor request will be send.");
+                    logger.Warn($"Batch has invalid quantum apexes (current: {Global.QuantumHandler.LastAddedQuantumApex}, received: {quantum.Apex}). New apex cursor request will be send.");
                     await connection.SendMessage(new SetApexCursor { Apex = Global.QuantumHandler.LastAddedQuantumApex });
                     return;
                 }
-                _ = Global.QuantumHandler.HandleAsync(quanta[i]);
+                _ = Global.QuantumHandler.HandleAsync(quantumEnvelope);
             }
         }
     }

@@ -1,4 +1,5 @@
-﻿using System;
+﻿using MongoDB.Bson;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -6,9 +7,7 @@ namespace Centaurus.DAL.Models
 {
     public class BalanceModel
     {
-        public int AssetId { get; set; }
-
-        public byte[] Account { get; set; }
+        public BsonObjectId Id { get; set; }
 
         public long Amount { get; set; }
 

@@ -15,7 +15,7 @@ namespace Centaurus.Test
         public void Setup()
         {
             EnvironmentHelper.SetTestEnvironmentVariable();
-            GlobalInitHelper.DefaultAuditorSetup();
+            GlobalInitHelper.DefaultAuditorSetup().Wait();
             MessageHandlers<AuditorWebSocketConnection>.Init();
         }
 
@@ -103,10 +103,10 @@ namespace Centaurus.Test
             Global.AppState.State = ApplicationState.Ready;
 
             var clientConnection = new AuditorWebSocketConnection(new FakeWebSocket(), null) { ConnectionState = state };
-
+            var account = Global.AccountStorage.GetAccount(clientKeyPair);
             var orderEnvelope = new OrderRequest
             {
-                Account = clientKeyPair
+                Account = account?.Account.Id ?? 0
             }.CreateEnvelope();
             orderEnvelope.Sign(clientKeyPair);
 

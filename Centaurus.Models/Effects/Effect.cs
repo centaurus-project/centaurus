@@ -24,7 +24,7 @@ namespace Centaurus.Models
         public abstract EffectTypes EffectType { get; }
 
         //ignore it during the serialization - we need it only to decide which effects to send back to a particular user
-        public RawPubKey Pubkey { get; set; }
+        public int Account { get; set; }
 
         [XdrField(0)]
         public long Apex { get; set; }

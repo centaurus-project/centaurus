@@ -27,9 +27,9 @@ namespace Centaurus.Domain
             context.EffectProcessors.AddBalanceUpdate(context.Destination, payment.Asset, payment.Amount);
 
             context.EffectProcessors.AddBalanceUpdate(context.SourceAccount, payment.Asset, -payment.Amount);
-            var effects = context.EffectProcessors.GetEffects();
+            var effects = context.EffectProcessors.Effects;
 
-            var accountEffects = effects.Where(e => ByteArrayPrimitives.Equals(e.Pubkey, payment.Account)).ToList();
+            var accountEffects = effects.Where(e => e.Account == payment.Account).ToList();
             return Task.FromResult(context.Envelope.CreateResult(ResultStatusCodes.Success, accountEffects));
         }
 
@@ -39,16 +39,13 @@ namespace Centaurus.Domain
 
             var payment = context.Payment;
 
-            if (payment.Account == null || payment.Account.IsZero())
-                throw new BadRequestException("Source should be valid public key");
-
             if (payment.Destination == null || payment.Destination.IsZero())
                 throw new BadRequestException("Destination should be valid public key");
 
-            if (context.SourceAccount == null)
-                throw new BadRequestException("No destination account.");
+            if (context.Destination == null)
+                throw new BadRequestException("Destination account is not registered.");
 
-            if (payment.Destination.Equals(payment.Account))
+            if (payment.Destination.Equals(payment.AccountWrapper.Account.Pubkey))
                 throw new BadRequestException("Source and destination must be different public keys");
 
             if (payment.Amount <= 0)
@@ -57,11 +54,7 @@ namespace Centaurus.Domain
             if (!Global.AssetIds.Contains(payment.Asset))
                 throw new BadRequestException($"Asset {payment.Asset} is not supported");
 
-            var account = payment.AccountWrapper.Account;
-            if (account == null)
-                throw new Exception("Quantum source has no account");
-
-            var balance = account.Balances.Find(b => b.Asset == payment.Asset);
+            var balance = payment.AccountWrapper.Account.Balances.Find(b => b.Asset == payment.Asset);
             if (balance == null || !balance.HasSufficientBalance(payment.Amount))
                 throw new BadRequestException("Insufficient funds");
 

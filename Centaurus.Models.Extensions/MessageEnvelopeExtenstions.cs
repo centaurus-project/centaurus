@@ -151,6 +151,8 @@ namespace Centaurus
 
             switch (messageType)
             {
+                case MessageTypes.HandshakeInit:
+                    return CreateResult<HandshakeResult>(envelope, status, effects);
                 case MessageTypes.AccountDataRequest:
                     return CreateResult<AccountDataResponse>(envelope, status, effects);
                 case MessageTypes.WithdrawalRequest:

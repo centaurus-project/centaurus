@@ -5,6 +5,7 @@ using NLog;
 using stellar_dotnet_sdk;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Net.WebSockets;
 using System.Text;
@@ -13,7 +14,7 @@ using System.Threading.Tasks;
 
 namespace Centaurus
 {
-    public class AuditorStartup: IStartup<AuditorSettings>
+    public class AuditorStartup : IStartup<AuditorSettings>
     {
         private AuditorWebSocketConnection auditor;
 
@@ -22,17 +23,27 @@ namespace Centaurus
         private Logger logger = LogManager.GetCurrentClassLogger();
         private ManualResetEvent resetEvent;
 
-        public void Run(AuditorSettings settings, ManualResetEvent resetEvent)
+        public async Task Run(AuditorSettings settings, ManualResetEvent resetEvent)
         {
-            this.resetEvent = resetEvent;
+            try
+            {
+                this.resetEvent = resetEvent;
 
-            Global.Init(settings, new MongoStorage());
+                await Global.Setup(settings, new MongoStorage());
 
-            Global.AppState.StateChanged += StateChanged;
+                Global.AppState.StateChanged += StateChanged;
 
-            MessageHandlers<AuditorWebSocketConnection>.Init();
+                MessageHandlers<AuditorWebSocketConnection>.Init();
 
-            _ = InternalRun();
+                _ = InternalRun();
+            }
+            catch (Exception exc)
+            {
+                logger.Error(exc);
+                if (Global.AppState != null)
+                    Global.AppState.State = ApplicationState.Failed;
+                resetEvent.Set();
+            }
         }
 
         private async Task InternalRun()
@@ -53,7 +64,8 @@ namespace Centaurus
                         Unsubscribe(_auditor);
                         await CloseConnection(_auditor);
 
-                        logger.Info(exc, "Unable establish connection. Retry in 5000ms");
+                        if (!(exc is TaskCanceledException || exc is OperationCanceledException))
+                            logger.Info(exc, "Unable establish connection. Retry in 5000ms");
                         Thread.Sleep(5000);
                     }
                 }
@@ -69,16 +81,18 @@ namespace Centaurus
         {
             if (state == ApplicationState.Failed)
             {
-                Thread.Sleep(10000);//sleep for 10 sec to make sure that pending updates are saved
+                Console.WriteLine("Application failed. Saving pending updates...");
+                Thread.Sleep(PendingUpdatesManager.SaveInterval);
                 resetEvent.Set();
             }
         }
 
-        public void Shutdown()
+        public async Task Shutdown()
         {
             isAborted = true;
             Unsubscribe(auditor);
-            CloseConnection(auditor).Wait();
+            await CloseConnection(auditor);
+            await Global.TearDown();
         }
 
         private void Subscribe(AuditorWebSocketConnection _auditor)
@@ -116,8 +130,7 @@ namespace Centaurus
         {
             if (_auditor != null)
             {
-                await _auditor?.CloseConnection();
-                _auditor?.Dispose();
+                await _auditor.CloseConnection();
             }
         }
 
@@ -132,6 +145,7 @@ namespace Centaurus
             Global.AppState.State = ApplicationState.Running;
             Unsubscribe(auditor);
             await CloseConnection(auditor);
+            auditor = null;
             if (!isAborted)
                 _ = InternalRun();
         }

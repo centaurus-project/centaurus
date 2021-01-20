@@ -8,7 +8,7 @@ namespace Centaurus.Exchange.Analytics
 {
     public class MarketDepthsManager
     {
-        public MarketDepthsManager(List<int> markets, List<double> precisions, IOrderMap orders)
+        public MarketDepthsManager(List<int> markets, List<double> precisions, AnalyticsOrderMap orders)
         {
             if (markets == null)
                 throw new ArgumentNullException(nameof(markets));

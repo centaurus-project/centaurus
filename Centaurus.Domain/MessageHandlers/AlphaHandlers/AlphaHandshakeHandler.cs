@@ -37,7 +37,7 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
         {
             Message message;
             if (Global.AppState.State == ApplicationState.Rising)
-                message = new AuditorStateRequest { TargetApex = await PersistenceManager.GetLastApex() };
+                message = new AuditorStateRequest { TargetApex = await Global.PersistenceManager.GetLastApex() };
             else
                 message = AlphaStateHelper.GetCurrentState();
             await connection.SendMessage(message);
@@ -51,7 +51,9 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
             if (connection.Account == null)
                 throw new ConnectionCloseException(WebSocketCloseStatus.NormalClosure, "Account is not registered.");
             connection.ConnectionState = ConnectionState.Ready;
-            await connection.SendMessage(envelope.CreateResult(ResultStatusCodes.Success));
+            var result = (HandshakeResult)envelope.CreateResult(ResultStatusCodes.Success);
+            result.AccountId = connection.Account.Account.Id;
+            await connection.SendMessage(result);
         }
     }
 }

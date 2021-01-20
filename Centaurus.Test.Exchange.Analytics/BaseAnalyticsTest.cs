@@ -27,7 +27,7 @@ namespace Centaurus.Test.Exchange.Analytics
             storage = new MockStorage();
             markets = Enumerable.Range(1, 2).ToList();
             historyLength = 100;
-            analyticsManager = new AnalyticsManager(storage, new List<double> { 1 }, new MockOrderMap(), markets, historyLength);
+            analyticsManager = new AnalyticsManager(storage, new List<double> { 1 }, markets, new List<OrderInfo>(), historyLength);
         }
 
         protected void GenerateTrades(int totalTradesCount)

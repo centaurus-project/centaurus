@@ -56,6 +56,10 @@ namespace Centaurus.Models
         /// </summary>
         HandshakeInit = 100,
         /// <summary>
+        /// Handshake result.
+        /// </summary>
+        HandshakeResult = 101,
+        /// <summary>
         /// Operation result, containing original quantum and processing status.
         /// </summary>
         ResultMessage = 102,

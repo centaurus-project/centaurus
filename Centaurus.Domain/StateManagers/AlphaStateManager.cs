@@ -12,6 +12,8 @@ namespace Centaurus.Domain
 
         public bool HasMajority => ConnectedAuditors.Count >= MajorityHelper.GetMajorityCount();
 
+        public int ConnectedAuditorsCount => ConnectedAuditors.Count;
+
         public void AuditorConnected(RawPubKey rawPubKey)
         {
             lock (this)
