@@ -11,35 +11,59 @@ using Centaurus.Xdr;
 
 namespace Centaurus
 {
+
     public static class WebSocketExtension
     {
         const int chunkSize = 512;
         const int maxMessageSize = 20480;
 
-        //TODO: validate msg size
-        public static async Task<byte[]> GetInputByteArray(this WebSocket webSocket, CancellationToken cancellationToken)
+        private static readonly ArrayPool<byte> bufferPool = ArrayPool<byte>.Create();
+
+        public static async Task<AssembledWebSoketBuffer> GetWebsocketBuffer(this WebSocket webSocket, CancellationToken cancellationToken)
         {
-            var buffer = WebSocket.CreateClientBuffer(chunkSize, chunkSize);
-            using (var ms = new MemoryStream())
+            var length = 0;
+
+            var messageBuffer = bufferPool.Rent(maxMessageSize);
+            do
             {
-                var result = default(WebSocketReceiveResult);
-                do
-                {
-                    result = await webSocket.ReceiveAsync(buffer, cancellationToken);
-                    if (result.CloseStatus.HasValue)
-                        throw new ConnectionCloseException(result.CloseStatus.Value, result.CloseStatusDescription);
-                    ms.Write(buffer.Array, buffer.Offset, result.Count);
-                    //if (checkLength && ms.Length > maxMessageSize) 
-                    //    throw new OutOfMemoryException("Suspiciously large message");
-                } while (!result.EndOfMessage);
-                return ms.ToArray();
-            }
+                if (length + chunkSize > maxMessageSize) throw new Exception("Too large message"); //TODO: handle it upstream
+                var chunk = new ArraySegment<byte>(messageBuffer, length, chunkSize);
+                var result = await webSocket.ReceiveAsync(chunk, cancellationToken);
+                length += result.Count;
+                if (result.EndOfMessage) break;
+                if (result.CloseStatus.HasValue)
+                    throw new ConnectionCloseException(result.CloseStatus.Value, result.CloseStatusDescription);
+            } while (true);
+
+            return new AssembledWebSoketBuffer(messageBuffer, length);
         }
 
-        public static async Task<XdrReader> GetInputStreamReader(this WebSocket webSocket, CancellationToken cancellationToken)
+        public class AssembledWebSoketBuffer : IDisposable
         {
-            var res = await GetInputByteArray(webSocket, cancellationToken);
-            return new XdrReader(res, res.Length);
+            public AssembledWebSoketBuffer(byte[] messageBuffer, int length)
+            {
+                Buffer = messageBuffer;
+                Length = length;
+            }
+
+            private readonly byte[] Buffer;
+
+            public readonly int Length;
+
+            public void Dispose()
+            {
+                bufferPool.Return(Buffer);
+            }
+
+            public XdrReader CreateReader()
+            {
+                return new XdrBufferReader(Buffer, Length);
+            }
+
+            public ReadOnlySpan<byte> AsSpan()
+            {
+                return Buffer.AsSpan(0, Length);
+            }
         }
     }
 }

@@ -25,7 +25,7 @@ namespace Centaurus.Xdr
 
         public static byte[] Serialize(object value)
         {
-            using (var writer = new XdrWriter())
+            using (var writer = new XdrBufferWriter())
             {
                 Serialize(value, writer);
                 return writer.ToArray();
@@ -105,7 +105,7 @@ namespace Centaurus.Xdr
 
         public static object Deserialize(byte[] serialized, Type type)
         {
-            return Deserialize(new XdrReader(serialized), type);
+            return Deserialize(new XdrBufferReader(serialized), type);
         }
 
         public static T Deserialize<T>(XdrReader reader) where T : class
@@ -115,7 +115,7 @@ namespace Centaurus.Xdr
 
         public static T Deserialize<T>(byte[] serialized) where T : class
         {
-            return Deserialize(new XdrReader(serialized), typeof(T)) as T;
+            return Deserialize(new XdrBufferReader(serialized), typeof(T)) as T;
         }
 
         private static XdrContractSerializer LookupSerializer(Type type)

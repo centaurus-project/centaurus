@@ -2,8 +2,8 @@
 
 # Project Centaurus
 
-Project Centaurus is the second layer payment network, exchange, and scaling solution 
-for [Stellar Network](https://www.stellar.org/).
+Project Centaurus is a second-layer payment network and exchange for 
+[Stellar Network](https://www.stellar.org/).
 
 ## Features
 

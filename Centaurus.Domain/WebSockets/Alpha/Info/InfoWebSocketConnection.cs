@@ -119,13 +119,13 @@ namespace Centaurus.Domain
         {
             try
             {
-                var reader = await webSocket.GetInputByteArray(cancellationToken);
                 while (true)
                 {
+                    using var message = await webSocket.GetWebsocketBuffer(cancellationToken);
                     BaseCommand command = null;
                     try
                     {
-                        command = BaseCommand.Deserialize(reader);
+                        command = BaseCommand.Deserialize(message.AsSpan());
                         var result = await commandHandlers.HandleCommand(this, command);
                         await SendMessage(result);
                     }
@@ -144,7 +144,7 @@ namespace Centaurus.Domain
                         if (statusCode == ResultStatusCodes.InternalError || !Global.IsAlpha)
                             logger.Error(exc);
                     }
-                    reader = await webSocket.GetInputByteArray(cancellationToken);
+
                 }
             }
             catch (ConnectionCloseException e)

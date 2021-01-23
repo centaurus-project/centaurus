@@ -156,33 +156,19 @@ namespace Centaurus
 
 
         private SemaphoreSlim receiveMessageSemaphore = new SemaphoreSlim(1);
-        public async Task<XdrReader> GetReader()
+
+        public async Task Listen()
         {
             await receiveMessageSemaphore.WaitAsync();
             try
             {
-                return await webSocket.GetInputStreamReader(cancellationToken);
-            }
-            finally
-            {
-                receiveMessageSemaphore.Release();
-            }
-        }
-
-        public async Task Listen()
-        {
-            var readerTask = GetReader();
-            try
-            {
                 do
                 {
-                    var reader = await readerTask;
-                    //get next message reader
-                    readerTask = GetReader();
+                    using var buffer = await webSocket.GetWebsocketBuffer(cancellationToken);
                     MessageEnvelope envelope = null;
                     try
                     {
-                        envelope = XdrConverter.Deserialize<MessageEnvelope>(reader);
+                        envelope = XdrConverter.Deserialize<MessageEnvelope>(buffer.CreateReader());
 
                         if (!await HandleMessage(envelope))
                             throw new UnexpectedMessageException($"No handler registered for message type {envelope.Message.MessageType}.");
@@ -197,7 +183,7 @@ namespace Centaurus
                         var statusCode = exc.GetStatusCode();
 
                         //prevent recursive error sending
-                        if (!(envelope.Message is ResultMessage))
+                        if (!(envelope?.Message is ResultMessage))
                             _ = SendMessage(envelope.CreateResult(statusCode));
                         if (statusCode == ResultStatusCodes.InternalError || !Global.IsAlpha)
                             logger.Error(exc);
@@ -225,6 +211,10 @@ namespace Centaurus
                     return;
                 Global.ExtensionsManager.HandleMessageFailed(this, null, e);
                 logger.Error(e);
+            }
+            finally
+            {
+                receiveMessageSemaphore.Release();
             }
         }
 

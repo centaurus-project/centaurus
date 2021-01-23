@@ -1,33 +1,24 @@
 ﻿using System;
-using System.Buffers;
 using System.Buffers.Binary;
-using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace Centaurus.Xdr
 {
-
-    public class XdrWriter : IDisposable
+    public class XdrBufferWriter : XdrWriter, IDisposable
     {
-        const int DefaultBufferSize = 64 * 1024; //64KB
-        static readonly Encoding StringEncoding = Encoding.UTF8;
-
-        //TODO: try ArrayBufferWriter instead of byte[]
-        public XdrWriter()
+        public XdrBufferWriter()
         {
             AllocateBuffer();
         }
 
         private XdrBuffer buffer;
 
-        //private readonly List<XdrBuffer> bufferChunks = new List<XdrBuffer>(1);
-
         /// <summary>
         /// Current writer position.
         /// </summary>
-        public int Position => buffer.Position;
+        public override int Position => buffer.Position;
 
         public void Dispose()
         {
@@ -59,7 +50,7 @@ namespace Centaurus.Xdr
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteInt32(int value)
+        public override void WriteInt32(int value)
         {
             EnsureCapacity(4);
             var span = buffer.Data.AsSpan(Position, 4);
@@ -68,7 +59,7 @@ namespace Centaurus.Xdr
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteUInt32(uint value)
+        public override void WriteUInt32(uint value)
         {
             EnsureCapacity(4);
             var span = buffer.Data.AsSpan(Position, 4);
@@ -77,7 +68,7 @@ namespace Centaurus.Xdr
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteInt64(long value)
+        public override void WriteInt64(long value)
         {
             EnsureCapacity(8);
             var span = buffer.Data.AsSpan(Position, 8);
@@ -86,7 +77,7 @@ namespace Centaurus.Xdr
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteUInt64(ulong value)
+        public override void WriteUInt64(ulong value)
         {
             EnsureCapacity(8);
             var span = buffer.Data.AsSpan(Position, 8);
@@ -95,31 +86,31 @@ namespace Centaurus.Xdr
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteFloat(float value)
+        public override void WriteFloat(float value)
         {
             WriteInt32(BitConverter.SingleToInt32Bits(value));
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteDouble(double value)
+        public override void WriteDouble(double value)
         {
             WriteInt64(BitConverter.DoubleToInt64Bits(value));
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteBoolean(bool value)
+        public override void WriteBoolean(bool value)
         {
             WriteInt32(value ? 1 : 0);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteEnum(Enum value)
+        public override void WriteEnum(Enum value)
         {
             WriteInt32((int)(object)value);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteString(string value)
+        public override void WriteString(string value)
         {
             var raw = value.AsSpan();
             int length = StringEncoding.GetByteCount(raw);
@@ -131,22 +122,20 @@ namespace Centaurus.Xdr
             StringEncoding.GetBytes(raw, buffer.Data.AsSpan(Position, length));
             buffer.Position += length;
             //padd offset to match 4-bytes chunks
-            var reminder = length % 4;
-            if (reminder > 0)
-            {
-                WritePadding(reminder);
-            }
+            WritePadding(length);
         }
 
-        private void WritePadding(int reminder)
+        private void WritePadding(int length)
         {
+            var reminder = length % 4;
+            if (reminder == 0) return;
             var padding = 4 - reminder;
             buffer.Data.AsSpan(Position, padding).Fill(0);
             buffer.Position += padding;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteVariable(byte[] value, int? count = null)
+        public override void WriteVariable(byte[] value, int? count = null)
         {
             if (count == null)
             {
@@ -171,15 +160,11 @@ namespace Centaurus.Xdr
             value.CopyTo(span);
             buffer.Position += length;
             //padd offset to match 4-bytes chunks
-            var reminder = length % 4;
-            if (reminder > 0)
-            {
-                WritePadding(reminder);
-            }
+            WritePadding(length);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteObject(object value, Type type)
+        public override void WriteObject(object value, Type type)
         {
             XdrConverter.Serialize(value, this);
         }
@@ -215,12 +200,10 @@ namespace Centaurus.Xdr
         {
             public XdrBuffer()
             {
-                Data = bufferPool.Rent(DefaultBufferSize);
+                Data = BufferPool.Rent(DefaultBufferSize);
             }
 
             public XdrBuffer PrevChunk;
-
-            private static readonly ArrayPool<byte> bufferPool = ArrayPool<byte>.Create(DefaultBufferSize, 10000);
 
             public byte[] Data;
 
@@ -228,7 +211,7 @@ namespace Centaurus.Xdr
 
             public void Dispose()
             {
-                bufferPool.Return(Data);
+                BufferPool.Return(Data);
             }
         }
     }

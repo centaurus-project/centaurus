@@ -5,6 +5,7 @@ using System.Linq;
 using Centaurus.Xdr;
 using NUnit.Framework;
 using stellar_dotnet_sdk.xdr;
+using System.IO;
 
 namespace Centaurus.Test
 {
@@ -74,43 +75,79 @@ namespace Centaurus.Test
             legacyXdrSerializationStream.WriteString("oiewurouqwe");
             legacyXdrSerializationStream.WriteVarOpaque(32, testArray);
 
-            var fastXdrReader = new XdrReader(legacyXdrSerializationStream.ToArray());
-            Assert.AreEqual(435, fastXdrReader.ReadInt32());
-            Assert.AreEqual((uint)435, fastXdrReader.ReadUInt32());
-            Assert.AreEqual(43546345634657565L, fastXdrReader.ReadInt64());
+            var bufferReader = new XdrBufferReader(legacyXdrSerializationStream.ToArray());
+            Assert.AreEqual(435, bufferReader.ReadInt32());
+            Assert.AreEqual((uint)435, bufferReader.ReadUInt32());
+            Assert.AreEqual(43546345634657565L, bufferReader.ReadInt64());
             {
-                var length = fastXdrReader.ReadInt32();
+                var length = bufferReader.ReadInt32();
                 var value = new double[length];
                 for (var i = 0; i < length; i++)
                 {
-                    value[i] = fastXdrReader.ReadDouble();
+                    value[i] = bufferReader.ReadDouble();
                 }
                 Assert.AreEqual(new double[] { 435.15, 64656.11 }, value);
             }
-            Assert.AreEqual("oiewurouqwe", fastXdrReader.ReadString());
-            Assert.AreEqual(testArray, fastXdrReader.ReadVariable());
+            Assert.AreEqual("oiewurouqwe", bufferReader.ReadString());
+            Assert.AreEqual(testArray, bufferReader.ReadVariable());
+
+            using var streamReader = new XdrStreamReader(new MemoryStream(legacyXdrSerializationStream.ToArray()));
+            Assert.AreEqual(435, streamReader.ReadInt32());
+            Assert.AreEqual((uint)435, streamReader.ReadUInt32());
+            Assert.AreEqual(43546345634657565L, streamReader.ReadInt64());
+            {
+                var length = streamReader.ReadInt32();
+                var value = new double[length];
+                for (var i = 0; i < length; i++)
+                {
+                    value[i] = streamReader.ReadDouble();
+                }
+                Assert.AreEqual(new double[] { 435.15, 64656.11 }, value);
+            }
+            Assert.AreEqual("oiewurouqwe", streamReader.ReadString());
+            Assert.AreEqual(testArray, streamReader.ReadVariable());
 
             //backward compatibility
-            var fastWriter = new XdrWriter();
-            fastWriter.WriteInt32(435);
-            fastWriter.WriteUInt32((uint)435);
+            var bufferWriter = new XdrBufferWriter();
+            bufferWriter.WriteInt32(435);
+            bufferWriter.WriteUInt32((uint)435);
             {
                 var arr = new double[] { 435.15, 64656.11 };
-                fastWriter.WriteInt32(arr.Length);
+                bufferWriter.WriteInt32(arr.Length);
                 foreach (var d in arr)
                 {
-                    fastWriter.WriteDouble(d);
+                    bufferWriter.WriteDouble(d);
                 }
             }
-            fastWriter.WriteString("oiewurouqwe");
-            fastWriter.WriteVariable(testArray);
+            bufferWriter.WriteString("oiewurouqwe");
+            bufferWriter.WriteVariable(testArray);
 
-            var legacyXdrReader = new XdrDataInputStream(fastWriter.ToArray());
+            var legacyXdrReader = new XdrDataInputStream(bufferWriter.ToArray());
             Assert.AreEqual(435, legacyXdrReader.ReadInt());
             Assert.AreEqual((uint)435, legacyXdrReader.ReadUInt());
             Assert.AreEqual(new double[] { 435.15, 64656.11 }, legacyXdrReader.ReadDoubleArray());
             Assert.AreEqual("oiewurouqwe", legacyXdrReader.ReadString());
             Assert.AreEqual(testArray, legacyXdrReader.ReadVarOpaque(32));
+
+
+            using var memoryStream = new MemoryStream();
+            var streamWriter = new XdrStreamWriter(memoryStream);
+            streamWriter.WriteInt32(435);
+            streamWriter.WriteUInt32((uint)435);
+            {
+                var arr = new double[] { 435.15, 64656.11 };
+                streamWriter.WriteInt32(arr.Length);
+                foreach (var d in arr)
+                {
+                    streamWriter.WriteDouble(d);
+                }
+            }
+            streamWriter.WriteString("oiewurouqwe");
+            streamWriter.WriteVariable(testArray);
+            var res = memoryStream.ToArray();
+            var reference = bufferWriter.ToArray();
+            CollectionAssert.AreEqual(reference, res);
+
         }
 
         [TestCase(1, 1000000)]
@@ -183,7 +220,7 @@ namespace Centaurus.Test
             {
                 for (var r = 0; r < rounds; r++)
                 {
-                    var stream = new XdrWriter();
+                    var stream = new XdrBufferWriter();
                     for (var i = 0; i < iterations; i++)
                     {
                         stream.WriteInt32(435);
@@ -204,7 +241,7 @@ namespace Centaurus.Test
             var testArray = new byte[32];
             Array.Fill(testArray, (byte)100);
 
-            var stream = new XdrWriter();
+            var stream = new XdrBufferWriter();
             for (var i = 0; i < iterations; i++)
             {
                 stream.WriteInt32(435);
@@ -217,7 +254,7 @@ namespace Centaurus.Test
             {
                 for (var r = 0; r < rounds; r++)
                 {
-                    var reader = new XdrReader(serialized);
+                    var reader = new XdrBufferReader(serialized);
                     for (var i = 0; i < iterations; i++)
                     {
                         reader.ReadInt32();
