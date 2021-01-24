@@ -36,12 +36,14 @@ namespace Centaurus
 
         public static byte[] ComputeHash(this object objToSerialize)
         {
-            byte[] bytes = objToSerialize as byte[];
-            if (bytes == null)
-            {
-                bytes = XdrConverter.Serialize(objToSerialize);
-            }
-            return SHA256.Create().ComputeHash(bytes);
+            var bytes = objToSerialize as byte[];
+
+            if (bytes != null)
+                return SHA256.Create().ComputeHash(bytes);
+            using var buffer = XdrBufferFactory.Rent();
+            using var writer = new XdrBufferWriter(buffer.Buffer);
+            XdrConverter.Serialize(objToSerialize, writer);
+            return SHA256.Create().ComputeHash(bytes, 0, writer.Length);
         }
 
         public static byte[] FromHexString(string hexString)

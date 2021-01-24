@@ -133,15 +133,18 @@ namespace Centaurus
                 if (!envelope.IsSignedBy(Global.Settings.KeyPair.PublicKey))
                     envelope.Sign(Global.Settings.KeyPair);
 
-                var serializedData = XdrConverter.Serialize(envelope);
+                using var buffer = XdrBufferFactory.Rent();
+                using var writer = new XdrBufferWriter(buffer.Buffer);
+                XdrConverter.Serialize(envelope, writer);
+
                 if (webSocket == null)
                     throw new ObjectDisposedException(nameof(webSocket));
-                await webSocket.SendAsync(serializedData, WebSocketMessageType.Binary, true, cancellationToken);
+                await webSocket.SendAsync(buffer.AsSegment(0, writer.Length), WebSocketMessageType.Binary, true, cancellationToken);
                 Global.ExtensionsManager.AfterSendMessage(this, envelope);
             }
             catch (Exception exc)
             {
-                if (exc is TaskCanceledException 
+                if (exc is TaskCanceledException
                     || exc is OperationCanceledException
                     || exc is WebSocketException socketException && (socketException.WebSocketErrorCode == WebSocketError.InvalidState))
                     return;
@@ -168,7 +171,8 @@ namespace Centaurus
                     MessageEnvelope envelope = null;
                     try
                     {
-                        envelope = XdrConverter.Deserialize<MessageEnvelope>(buffer.CreateReader());
+                        var reader = new XdrBufferReader(buffer.Buffer, buffer.Length);
+                        envelope = XdrConverter.Deserialize<MessageEnvelope>(reader);
 
                         if (!await HandleMessage(envelope))
                             throw new UnexpectedMessageException($"No handler registered for message type {envelope.Message.MessageType}.");
@@ -197,7 +201,7 @@ namespace Centaurus
             }
             catch (WebSocketException e)
             {
-                Global.ExtensionsManager.HandleMessageFailed(this, null, e); 
+                Global.ExtensionsManager.HandleMessageFailed(this, null, e);
                 var closureStatus = WebSocketCloseStatus.InternalServerError;
                 if (e.WebSocketErrorCode == WebSocketError.ConnectionClosedPrematurely)
                     closureStatus = WebSocketCloseStatus.NormalClosure;

@@ -15,20 +15,18 @@ namespace Centaurus.Xdr
             if (stream == null) throw new ArgumentNullException(nameof(stream));
             if (!stream.CanWrite) throw new ArgumentException("Stream is not writable");
             this.stream = stream;
-            sharedBuffer = BufferPool.Rent(DefaultBufferSize);
+            sharedBuffer = XdrBufferFactory.Rent(DefaultBufferSize);
         }
 
         private readonly Stream stream;
 
-        private int bytesWritten = 0;
+        public int Length = 0;
 
-        public override int Position => bytesWritten;
-
-        private byte[] sharedBuffer;
+        private XdrBufferFactory.RentedBuffer sharedBuffer;
 
         private Span<byte> Allocate(int length)
         {
-            bytesWritten += length;
+            Length += length;
             return sharedBuffer.AsSpan(0, length);
         }
 
@@ -99,7 +97,7 @@ namespace Centaurus.Xdr
             var span = Allocate(length);
             StringEncoding.GetBytes(raw, span);
             stream.Write(span);
-            bytesWritten += length;
+            Length += length;
             //padd offset to match 4-bytes chunks
             WritePadding(length);
         }
@@ -111,7 +109,7 @@ namespace Centaurus.Xdr
             //length prefix
             WriteInt32(length);
             stream.Write(value);
-            bytesWritten += length;
+            Length += length;
             //padd offset to match 4-bytes chunks
             WritePadding(length);
         }
@@ -147,7 +145,7 @@ namespace Centaurus.Xdr
 
         public void Dispose()
         {
-            BufferPool.Return(sharedBuffer);
+            sharedBuffer.Dispose();
         }
     }
 }

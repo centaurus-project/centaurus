@@ -25,11 +25,9 @@ namespace Centaurus.Xdr
 
         public static byte[] Serialize(object value)
         {
-            using (var writer = new XdrBufferWriter())
-            {
-                Serialize(value, writer);
-                return writer.ToArray();
-            }
+            using var writer = new XdrBufferWriter();
+            Serialize(value, writer);
+            return writer.ToArray();
         }
 
         public static void Serialize(object value, XdrWriter writer)

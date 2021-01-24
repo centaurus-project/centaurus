@@ -12,10 +12,6 @@ namespace Centaurus.Xdr
 
         protected static readonly Encoding StringEncoding = Encoding.UTF8;
 
-        protected static readonly ArrayPool<byte> BufferPool = ArrayPool<byte>.Create();
-
-        public abstract int Position { get; }
-
         public abstract void WriteInt32(int value);
 
         public abstract void WriteUInt32(uint value);

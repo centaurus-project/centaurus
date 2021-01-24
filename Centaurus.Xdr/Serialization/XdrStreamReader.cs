@@ -13,16 +13,14 @@ namespace Centaurus.Xdr
         public XdrStreamReader(Stream stream)
         {
             this.stream = stream;
-            buffer = bufferPool.Rent(64 * 1024);
+            buffer = XdrBufferFactory.Rent();
         }
 
         private Stream stream;
 
-        private byte[] buffer;
+        private XdrBufferFactory.RentedBuffer buffer;
 
         private int position = 0;
-
-        private static readonly ArrayPool<byte> bufferPool = ArrayPool<byte>.Create();
 
         public override int Position => position;
 
@@ -43,7 +41,7 @@ namespace Centaurus.Xdr
 
         public void Dispose()
         {
-            bufferPool.Return(buffer);
+            buffer.Dispose();
         }
     }
 }
