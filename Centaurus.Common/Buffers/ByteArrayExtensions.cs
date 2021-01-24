@@ -43,7 +43,8 @@ namespace Centaurus
             using var buffer = XdrBufferFactory.Rent();
             using var writer = new XdrBufferWriter(buffer.Buffer);
             XdrConverter.Serialize(objToSerialize, writer);
-            return SHA256.Create().ComputeHash(bytes, 0, writer.Length);
+            var hash = SHA256.Create().ComputeHash(buffer.Buffer, 0, writer.Length);
+            return hash;
         }
 
         public static byte[] FromHexString(string hexString)

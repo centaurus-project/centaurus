@@ -22,6 +22,6 @@ namespace Centaurus.Models
         [XdrField(2)]
         public int Limit { get; set; }
 
-        public bool IsDesc => Order.Equals(Desc, StringComparison.OrdinalIgnoreCase);
+        public bool IsDesc => Desc.Equals(Order, StringComparison.OrdinalIgnoreCase);
     }
 }
