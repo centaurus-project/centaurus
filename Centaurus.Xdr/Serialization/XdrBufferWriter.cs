@@ -1,37 +1,34 @@
 ﻿using System;
-using System.Buffers;
 using System.Buffers.Binary;
-using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace Centaurus.Xdr
 {
-
-    public class XdrWriter : IDisposable
+    public class XdrBufferWriter : XdrWriter, IDisposable
     {
-        const int DefaultBufferSize = 64 * 1024; //64KB
-        static readonly Encoding StringEncoding = Encoding.UTF8;
-
-        //TODO: try ArrayBufferWriter instead of byte[]
-        public XdrWriter()
+        public XdrBufferWriter()
         {
             AllocateBuffer();
         }
 
-        private XdrBuffer buffer;
+        public XdrBufferWriter(byte[] into)
+        {
+            externalBuffer = into;
+            bufferChunk = new XdrBuffer(externalBuffer);
+        }
 
-        //private readonly List<XdrBuffer> bufferChunks = new List<XdrBuffer>(1);
+        private byte[] externalBuffer;
 
-        /// <summary>
-        /// Current writer position.
-        /// </summary>
-        public int Position => buffer.Position;
+        private XdrBuffer bufferChunk;
+
+        public int Length => bufferChunk.TotalLength;
 
         public void Dispose()
         {
-            var chunk = buffer;
+            if (externalBuffer != null) return;
+            var chunk = bufferChunk;
             do
             {
                 chunk.Dispose();
@@ -43,110 +40,93 @@ namespace Centaurus.Xdr
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void AllocateBuffer()
         {
-            var newBuffer = new XdrBuffer();
-            newBuffer.PrevChunk = buffer;
-            buffer = newBuffer;
+            if (externalBuffer != null)
+                throw new IndexOutOfRangeException("Serialized object exceeded capacity of the external buffer");
+            bufferChunk = new XdrBuffer(bufferChunk);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void EnsureCapacity(int requiredCapacity)
+        private Span<byte> Allocate(int requiredCapacity)
         {
             //allocate new chunk when the buffer size capacity is reached
-            if (buffer.Position + requiredCapacity > DefaultBufferSize)
+            if (bufferChunk.Position + requiredCapacity > DefaultBufferSize)
             {
                 AllocateBuffer();
             }
+            return bufferChunk.Allocate(requiredCapacity);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteInt32(int value)
+        public override void WriteInt32(int value)
         {
-            EnsureCapacity(4);
-            var span = buffer.Data.AsSpan(Position, 4);
-            BinaryPrimitives.WriteInt32BigEndian(span, value);
-            buffer.Position += 4;
+            BinaryPrimitives.WriteInt32BigEndian(Allocate(4), value);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteUInt32(uint value)
+        public override void WriteUInt32(uint value)
         {
-            EnsureCapacity(4);
-            var span = buffer.Data.AsSpan(Position, 4);
-            BinaryPrimitives.WriteUInt32BigEndian(span, value);
-            buffer.Position += 4;
+            BinaryPrimitives.WriteUInt32BigEndian(Allocate(4), value);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteInt64(long value)
+        public override void WriteInt64(long value)
         {
-            EnsureCapacity(8);
-            var span = buffer.Data.AsSpan(Position, 8);
-            BinaryPrimitives.WriteInt64BigEndian(span, value);
-            buffer.Position += 8;
+            BinaryPrimitives.WriteInt64BigEndian(Allocate(8), value);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteUInt64(ulong value)
+        public override void WriteUInt64(ulong value)
         {
-            EnsureCapacity(8);
-            var span = buffer.Data.AsSpan(Position, 8);
-            BinaryPrimitives.WriteUInt64BigEndian(span, value);
-            buffer.Position += 8;
+            BinaryPrimitives.WriteUInt64BigEndian(Allocate(8), value);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteFloat(float value)
+        public override void WriteFloat(float value)
         {
             WriteInt32(BitConverter.SingleToInt32Bits(value));
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteDouble(double value)
+        public override void WriteDouble(double value)
         {
             WriteInt64(BitConverter.DoubleToInt64Bits(value));
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteBoolean(bool value)
+        public override void WriteBoolean(bool value)
         {
             WriteInt32(value ? 1 : 0);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteEnum(Enum value)
+        public override void WriteEnum(Enum value)
         {
             WriteInt32((int)(object)value);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteString(string value)
+        public override void WriteString(string value)
         {
             var raw = value.AsSpan();
             int length = StringEncoding.GetByteCount(raw);
             //reserve additional 4 bytes for the length prefix
             WriteInt32(length);
-            //check that a variable fits into buffer
-            EnsureCapacity(length);
             //write chars to span
-            StringEncoding.GetBytes(raw, buffer.Data.AsSpan(Position, length));
-            buffer.Position += length;
+            StringEncoding.GetBytes(raw, Allocate(length));
             //padd offset to match 4-bytes chunks
-            var reminder = length % 4;
-            if (reminder > 0)
-            {
-                WritePadding(reminder);
-            }
+            WritePadding(length);
         }
 
-        private void WritePadding(int reminder)
+        private void WritePadding(int length)
         {
+            var reminder = length % 4;
+            if (reminder == 0) return;
             var padding = 4 - reminder;
-            buffer.Data.AsSpan(Position, padding).Fill(0);
-            buffer.Position += padding;
+            Allocate(padding).Fill(0);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteVariable(byte[] value, int? count = null)
+        public override void WriteVariable(byte[] value, int? count = null)
         {
             if (count == null)
             {
@@ -163,23 +143,14 @@ namespace Centaurus.Xdr
             var length = value.Length;
             //reserve additional 4 bytes for the length prefix
             WriteInt32(length);
-            //check that a variable fits into buffer
-            EnsureCapacity(length);
-            //pin memory for the variable itself
-            var span = buffer.Data.AsSpan(Position, length);
             //write bytes
-            value.CopyTo(span);
-            buffer.Position += length;
+            value.CopyTo(Allocate(length));
             //padd offset to match 4-bytes chunks
-            var reminder = length % 4;
-            if (reminder > 0)
-            {
-                WritePadding(reminder);
-            }
+            WritePadding(length);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void WriteObject(object value, Type type)
+        public override void WriteObject(object value, Type type)
         {
             XdrConverter.Serialize(value, this);
         }
@@ -187,7 +158,7 @@ namespace Centaurus.Xdr
         public byte[] ToArray()
         {
             //calculate total output size
-            var chunk = buffer;
+            var chunk = bufferChunk;
             int totalLength = 0;
             do
             {
@@ -199,7 +170,7 @@ namespace Centaurus.Xdr
             //allocate output buffer
             var result = new byte[totalLength];
             //merge all chunks
-            chunk = buffer;
+            chunk = bufferChunk;
             int pointer = totalLength;
             do
             {
@@ -213,22 +184,47 @@ namespace Centaurus.Xdr
 
         internal class XdrBuffer
         {
-            public XdrBuffer()
+            public XdrBuffer(XdrBuffer prevChunk = null)
             {
-                Data = bufferPool.Rent(DefaultBufferSize);
+                buffer = XdrBufferFactory.Rent(DefaultBufferSize);
+                Data = buffer.Buffer;
+                if (prevChunk != null)
+                {
+                    PrevChunk = prevChunk;
+                    prevChunkTotalLength = prevChunk.TotalLength;
+                }
             }
 
-            public XdrBuffer PrevChunk;
+            public XdrBuffer(byte[] externalBuffer)
+            {
+                Data = externalBuffer;
+            }
 
-            private static readonly ArrayPool<byte> bufferPool = ArrayPool<byte>.Create(DefaultBufferSize, 10000);
+            private readonly XdrBufferFactory.RentedBuffer buffer;
 
-            public byte[] Data;
+            private readonly int prevChunkTotalLength;
 
-            public int Position;
+            public readonly XdrBuffer PrevChunk;
+
+            public int TotalLength => prevChunkTotalLength + Position;
+
+            public byte[] Data { get; private set; }
+
+            public int Position { get; private set; }
+
+            public Span<byte> Allocate(int length)
+            {
+                var span = Data.AsSpan(Position, length);
+                Position += length;
+                return span;
+            }
 
             public void Dispose()
             {
-                bufferPool.Return(Data);
+                if (buffer != null)
+                {
+                    buffer.Dispose();
+                }
             }
         }
     }

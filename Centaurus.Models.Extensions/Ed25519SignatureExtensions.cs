@@ -23,10 +23,5 @@ namespace Centaurus
             var keypair = KeyPair.FromPublicKey(signature.Signer.ToArray());
             return keypair.Verify(data, signature.Signature);
         }
-
-        public static bool IsValid(this Ed25519Signature signature, Message message)
-        {
-            return IsValid(signature, XdrConverter.Serialize(message));
-        }
     }
 }

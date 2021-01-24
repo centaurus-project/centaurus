@@ -27,7 +27,7 @@ namespace Centaurus.Domain
 
         public string Command { get; set; }
 
-        public static BaseCommand Deserialize(byte[] request)
+        public static BaseCommand Deserialize(ReadOnlySpan<byte> request)
         {
             var obj = JsonSerializer.Deserialize<CommandWrapper>(request, SerializeOptions);
             return obj.CommandObject;

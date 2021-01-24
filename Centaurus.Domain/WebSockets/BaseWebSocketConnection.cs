@@ -133,15 +133,18 @@ namespace Centaurus
                 if (!envelope.IsSignedBy(Global.Settings.KeyPair.PublicKey))
                     envelope.Sign(Global.Settings.KeyPair);
 
-                var serializedData = XdrConverter.Serialize(envelope);
+                using var buffer = XdrBufferFactory.Rent();
+                using var writer = new XdrBufferWriter(buffer.Buffer);
+                XdrConverter.Serialize(envelope, writer);
+
                 if (webSocket == null)
                     throw new ObjectDisposedException(nameof(webSocket));
-                await webSocket.SendAsync(serializedData, WebSocketMessageType.Binary, true, cancellationToken);
+                await webSocket.SendAsync(buffer.AsSegment(0, writer.Length), WebSocketMessageType.Binary, true, cancellationToken);
                 Global.ExtensionsManager.AfterSendMessage(this, envelope);
             }
             catch (Exception exc)
             {
-                if (exc is TaskCanceledException 
+                if (exc is TaskCanceledException
                     || exc is OperationCanceledException
                     || exc is WebSocketException socketException && (socketException.WebSocketErrorCode == WebSocketError.InvalidState))
                     return;
@@ -156,32 +159,19 @@ namespace Centaurus
 
 
         private SemaphoreSlim receiveMessageSemaphore = new SemaphoreSlim(1);
-        public async Task<XdrReader> GetReader()
+
+        public async Task Listen()
         {
             await receiveMessageSemaphore.WaitAsync();
             try
             {
-                return await webSocket.GetInputStreamReader(cancellationToken);
-            }
-            finally
-            {
-                receiveMessageSemaphore.Release();
-            }
-        }
-
-        public async Task Listen()
-        {
-            var readerTask = GetReader();
-            try
-            {
                 do
                 {
-                    var reader = await readerTask;
-                    //get next message reader
-                    readerTask = GetReader();
+                    using var buffer = await webSocket.GetWebsocketBuffer(cancellationToken);
                     MessageEnvelope envelope = null;
                     try
                     {
+                        var reader = new XdrBufferReader(buffer.Buffer, buffer.Length);
                         envelope = XdrConverter.Deserialize<MessageEnvelope>(reader);
 
                         if (!await HandleMessage(envelope))
@@ -197,7 +187,7 @@ namespace Centaurus
                         var statusCode = exc.GetStatusCode();
 
                         //prevent recursive error sending
-                        if (!(envelope.Message is ResultMessage))
+                        if (!(envelope?.Message is ResultMessage))
                             _ = SendMessage(envelope.CreateResult(statusCode));
                         if (statusCode == ResultStatusCodes.InternalError || !Global.IsAlpha)
                             logger.Error(exc);
@@ -211,7 +201,7 @@ namespace Centaurus
             }
             catch (WebSocketException e)
             {
-                Global.ExtensionsManager.HandleMessageFailed(this, null, e); 
+                Global.ExtensionsManager.HandleMessageFailed(this, null, e);
                 var closureStatus = WebSocketCloseStatus.InternalServerError;
                 if (e.WebSocketErrorCode == WebSocketError.ConnectionClosedPrematurely)
                     closureStatus = WebSocketCloseStatus.NormalClosure;
@@ -225,6 +215,10 @@ namespace Centaurus
                     return;
                 Global.ExtensionsManager.HandleMessageFailed(this, null, e);
                 logger.Error(e);
+            }
+            finally
+            {
+                receiveMessageSemaphore.Release();
             }
         }
 

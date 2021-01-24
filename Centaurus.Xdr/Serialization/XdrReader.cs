@@ -7,47 +7,16 @@ using System.Text;
 
 namespace Centaurus.Xdr
 {
-    public class XdrReader
+    public abstract class XdrReader
     {
-        public XdrReader(byte[] source, int length)
-        {
-            this.source = source;
-            Length = length;
-        }
+        protected static readonly Encoding StringEncoding = Encoding.UTF8;
 
-        static readonly Encoding StringEncoding = Encoding.UTF8;
-
-        public XdrReader(byte[] source) : this(source, source.Length) { }
-
-        private readonly byte[] source;
-
-        public int Length { get; private set; }
-
-        private int position = 0;
-
-        public bool CanRead { get { return position < Length; } }
-
-        public byte[] ToArray()
-        {
-            var res = new byte[Length];
-            Array.Copy(source, 0, res, 0, Length);
-            return res;
-        }
+        public abstract int Position { get; }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal ReadOnlySpan<byte> ReadAndAdvance(int bytesToRead)
-        {
-            if (bytesToRead + position > Length)
-                throw new FormatException($"Unexpected attempt to read {bytesToRead} bytes at position {position}. Source stream is too short.");
-            var span = source.AsSpan(position, bytesToRead);
-            position += bytesToRead;
-            return span;
-        }
+        protected abstract ReadOnlySpan<byte> ReadAndAdvance(int bytesToRead);
 
-        internal void Advance(int bytes)
-        {
-            position += bytes;
-        }
+        internal abstract void Advance(int bytes);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public int ReadInt32()
@@ -139,18 +108,16 @@ namespace Centaurus.Xdr
         public ReadOnlySpan<byte> ReadVariableAsSpan()
         {
             var length = ReadInt32();
-            var res = ReadAndAdvance(length);
-            var padding = length % 4;
-            if (padding != 0)
+            var padding = (4 - length % 4) % 4;
+            var bufferLength = length + padding;
+            var res = ReadAndAdvance(bufferLength);
+            if (padding == 0) return res;
+            //ensure padding bytes are empty
+            for (var i = length; i < bufferLength; i++) //potentially can be slightly faster if operations are inlined (vs loop)
             {
-                padding = 4 - padding;
-                var tail = ReadAndAdvance(padding);
-                for (var i = 0; i < padding; i++)
-                {
-                    if (tail[i] != 0b0) throw new FormatException($"Non-zero variable padding at position {position + i - padding}.");
-                }
+                if (res[i] != 0b0) throw new FormatException($"Non-zero variable padding at position {Position + i}.");
             }
-            return res;
+            return res.Slice(0, length);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

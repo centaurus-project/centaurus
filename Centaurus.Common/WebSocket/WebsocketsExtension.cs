@@ -11,35 +11,29 @@ using Centaurus.Xdr;
 
 namespace Centaurus
 {
+
     public static class WebSocketExtension
     {
-        const int chunkSize = 512;
+        const int chunkSize = 1024;
         const int maxMessageSize = 20480;
 
-        //TODO: validate msg size
-        public static async Task<byte[]> GetInputByteArray(this WebSocket webSocket, CancellationToken cancellationToken)
+        public static async Task<XdrBufferFactory.RentedBuffer> GetWebsocketBuffer(this WebSocket webSocket, CancellationToken cancellationToken)
         {
-            var buffer = WebSocket.CreateClientBuffer(chunkSize, chunkSize);
-            using (var ms = new MemoryStream())
-            {
-                var result = default(WebSocketReceiveResult);
-                do
-                {
-                    result = await webSocket.ReceiveAsync(buffer, cancellationToken);
-                    if (result.CloseStatus.HasValue)
-                        throw new ConnectionCloseException(result.CloseStatus.Value, result.CloseStatusDescription);
-                    ms.Write(buffer.Array, buffer.Offset, result.Count);
-                    //if (checkLength && ms.Length > maxMessageSize) 
-                    //    throw new OutOfMemoryException("Suspiciously large message");
-                } while (!result.EndOfMessage);
-                return ms.ToArray();
-            }
-        }
+            var length = 0;
 
-        public static async Task<XdrReader> GetInputStreamReader(this WebSocket webSocket, CancellationToken cancellationToken)
-        {
-            var res = await GetInputByteArray(webSocket, cancellationToken);
-            return new XdrReader(res, res.Length);
+            var messageBuffer = XdrBufferFactory.Rent(maxMessageSize);
+            do
+            {
+                if (length + chunkSize > maxMessageSize) throw new Exception("Too large message"); //TODO: handle it upstream
+                var chunk = messageBuffer.AsSegment(length, chunkSize);
+                var result = await webSocket.ReceiveAsync(chunk, cancellationToken);
+                length += result.Count;
+                if (result.EndOfMessage) break;
+                if (result.CloseStatus.HasValue)
+                    throw new ConnectionCloseException(result.CloseStatus.Value, result.CloseStatusDescription);
+            } while (true);
+            messageBuffer.Resize(length);
+            return messageBuffer;
         }
     }
 }
