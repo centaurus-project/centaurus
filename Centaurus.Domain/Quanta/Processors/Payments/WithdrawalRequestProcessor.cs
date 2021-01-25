@@ -17,7 +17,7 @@ namespace Centaurus.Domain
         {
             context.UpdateNonce();
 
-            var withdrawal = new Withdrawal
+            var withdrawal = new WithdrawalWrapper
             {
                 Envelope = context.Envelope,
                 Hash = context.TransactionHash,

@@ -8,9 +8,9 @@ namespace Centaurus.Domain
     public class WithdrawalCreateEffectProcessor : EffectProcessor<WithdrawalCreateEffect>
     {
         private WithdrawalStorage withdrawalStorage;
-        private Withdrawal withdrawal;
+        private WithdrawalWrapper withdrawal;
 
-        public WithdrawalCreateEffectProcessor(WithdrawalCreateEffect effect, Withdrawal withdrawal, WithdrawalStorage withdrawalStorage)
+        public WithdrawalCreateEffectProcessor(WithdrawalCreateEffect effect, WithdrawalWrapper withdrawal, WithdrawalStorage withdrawalStorage)
             :base(effect)
         {
             this.withdrawalStorage = withdrawalStorage ?? throw new ArgumentNullException(nameof(withdrawalStorage));
@@ -21,11 +21,15 @@ namespace Centaurus.Domain
         {
             MarkAsProcessed();
             withdrawalStorage.Add(withdrawal);
+            withdrawal.Source.Withdrawal = withdrawal;
+            withdrawal.Source.Account.Withdrawal = withdrawal.Apex;
         }
 
         public override void RevertEffect()
         {
             MarkAsProcessed();
+            withdrawal.Source.Account.Withdrawal = 0;
+            withdrawal.Source.Withdrawal = null;
             withdrawalStorage.Remove(withdrawal.Hash);
         }
     }

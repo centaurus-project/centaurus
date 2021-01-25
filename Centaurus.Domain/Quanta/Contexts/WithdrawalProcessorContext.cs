@@ -14,7 +14,7 @@ namespace Centaurus.Domain
             WithdrawalRequest = (WithdrawalRequest)Request.RequestEnvelope.Message;
         }
 
-        public List<WithdrawalItem> WithdrawalItems { get; set; } = new List<WithdrawalItem>();
+        public List<WithdrawalWrapperItem> WithdrawalItems { get; set; } = new List<WithdrawalWrapperItem>();
 
         public WithdrawalRequest WithdrawalRequest { get; }
 

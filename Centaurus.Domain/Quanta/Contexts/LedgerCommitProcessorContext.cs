@@ -12,6 +12,6 @@ namespace Centaurus.Domain
         {
         }
 
-        public Dictionary<Models.Withdrawal, Withdrawal> Withdrawals { get; } = new Dictionary<Models.Withdrawal, Withdrawal>();
+        public Dictionary<Withdrawal, WithdrawalWrapper> Withdrawals { get; } = new Dictionary<Withdrawal, WithdrawalWrapper>();
     }
 }

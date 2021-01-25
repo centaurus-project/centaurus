@@ -187,7 +187,7 @@ namespace Centaurus
                         var statusCode = exc.GetStatusCode();
 
                         //prevent recursive error sending
-                        if (!(envelope?.Message is ResultMessage))
+                        if (!(envelope == null || envelope.Message is ResultMessage))
                             _ = SendMessage(envelope.CreateResult(statusCode));
                         if (statusCode == ResultStatusCodes.InternalError || !Global.IsAlpha)
                             logger.Error(exc);

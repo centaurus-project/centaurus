@@ -19,6 +19,9 @@ namespace Centaurus.Models
         [XdrField(2)]
         public List<Effect> Effects { get; set; }
 
+        [XdrField(3, Optional = true)]
+        public string ErrorMessage { get; set; }
+
         public override long MessageId => OriginalMessage.Message.MessageId;
     }
 }

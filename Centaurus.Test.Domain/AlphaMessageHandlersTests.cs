@@ -161,7 +161,7 @@ namespace Centaurus.Test
 
             var envelope = new AuditorState
             {
-                PendingQuantums = new List<MessageEnvelope>(),
+                PendingQuanta = new List<MessageEnvelope>(),
                 State = ApplicationState.Running
             }.CreateEnvelope();
             envelope.Sign(clientKeyPair);

@@ -19,6 +19,6 @@ namespace Centaurus.Domain
 
         public List<Order> Orders { get; set; }
 
-        public List<Withdrawal> Withdrawals { get; set; }
+        public List<WithdrawalWrapper> Withdrawals { get; set; }
     }
 }

@@ -77,9 +77,9 @@ namespace Centaurus
             }
         }
 
-        private void StateChanged(object sender, ApplicationState state)
+        private void StateChanged(StateChangedEventArgs eventArgs)
         {
-            if (state == ApplicationState.Failed)
+            if (eventArgs.State == ApplicationState.Failed)
             {
                 Console.WriteLine("Application failed. Saving pending updates...");
                 Thread.Sleep(PendingUpdatesManager.SaveInterval);

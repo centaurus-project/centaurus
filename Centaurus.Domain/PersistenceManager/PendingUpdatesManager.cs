@@ -41,11 +41,8 @@ namespace Centaurus.Domain
                 awaitedUpdates.CompleteAdding();
             if (IsRunning)
             {
-                var updatesCount = awaitedUpdates.Count;
-                if (updatesCount == 0)
-                    updatesCount = 1;
                 //add some threshold just for case 
-                var maxWaitTime = updatesCount * SaveInterval * 1.2;
+                var maxWaitTime = 60 * 1000 * 5;
 
                 var sw = new Stopwatch();
                 sw.Start();
@@ -134,29 +131,37 @@ namespace Centaurus.Domain
 
         private void RefreshUpdatesContainer()
         {
-            var pendingUpdates = default(DiffObject);
             UpdatesSyncRoot.Wait();
             try
             {
-                if (Current.Quanta.Count > 0)
-                {
-                    pendingUpdates = Current;
-                    Current = new DiffObject();
-                }
-                if (awaitedUpdates != null)
-                {
-                    if (pendingUpdates != null)
-                        awaitedUpdates.Add(pendingUpdates);
-                    if (awaitedUpdates.Count > 10)
-                    {
-                        awaitedUpdates.CompleteAdding();
-                        OnSaveFailed($"Delayed updates queue ({awaitedUpdates.Count}) is too long.");
-                    }
-                }
+                RefreshUpdatesUnlocked();
             }
             finally
             {
                 UpdatesSyncRoot.Release();
+            }
+        }
+
+        public void TryRefreshContainer()
+        {
+            if (Current.Effects.Count > 30_000)
+                RefreshUpdatesUnlocked();
+        }
+
+        private void RefreshUpdatesUnlocked()
+        {
+            var pendingUpdates = default(DiffObject);
+            if (Current.Quanta.Count > 0)
+            {
+                pendingUpdates = Current;
+                Current = new DiffObject();
+            }
+            if (awaitedUpdates != null)
+            {
+                if (pendingUpdates != null)
+                    awaitedUpdates.Add(pendingUpdates);
+                if (awaitedUpdates.Count >= 10 && Global.AppState.State != ApplicationState.Failed)
+                    OnSaveFailed($"Delayed updates queue ({awaitedUpdates.Count}) is too long.");
             }
         }
 
@@ -175,7 +180,8 @@ namespace Centaurus.Domain
             {
                 //we need to cancel all pending updates
                 cancellationTokenSource.Cancel();
-                OnSaveFailed("Error on saving updates.", exc);
+                if (Global.AppState.State != ApplicationState.Failed)
+                    OnSaveFailed("Error on saving updates.", exc);
             }
         }
 

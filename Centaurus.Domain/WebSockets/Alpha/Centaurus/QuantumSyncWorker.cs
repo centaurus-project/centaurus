@@ -29,7 +29,7 @@ namespace Centaurus
         private CancellationTokenSource cancellationTokenSource;
         private CancellationToken cancellationToken;
 
-        private const int batchSize = 100;
+        private const int batchSize = 25;
 
         private void SendQuantums()
         {

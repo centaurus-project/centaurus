@@ -15,7 +15,8 @@ namespace Centaurus.Domain
             {
                 Id = accountModel.Id,
                 Nonce = accountModel.Nonce,
-                Pubkey = new RawPubKey { Data = accountModel.PubKey }
+                Pubkey = new RawPubKey { Data = accountModel.PubKey },
+                Withdrawal = accountModel.Withdrawal
             };
 
             if (accountModel.RequestRateLimits != null)

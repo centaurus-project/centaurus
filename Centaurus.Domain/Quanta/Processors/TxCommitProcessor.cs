@@ -30,7 +30,7 @@ namespace Centaurus.Domain
                         ProcessDeposite(payment as Deposit, context);
                         break;
                     case PaymentTypes.Withdrawal:
-                        ProcessWithdrawal(payment as Models.Withdrawal, context);
+                        ProcessWithdrawal(payment as Withdrawal, context);
                         break;
                     default:
                         throw new InvalidOperationException("Unsupported payment type");
@@ -65,7 +65,7 @@ namespace Centaurus.Domain
                         ValidateDeposite(payment as Deposit);
                         break;
                     case PaymentTypes.Withdrawal:
-                        ValidateWithdrawal(payment as Models.Withdrawal, context);
+                        ValidateWithdrawal(payment as Withdrawal, context);
                         break;
                     default:
                         throw new InvalidOperationException("Unsupported payment type: " + payment.Type.ToString());
@@ -120,7 +120,7 @@ namespace Centaurus.Domain
             context.EffectProcessors.AddBalanceUpdate(account, deposite.Asset, deposite.Amount);
         }
 
-        private void ValidateWithdrawal(Models.Withdrawal withdrawalModel, LedgerCommitProcessorContext context)
+        private void ValidateWithdrawal(Withdrawal withdrawalModel, LedgerCommitProcessorContext context)
         {
             if (withdrawalModel == null)
                 throw new ArgumentNullException(nameof(withdrawalModel));
@@ -131,7 +131,7 @@ namespace Centaurus.Domain
             context.Withdrawals.Add(withdrawalModel, withdrawal);
         }
 
-        private void ProcessWithdrawal(Models.Withdrawal withdrawalModel, LedgerCommitProcessorContext context)
+        private void ProcessWithdrawal(Withdrawal withdrawalModel, LedgerCommitProcessorContext context)
         {
             var withdrawal = context.Withdrawals[withdrawalModel];
             var isSuccess = withdrawalModel.PaymentResult == PaymentResults.Success;

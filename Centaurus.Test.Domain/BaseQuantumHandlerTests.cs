@@ -93,7 +93,7 @@ namespace Centaurus.Test
                             Destination = TestEnvironment.Client1KeyPair,
                             Asset = asset
                         },
-                        new Models.Withdrawal
+                        new Withdrawal
                         {
                             TransactionHash = txHash,
                             PaymentResult = PaymentResults.Success
@@ -260,12 +260,9 @@ namespace Centaurus.Test
             stellar_dotnet_sdk.xdr.Transaction.Encode(outputStream, tx.ToXdrV1());
 
             var account = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
-            account.HasPendingWithdrawal = hasWithdrawal;
-
-            var acc = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
             var withdrawal = new WithdrawalRequest
             {
-                Account = acc.Account.Id,
+                Account = account.Account.Id,
                 Nonce = 1,
                 TransactionXdr = outputStream.ToArray(),
                 AccountWrapper = account

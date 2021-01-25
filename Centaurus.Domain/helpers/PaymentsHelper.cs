@@ -53,12 +53,7 @@ namespace Centaurus.Domain
                             TransactionHash = transactionHash
                         };
                     else if (Global.Constellation.Vault.Equals((RawPubKey)source.PublicKey))
-                    {
-                        var withdrawal = Global.WithdrawalStorage.GetWithdrawal(transactionHash);
-                        if (withdrawal == null)
-                            throw new Exception("Unable to find withdrawal by hash.");
-                        payment = new Models.Withdrawal { TransactionHash = transactionHash  };
-                    }
+                        payment = new Withdrawal { TransactionHash = transactionHash  };
                     if (payment != null)
                     {
                         payment.PaymentResult = pResult;

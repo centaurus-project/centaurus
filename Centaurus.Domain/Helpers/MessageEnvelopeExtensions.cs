@@ -10,6 +10,11 @@ namespace Centaurus.Domain
 
         public static void TryAssignAccountWrapper(this MessageEnvelope envelope)
         {
+            envelope.TryAssignAccountWrapper(Global.AccountStorage);
+        }
+
+        public static void TryAssignAccountWrapper(this MessageEnvelope envelope, AccountStorage accountStorage)
+        {
             var requestMessage = default(RequestMessage);
             if (envelope.Message is RequestQuantum)
                 requestMessage = ((RequestQuantum)envelope.Message).RequestMessage;
@@ -18,7 +23,9 @@ namespace Centaurus.Domain
             else
                 return;
 
-            requestMessage.AccountWrapper = Global.AccountStorage.GetAccount(requestMessage.Account);
+            if (accountStorage == null)
+                throw new ArgumentNullException(nameof(accountStorage));
+            requestMessage.AccountWrapper = accountStorage.GetAccount(requestMessage.Account);
         }
     }
 }

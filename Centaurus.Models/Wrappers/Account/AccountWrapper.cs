@@ -14,6 +14,8 @@ namespace Centaurus.Models
 
         public AccountRequestCounter RequestCounter { get; }
 
-        public bool HasPendingWithdrawal { get; set; }
+        public WithdrawalWrapper Withdrawal { get; set; }
+
+        public bool HasPendingWithdrawal => Withdrawal != null;
     }
 }
