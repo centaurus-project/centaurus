@@ -4,14 +4,14 @@ using System.Text;
 
 namespace Centaurus
 {
-    public class TooManyRequests : BaseClientException
+    public class TooManyRequestsException : BaseClientException
     {
-        public TooManyRequests()
+        public TooManyRequestsException()
         {
 
         }
 
-        public TooManyRequests(string message)
+        public TooManyRequestsException(string message)
             : base(message)
         {
 

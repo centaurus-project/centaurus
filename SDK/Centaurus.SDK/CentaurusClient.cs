@@ -453,6 +453,13 @@ namespace Centaurus.SDK
 
             public void Dispose()
             {
+                if (heartbeatTimer != null)
+                {
+                    heartbeatTimer.Elapsed -= HeartbeatTimer_Elapsed;
+                    heartbeatTimer.Dispose();
+                    heartbeatTimer = null;
+                }
+
                 cancellationTokenSource?.Dispose();
                 cancellationTokenSource = null;
 

@@ -216,7 +216,7 @@ namespace Centaurus.Domain
                 return;
             var account = request.RequestMessage.AccountWrapper;
             if (!account.RequestCounter.IncRequestCount(request.Timestamp, out string error))
-                throw new TooManyRequests($"Request limit reached for account {account.Account.Pubkey}.");
+                throw new TooManyRequestsException($"Request limit reached for account {account.Account.Pubkey}.");
         }
 
         void ProcessTransaction(object context, ResultMessage resultMessage)

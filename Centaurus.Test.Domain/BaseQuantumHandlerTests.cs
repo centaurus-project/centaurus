@@ -453,7 +453,7 @@ namespace Centaurus.Test
                 }
 
                 if (i + 1 > minuteLimit)
-                    await AssertQuantumHandling(envelope, typeof(TooManyRequests));
+                    await AssertQuantumHandling(envelope, typeof(TooManyRequestsException));
                 else
                     await AssertQuantumHandling(envelope, null);
             }
