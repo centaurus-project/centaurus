@@ -7,7 +7,7 @@ namespace Centaurus.Domain
 {
     public static class EffectProcessorsContainerExtensions
     {
-        public static void AddWithdrawalCreate(this EffectProcessorsContainer effectProcessors, Withdrawal withdrawal, WithdrawalStorage withdrawalStorage)
+        public static void AddWithdrawalCreate(this EffectProcessorsContainer effectProcessors, WithdrawalWrapper withdrawal, WithdrawalStorage withdrawalStorage)
         {
             var effect = new WithdrawalCreateEffect
             {
@@ -17,7 +17,7 @@ namespace Centaurus.Domain
             effectProcessors.Add(new WithdrawalCreateEffectProcessor(effect, withdrawal, withdrawalStorage));
         }
 
-        public static void AddWithdrawalRemove(this EffectProcessorsContainer effectProcessors, Withdrawal withdrawal, WithdrawalStorage withdrawalStorage)
+        public static void AddWithdrawalRemove(this EffectProcessorsContainer effectProcessors, WithdrawalWrapper withdrawal, WithdrawalStorage withdrawalStorage)
         {
             var effect = new WithdrawalRemoveEffect
             {
@@ -167,7 +167,8 @@ namespace Centaurus.Domain
                     MinAccountBalance = initQuantum.MinAccountBalance,
                     MinAllowedLotSize = initQuantum.MinAllowedLotSize,
                     Vault = initQuantum.Vault,
-                    RequestRateLimits = initQuantum.RequestRateLimits
+                    RequestRateLimits = initQuantum.RequestRateLimits,
+                    TxCursor = initQuantum.TxCursor
                 }
             ));
         }

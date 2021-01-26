@@ -133,30 +133,6 @@ namespace Centaurus.Test
             return Task.FromResult(assets);
         }
 
-        public Task<List<QuantumModel>> LoadWithdrawals()
-        {
-            var allAccounts = effectsCollection.Select(e => e.Account).Distinct().ToList();
-
-            var withdrawals = new List<QuantumModel>();
-            var effectTypes = new int[] { (int)EffectTypes.WithdrawalCreate, (int)EffectTypes.WithdrawalRemove };
-            foreach (var acc in allAccounts)
-            {
-                var lastEffect = effectsCollection
-                    .OrderByDescending(e => e.Id)
-                    .FirstOrDefault(e => e.Account == acc);
-                if (lastEffect?.EffectType == (int)EffectTypes.WithdrawalCreate)
-                {
-                    var decodedId = EffectModelIdConverter.DecodeId(lastEffect.Id);
-                    var quantum = quantaCollection
-                        .FirstOrDefault(q => q.Apex == decodedId.apex);
-                    if (quantum == null)
-                        throw new Exception($"Unable to find quantum with apex {decodedId.apex}");
-                    withdrawals.Add(quantum);
-                }
-            }
-            return Task.FromResult(withdrawals.OrderBy(w => w.Apex).ToList());
-        }
-
         public Task<List<OrderModel>> LoadOrders()
         {
             return Task.FromResult(ordersCollection.OrderBy(o => o.Id).ToList());

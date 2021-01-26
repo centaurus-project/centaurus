@@ -15,6 +15,10 @@ namespace Centaurus.Models
         public ApplicationState State { get; set; }
 
         [XdrField(1)]
-        public List<MessageEnvelope> PendingQuantums { get; set; } = new List<MessageEnvelope>();
+        public List<MessageEnvelope> PendingQuanta { get; set; } = new List<MessageEnvelope>();
+
+
+        [XdrField(2)]
+        public bool HasMorePendingQuanta { get; set; }
     }
 }

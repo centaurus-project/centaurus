@@ -114,7 +114,7 @@ namespace Centaurus.Domain
                 Apex = constellationInitEffect.Apex,
                 Accounts = new List<Account>(),
                 Orders = new List<Order>(),
-                Withdrawals = new List<Withdrawal>(),
+                Withdrawals = new List<WithdrawalWrapper>(),
                 Settings = new ConstellationSettings
                 {
                     Apex = constellationInitEffect.Apex,
@@ -304,16 +304,19 @@ namespace Centaurus.Domain
             return accounts;
         }
 
-        private async Task<List<Withdrawal>> GetWithdrawals(AccountStorage accountStorage, ConstellationSettings constellationSettings)
+        private async Task<List<WithdrawalWrapper>> GetWithdrawals(AccountStorage accountStorage, ConstellationSettings constellationSettings)
         {
-            var withdrawalQuanta = await storage.LoadWithdrawals();
+            var withdrawalApexes = accountStorage.GetAll().Where(a => a.Account.Withdrawal != default).Select(a => a.Account.Withdrawal).ToArray();
+            if (withdrawalApexes.Length < 1)
+                return new List<WithdrawalWrapper>();
+            var withdrawalQuanta = await storage.LoadQuanta(withdrawalApexes);
             var withdrawals = withdrawalQuanta
                 .Select(w =>
                 {
                     var withdrawalQuantum = XdrConverter.Deserialize<MessageEnvelope>(w.RawQuantum);
                     var withdrawalRequest = ((WithdrawalRequest)((RequestQuantum)withdrawalQuantum.Message).RequestMessage);
-                    withdrawalQuantum.TryAssignAccountWrapper();
-                    return Withdrawal.GetWithdrawal(withdrawalQuantum, constellationSettings);
+                    withdrawalQuantum.TryAssignAccountWrapper(accountStorage);
+                    return WithdrawalWrapperExtensions.GetWithdrawal(withdrawalQuantum, constellationSettings);
                 });
 
             return withdrawals.OrderBy(w => w.Apex).ToList();

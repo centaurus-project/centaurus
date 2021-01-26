@@ -453,6 +453,13 @@ namespace Centaurus.SDK
 
             public void Dispose()
             {
+                if (heartbeatTimer != null)
+                {
+                    heartbeatTimer.Elapsed -= HeartbeatTimer_Elapsed;
+                    heartbeatTimer.Dispose();
+                    heartbeatTimer = null;
+                }
+
                 cancellationTokenSource?.Dispose();
                 cancellationTokenSource = null;
 
@@ -546,10 +553,11 @@ namespace Centaurus.SDK
                 return false;
             }
 
-            private MessageEnvelope DeserializeMessage(XdrReader reader)
+            private MessageEnvelope DeserializeMessage(XdrBufferFactory.RentedBuffer buffer)
             {
                 try
                 {
+                    var reader = new XdrBufferReader(buffer.Buffer, buffer.Length);
                     return XdrConverter.Deserialize<MessageEnvelope>(reader);
                 }
                 catch
@@ -562,19 +570,19 @@ namespace Centaurus.SDK
             {
                 try
                 {
-                    var reader = await webSocket.GetInputStreamReader(cancellationToken);
-                    while (true)
+                    do
                     {
+                        using var buffer = await webSocket.GetWebsocketBuffer(cancellationToken);
                         try
                         {
-                            HandleMessage(DeserializeMessage(reader));
-                            reader = await webSocket.GetInputStreamReader(cancellationToken);
+                            HandleMessage(DeserializeMessage(buffer));
                         }
                         catch (UnexpectedMessageException e)
                         {
                             _ = Task.Factory.StartNew(() => OnException?.Invoke(e));
                         }
                     }
+                    while (true);
                 }
                 catch (WebSocketException e)
                 {
@@ -595,7 +603,6 @@ namespace Centaurus.SDK
             private void HandleMessage(MessageEnvelope envelope)
             {
                 TryResolveRequest(envelope);
-                Thread.Sleep(100);
                 _ = Task.Factory.StartNew(() => OnMessage?.Invoke(envelope));
             }
 

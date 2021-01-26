@@ -16,19 +16,19 @@ namespace Centaurus.Domain
 {
     public class WithdrawalStorage : IDisposable
     {
-        public WithdrawalStorage(IEnumerable<Withdrawal> payments, bool startSubmitTimer = true)
+        public WithdrawalStorage(IEnumerable<WithdrawalWrapper> withdrawals, bool startSubmitTimer = true)
         {
-            withdrawals = new Dictionary<byte[], Withdrawal>(new HashComparer());
+            this.withdrawals = new Dictionary<byte[], WithdrawalWrapper>(new HashComparer());
 
-            if (payments == null)
+            if (withdrawals == null)
                 return;
-            foreach (var payment in payments)
+            foreach (var payment in withdrawals)
                 Add(payment);
             if (startSubmitTimer)
                 InitTimer();
         }
 
-        public void Add(Withdrawal withdrawal)
+        public void Add(WithdrawalWrapper withdrawal)
         {
             if (withdrawal == null)
                 throw new ArgumentNullException(nameof(withdrawal));
@@ -37,7 +37,6 @@ namespace Centaurus.Domain
             {
                 if (!withdrawals.TryAdd(withdrawal.Hash, withdrawal))
                     throw new Exception("Payment with specified transaction hash already exists");
-                withdrawal.Source.HasPendingWithdrawal = true;
             }
         }
 
@@ -50,17 +49,16 @@ namespace Centaurus.Domain
             {
                 if (!withdrawals.Remove(transactionHash, out var withdrawal))
                     throw new Exception("Withdrawal with specified hash is not found");
-                withdrawal.Source.HasPendingWithdrawal = false;
             }
         }
 
-        public IEnumerable<Withdrawal> GetAll()
+        public IEnumerable<WithdrawalWrapper> GetAll()
         {
             lock (withdrawals)
                 return withdrawals.Values.Select(w => w);
         }
 
-        public Withdrawal GetWithdrawal(byte[] transactionHash)
+        public WithdrawalWrapper GetWithdrawal(byte[] transactionHash)
         {
             if (transactionHash == null)
                 throw new ArgumentNullException(nameof(transactionHash));
@@ -69,7 +67,7 @@ namespace Centaurus.Domain
                 return withdrawals.GetValueOrDefault(transactionHash);
         }
 
-        public Withdrawal GetWithdrawal(long apex)
+        public WithdrawalWrapper GetWithdrawal(long apex)
         {
             if (apex == default)
                 throw new ArgumentNullException(nameof(apex));
@@ -90,7 +88,7 @@ namespace Centaurus.Domain
 
         #region private members
 
-        private Dictionary<byte[], Withdrawal> withdrawals;
+        private Dictionary<byte[], WithdrawalWrapper> withdrawals;
         private System.Timers.Timer submitTimer;
         private static Logger logger = LogManager.GetCurrentClassLogger();
 

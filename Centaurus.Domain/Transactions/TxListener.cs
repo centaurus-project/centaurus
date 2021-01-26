@@ -5,6 +5,7 @@ using stellar_dotnet_sdk.responses;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -87,7 +88,7 @@ namespace Centaurus.Domain
         static Logger logger = LogManager.GetCurrentClassLogger();
 
         public AuditorTxListener(long cursor)
-            :base(cursor)
+            : base(cursor)
         {
         }
 
@@ -101,8 +102,10 @@ namespace Centaurus.Domain
                 var source = transaction.Operations[i].SourceAccount?.SigningKey ?? transaction.SourceAccount.SigningKey;
                 if (PaymentsHelper.FromOperationResponse(transaction.Operations[i].ToOperationBody(), source, res, txHash, out PaymentBase payment))
                 {
-                    if (!(payment is Models.Withdrawal && ledgerPayments.Any(p => ByteArrayPrimitives.Equals(p.TransactionHash, txHash))))
-                        ledgerPayments.Add(payment);
+                    //withdrawals are grouped by tx hash. If one withdrawal item already in list, then we can skip this one
+                    if (ledgerPayments.Any(p => p is Withdrawal))
+                        continue;
+                    ledgerPayments.Add(payment);
                 }
             }
             return ledgerPayments;
@@ -117,13 +120,14 @@ namespace Centaurus.Domain
                     listener.Shutdown();
                     return;
                 }
+                var pagingToken = long.Parse(tx.PagingToken);
 
                 var payments = AddVaultPayments(Transaction.FromEnvelopeXdr(tx.EnvelopeXdr), tx.Result.IsSuccess);
                 if (payments.Count > 0)
                 {
                     var payment = new TxNotification
                     {
-                        TxCursor = long.Parse(tx.PagingToken),
+                        TxCursor = pagingToken,
                         Payments = payments
                     };
 
@@ -143,6 +147,7 @@ namespace Centaurus.Domain
                 Global.AppState.State = ApplicationState.Failed;
 
                 listener?.Shutdown();
+
 
                 throw;
             }

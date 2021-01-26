@@ -19,7 +19,6 @@ using System.IO;
 using Microsoft.AspNetCore.Http;
 using System.Collections.Generic;
 using System.Threading;
-using System.Diagnostics;
 
 namespace Centaurus
 {
@@ -71,9 +70,9 @@ namespace Centaurus
             MessageHandlers<AlphaWebSocketConnection>.Init();
         }
 
-        private void Current_StateChanged(object sender, ApplicationState e)
+        private void Current_StateChanged(StateChangedEventArgs eventArgs)
         {
-            if (e == ApplicationState.Failed)
+            if (eventArgs.State == ApplicationState.Failed)
             {
                 Console.WriteLine("Application failed. Saving pending updates...");
                 Thread.Sleep(PendingUpdatesManager.SaveInterval);

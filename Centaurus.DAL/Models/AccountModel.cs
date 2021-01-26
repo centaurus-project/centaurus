@@ -10,6 +10,8 @@ namespace Centaurus.DAL.Models
 
         public long Nonce { get; set; }
 
+        public long Withdrawal { get; set; }
+
         public RequestRateLimitsModel RequestRateLimits { get; set; }
     }
 }

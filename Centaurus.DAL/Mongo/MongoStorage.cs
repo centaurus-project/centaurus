@@ -35,19 +35,6 @@ namespace Centaurus.DAL.Mongo
 
         private IMongoCollection<PriceHistoryFrameModel> priceHistoryCollection;
 
-        private async Task CreateIndexes()
-        {
-            await quantaCollection.Indexes.CreateOneAsync(
-                 new CreateIndexModel<QuantumModel>(Builders<QuantumModel>.IndexKeys.Ascending(q => q.TimeStamp).Descending(q => q.Apex),
-                 new CreateIndexOptions { Background = true })
-            );
-
-            await effectsCollection.Indexes.CreateOneAsync(
-                 new CreateIndexModel<EffectModel>(Builders<EffectModel>.IndexKeys.Ascending(e => e.Id).Ascending(e => e.EffectType),
-                 new CreateIndexOptions { Background = true })
-            );
-        }
-
         private async Task<IMongoCollection<T>> GetCollection<T>(string collectionName)
         {
             if (!(await database.ListCollectionNamesAsync(new ListCollectionNamesOptions { Filter = Builders<BsonDocument>.Filter.Eq("name", collectionName) })).Any())
@@ -78,57 +65,11 @@ namespace Centaurus.DAL.Mongo
             assetsCollection = await GetCollection<AssetModel>("assets");
 
             priceHistoryCollection = await GetCollection<PriceHistoryFrameModel>("priceHistory");
-
-            await CreateIndexes();
         }
 
         public Task CloseConnection()
         {
             return Task.CompletedTask;
-        }
-
-        public async Task<List<QuantumModel>> LoadWithdrawals()
-        {
-            var lastQuantum = await GetLastQuantum();
-            if (lastQuantum == null) //no quanta no withdrawals
-                return new List<QuantumModel>();
-
-            var timestampFrom = (new DateTime(lastQuantum.TimeStamp, DateTimeKind.Utc) - TimeSpan.FromMinutes(120)).Ticks;
-            var fromQuantum = await quantaCollection
-                .Find(q => q.TimeStamp <= timestampFrom)
-                .SortByDescending(q => q.Apex)
-                .FirstOrDefaultAsync();
-
-            var fromId = EffectModelIdConverter.EncodeId(fromQuantum?.Apex ?? 0, 0);
-
-            var effectTypes = new int[] { (int)EffectTypes.WithdrawalCreate, (int)EffectTypes.WithdrawalRemove };
-
-            var eFilter = Builders<EffectModel>.Filter;
-
-            var withdrawalEffects = await effectsCollection.Aggregate()
-                .Match(eFilter.And(eFilter.Gte(e => e.Id, fromId), eFilter.In(e => e.EffectType, effectTypes)))
-                .SortByDescending(e => e.Id)
-                .Group(new BsonDocument {
-                    { "_id", "$Account" },
-                    { "effectId", new BsonDocument { { "$first", "$_id" } } },
-                    { "lastEffectType", new BsonDocument { { "$first", "$EffectType" } } }
-                })
-                .Match(new BsonDocument { { "lastEffectType", (int)EffectTypes.WithdrawalCreate } })
-                .ToListAsync();
-
-            var quantumIds = withdrawalEffects
-                .Select(q =>
-                {
-                    var effectId = q["effectId"].AsObjectId;
-                    var decoded = EffectModelIdConverter.DecodeId(effectId);
-                    return decoded.apex;
-                });
-
-            var withdrawals = await quantaCollection
-                .Find(Builders<QuantumModel>.Filter.In(q => q.Apex, quantumIds))
-                .SortBy(q => q.Apex)
-                .ToListAsync();
-            return withdrawals;
         }
 
         public async Task<List<OrderModel>> LoadOrders()
@@ -322,8 +263,6 @@ namespace Centaurus.DAL.Mongo
 
         #region Updates
 
-        private SemaphoreSlim updateSyncRoot = new SemaphoreSlim(1);
-
         public async Task Update(DiffObject update)
         {
             var stellarUpdates = GetStellarDataUpdate(update.StellarInfoData);
@@ -331,64 +270,60 @@ namespace Centaurus.DAL.Mongo
             var balanceUpdates = GetBalanceUpdates(update.Balances.Values.ToList());
             var orderUpdates = GetOrderUpdates(update.Orders.Values.ToList());
 
-            await updateSyncRoot.WaitAsync();
-            try
+            var tries = 0;
+            var maxTries = 5;
+            var isCommitInvoked = false;
+            while (true)
             {
-                var tries = 0;
-                var maxTries = 5;
-                var commitInvoked = false;
-                while (true)
+                using (var session = await client.StartSessionAsync())
                 {
                     try
                     {
-                        using (var session = await client.StartSessionAsync())
+                        session.StartTransaction();
+                        try
                         {
-                            session.StartTransaction();
-                            try
+                            var updateTasks = new List<Task>();
+
+                            if (stellarUpdates != null)
+                                updateTasks.Add(constellationStateCollection.BulkWriteAsync(session, new WriteModel<ConstellationState>[] { stellarUpdates }));
+
+                            if (update.ConstellationSettings != null)
+                                updateTasks.Add(settingsCollection.InsertOneAsync(session, update.ConstellationSettings));
+
+                            if (update.Assets != null && update.Assets.Count > 0)
+                                updateTasks.Add(assetsCollection.InsertManyAsync(session, update.Assets));
+
+                            if (accountUpdates != null)
+                                updateTasks.Add(accountsCollection.BulkWriteAsync(session, accountUpdates));
+
+                            if (balanceUpdates != null)
+                                updateTasks.Add(balancesCollection.BulkWriteAsync(session, balanceUpdates));
+
+                            if (orderUpdates != null)
+                                updateTasks.Add(ordersCollection.BulkWriteAsync(session, orderUpdates));
+
+                            updateTasks.Add(quantaCollection.InsertManyAsync(session, update.Quanta, new InsertManyOptions { BypassDocumentValidation = true }));
+
+                            updateTasks.Add(effectsCollection.InsertManyAsync(session, update.Effects, new InsertManyOptions { BypassDocumentValidation = true }));
+
+                            await Task.WhenAll(updateTasks);
+
+                            isCommitInvoked = true;
+                            await CommitWithRetry(session);
+
+                            break;
+                        }
+                        catch
+                        {
+                            if (!isCommitInvoked)
                             {
-                                var updateTasks = new List<Task>();
-
-                                if (stellarUpdates != null)
-                                    updateTasks.Add(constellationStateCollection.BulkWriteAsync(session, new WriteModel<ConstellationState>[] { stellarUpdates }));
-
-                                if (update.ConstellationSettings != null)
-                                    updateTasks.Add(settingsCollection.InsertOneAsync(session, update.ConstellationSettings));
-
-                                if (update.Assets != null && update.Assets.Count > 0)
-                                    updateTasks.Add(assetsCollection.InsertManyAsync(session, update.Assets));
-
-                                if (accountUpdates != null)
-                                    updateTasks.Add(accountsCollection.BulkWriteAsync(session, accountUpdates));
-
-                                if (balanceUpdates != null)
-                                    updateTasks.Add(balancesCollection.BulkWriteAsync(session, balanceUpdates));
-
-                                if (orderUpdates != null)
-                                    updateTasks.Add(ordersCollection.BulkWriteAsync(session, orderUpdates));
-
-                                updateTasks.Add(quantaCollection.InsertManyAsync(session, update.Quanta));
-
-                                updateTasks.Add(effectsCollection.InsertManyAsync(session, update.Effects));
-
-                                await Task.WhenAll(updateTasks);
-
-                                commitInvoked = true;
-                                await CommitWithRetry(session);
-
-                                break;
-                            }
-                            catch
-                            {
-                                if (!commitInvoked)
+                                try
                                 {
-                                    try
-                                    {
-                                        await session.AbortTransactionAsync();
-                                    }
-                                    catch { } //MongoDB best practice ;)
+                                    await session.AbortTransactionAsync();
                                 }
-                                throw;
+                                catch { } //MongoDB best practice ;)
                             }
+                            throw;
                         }
                     }
                     catch (Exception exc)
@@ -402,10 +337,6 @@ namespace Centaurus.DAL.Mongo
                         new Exception($"Unable to commit transaction after {tries} tries", exc);
                     }
                 }
-            }
-            finally
-            {
-                updateSyncRoot.Release();
             }
         }
 
@@ -480,20 +411,24 @@ namespace Centaurus.DAL.Mongo
                         Id = acc.Id,
                         Nonce = acc.Nonce,
                         PubKey = acc.PubKey,
-                        RequestRateLimits = acc.RequestRateLimits
+                        RequestRateLimits = acc.RequestRateLimits,
+                        Withdrawal = (acc.Withdrawal.HasValue ? acc.Withdrawal.Value : 0)
                     });
                 else if (acc.IsDeleted)
                     updates[i] = new DeleteOneModel<AccountModel>(currentAccFilter);
                 else
                 {
-                    UpdateDefinition<AccountModel> currentUpdate = null;
+                    var updateDefs = new List<UpdateDefinition<AccountModel>>();
                     if (acc.Nonce != 0)
-                        currentUpdate = update.Set(a => a.Nonce, acc.Nonce);
+                        updateDefs.Add(update.Set(a => a.Nonce, acc.Nonce));
+
                     if (acc.RequestRateLimits != null)
-                        currentUpdate = currentUpdate == null
-                            ? update.Set(a => a.RequestRateLimits, acc.RequestRateLimits)
-                            : currentUpdate.Set(a => a.RequestRateLimits, acc.RequestRateLimits);
-                    updates[i] = new UpdateOneModel<AccountModel>(currentAccFilter, currentUpdate);
+                        updateDefs.Add(update.Set(a => a.RequestRateLimits, acc.RequestRateLimits));
+
+                    if (acc.Withdrawal.HasValue)
+                        updateDefs.Add(update.Set(a => a.Withdrawal, acc.Withdrawal.Value));
+
+                    updates[i] = new UpdateOneModel<AccountModel>(currentAccFilter, update.Combine(updateDefs));
                 }
             }
             return updates;

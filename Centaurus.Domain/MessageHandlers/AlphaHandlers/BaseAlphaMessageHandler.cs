@@ -31,7 +31,7 @@ namespace Centaurus.Domain
                 throw new UnauthorizedException();
 
             if (connection.Account != null && !connection.Account.RequestCounter.IncRequestCount(DateTime.UtcNow.Ticks, out string error))
-                throw new TooManyRequests(error);
+                throw new TooManyRequestsException(error);
 
             await base.Validate(connection, envelope);
         }

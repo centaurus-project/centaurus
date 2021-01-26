@@ -22,7 +22,7 @@ namespace Centaurus.Domain
 
             var account = requestMessage.AccountWrapper.Account;
 
-            var resultMessage = context.Envelope.CreateResult<AccountDataResponse>(ResultStatusCodes.Success, accountEffects);
+            var resultMessage = (AccountDataResponse)context.Envelope.CreateResult(ResultStatusCodes.Success, accountEffects);
             resultMessage.Balances = account.Balances;
             //TODO: create property in Account object
             resultMessage.Orders = Global.Exchange.OrderMap.GetAllAccountOrders(account).OrderBy(o => o.OrderId).ToList();

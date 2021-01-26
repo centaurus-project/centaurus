@@ -1,4 +1,5 @@
-﻿using Centaurus.Models;
+﻿using Centaurus.Domain;
+using Centaurus.Models;
 using stellar_dotnet_sdk;
 using System;
 using System.Collections.Generic;
@@ -129,7 +130,7 @@ namespace Centaurus
             return envelope.Signatures.Any(s => s.Signer.Equals(pubKey));
         }
 
-        public static TResultMessage CreateResult<TResultMessage>(this MessageEnvelope envelope, ResultStatusCodes status = ResultStatusCodes.InternalError, List<Effect> effects = null)
+        private static TResultMessage CreateResult<TResultMessage>(this MessageEnvelope envelope, ResultStatusCodes status = ResultStatusCodes.InternalError, List<Effect> effects = null)
             where TResultMessage : ResultMessage
         {
             if (envelope == null)
@@ -160,6 +161,20 @@ namespace Centaurus
                 default:
                     return CreateResult<ResultMessage>(envelope, status, effects);
             }
+        }
+
+        public static ResultMessage CreateResult(this MessageEnvelope envelope, Exception exc)
+        {
+            if (envelope == null)
+                throw new ArgumentNullException(nameof(envelope));
+            if (exc == null)
+                throw new ArgumentNullException(nameof(exc));
+            var result = envelope.CreateResult(exc.GetStatusCode());
+            if (!(result.Status == ResultStatusCodes.InternalError || string.IsNullOrWhiteSpace(exc.Message)))
+                result.ErrorMessage = exc.Message;
+            else
+                result.ErrorMessage = result.Status.ToString();
+            return result;
         }
     }
 }

@@ -63,11 +63,14 @@ namespace Centaurus.Domain
         /// <summary>
         /// Closes all connection
         /// </summary>
-        public static async Task CloseAllConnections()
+        public static async Task CloseAllConnections(bool includingAuditors = true)
         {
             foreach (var connection in connections)
                 try
                 {
+                    //skip if auditor
+                    if (!includingAuditors && Global.Constellation.Auditors.Contains(connection.Value.ClientPubKey))
+                        continue;
                     await UnsubscribeAndClose(connection.Value);
                 }
                 catch (Exception e)

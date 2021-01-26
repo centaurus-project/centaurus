@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using Centaurus.Models;
+using System.Collections.Generic;
 
 namespace Centaurus.Domain
 {
@@ -9,6 +10,6 @@ namespace Centaurus.Domain
         {
         }
 
-        public Withdrawal Withdrawal { get; set; }
+        public WithdrawalWrapper Withdrawal { get; set; }
     }
 }

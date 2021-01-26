@@ -9,7 +9,7 @@ namespace Centaurus.Domain
 {
     public static class WithdrawalExtensions
     {
-        public static List<WithdrawalItem> GetWithdrawals(this stellar_dotnet_sdk.Transaction transaction, Account sourceAccount, ConstellationSettings constellationSettings)
+        public static List<WithdrawalWrapperItem> GetWithdrawals(this stellar_dotnet_sdk.Transaction transaction, Account sourceAccount, ConstellationSettings constellationSettings)
         {
             if (transaction == null)
                 throw new ArgumentNullException(nameof(transaction));
@@ -21,7 +21,7 @@ namespace Centaurus.Domain
                 .Where(o => o is stellar_dotnet_sdk.PaymentOperation)
                 .Cast<stellar_dotnet_sdk.PaymentOperation>();
 
-            var withdrawals = new List<WithdrawalItem>();
+            var withdrawals = new List<WithdrawalWrapperItem>();
             foreach (var payment in payments)
             {
                 if (!constellationSettings.TryFindAssetSettings(payment.Asset, out var asset))
@@ -35,7 +35,7 @@ namespace Centaurus.Domain
                 if (!(sourceAccount.GetBalance(asset.Id)?.HasSufficientBalance(amount) ?? false))
                     throw new BadRequestException($"Insufficient balance.");
 
-                withdrawals.Add(new WithdrawalItem
+                withdrawals.Add(new WithdrawalWrapperItem
                 {
                     Asset = asset.Id,
                     Amount = amount,

@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -77,13 +76,17 @@ namespace Centaurus.Domain
             QuantumHandler = new QuantumHandler(QuantumStorage.CurrentApex);
         }
 
-        private static void AppState_StateChanged(object sender, ApplicationState state)
+        private static void AppState_StateChanged(StateChangedEventArgs stateChangedEventArgs)
         {
+            var state = stateChangedEventArgs.State;
             if (!(PendingUpdatesManager?.IsRunning ?? true) &&
                 (state == ApplicationState.Running 
                 || state == ApplicationState.Ready
                 || state == ApplicationState.WaitingForInit))
             PendingUpdatesManager?.Start();
+            if (state != ApplicationState.Ready 
+                && stateChangedEventArgs.PrevState == ApplicationState.Running) //close all connections (except auditors) if Alpha is not in Ready state
+                ConnectionManager.CloseAllConnections(false).Wait();
         }
 
         public static async Task TearDown()

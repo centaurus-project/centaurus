@@ -161,7 +161,7 @@ namespace Centaurus.Test
 
             var envelope = new AuditorState
             {
-                PendingQuantums = new List<MessageEnvelope>(),
+                PendingQuanta = new List<MessageEnvelope>(),
                 State = ApplicationState.Running
             }.CreateEnvelope();
             envelope.Sign(clientKeyPair);
@@ -274,7 +274,7 @@ namespace Centaurus.Test
                 }.CreateEnvelope();
                 envelope.Sign(clientKeyPair);
                 if (i + 1 > minuteLimit)
-                    await AssertMessageHandling(clientConnection, envelope, typeof(TooManyRequests));
+                    await AssertMessageHandling(clientConnection, envelope, typeof(TooManyRequestsException));
                 else
                     await AssertMessageHandling(clientConnection, envelope);
             }

@@ -79,8 +79,6 @@ namespace Centaurus.DAL
         /// <returns></returns>
         public Task<List<AssetModel>> LoadAssets(long apex);
 
-        public Task<List<QuantumModel>> LoadWithdrawals();
-
         //returns sorted by id orders
         public Task<List<OrderModel>> LoadOrders();
 

@@ -84,7 +84,7 @@ namespace Centaurus.Domain
             catch (Exception exc)
             {
                 if (result == null)
-                    result = envelope.CreateResult(exc.GetStatusCode());
+                    result = envelope.CreateResult(exc);
                 Notifier.OnMessageProcessResult(result);
                 tcs.SetException(exc);
                 if (!Global.IsAlpha) //auditor should fail on quantum processing handling
@@ -111,9 +111,19 @@ namespace Centaurus.Domain
         async Task<ResultMessage> HandleQuantum(MessageEnvelope quantumEnvelope, long timestamp)
         {
             quantumEnvelope.TryAssignAccountWrapper();
-            return Global.IsAlpha
-                ? await AlphaHandleQuantum(quantumEnvelope, timestamp)
-                : await AuditorHandleQuantum(quantumEnvelope);
+
+            await Global.PendingUpdatesManager.UpdatesSyncRoot.WaitAsync();
+            try
+            {
+                Global.PendingUpdatesManager.TryRefreshContainer();
+                return Global.IsAlpha
+                    ? await AlphaHandleQuantum(quantumEnvelope, timestamp)
+                    : await AuditorHandleQuantum(quantumEnvelope);
+            }
+            finally
+            {
+                Global.PendingUpdatesManager.UpdatesSyncRoot.Release();
+            }
         }
 
         async Task<ResultMessage> AlphaHandleQuantum(MessageEnvelope envelope, long timestamp)
@@ -131,39 +141,31 @@ namespace Centaurus.Domain
             //we need to sign the quantum here to prevent multiple signatures that can occur if we sign it when sending
             quantumEnvelope.Sign(Global.Settings.KeyPair);
 
-            try
+            var effectsContainer = GetEffectProcessorsContainer(quantumEnvelope);
+
+            var context = processor.GetContext(effectsContainer);
+
+            await processor.Validate(context);
+
+            var resultMessage = await processor.Process(context);
+
+            Global.QuantumStorage.AddQuantum(quantumEnvelope);
+
+            effectsContainer.Complete();
+
+            //TODO: create single method for getting result message and all additional messages
+            Notifier.OnMessageProcessResult(resultMessage);
+
+            var additionalMessages = processor.GetNotificationMessages(context);
+            foreach (var m in additionalMessages)
             {
-                await Global.PendingUpdatesManager.UpdatesSyncRoot.WaitAsync();
-                var effectsContainer = GetEffectProcessorsContainer(quantumEnvelope);
-
-                var context = processor.GetContext(effectsContainer);
-
-                await processor.Validate(context);
-
-                var resultMessage = await processor.Process(context);
-
-                Global.QuantumStorage.AddQuantum(quantumEnvelope);
-
-                effectsContainer.Complete();
-
-                //TODO: create single method for getting result message and all additional messages
-                Notifier.OnMessageProcessResult(resultMessage);
-
-                var additionalMessages = processor.GetNotificationMessages(context);
-                foreach (var m in additionalMessages)
-                {
-                    var aPubKey = Global.AccountStorage.GetAccount(m.Key).Account.Pubkey;
-                    Notifier.Notify(aPubKey, m.Value.CreateEnvelope());
-                }
-
-                logger.Trace($"Message of type {envelope.Message} with apex {quantum.Apex} is handled.");
-
-                return resultMessage;
+                var aPubKey = Global.AccountStorage.GetAccount(m.Key).Account.Pubkey;
+                Notifier.Notify(aPubKey, m.Value.CreateEnvelope());
             }
-            finally
-            {
-                Global.PendingUpdatesManager.UpdatesSyncRoot.Release();
-            }
+
+            logger.Trace($"Message of type {envelope.Message} with apex {quantum.Apex} is handled.");
+
+            return resultMessage;
         }
 
         async Task<ResultMessage> AuditorHandleQuantum(MessageEnvelope envelope)
@@ -179,36 +181,27 @@ namespace Centaurus.Domain
 
             ValidateAccountRequestRate(envelope);
 
-            try
-            {
-                await Global.PendingUpdatesManager.UpdatesSyncRoot.WaitAsync();
+            var effectsContainer = GetEffectProcessorsContainer(envelope);
 
-                var effectsContainer = GetEffectProcessorsContainer(envelope);
+            var context = processor.GetContext(effectsContainer);
 
-                var context = processor.GetContext(effectsContainer);
+            await processor.Validate(context);
 
-                await processor.Validate(context);
+            var result = await processor.Process(context);
 
-                var result = await processor.Process(context);
+            Global.QuantumStorage.AddQuantum(envelope);
 
-                Global.QuantumStorage.AddQuantum(envelope);
+            ProcessTransaction(context, result);
 
-                ProcessTransaction(context, result);
+            effectsContainer.Complete();
 
-                effectsContainer.Complete();
+            logger.Trace($"Message of type {messageType} with apex {((Quantum)envelope.Message).Apex} is handled.");
 
-                logger.Trace($"Message of type {messageType} with apex {((Quantum)envelope.Message).Apex} is handled.");
+            var resultEnvelope = result.CreateEnvelope();
 
-                var resultEnvelope = result.CreateEnvelope();
+            OutgoingMessageStorage.EnqueueMessage(resultEnvelope);
 
-                OutgoingMessageStorage.EnqueueMessage(resultEnvelope);
-
-                return result;
-            }
-            finally
-            {
-                Global.PendingUpdatesManager.UpdatesSyncRoot.Release();
-            }
+            return result;
         }
 
         EffectProcessorsContainer GetEffectProcessorsContainer(MessageEnvelope envelope)
@@ -223,7 +216,7 @@ namespace Centaurus.Domain
                 return;
             var account = request.RequestMessage.AccountWrapper;
             if (!account.RequestCounter.IncRequestCount(request.Timestamp, out string error))
-                throw new TooManyRequests($"Request limit reached for account {account.Account.Pubkey}.");
+                throw new TooManyRequestsException($"Request limit reached for account {account.Account.Pubkey}.");
         }
 
         void ProcessTransaction(object context, ResultMessage resultMessage)

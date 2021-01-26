@@ -6,6 +6,18 @@ using System.Text;
 
 namespace Centaurus.Domain
 {
+    public class StateChangedEventArgs : EventArgs
+    {
+        public StateChangedEventArgs(ApplicationState state, ApplicationState prevState)
+        {
+            State = state;
+            PrevState = prevState;
+        }
+
+        public ApplicationState State { get; }
+
+        public ApplicationState PrevState { get; }
+    }
 
     public abstract class StateManager
     {
@@ -24,13 +36,14 @@ namespace Centaurus.Domain
                     {
                         if (state != value)
                         {
+                            var stateArgs = new StateChangedEventArgs(value, state);
                             state = value;
-                            StateChanged?.Invoke(this, state);
+                            StateChanged?.Invoke(stateArgs);
                         }
                     }
             }
         }
 
-        public event EventHandler<ApplicationState> StateChanged;
+        public event Action<StateChangedEventArgs> StateChanged;
     }
 }

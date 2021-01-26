@@ -28,19 +28,32 @@ namespace Centaurus.Domain
                 if (Global.AppState.State != ApplicationState.Rising)
                     throw new InvalidOperationException("Auditor state messages can be only handled when Alpha is in rising state");
 
-                if (allAuditorStates.ContainsKey(pubKey))
+                if (allAuditorStates.TryGetValue(pubKey, out var pendingAuditorState))
+                {
+                    if (!pendingAuditorState.HasMorePendingQuanta) //check if auditor send all quanta already
+                        return;
+                    allAuditorStates[pubKey].PendingQuanta.AddRange(auditorState.PendingQuanta);
+                    allAuditorStates[pubKey].HasMorePendingQuanta = auditorState.HasMorePendingQuanta;
+                }
+                else
+                    allAuditorStates.Add(pubKey, auditorState);
+                var currentAuditorState = allAuditorStates[pubKey];
+
+                if (currentAuditorState.HasMorePendingQuanta) //wait while auditor will send all quanta it has
                     return;
-                allAuditorStates.Add(pubKey, auditorState);
-                if (IsStateValid(auditorState))
-                    validAuditorStates.Add(pubKey, auditorState);
+
+                if (IsStateValid(currentAuditorState))
+                    validAuditorStates.Add(pubKey, currentAuditorState);
 
                 int majority = MajorityHelper.GetMajorityCount(),
                 totalAuditorsCount = MajorityHelper.GetTotalAuditorsCount();
 
-                if (allAuditorStates.Count < majority)
+                var completedStatesCount = allAuditorStates.Count(s => !s.Value.HasMorePendingQuanta);
+
+                if (completedStatesCount < majority)
                     return;
 
-                var possibleConsensusCount = (totalAuditorsCount - allAuditorStates.Count) + validAuditorStates.Count;
+                var possibleConsensusCount = (totalAuditorsCount - completedStatesCount) + validAuditorStates.Count;
                 if (validAuditorStates.Count >= majority)
                 {
                     await ApplyAuditorsData();
@@ -63,12 +76,23 @@ namespace Centaurus.Domain
         }
 
         /// <summary>
-        /// Checks that all quanta has valid Alpha signature
+        /// Checks that all quanta have valid Alpha signature
         /// </summary>
         private static bool IsStateValid(AuditorState state)
         {
-            return state.PendingQuantums.All(q => q.Signatures.Any(s => s.Signer.Equals((RawPubKey)Global.Settings.KeyPair.PublicKey))
-                        && q.AreSignaturesValid());
+            var alphaPubkey = (RawPubKey)Global.Settings.KeyPair.PublicKey;
+            var lastApex = Global.QuantumStorage.CurrentApex;
+            for (int i = 0; i < state.PendingQuanta.Count; i++)
+            {
+                var currentQuantumEnvelope = state.PendingQuanta[i];
+                var currentQuantum = (Quantum)currentQuantumEnvelope.Message;
+                if (!(lastApex + 1 == currentQuantum.Apex 
+                    && currentQuantumEnvelope.Signatures.Any(s => s.Signer.Equals(alphaPubkey))
+                    && currentQuantumEnvelope.AreSignaturesValid()))
+                    return false;
+                lastApex = currentQuantum.Apex;
+            }
+            return true;
         }
 
         private static async Task ApplyAuditorsData()
@@ -108,7 +132,7 @@ namespace Centaurus.Domain
         {
             //group all quanta by their apex
             var quanta = validAuditorStates.Values
-                .SelectMany(a => a.PendingQuantums)
+                .SelectMany(a => a.PendingQuanta)
                 .GroupBy(q => ((Quantum)q.Message).Apex)
                 .OrderBy(q => q.Key);
 
