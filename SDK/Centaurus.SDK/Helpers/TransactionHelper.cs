@@ -36,7 +36,7 @@ namespace Centaurus.SDK
             }
         }
 
-        public static async Task<Transaction> GetDepositeTx(KeyPair sourceAccount, ConstellationInfo constellation, string amount, ConstellationInfo.Asset asset)
+        public static async Task<Transaction> GetDepositTx(KeyPair sourceAccount, ConstellationInfo constellation, string amount, ConstellationInfo.Asset asset)
         {
             using (var server = constellation.StellarNetwork.GetServer())
             {

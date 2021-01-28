@@ -27,7 +27,7 @@ namespace Centaurus.Domain
                 switch (payment.Type)
                 {
                     case PaymentTypes.Deposit:
-                        ProcessDeposite(payment as Deposit, context);
+                        ProcessDeposit(payment as Deposit, context);
                         break;
                     case PaymentTypes.Withdrawal:
                         ProcessWithdrawal(payment as Withdrawal, context);
@@ -62,7 +62,7 @@ namespace Centaurus.Domain
                 switch (payment.Type)
                 {
                     case PaymentTypes.Deposit:
-                        ValidateDeposite(payment as Deposit);
+                        ValidateDeposit(payment as Deposit);
                         break;
                     case PaymentTypes.Withdrawal:
                         ValidateWithdrawal(payment as Withdrawal, context);
@@ -84,40 +84,43 @@ namespace Centaurus.Domain
                 throw new InvalidOperationException("Signatures is invalid");
         }
 
-        private void ValidateDeposite(Deposit deposite)
+        private void ValidateDeposit(Deposit deposit)
         {
-            if (deposite == null)
-                throw new ArgumentNullException(nameof(deposite));
+            if (deposit == null)
+                throw new ArgumentNullException(nameof(deposit));
 
-            if (deposite.Destination == null || deposite.Destination.IsZero())
+            if (deposit.Destination == null || deposit.Destination.IsZero())
                 throw new InvalidOperationException("Destination should be valid public key");
 
-            if (deposite.Amount <= 0)
+            if (deposit.Amount <= 0)
                 throw new InvalidOperationException("Amount should be greater than 0");
         }
 
         /// <summary>
         /// Creates balance and account if needed, updates balance
         /// </summary>
-        private void ProcessDeposite(Deposit deposite, LedgerCommitProcessorContext context)
+        private void ProcessDeposit(Deposit deposit, LedgerCommitProcessorContext context)
         {
-            if (deposite.PaymentResult == PaymentResults.Failed)
+            if (deposit.PaymentResult == PaymentResults.Failed)
                 return;
 
-            var account = Global.AccountStorage.GetAccount(deposite.Destination)?.Account;
+            var account = Global.AccountStorage.GetAccount(deposit.Destination)?.Account;
             if (account == null)
             {
+                //ignore registration with non-native asset or with amount that is less than MinAccountBalance
+                if (deposit.Asset != 0 || deposit.Amount < Global.Constellation.MinAccountBalance)
+                    return;
                 var accId = Global.AccountStorage.GetNextAccountId();
-                context.EffectProcessors.AddAccountCreate(Global.AccountStorage, accId, deposite.Destination);
+                context.EffectProcessors.AddAccountCreate(Global.AccountStorage, accId, deposit.Destination);
                 account = Global.AccountStorage.GetAccount(accId).Account;
             }
 
-            if (!account.HasBalance(deposite.Asset))
+            if (!account.HasBalance(deposit.Asset))
             {
-                context.EffectProcessors.AddBalanceCreate(account, deposite.Asset);
+                context.EffectProcessors.AddBalanceCreate(account, deposit.Asset);
             }
 
-            context.EffectProcessors.AddBalanceUpdate(account, deposite.Asset, deposite.Amount);
+            context.EffectProcessors.AddBalanceUpdate(account, deposit.Asset, deposit.Amount);
         }
 
         private void ValidateWithdrawal(Withdrawal withdrawalModel, LedgerCommitProcessorContext context)

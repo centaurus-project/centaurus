@@ -177,7 +177,7 @@ namespace Centaurus.SDK
             if (amount < constellation.MinAccountBalance)
                 throw new Exception($"Min allowed account balance is {amount}.");
 
-            await Deposite(amount, constellation.Assets.First(a => a.Issuer == null), extraSigners);
+            await Deposit(amount, constellation.Assets.First(a => a.Issuer == null), extraSigners);
             var tries = 0;
             while (true)
                 try
@@ -196,9 +196,9 @@ namespace Centaurus.SDK
                 }
         }
 
-        public async Task Deposite(long amount, ConstellationInfo.Asset asset, params KeyPair[] extraSigners)
+        public async Task Deposit(long amount, ConstellationInfo.Asset asset, params KeyPair[] extraSigners)
         {
-            var tx = await TransactionHelper.GetDepositeTx(keyPair, constellation, Amount.FromXdr(amount), asset);
+            var tx = await TransactionHelper.GetDepositTx(keyPair, constellation, Amount.FromXdr(amount), asset);
             tx.Sign(keyPair);
             foreach (var signer in extraSigners)
                 tx.Sign(signer);
