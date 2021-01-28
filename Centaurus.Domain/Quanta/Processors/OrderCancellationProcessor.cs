@@ -27,7 +27,7 @@ namespace Centaurus.Domain
             //lock order reserve
             if (context.OrderSide == OrderSide.Buy)
                 //TODO: check this - potential rounding error with multiple trades
-                context.EffectProcessors.AddUpdateLiabilities(orderRequest.AccountWrapper.Account, 0, -context.XmlAmount);
+                context.EffectProcessors.AddUpdateLiabilities(orderRequest.AccountWrapper.Account, 0, -context.XlmAmount);
             else
                 context.EffectProcessors.AddUpdateLiabilities(orderRequest.AccountWrapper.Account, context.Asset, -context.Order.Amount);
 
@@ -62,10 +62,10 @@ namespace Centaurus.Domain
 
             if (context.OrderSide == OrderSide.Buy)
             {
-                context.XmlAmount = OrderMatcher.EstimateTradedXlmAmount(context.Order.Amount, context.Order.Price);
+                context.XlmAmount = OrderMatcher.EstimateTradedXlmAmount(context.Order.Amount, context.Order.Price);
                 var balance = orderRequest.AccountWrapper.Account.GetBalance(0);
-                if (balance.Liabilities < context.XmlAmount)
-                    throw new BadRequestException("Xml liabilities is less than order size.");
+                if (balance.Liabilities < context.XlmAmount)
+                    throw new BadRequestException("Xlm liabilities is less than order size.");
             }
             else
             {

@@ -38,6 +38,6 @@ namespace Centaurus.Domain.Quanta.Contexts
 
         public int Asset { get; private set; }
 
-        public long XmlAmount { get; set; }
+        public long XlmAmount { get; set; }
     }
 }
