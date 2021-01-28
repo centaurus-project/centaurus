@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Centaurus.Models;
+using stellar_dotnet_sdk;
 
 namespace Centaurus.Domain
 {
@@ -22,9 +23,15 @@ namespace Centaurus.Domain
 
             var payment = context.Payment;
 
-            if (!context.Destination.HasBalance(payment.Asset))
-                context.EffectProcessors.AddBalanceCreate(context.Destination, payment.Asset);
-            context.EffectProcessors.AddBalanceUpdate(context.Destination, payment.Asset, payment.Amount);
+            if (context.DestinationAccount == null)
+            {
+                var accId = Global.AccountStorage.GetNextAccountId();
+                context.EffectProcessors.AddAccountCreate(Global.AccountStorage, accId, payment.Destination);
+            }
+
+            if (!context.DestinationAccount.HasBalance(payment.Asset))
+                context.EffectProcessors.AddBalanceCreate(context.DestinationAccount, payment.Asset);
+            context.EffectProcessors.AddBalanceUpdate(context.DestinationAccount, payment.Asset, payment.Amount);
 
             context.EffectProcessors.AddBalanceUpdate(context.SourceAccount, payment.Asset, -payment.Amount);
             var effects = context.EffectProcessors.Effects;
@@ -42,8 +49,13 @@ namespace Centaurus.Domain
             if (payment.Destination == null || payment.Destination.IsZero())
                 throw new BadRequestException("Destination should be valid public key");
 
-            if (context.Destination == null)
-                throw new BadRequestException("Destination account is not registered.");
+            if (context.DestinationAccount == null)
+            {
+                if (payment.Asset != 0)
+                    throw new BadRequestException("Account excepts only XLM asset.");
+                if (payment.Amount < Global.Constellation.MinAccountBalance)
+                throw new BadRequestException($"Min payment amount is {Amount.FromXdr(Global.Constellation.MinAccountBalance)} XLM for this account.");
+            }
 
             if (payment.Destination.Equals(payment.AccountWrapper.Account.Pubkey))
                 throw new BadRequestException("Source and destination must be different public keys");
