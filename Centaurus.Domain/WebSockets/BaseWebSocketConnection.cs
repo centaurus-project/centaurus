@@ -82,7 +82,9 @@ namespace Centaurus
             try
             {
                 Global.ExtensionsManager.BeforeConnectionClose(this);
-                if (webSocket.State == WebSocketState.Open || webSocket.State == WebSocketState.Connecting)
+                if (webSocket.State == WebSocketState.Open
+                    || webSocket.State == WebSocketState.CloseReceived
+                    || webSocket.State == WebSocketState.CloseSent)
                 {
                     var connectionPubKey = "no public key";
                     if (ClientPubKey != null)
@@ -144,8 +146,7 @@ namespace Centaurus
             }
             catch (Exception exc)
             {
-                if (exc is TaskCanceledException
-                    || exc is OperationCanceledException
+                if (exc is OperationCanceledException
                     || exc is WebSocketException socketException && (socketException.WebSocketErrorCode == WebSocketError.InvalidState))
                     return;
                 Global.ExtensionsManager.SendMessageFailed(this, envelope, exc);
@@ -199,22 +200,20 @@ namespace Centaurus
             {
                 await CloseConnection(e.Status, e.Description);
             }
-            catch (WebSocketException e)
+            catch (Exception e)
             {
+                if (e is OperationCanceledException)
+                    return;
+
                 Global.ExtensionsManager.HandleMessageFailed(this, null, e);
                 var closureStatus = WebSocketCloseStatus.InternalServerError;
-                if (e.WebSocketErrorCode == WebSocketError.ConnectionClosedPrematurely)
+                if (e is WebSocketException webSocketException && webSocketException.WebSocketErrorCode == WebSocketError.ConnectionClosedPrematurely)
                     closureStatus = WebSocketCloseStatus.NormalClosure;
+                else if (e is FormatException)
+                    closureStatus = WebSocketCloseStatus.ProtocolError;
                 else
                     logger.Error(e);
                 await CloseConnection(closureStatus);
-            }
-            catch (Exception e)
-            {
-                if (e is TaskCanceledException || e is OperationCanceledException)
-                    return;
-                Global.ExtensionsManager.HandleMessageFailed(this, null, e);
-                logger.Error(e);
             }
             finally
             {

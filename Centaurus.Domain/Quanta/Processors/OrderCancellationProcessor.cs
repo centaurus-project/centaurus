@@ -24,11 +24,10 @@ namespace Centaurus.Domain
 
             context.UpdateNonce();
 
-            var xmlAmount = OrderMatcher.EstimateTradedXlmAmount(context.Order.Amount, context.Order.Price);
             //lock order reserve
             if (context.OrderSide == OrderSide.Buy)
                 //TODO: check this - potential rounding error with multiple trades
-                context.EffectProcessors.AddUpdateLiabilities(orderRequest.AccountWrapper.Account, 0, -xmlAmount);
+                context.EffectProcessors.AddUpdateLiabilities(orderRequest.AccountWrapper.Account, 0, -context.XmlAmount);
             else
                 context.EffectProcessors.AddUpdateLiabilities(orderRequest.AccountWrapper.Account, context.Asset, -context.Order.Amount);
 
@@ -38,7 +37,7 @@ namespace Centaurus.Domain
             return Task.FromResult(resultMessage);
         }
 
-        //TODO: replace all system exceptions that occur on validation with our client exceptions
+
         public override Task Validate(OrderCancellationProcessorContext context)
         {
             context.ValidateNonce();
@@ -55,11 +54,27 @@ namespace Centaurus.Domain
             context.Order = context.Orderbook.GetOrder(orderRequest.OrderId);
 
             if (context.Order is null)
-                throw new BadRequestException($"Order {orderRequest.OrderId} is not found.{(quantum.Apex != default ? $" Apex {quantum.Apex}": "")}");
+                throw new BadRequestException($"Order {orderRequest.OrderId} is not found.{(quantum.Apex != default ? $" Apex {quantum.Apex}" : "")}");
 
             //TODO: check that lot size is greater than minimum allowed lot
-            if (context.Order.Account.Id != orderRequest.Account) 
+            if (context.Order.Account.Id != orderRequest.Account)
                 throw new ForbiddenException();
+
+            if (context.OrderSide == OrderSide.Buy)
+            {
+                context.XmlAmount = OrderMatcher.EstimateTradedXlmAmount(context.Order.Amount, context.Order.Price);
+                var balance = orderRequest.AccountWrapper.Account.GetBalance(0);
+                if (balance.Liabilities < context.XmlAmount)
+                    throw new BadRequestException("Xml liabilities is less than order size.");
+            }
+            else
+            {
+                var balance = orderRequest.AccountWrapper.Account.GetBalance(orderData.Asset);
+                if (balance == null)
+                    throw new BadRequestException("Balance for asset is not found.");
+                if (balance.Liabilities < context.Order.Amount)
+                    throw new BadRequestException("Asset liabilities is less than order size.");
+            }
 
             return Task.CompletedTask;
         }
