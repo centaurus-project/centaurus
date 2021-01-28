@@ -24,7 +24,7 @@ namespace Centaurus.Domain
 
             context.UpdateNonce();
 
-            //lock order reserve
+            //unlock order reserve
             if (context.OrderSide == OrderSide.Buy)
                 //TODO: check this - potential rounding error with multiple trades
                 context.EffectProcessors.AddUpdateLiabilities(orderRequest.AccountWrapper.Account, 0, -context.XlmAmount);

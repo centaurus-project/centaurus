@@ -145,7 +145,7 @@ namespace Centaurus.Test
                     addAssetsFn(clients[i].PublicKey, assets[c].Id);
             }
 
-            var depositeQuantum = new TxCommitQuantum
+            var depositQuantum = new TxCommitQuantum
             {
                 Apex = 2,
                 PrevHash = Global.QuantumStorage.LastQuantumHash,
@@ -156,9 +156,9 @@ namespace Centaurus.Test
                 }.CreateEnvelope()
             };
 
-            depositeQuantum.Source.Sign(TestEnvironment.Auditor1KeyPair);
+            depositQuantum.Source.Sign(TestEnvironment.Auditor1KeyPair);
 
-            await Global.QuantumHandler.HandleAsync(depositeQuantum.CreateEnvelope());
+            await Global.QuantumHandler.HandleAsync(depositQuantum.CreateEnvelope());
 
             //save all effects
             await SnapshotHelper.ApplyUpdates();

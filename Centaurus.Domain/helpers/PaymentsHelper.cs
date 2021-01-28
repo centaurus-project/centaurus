@@ -27,7 +27,7 @@ namespace Centaurus.Domain
             return true;
         }
 
-        public static OperationTypeEnum[] SupportedDepositeOperations = new OperationTypeEnum[] { OperationTypeEnum.PAYMENT };
+        public static OperationTypeEnum[] SupportedDepositOperations = new OperationTypeEnum[] { OperationTypeEnum.PAYMENT };
 
         public static bool FromOperationResponse(Operation.OperationBody operation, stellar_dotnet_sdk.KeyPair source, PaymentResults pResult, byte[] transactionHash, out PaymentBase payment)
         {
@@ -35,7 +35,7 @@ namespace Centaurus.Domain
             int asset;
             //check supported deposit operations is overkill, but we need to keep SupportedDepositOperations up to date
             bool result = false;
-            if (!SupportedDepositeOperations.Contains(operation.Discriminant.InnerValue))
+            if (!SupportedDepositOperations.Contains(operation.Discriminant.InnerValue))
                 return false;
             switch (operation.Discriminant.InnerValue)
             {

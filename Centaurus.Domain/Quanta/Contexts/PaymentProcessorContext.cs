@@ -18,15 +18,15 @@ namespace Centaurus.Domain
 
         public Account SourceAccount { get; }
 
-        private Account destination;
-        public Account Destination
+        private Account destinationAccount;
+        public Account DestinationAccount
         {
             get
             {
-                if (destination == null)
-                    destination = Global.AccountStorage.GetAccount(Payment.Destination)?.Account;
+                if (destinationAccount == null)
+                    destinationAccount = Global.AccountStorage.GetAccount(Payment.Destination)?.Account;
 
-                return destination;
+                return destinationAccount;
             }
         }
     }

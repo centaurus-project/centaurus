@@ -162,7 +162,7 @@ namespace Centaurus.Domain
             }
             catch (Exception e)
             {
-                if (e is TaskCanceledException || e is OperationCanceledException)
+                if (e is OperationCanceledException)
                     return;
                 logger.Error(e);
             }
