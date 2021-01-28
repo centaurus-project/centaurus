@@ -202,7 +202,7 @@ namespace Centaurus.Domain
                     return;
                 }
                 var transaction = Transaction.FromEnvelopeXdr(tx.EnvelopeXdr);
-                if (!transaction.Operations.Any(o => PaymentsHelper.SupportedDepositeOperations.Contains(o.ToOperationBody().Discriminant.InnerValue)))
+                if (!transaction.Operations.Any(o => PaymentsHelper.SupportedDepositOperations.Contains(o.ToOperationBody().Discriminant.InnerValue)))
                     return;
                 RegisterNewCursor(long.Parse(tx.PagingToken));
             }

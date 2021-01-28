@@ -166,7 +166,7 @@ namespace Centaurus.SDK
             return result;
         }
 
-        public async Task Register(long amount, ConstellationInfo.Asset asset, params KeyPair[] extraSigners)
+        public async Task Register(long amount, params KeyPair[] extraSigners)
         {
             //try to connect to make sure that pubkey is not registered yet
             try { await Connect(); } catch { }
@@ -174,7 +174,10 @@ namespace Centaurus.SDK
             if (IsConnected)
                 throw new Exception("Already registered.");
 
-            await Deposite(amount, asset, extraSigners);
+            if (amount < constellation.MinAccountBalance)
+                throw new Exception($"Min allowed account balance is {amount}.");
+
+            await Deposite(amount, constellation.Assets.First(a => a.Issuer == null), extraSigners);
             var tries = 0;
             while (true)
                 try
