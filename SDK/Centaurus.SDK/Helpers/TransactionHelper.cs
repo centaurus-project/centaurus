@@ -20,7 +20,7 @@ namespace Centaurus.SDK
             return txBuilder;
         }
 
-        public static async Task<Transaction> GetPaymentTx(KeyPair sourceAccount, ConstellationInfo constellation, KeyPair destination, string amount, ConstellationInfo.Asset asset)
+        public static async Task<Transaction> GetWithdrawalTx(KeyPair sourceAccount, ConstellationInfo constellation, KeyPair destination, string amount, ConstellationInfo.Asset asset)
         {
             using (var server = constellation.StellarNetwork.GetServer())
             {
@@ -31,6 +31,18 @@ namespace Centaurus.SDK
 
                 txBuilder.AddOperation(new PaymentOperation.Builder(destination, asset.StellarAsset, amount).SetSourceAccount(KeyPair.FromAccountId(constellation.Vault)).Build());
                 txBuilder.AddTimeBounds(new stellar_dotnet_sdk.TimeBounds(maxTime: DateTimeOffset.UtcNow.AddSeconds(60)));
+                var tx = txBuilder.Build();
+                return tx;
+            }
+        }
+
+        public static async Task<Transaction> GetDepositeTx(KeyPair sourceAccount, ConstellationInfo constellation, string amount, ConstellationInfo.Asset asset)
+        {
+            using (var server = constellation.StellarNetwork.GetServer())
+            {
+                var txBuilder = await GetTxBuilder(server, sourceAccount);
+
+                txBuilder.AddOperation(new PaymentOperation.Builder((KeyPair)constellation.VaultPubKey, asset.StellarAsset, amount).Build());
                 var tx = txBuilder.Build();
                 return tx;
             }
