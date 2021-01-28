@@ -24,11 +24,11 @@ namespace Centaurus.Domain
 
             context.UpdateNonce();
 
-            var xmlAmount = OrderMatcher.EstimateTradedXlmAmount(context.Order.Amount, context.Order.Price);
+            var xlmAmount = OrderMatcher.EstimateTradedXlmAmount(context.Order.Amount, context.Order.Price);
             //lock order reserve
             if (context.OrderSide == OrderSide.Buy)
                 //TODO: check this - potential rounding error with multiple trades
-                context.EffectProcessors.AddUpdateLiabilities(orderRequest.AccountWrapper.Account, 0, -xmlAmount);
+                context.EffectProcessors.AddUpdateLiabilities(orderRequest.AccountWrapper.Account, 0, -xlmAmount);
             else
                 context.EffectProcessors.AddUpdateLiabilities(orderRequest.AccountWrapper.Account, context.Asset, -context.Order.Amount);
 

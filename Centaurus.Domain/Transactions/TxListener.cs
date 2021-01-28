@@ -123,18 +123,15 @@ namespace Centaurus.Domain
                 var pagingToken = long.Parse(tx.PagingToken);
 
                 var payments = AddVaultPayments(Transaction.FromEnvelopeXdr(tx.EnvelopeXdr), tx.Result.IsSuccess);
-                if (payments.Count > 0)
+                var payment = new TxNotification
                 {
-                    var payment = new TxNotification
-                    {
-                        TxCursor = pagingToken,
-                        Payments = payments
-                    };
+                    TxCursor = pagingToken,
+                    Payments = payments
+                };
 
-                    logger.Trace($"Tx with hash {tx.Hash} is handled. Number of payments for account {Global.Constellation.Vault} is {payment.Payments.Count}.");
+                logger.Trace($"Tx with hash {tx.Hash} is handled. Number of payments for account {Global.Constellation.Vault} is {payment.Payments.Count}.");
 
-                    OutgoingMessageStorage.OnTransaction(payment);
-                }
+                OutgoingMessageStorage.OnTransaction(payment);
             }
             catch (Exception exc)
             {
@@ -173,7 +170,7 @@ namespace Centaurus.Domain
         }
 
         public long PeekCursor()
-        { 
+        {
             lock (pendingTxCursors)
             {
                 pendingTxCursors.TryPeek(out var cursor);
@@ -202,7 +199,7 @@ namespace Centaurus.Domain
                     return;
                 }
                 var transaction = Transaction.FromEnvelopeXdr(tx.EnvelopeXdr);
-                if (!transaction.Operations.Any(o => PaymentsHelper.SupportedDepositeOperations.Contains(o.ToOperationBody().Discriminant.InnerValue)))
+                if (!transaction.Operations.Any(o => PaymentsHelper.SupportedDepositOperations.Contains(o.ToOperationBody().Discriminant.InnerValue)))
                     return;
                 RegisterNewCursor(long.Parse(tx.PagingToken));
             }

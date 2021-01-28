@@ -29,6 +29,8 @@ namespace Centaurus.SDK
             this.alphaWebSocketAddress = alphaWebSocketAddress ?? throw new ArgumentNullException(nameof(alphaWebSocketAddress));
             this.keyPair = keyPair ?? throw new ArgumentNullException(nameof(keyPair));
             this.constellation = constellationInfo ?? throw new ArgumentNullException(nameof(constellationInfo));
+
+            Network.Use(new Network(constellation.StellarNetwork.Passphrase));
         }
 
         public async Task Connect()
@@ -39,6 +41,8 @@ namespace Centaurus.SDK
 
                 if (IsConnected)
                     return;
+
+                handshakeResult = new TaskCompletionSource<int>();
 
                 connection = new CentaurusConnection(alphaWebSocketAddress, keyPair, constellation);
                 SubscribeToEvents(connection);
@@ -54,13 +58,12 @@ namespace Centaurus.SDK
             {
                 UnsubscribeFromEvents(connection);
                 if (connection != null)
-                    await connection.CloseConnection();
+                    await connection.CloseAndDispose();
                 connection = null;
                 throw new Exception("Login failed.", exc);
             }
             finally
             {
-
                 connectionSemaphore.Release();
             }
         }
@@ -75,6 +78,7 @@ namespace Centaurus.SDK
             try
             {
                 connectionSemaphore.Wait();
+                UnsubscribeFromEvents(connection);
                 if (connection != null)
                     await connection.CloseAndDispose();
                 connection = null;
@@ -113,7 +117,7 @@ namespace Centaurus.SDK
         public async Task<MessageEnvelope> Withdrawal(KeyPair destination, string amount, ConstellationInfo.Asset asset, bool waitForFinalize = true)
         {
             var paymentMessage = new WithdrawalRequest();
-            var tx = await TransactionHelper.GetPaymentTx(keyPair, constellation, destination, amount, asset);
+            var tx = await TransactionHelper.GetWithdrawalTx(keyPair, constellation, destination, amount, asset);
 
             paymentMessage.TransactionXdr = tx.ToArray();
 
@@ -123,7 +127,6 @@ namespace Centaurus.SDK
             if (txResultMessage is null)
                 throw new Exception($"Unexpected result type '{result.Message.MessageType}'");
 
-            Network.Use(new Network(constellation.StellarNetwork.Passphrase));
             tx.Sign(keyPair);
             foreach (var signature in txResultMessage.TxSignatures)
             {
@@ -163,6 +166,45 @@ namespace Centaurus.SDK
             return result;
         }
 
+        public async Task Register(long amount, params KeyPair[] extraSigners)
+        {
+            //try to connect to make sure that pubkey is not registered yet
+            try { await Connect(); } catch { }
+
+            if (IsConnected)
+                throw new Exception("Already registered.");
+
+            if (amount < constellation.MinAccountBalance)
+                throw new Exception($"Min allowed account balance is {amount}.");
+
+            await Deposit(amount, constellation.Assets.First(a => a.Issuer == null), extraSigners);
+            var tries = 0;
+            while (true)
+                try
+                {
+                    await Connect();
+                    break;
+                }
+                catch
+                {
+                    if (++tries < 10)
+                    {
+                        await Task.Delay(3000);
+                        continue;
+                    }
+                    throw new Exception("Unable to login. Maybe server is too busy. Try later.");
+                }
+        }
+
+        public async Task Deposit(long amount, ConstellationInfo.Asset asset, params KeyPair[] extraSigners)
+        {
+            var tx = await TransactionHelper.GetDepositTx(keyPair, constellation, Amount.FromXdr(amount), asset);
+            tx.Sign(keyPair);
+            foreach (var signer in extraSigners)
+                tx.Sign(signer);
+            await tx.Submit(constellation);
+        }
+
         public void Dispose()
         {
             UnsubscribeFromEvents(connection);
@@ -182,7 +224,7 @@ namespace Centaurus.SDK
         private Uri alphaWebSocketAddress;
         private KeyPair keyPair;
         private ConstellationInfo constellation;
-        private TaskCompletionSource<int> handshakeResult = new TaskCompletionSource<int>();
+        private TaskCompletionSource<int> handshakeResult;
 
         private void ResultMessageHandler(MessageEnvelope envelope)
         {
@@ -375,7 +417,9 @@ namespace Centaurus.SDK
                     return;
                 try
                 {
-                    if (webSocket.State == WebSocketState.Open || webSocket.State == WebSocketState.Connecting)
+                    if (webSocket.State == WebSocketState.Open 
+                        || webSocket.State == WebSocketState.CloseReceived
+                        || webSocket.State == WebSocketState.CloseSent)
                     {
                         cancellationTokenSource?.Cancel();
                         await webSocket.CloseAsync(status, desc, CancellationToken.None);
@@ -383,8 +427,9 @@ namespace Centaurus.SDK
                 }
                 catch (WebSocketException exc)
                 {
-                    //ignore "closed-without-completing-handshake" error
-                    if (exc.WebSocketErrorCode != WebSocketError.ConnectionClosedPrematurely)
+                    //ignore "closed-without-completing-handshake" error and invalid state error
+                    if (exc.WebSocketErrorCode != WebSocketError.ConnectionClosedPrematurely
+                        && exc.WebSocketErrorCode != WebSocketError.InvalidState)
                         throw;
                 }
                 finally
@@ -584,6 +629,8 @@ namespace Centaurus.SDK
                     }
                     while (true);
                 }
+                catch (OperationCanceledException)
+                { }
                 catch (WebSocketException e)
                 {
                     await CloseConnection(WebSocketCloseStatus.ProtocolError, e.Message);

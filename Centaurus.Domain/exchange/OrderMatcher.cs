@@ -88,13 +88,13 @@ namespace Centaurus.Domain
         private bool PlaceReminderOrder()
         {
             if (takerOrder.Amount <= 0) return false;
-            var xmlAmount = EstimateTradedXlmAmount(takerOrder.Amount, takerOrder.Price);
-            if (xmlAmount <= 0) return false;
+            var xlmAmount = EstimateTradedXlmAmount(takerOrder.Amount, takerOrder.Price);
+            if (xlmAmount <= 0) return false;
             //lock order reserve
             if (side == OrderSide.Buy)
             {
                 //TODO: check this - potential rounding error with multiple trades
-                resultEffects.AddUpdateLiabilities(takerOrder.Account, 0, xmlAmount);
+                resultEffects.AddUpdateLiabilities(takerOrder.Account, 0, xlmAmount);
             }
             else
             {

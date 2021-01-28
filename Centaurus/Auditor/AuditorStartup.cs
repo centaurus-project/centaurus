@@ -64,7 +64,7 @@ namespace Centaurus
                         Unsubscribe(_auditor);
                         await CloseConnection(_auditor);
 
-                        if (!(exc is TaskCanceledException || exc is OperationCanceledException))
+                        if (!(exc is OperationCanceledException))
                             logger.Info(exc, "Unable establish connection. Retry in 5000ms");
                         Thread.Sleep(5000);
                     }

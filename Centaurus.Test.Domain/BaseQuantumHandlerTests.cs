@@ -80,7 +80,7 @@ namespace Centaurus.Test
                 await Global.QuantumHandler.HandleAsync(quantum);
             }
 
-            var depositeAmount = new Random().Next(10, 1000);
+            var depositAmount = new Random().Next(10, 1000);
 
             var ledgerNotification = new TxNotification
             {
@@ -89,7 +89,7 @@ namespace Centaurus.Test
                     {
                         new Deposit
                         {
-                            Amount = depositeAmount,
+                            Amount = depositAmount,
                             Destination = TestEnvironment.Client1KeyPair,
                             Asset = asset
                         },
@@ -121,7 +121,7 @@ namespace Centaurus.Test
                 Assert.AreEqual(Global.TxCursorManager.TxCursor, ledgerNotification.TxCursor);
 
                 Assert.AreEqual(account1.GetBalance(asset).Liabilities, 0);
-                Assert.AreEqual(account1.GetBalance(asset).Amount, client1StartBalanceAmount - amount + depositeAmount); //acc balance + deposit - withdrawal
+                Assert.AreEqual(account1.GetBalance(asset).Amount, client1StartBalanceAmount - amount + depositAmount); //acc balance + deposit - withdrawal
             }
         }
 
