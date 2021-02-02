@@ -150,19 +150,12 @@ namespace Centaurus.Domain
 
         private void RefreshUpdatesUnlocked()
         {
-            var pendingUpdates = default(DiffObject);
-            if (Current.Quanta.Count > 0)
-            {
-                pendingUpdates = Current;
-                Current = new DiffObject();
-            }
-            if (awaitedUpdates != null)
-            {
-                if (pendingUpdates != null)
-                    awaitedUpdates.Add(pendingUpdates);
-                if (awaitedUpdates.Count >= 10 && Global.AppState.State != ApplicationState.Failed)
-                    OnSaveFailed($"Delayed updates queue ({awaitedUpdates.Count}) is too long.");
-            }
+            if (Current.Quanta.Count < 1)
+                return;
+            var pendingUpdates = Current;
+            Current = new DiffObject();
+            awaitedUpdates?.Add(pendingUpdates);
+            QuantaThrottlingManager.Current.SetBatchQueueLength(awaitedUpdates.Count);
         }
 
         private async Task ApplyUpdates(DiffObject updates)
@@ -174,7 +167,7 @@ namespace Centaurus.Domain
                 await Global.PersistenceManager.ApplyUpdates(updates);
                 sw.Stop();
                 //TODO: remove it
-                Console.WriteLine($"Saved {updates.Quanta.Count} quanta ({updates.Effects.Count} effects) in {sw.ElapsedMilliseconds} ms");
+                logger.Warn($"Saved {updates.Quanta.Count} quanta ({updates.Effects.Count} effects) in {sw.ElapsedMilliseconds} ms");
             }
             catch (Exception exc)
             {
