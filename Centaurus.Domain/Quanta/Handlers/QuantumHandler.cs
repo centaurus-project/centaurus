@@ -61,7 +61,7 @@ namespace Centaurus.Domain
                 foreach (var handlingItem in awaitedQuanta.GetConsumingEnumerable())
                 {
                     await ProcessQuantum(handlingItem);
-                    if (QuantaThrottlingManager.Current.IsThrottlingEnabled)
+                    if (Global.IsAlpha && QuantaThrottlingManager.Current.IsThrottlingEnabled)
                         Thread.Sleep(QuantaThrottlingManager.Current.SleepTime);
                 }
             }
@@ -120,6 +120,7 @@ namespace Centaurus.Domain
             await Global.PendingUpdatesManager.UpdatesSyncRoot.WaitAsync();
             try
             {
+                Global.PendingUpdatesManager.TryRefreshContainer();
                 return Global.IsAlpha
                     ? await AlphaHandleQuantum(quantumEnvelope, timestamp)
                     : await AuditorHandleQuantum(quantumEnvelope);

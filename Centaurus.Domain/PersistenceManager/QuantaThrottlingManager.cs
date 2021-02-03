@@ -19,7 +19,7 @@ namespace Centaurus.Domain
         {
             lock (batchQueueLengthHistory)
             {
-                if (batchQueueLengthHistory.Count == 0 && batchQueueLength < 10)
+                if (batchQueueLengthHistory.Count == 0 && batchQueueLength < maxAllowedBatchLength)
                     return;
                 if (batchQueueLength <= 3) //stop throttling if the queue is 3 or less
                 {
@@ -33,6 +33,8 @@ namespace Centaurus.Domain
                     Throttle();
             }
         }
+
+        private int maxAllowedBatchLength = 10;
 
         private void Reset()
         {
@@ -48,7 +50,6 @@ namespace Centaurus.Domain
 
             MaxItemsPerSecond = MaxItemsPerSecond != 0 ? MaxItemsPerSecond / 2 : 1000; //start with max 1000 items per second
             SleepTime = 1000 / MaxItemsPerSecond; //1000ms divided by max quanta per second
-            Console.WriteLine($"Throttling: MaxItemsPerSecond = {MaxItemsPerSecond}, SleepTime = {SleepTime}");
         }
 
         public static QuantaThrottlingManager Current { get; } = new QuantaThrottlingManager();
