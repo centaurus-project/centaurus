@@ -25,13 +25,12 @@ namespace Centaurus.Exchange.Analytics
                 await syncRoot.WaitAsync();
                 foreach (var market in markets)
                 {
-                    if (!tickers.ContainsKey(market))
-                        tickers.Add(market, null);
-
-                    var currentTicker = tickers[market];
-                    var updateTicker = await GenerateTicker(market, updateDate);
-                    if (!(updateTicker == null || updateTicker.Equals(currentTicker)))
-                        tickers[market] = updateTicker;
+                    if (!tickers.TryGetValue(market, out var currentTicker))
+                    {
+                        currentTicker = new MarketTicker(market);
+                        tickers.Add(market, currentTicker);
+                    }
+                    await UpdateTicker(currentTicker, updateDate);
                 }
             }
             finally
@@ -46,14 +45,13 @@ namespace Centaurus.Exchange.Analytics
         private PriceHistoryManager framesManager;
         private Dictionary<int, MarketTicker> tickers = new Dictionary<int, MarketTicker>();
 
-        private async Task<MarketTicker> GenerateTicker(int market, DateTime updateDate)
+        private async Task UpdateTicker(MarketTicker marketTicker, DateTime updateDate)
         {
-            var frames = await framesManager.GetPriceHistory(0, market, period);
+            var frames = await framesManager.GetPriceHistory(0, marketTicker.Market, period);
             var fromDate = DateTime.UtcNow.AddDays(-1);
             var framesFor24Hours = frames.frames.TakeWhile(f => f.StartTime >= fromDate);
-            var marketTicker = new MarketTicker(market);
             if (framesFor24Hours.Count() < 1)
-                return marketTicker;
+                return;
 
             marketTicker.Open = framesFor24Hours.Last().Open;
             marketTicker.Close = framesFor24Hours.First().Close;
@@ -62,7 +60,6 @@ namespace Centaurus.Exchange.Analytics
             marketTicker.BaseVolume = framesFor24Hours.Sum(f => f.BaseVolume);
             marketTicker.CounterVolume = framesFor24Hours.Sum(f => f.CounterVolume);
             marketTicker.UpdatedAt = updateDate;
-            return marketTicker;
         }
 
         public MarketTicker GetMarketTicker(int market)

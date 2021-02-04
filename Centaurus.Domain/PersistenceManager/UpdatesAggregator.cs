@@ -52,39 +52,34 @@ namespace Centaurus.Domain
                 case NonceUpdateEffect nonceUpdateEffect:
                     {
                         var accId = nonceUpdateEffect.Account;
-                        EnsureAccountRecordExists(pendingDiffObject.Accounts, accId);
-                        pendingDiffObject.Accounts[accId].Nonce = nonceUpdateEffect.Nonce;
+                        GetAccount(pendingDiffObject.Accounts, accId).Nonce = nonceUpdateEffect.Nonce;
                     }
                     break;
                 case BalanceCreateEffect balanceCreateEffect:
                     {
                         var accId = balanceCreateEffect.Account;
                         var balanceId = BalanceModelIdConverter.EncodeId(accId, balanceCreateEffect.Asset);
-                        EnsureBalanceRecordExists(pendingDiffObject.Balances, balanceId);
-                        pendingDiffObject.Balances[balanceId].IsInserted = true;
+                        GetBalance(pendingDiffObject.Balances, balanceId).IsInserted = true;
                     }
                     break;
                 case BalanceUpdateEffect balanceUpdateEffect:
                     {
                         var accId = balanceUpdateEffect.Account;
                         var balanceId = BalanceModelIdConverter.EncodeId(accId, balanceUpdateEffect.Asset);
-                        EnsureBalanceRecordExists(pendingDiffObject.Balances, balanceId);
-                        pendingDiffObject.Balances[balanceId].Amount += balanceUpdateEffect.Amount;
+                        GetBalance(pendingDiffObject.Balances, balanceId).Amount += balanceUpdateEffect.Amount;
                     }
                     break;
                 case UpdateLiabilitiesEffect lockLiabilitiesEffect:
                     {
                         var accId = lockLiabilitiesEffect.Account;
                         var balanceId = BalanceModelIdConverter.EncodeId(accId, lockLiabilitiesEffect.Asset);
-                        EnsureBalanceRecordExists(pendingDiffObject.Balances, balanceId);
-                        pendingDiffObject.Balances[balanceId].Liabilities += lockLiabilitiesEffect.Amount;
+                        GetBalance(pendingDiffObject.Balances, balanceId).Liabilities += lockLiabilitiesEffect.Amount;
                     }
                     break;
                 case RequestRateLimitUpdateEffect requestRateLimitUpdateEffect:
                     {
                         var accId = requestRateLimitUpdateEffect.Account;
-                        EnsureAccountRecordExists(pendingDiffObject.Accounts, accId);
-                        pendingDiffObject.Accounts[accId].RequestRateLimits = new RequestRateLimitsModel
+                        GetAccount(pendingDiffObject.Accounts, accId).RequestRateLimits = new RequestRateLimitsModel
                         {
                             HourLimit = requestRateLimitUpdateEffect.RequestRateLimits.HourLimit,
                             MinuteLimit = requestRateLimitUpdateEffect.RequestRateLimits.MinuteLimit
@@ -107,20 +102,13 @@ namespace Centaurus.Domain
                 case OrderRemovedEffect orderRemovedEffect:
                     {
                         var orderId = orderRemovedEffect.OrderId;
-                        if (!pendingDiffObject.Orders.ContainsKey(orderId))
-                            pendingDiffObject.Orders.Add(orderId, new DiffObject.Order
-                            {
-                                OrderId = orderId
-                            });
-                        pendingDiffObject.Orders[orderId].IsDeleted = true;
+                        GetOrder(pendingDiffObject.Orders, orderId).IsDeleted = true;
                     }
                     break;
                 case TradeEffect tradeEffect:
                     {
                         var orderId = tradeEffect.OrderId;
-                        if (!pendingDiffObject.Orders.ContainsKey(orderId))
-                            pendingDiffObject.Orders.Add(orderId, new DiffObject.Order { OrderId = orderId });
-                        pendingDiffObject.Orders[orderId].Amount += -(tradeEffect.AssetAmount);
+                        GetOrder(pendingDiffObject.Orders, orderId).Amount += -(tradeEffect.AssetAmount);
                     }
                     break;
                 case TxCursorUpdateEffect cursorUpdateEffect:
@@ -134,15 +122,13 @@ namespace Centaurus.Domain
                 case WithdrawalCreateEffect withdrawalCreateEffect:
                     {
                         var accId = withdrawalCreateEffect.Account;
-                        EnsureAccountRecordExists(pendingDiffObject.Accounts, accId);
-                        pendingDiffObject.Accounts[accId].Withdrawal = withdrawalCreateEffect.Apex;
+                        GetAccount(pendingDiffObject.Accounts, accId).Withdrawal = withdrawalCreateEffect.Apex;
                     }
                     break;
                 case WithdrawalRemoveEffect withdrawalRemoveEffect:
                     {
                         var accId = withdrawalRemoveEffect.Account;
-                        EnsureAccountRecordExists(pendingDiffObject.Accounts, accId);
-                        pendingDiffObject.Accounts[accId].Withdrawal = 0;
+                        GetAccount(pendingDiffObject.Accounts, accId).Withdrawal = 0;
                     }
                     break;
                 default:
@@ -150,16 +136,34 @@ namespace Centaurus.Domain
             }
         }
 
-        private static void EnsureAccountRecordExists(Dictionary<int, DiffObject.Account> accounts, int accountId)
+        private static DiffObject.Account GetAccount(Dictionary<int, DiffObject.Account> accounts, int accountId)
         {
-            if (!accounts.ContainsKey(accountId))
-                accounts.Add(accountId, new DiffObject.Account { Id = accountId });
+            if (!accounts.TryGetValue(accountId, out var account))
+            {
+                account = new DiffObject.Account { Id = accountId };
+                accounts.Add(accountId, account);
+            }
+            return account;
         }
 
-        private static void EnsureBalanceRecordExists(Dictionary<BsonObjectId, DiffObject.Balance> balances, BsonObjectId balanceId)
+        private static DiffObject.Balance GetBalance(Dictionary<BsonObjectId, DiffObject.Balance> balances, BsonObjectId balanceId)
         {
-            if (!balances.ContainsKey(balanceId))
-                balances.Add(balanceId, new DiffObject.Balance { Id = balanceId });
+            if (!balances.TryGetValue(balanceId, out var balance))
+            {
+                balance = new DiffObject.Balance { Id = balanceId };
+                balances.Add(balanceId, balance);
+            }
+            return balance;
+        }
+
+        private static DiffObject.Order GetOrder(Dictionary<ulong, DiffObject.Order> orders, ulong orderId)
+        {
+            if (!orders.TryGetValue(orderId, out var order))
+            {
+                order = new DiffObject.Order { OrderId = orderId };
+                orders.Add(orderId, order);
+            }
+            return order;
         }
 
         private static SettingsModel GetConstellationSettings(ConstellationEffect constellationInit)

@@ -55,22 +55,5 @@ namespace Centaurus.Exchange.Analytics
         public double CounterVolume { get; set; }
 
         public DateTime UpdatedAt { get; set; }
-
-        public override bool Equals(object obj)
-        {
-            return obj is MarketTicker ticker &&
-                   Market == ticker.Market &&
-                   Open == ticker.Open &&
-                   Close == ticker.Close &&
-                   High == ticker.High &&
-                   Low == ticker.Low &&
-                   BaseVolume == ticker.BaseVolume &&
-                   CounterVolume == ticker.CounterVolume;
-        }
-
-        public override int GetHashCode()
-        {
-            return HashCode.Combine(Market, Open, Close, High, Low, BaseVolume, CounterVolume);
-        }
     }
 }

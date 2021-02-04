@@ -74,9 +74,12 @@ namespace Centaurus.Domain
         {
             lock (syncRoot)
             {
-                if (!pendingAggregates.ContainsKey(id))
-                    pendingAggregates[id] = new ConsensusAggregate(id, this);
-                return pendingAggregates[id];
+                if (!pendingAggregates.TryGetValue(id, out var consensusAggregate))
+                {
+                    consensusAggregate = new ConsensusAggregate(id, this);
+                    pendingAggregates[id] = consensusAggregate;
+                }
+                return consensusAggregate;
             }
         }
 
@@ -147,14 +150,13 @@ namespace Centaurus.Domain
                 lock (syncRoot)
                 {
                     var envelopeHash = majorityManager.GetHash(envelope);
-                    var resultStorageEnvelope = envelope;
-                    if (!storage.ContainsKey(envelopeHash))//first result with such hash
-                        storage[envelopeHash] = envelope;
-                    else
+                    if (!storage.TryGetValue(envelopeHash, out var resultStorageEnvelope))//first result with such hash
                     {
-                        resultStorageEnvelope = storage[envelopeHash];
-                        resultStorageEnvelope.AggregateEnvelopUnsafe(envelope);//we can use AggregateEnvelopUnsafe, we compute hash for every envelope above
+                        resultStorageEnvelope = envelope;
+                        storage[envelopeHash] = envelope;
                     }
+                    else
+                        resultStorageEnvelope.AggregateEnvelopUnsafe(envelope);//we can use AggregateEnvelopUnsafe, we compute hash for every envelope above
 
                     if (IsProcessed)
                     {
