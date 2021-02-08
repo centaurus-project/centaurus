@@ -617,7 +617,7 @@ namespace Centaurus.SDK
                 {
                     do
                     {
-                        using var buffer = await webSocket.GetWebsocketBuffer(cancellationToken);
+                        using var buffer = await webSocket.GetWebsocketBuffer(WebSocketExtension.ChunkSize * 100, cancellationToken);
                         try
                         {
                             HandleMessage(DeserializeMessage(buffer));

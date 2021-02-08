@@ -24,6 +24,7 @@ namespace Centaurus.Domain
             //we don't need to create and sign heartbeat message on every sending
             hearbeatMessage = new Heartbeat().CreateEnvelope();
             hearbeatMessage.Sign(Global.Settings.KeyPair);
+            MaxMessageSize = MaxMessageSize * Global.MaxMessageBatchSize;
 #if !DEBUG
             InitTimer();
 #endif

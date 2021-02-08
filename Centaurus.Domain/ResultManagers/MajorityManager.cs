@@ -10,7 +10,6 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    //TODO: add validation timeout
     public abstract class MajorityManager : IDisposable
     {
         public MajorityManager()
@@ -20,7 +19,11 @@ namespace Centaurus.Domain
 
         public void Add(MessageEnvelope envelope)
         {
-            Aggregate(envelope);
+            var id = GetId(envelope);
+            ConsensusAggregate aggregate = GetConsensusAggregate(id);
+
+            //add the signature to the aggregate
+            aggregate.Add(envelope);
         }
 
         public virtual void Dispose()
@@ -81,15 +84,6 @@ namespace Centaurus.Domain
                 }
                 return consensusAggregate;
             }
-        }
-
-        protected void Aggregate(MessageEnvelope envelope)
-        {
-            var id = GetId(envelope);
-            ConsensusAggregate aggregate = GetConsensusAggregate(id);
-
-            //add the signature to the aggregate
-            aggregate.Add(envelope);
         }
 
         /// <summary>
@@ -204,7 +198,10 @@ namespace Centaurus.Domain
                 }
                 //failed to rich consensus
                 consensus = null;
-                if (maxVotes - totalOpposition < requiredMajority)
+
+                var maxPossibleVotes = (maxVotes - totalOpposition) + maxConsensus;
+
+                if (maxPossibleVotes < requiredMajority)
                 {//no chances to reach the majority
                     return MajorityResults.Unreachable;
                 }

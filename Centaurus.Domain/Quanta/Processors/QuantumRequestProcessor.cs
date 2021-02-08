@@ -43,9 +43,12 @@ namespace Centaurus.Domain
                 if (effect.Account == default
                     || effect.Account == requestAccount)
                     continue;
-                if (!result.ContainsKey(effect.Account))
-                    result[effect.Account] = new EffectsNotification { Effects = new List<Effect>() };
-                result[effect.Account].Effects.Add(effect);
+                if (!result.TryGetValue(effect.Account, out var effectsNotification))
+                {
+                    effectsNotification = new EffectsNotification { Effects = new List<Effect>() };
+                    result.Add(effect.Account, effectsNotification);
+                }
+                effectsNotification.Effects.Add(effect);
             }
             return result.ToDictionary(k => k.Key, v => (Message)v.Value);
         }

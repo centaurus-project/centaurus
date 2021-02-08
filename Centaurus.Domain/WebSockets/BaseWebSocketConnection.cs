@@ -50,6 +50,8 @@ namespace Centaurus
         /// </summary>
         public RawPubKey ClientPubKey { get; set; }
 
+        public int MaxMessageSize { get; set; } = WebSocketExtension.ChunkSize;
+
         ConnectionState connectionState;
         /// <summary>
         /// Current connection state
@@ -168,7 +170,7 @@ namespace Centaurus
             {
                 do
                 {
-                    using var buffer = await webSocket.GetWebsocketBuffer(cancellationToken);
+                    using var buffer = await webSocket.GetWebsocketBuffer(MaxMessageSize, cancellationToken);
                     MessageEnvelope envelope = null;
                     try
                     {

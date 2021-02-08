@@ -14,18 +14,17 @@ namespace Centaurus
 
     public static class WebSocketExtension
     {
-        const int chunkSize = 1024;
-        const int maxMessageSize = 20480;
+        public const int ChunkSize = 1024;
 
-        public static async Task<XdrBufferFactory.RentedBuffer> GetWebsocketBuffer(this WebSocket webSocket, CancellationToken cancellationToken)
+        public static async Task<XdrBufferFactory.RentedBuffer> GetWebsocketBuffer(this WebSocket webSocket, int maxMessageSize, CancellationToken cancellationToken)
         {
             var length = 0;
 
             var messageBuffer = XdrBufferFactory.Rent(maxMessageSize);
             do
             {
-                if (length + chunkSize > maxMessageSize) throw new Exception("Too large message"); //TODO: handle it upstream
-                var chunk = messageBuffer.AsSegment(length, chunkSize);
+                if (length + ChunkSize > maxMessageSize) throw new Exception("Too large message"); //TODO: handle it upstream
+                var chunk = messageBuffer.AsSegment(length, ChunkSize);
                 var result = await webSocket.ReceiveAsync(chunk, cancellationToken);
                 length += result.Count;
                 if (result.EndOfMessage) break;

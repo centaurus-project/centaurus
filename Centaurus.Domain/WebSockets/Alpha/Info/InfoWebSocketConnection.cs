@@ -121,7 +121,7 @@ namespace Centaurus.Domain
             {
                 while (true)
                 {
-                    using var message = await webSocket.GetWebsocketBuffer(cancellationToken);
+                    using var message = await webSocket.GetWebsocketBuffer(512, cancellationToken);
                     BaseCommand command = null;
                     try
                     {

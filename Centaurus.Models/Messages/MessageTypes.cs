@@ -110,6 +110,10 @@ namespace Centaurus.Models
         /// <summary>
         /// Contains batch of quanta
         /// </summary>
-        QuantaBatch = 204
+        QuantaBatch = 204,
+        /// <summary>
+        /// Contains array of auditor's quantum processing results
+        /// </summary>
+        AuditorResultsBatch = 210
     }
 }

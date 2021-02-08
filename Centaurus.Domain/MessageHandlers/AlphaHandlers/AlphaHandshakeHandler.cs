@@ -35,6 +35,7 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
 
         private async Task HandleAuditorHandshake(AlphaWebSocketConnection connection)
         {
+            connection.MaxMessageSize = connection.MaxMessageSize * Global.MaxMessageBatchSize;
             Message message;
             if (Global.AppState.State == ApplicationState.Rising)
                 message = new AuditorStateRequest { TargetApex = await Global.PersistenceManager.GetLastApex() };

@@ -156,17 +156,9 @@ namespace Centaurus.Domain
 
             Global.QuantumStorage.AddQuantum(quantumEnvelope);
 
+            Global.AuditResultManager.Register(resultMessage, processor.GetNotificationMessages(context));
+
             effectsContainer.Complete();
-
-            //TODO: create single method for getting result message and all additional messages
-            Notifier.OnMessageProcessResult(resultMessage);
-
-            var additionalMessages = processor.GetNotificationMessages(context);
-            foreach (var m in additionalMessages)
-            {
-                var aPubKey = Global.AccountStorage.GetAccount(m.Key).Account.Pubkey;
-                Notifier.Notify(aPubKey, m.Value.CreateEnvelope());
-            }
 
             logger.Trace($"Message of type {envelope.Message} with apex {quantum.Apex} is handled.");
 
@@ -202,9 +194,7 @@ namespace Centaurus.Domain
 
             logger.Trace($"Message of type {messageType} with apex {((Quantum)envelope.Message).Apex} is handled.");
 
-            var resultEnvelope = result.CreateEnvelope();
-
-            OutgoingMessageStorage.EnqueueMessage(resultEnvelope);
+            OutgoingResultsStorage.EnqueueResult(result);
 
             return result;
         }
