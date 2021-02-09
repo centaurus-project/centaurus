@@ -43,6 +43,8 @@ namespace Centaurus.Domain
         /// <param name="long">Quantum timestamp. We need it for quanta recovery, otherwise Alpha will have different hash.</param>
         public Task<ResultMessage> HandleAsync(MessageEnvelope envelope, long timestamp = 0)
         {
+            if (QuantaThrottlingManager.Current.IsThrottlingEnabled && QuantaThrottlingManager.Current.MaxItemsPerSecond <= awaitedQuanta.Count)
+                throw new TooManyRequestsException("Server is too busy. Try again later.");
             var newHandleItem = new HandleItem(envelope, timestamp);
             awaitedQuanta.Add(newHandleItem);
             if (!Global.IsAlpha)
@@ -57,7 +59,11 @@ namespace Centaurus.Domain
             try
             {
                 foreach (var handlingItem in awaitedQuanta.GetConsumingEnumerable())
+                {
                     await ProcessQuantum(handlingItem);
+                    if (Global.IsAlpha && QuantaThrottlingManager.Current.IsThrottlingEnabled)
+                        Thread.Sleep(QuantaThrottlingManager.Current.SleepTime);
+                }
             }
             catch (Exception exc)
             {
@@ -111,7 +117,6 @@ namespace Centaurus.Domain
         async Task<ResultMessage> HandleQuantum(MessageEnvelope quantumEnvelope, long timestamp)
         {
             quantumEnvelope.TryAssignAccountWrapper();
-
             await Global.PendingUpdatesManager.UpdatesSyncRoot.WaitAsync();
             try
             {

@@ -302,9 +302,21 @@ namespace Centaurus.DAL.Mongo
                             if (orderUpdates != null)
                                 updateTasks.Add(ordersCollection.BulkWriteAsync(session, orderUpdates));
 
-                            updateTasks.Add(quantaCollection.InsertManyAsync(session, update.Quanta, new InsertManyOptions { BypassDocumentValidation = true }));
+                            var batchSize = 10000;
 
-                            updateTasks.Add(effectsCollection.InsertManyAsync(session, update.Effects, new InsertManyOptions { BypassDocumentValidation = true }));
+                            var savedQuantaCount = 0; 
+                            while (savedQuantaCount < update.Quanta.Count)
+                            {
+                                updateTasks.Add(quantaCollection.InsertManyAsync(session, update.Quanta.Skip(savedQuantaCount).Take(batchSize), new InsertManyOptions { BypassDocumentValidation = true, IsOrdered = false }));
+                                savedQuantaCount += batchSize;
+                            }
+
+                            var savedEffectsCount = 0;
+                            while (savedEffectsCount < update.Effects.Count)
+                            {
+                                updateTasks.Add(effectsCollection.InsertManyAsync(session, update.Effects.Skip(savedEffectsCount).Take(batchSize), new InsertManyOptions { BypassDocumentValidation = true, IsOrdered = false }));
+                                savedEffectsCount += batchSize;
+                            }
 
                             await Task.WhenAll(updateTasks);
 
