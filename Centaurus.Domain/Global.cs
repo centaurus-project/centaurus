@@ -87,7 +87,7 @@ namespace Centaurus.Domain
                 || state == ApplicationState.WaitingForInit))
             PendingUpdatesManager?.Start();
             if (state != ApplicationState.Ready 
-                && stateChangedEventArgs.PrevState == ApplicationState.Running) //close all connections (except auditors) if Alpha is not in Ready state
+                && stateChangedEventArgs.PrevState == ApplicationState.Ready) //close all connections (except auditors) if Alpha is not in Ready state
                 ConnectionManager.CloseAllConnections(false).Wait();
         }
 

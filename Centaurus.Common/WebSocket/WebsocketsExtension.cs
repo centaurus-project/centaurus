@@ -11,28 +11,30 @@ using Centaurus.Xdr;
 
 namespace Centaurus
 {
-
     public static class WebSocketExtension
     {
         public const int ChunkSize = 1024;
 
-        public static async Task<XdrBufferFactory.RentedBuffer> GetWebsocketBuffer(this WebSocket webSocket, int maxMessageSize, CancellationToken cancellationToken)
+        public static async Task<(XdrBufferFactory.RentedBuffer messageBuffer, WebSocketMessageType messageType)> GetWebsocketBuffer(this WebSocket webSocket, int maxMessageSize, CancellationToken cancellationToken)
         {
             var length = 0;
-
+            var messageType = default(WebSocketMessageType);
             var messageBuffer = XdrBufferFactory.Rent(maxMessageSize);
-            do
+            while (true)
             {
-                if (length + ChunkSize > maxMessageSize) throw new Exception("Too large message"); //TODO: handle it upstream
+                if (length + ChunkSize > maxMessageSize) 
+                    throw new Exception("Too large message"); //TODO: handle it upstream
                 var chunk = messageBuffer.AsSegment(length, ChunkSize);
                 var result = await webSocket.ReceiveAsync(chunk, cancellationToken);
                 length += result.Count;
-                if (result.EndOfMessage) break;
-                if (result.CloseStatus.HasValue)
-                    throw new ConnectionCloseException(result.CloseStatus.Value, result.CloseStatusDescription);
-            } while (true);
+                if (result.EndOfMessage)
+                {
+                    messageType = result.MessageType;
+                    break;
+                }
+            }
             messageBuffer.Resize(length);
-            return messageBuffer;
+            return (messageBuffer, messageType);
         }
     }
 }

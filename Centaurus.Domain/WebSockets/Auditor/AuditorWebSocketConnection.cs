@@ -51,7 +51,7 @@ namespace Centaurus.Domain
             }
             catch (Exception exc)
             {
-                logger.Error(exc, "Unable to send hearbeat message.");
+                logger.Error(exc, "Unable to send heartbeat message.");
                 heartbeatTimer?.Reset();
             }
         }
@@ -122,6 +122,8 @@ namespace Centaurus.Domain
             heartbeatTimer = null;
 
             base.Dispose();
+            webSocket?.Dispose();
+            webSocket = null;
         }
     }
 }
