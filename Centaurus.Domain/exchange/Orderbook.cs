@@ -147,27 +147,20 @@ namespace Centaurus.Domain
         /// <returns>Removal result.</returns>
         public bool RemoveOrder(ulong orderId)
         {
-            var enumerator = GetEnumerator();
+            var order = orderMap.GetOrder(orderId);
+            if (order == null)
+                return false;
+            if (Head == order)
+                Head = order.Next;
+            if (Tail == order)
+                Tail = order.Prev;
+            if (order.Prev != null)
+                order.Prev.Next = order.Next;
+            if (order.Next != null)
+                order.Next.Prev = order.Prev;
 
-            while (enumerator.MoveNext())
-            {
-                var currentOrder = enumerator.Current;
-                if (enumerator.Current.OrderId == orderId)
-                {
-                    if (Head == currentOrder)
-                        Head = currentOrder.Next;
-                    if (Tail == currentOrder)
-                        Tail = currentOrder.Prev;
-                    if (currentOrder.Prev != null)
-                        currentOrder.Prev.Next = currentOrder.Next;
-                    if (currentOrder.Next != null)
-                        currentOrder.Next.Prev = currentOrder.Prev;
-
-                    orderMap.RemoveOrder(orderId);
-                    return true;
-                }
-            }
-            return false;
+            orderMap.RemoveOrder(orderId);
+            return true;
         }
 
         public Order GetOrder(ulong orderId)
