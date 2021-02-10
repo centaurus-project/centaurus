@@ -109,13 +109,12 @@ namespace Centaurus
                     catch (OperationCanceledException) { }
                     finally
                     {
-                        sendMessageSemaphore.Release();
+                        sendMessageSemaphore?.Release();
                     }
                 }
             }
             catch (Exception e)
             {
-                Debugger.Launch();
                 logger.Error(e, "Error on close connection");
             }
         }

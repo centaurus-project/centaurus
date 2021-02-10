@@ -1,9 +1,9 @@
 ﻿using Centaurus.Models;
 using NLog;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 
 namespace Centaurus.Domain
 {
@@ -16,22 +16,28 @@ namespace Centaurus.Domain
 
         public void Register(ResultMessage resultMessage, Dictionary<int, Message> notifications)
         {
-            lock (syncRoot)
-            {
-                var resultMessageItem = new ResultMessageItem(resultMessage, notifications);
-                pendingAggregates.Add(resultMessageItem.Apex, new ResultConsensusAggregate(resultMessageItem, this));
-            }
+            var resultMessageItem = new ResultMessageItem(resultMessage, notifications);
+            if (!pendingAggregates.TryAdd(resultMessageItem.Apex, new ResultConsensusAggregate(resultMessageItem, this)))
+                logger.Error("Unable to add result manager.");
         }
 
         public void Add(AuditorResultMessage resultMessage, RawPubKey auditor)
         {
-            var aggregate = default(ResultConsensusAggregate);
-            lock (syncRoot)
-                if (!pendingAggregates.TryGetValue(resultMessage.Apex, out aggregate))
-                    return;
+            if (!pendingAggregates.TryGetValue(resultMessage.Apex, out var aggregate))
+                return;
 
             //add the signature to the aggregate
             aggregate.Add(resultMessage, auditor);
+        }
+
+        /// <summary>
+        /// Remove an aggregate by message id.
+        /// </summary>
+        /// <param name="messageId">Message id key.</param>
+        public void Remove(long id)
+        {
+            if (!pendingAggregates.TryRemove(id, out _))
+                logger.Trace($"Unable to remove item by id '{id}'");
         }
 
         public virtual void Dispose()
@@ -62,13 +68,12 @@ namespace Centaurus.Domain
 
         private void AcknowledgmentTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
-            lock (syncRoot)
-            {
-                var acknowledgmentTimeout = TimeSpan.FromMilliseconds(100);
-                foreach (var aggregate in pendingAggregates)
-                    if (!aggregate.Value.IsAcknowledgmentSent && DateTime.UtcNow - aggregate.Value.CreatedAt > acknowledgmentTimeout)
-                        aggregate.Value.SendResult();
-            }
+            var acknowledgmentTimeout = TimeSpan.FromMilliseconds(100);
+            var resultsToSend = pendingAggregates.Values
+                .Where(a => !a.IsAcknowledgmentSent && DateTime.UtcNow - a.CreatedAt > acknowledgmentTimeout)
+                .ToArray();
+            foreach (var resultItem in resultsToSend)
+                resultItem.SendResult();
             acknowledgmentTimer.Start();
         }
 
@@ -76,17 +81,14 @@ namespace Centaurus.Domain
 
         private void CleanupTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
-            lock (syncRoot)
-            {
-                var now = DateTime.UtcNow;
-                var itemsToRemove = pendingAggregates
-                    .Where(kv => now - kv.Value.CreatedAt > aggregateLifeTime)
-                    .Select(kv => kv.Key)
-                    .ToArray();
+            var now = DateTime.UtcNow;
+            var itemsToRemove = pendingAggregates
+                .Where(kv => now - kv.Value.CreatedAt > aggregateLifeTime)
+                .Select(kv => kv.Key)
+                .ToArray();
 
-                foreach (var itemKey in itemsToRemove)
-                    Remove(itemKey);
-            }
+            foreach (var itemKey in itemsToRemove)
+                Remove(itemKey);
             cleanupTimer?.Start();
         }
 
@@ -95,22 +97,7 @@ namespace Centaurus.Domain
 
         protected static Logger logger = LogManager.GetCurrentClassLogger();
 
-        private Dictionary<long, ResultConsensusAggregate> pendingAggregates = new Dictionary<long, ResultConsensusAggregate>();
-
-        private object syncRoot = new { };
-
-        /// <summary>
-        /// Remove an aggregate by message id.
-        /// </summary>
-        /// <param name="messageId">Message id key.</param>
-        public void Remove(long id)
-        {
-            lock (syncRoot)
-            {
-                if (!pendingAggregates.Remove(id))
-                    logger.Error($"Unable to remove item by id '{id}'");
-            }
-        }
+        private ConcurrentDictionary<long, ResultConsensusAggregate> pendingAggregates = new ConcurrentDictionary<long, ResultConsensusAggregate>();
 
         class ResultConsensusAggregate
         {
@@ -124,8 +111,6 @@ namespace Centaurus.Domain
             public bool IsProcessed { get; private set; }
             public bool IsAcknowledgmentSent { get; private set; }
 
-            private object syncRoot = new { };
-
             public DateTime CreatedAt { get; }
             private ResultMessageItem resultMessageItem;
             private ResultManager resultManager;
@@ -133,7 +118,7 @@ namespace Centaurus.Domain
 
             public void Add(AuditorResultMessage result, RawPubKey auditor)
             {
-                lock (syncRoot)
+                lock (this)
                 {
                     if (IsProcessed || processedAuditors.Any(a => a.Equals(auditor)))
                         return;
@@ -156,7 +141,7 @@ namespace Centaurus.Domain
 
             public void SendResult()
             {
-                lock (syncRoot)
+                lock (this)
                 {
                     if (IsProcessed)
                         return;
@@ -225,7 +210,7 @@ namespace Centaurus.Domain
                 if (resultMessage == null)
                     throw new ArgumentNullException(nameof(resultMessage));
                 ResultEnvelope = resultMessage.CreateEnvelope();
-                Hash = resultMessage.ComputeHash();
+                Hash = ResultEnvelope.ComputeMessageHash();
                 Notifications = notifications ?? throw new ArgumentNullException(nameof(notifications));
             }
 

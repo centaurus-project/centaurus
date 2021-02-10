@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Centaurus.Models;
+using Centaurus.Models.Extensions;
 
 namespace Centaurus.Domain
 {
@@ -23,9 +24,9 @@ namespace Centaurus.Domain
             var account = requestMessage.AccountWrapper.Account;
 
             var resultMessage = (AccountDataResponse)context.Envelope.CreateResult(ResultStatusCodes.Success, accountEffects);
-            resultMessage.Balances = account.Balances;
+            resultMessage.Balances = account.Balances.Select(b => b.Clone()).ToList();
             //TODO: create property in Account object
-            resultMessage.Orders = Global.Exchange.OrderMap.GetAllAccountOrders(account).OrderBy(o => o.OrderId).ToList();
+            resultMessage.Orders = Global.Exchange.OrderMap.GetAllAccountOrders(account).OrderBy(o => o.OrderId).Select(o => o.Clone()).ToList();
 
             return Task.FromResult((ResultMessage)resultMessage);
         }
