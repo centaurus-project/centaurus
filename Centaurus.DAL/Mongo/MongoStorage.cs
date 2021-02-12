@@ -29,7 +29,7 @@ namespace Centaurus.DAL.Mongo
         private IMongoCollection<BalanceModel> balancesCollection;
         private IMongoCollection<QuantumModel> quantaCollection;
         private IMongoCollection<ConstellationState> constellationStateCollection;
-        private IMongoCollection<EffectModel> effectsCollection;
+        private IMongoCollection<EffectsModel> effectsCollection;
         private IMongoCollection<SettingsModel> settingsCollection;
         private IMongoCollection<AssetModel> assetsCollection;
 
@@ -58,7 +58,7 @@ namespace Centaurus.DAL.Mongo
             quantaCollection = await GetCollection<QuantumModel>("quanta");
             constellationStateCollection = await GetCollection<ConstellationState>("constellationState");
 
-            effectsCollection = await GetCollection<EffectModel>("effects");
+            effectsCollection = await GetCollection<EffectsModel>("effects");
 
             settingsCollection = await GetCollection<SettingsModel>("constellationSettings");
 
@@ -157,32 +157,30 @@ namespace Centaurus.DAL.Mongo
         public async Task<long> GetFirstEffectApex()
         {
             var firstEffect = await effectsCollection
-                   .Find(FilterDefinition<EffectModel>.Empty)
-                   .SortBy(e => e.Id)
+                   .Find(FilterDefinition<EffectsModel>.Empty)
+                   .SortBy(e => e.Apex)
                    .FirstOrDefaultAsync();
             if (firstEffect == null)
                 return -1;
 
-            var decodedId = EffectModelIdConverter.DecodeId(firstEffect.Id);
-            return decodedId.apex;
+            return firstEffect.Apex;
         }
 
-        public async Task<List<EffectModel>> LoadEffectsForApex(long apex)
+        public async Task<List<EffectsModel>> LoadEffectsForApex(long apex)
         {
             var fromCursor = EffectModelIdConverter.EncodeId(apex, 0);
             var toCursor = EffectModelIdConverter.EncodeId(apex + 1, 0);
             return await effectsCollection
-                .Find(e => e.Id >= fromCursor && e.Id < toCursor)
-                .SortBy(e => e.Id)
+                .Find(e => e.Apex == apex)
+                .SortBy(e => e.Apex)
                 .ToListAsync();
         }
 
-        public async Task<List<EffectModel>> LoadEffectsAboveApex(long apex)
+        public async Task<List<EffectsModel>> LoadEffectsAboveApex(long apex)
         {
-            var fromCursor = EffectModelIdConverter.EncodeId(apex + 1, 0);
             return await effectsCollection
-                .Find(e => e.Id >= fromCursor)
-                .SortBy(e => e.Id)
+                .Find(e => e.Apex >= apex)
+                .SortBy(e => e.Apex)
                 .ToListAsync();
         }
 
@@ -199,19 +197,18 @@ namespace Centaurus.DAL.Mongo
                    .FirstOrDefaultAsync();
         }
 
-        public async Task<List<EffectModel>> LoadEffects(byte[] cursor, bool isDesc, int limit, int account)
+        public async Task<List<EffectsModel>> LoadEffects(long apex, bool isDesc, int limit, int account)
         {
             if (account == default)
                 throw new ArgumentNullException(nameof(account));
-            var filter = Builders<EffectModel>.Filter.Eq(e => e.Account, account);
+            var filter = Builders<EffectsModel>.Filter.Eq(e => e.Account, account);
 
-            if (cursor != null && cursor.Any(x => x != 0))
+            if (apex > 0)
             {
-                var c = new BsonObjectId(new ObjectId(cursor));
                 if (isDesc)
-                    filter = Builders<EffectModel>.Filter.And(filter, Builders<EffectModel>.Filter.Lt(e => e.Id, c));
+                    filter = Builders<EffectsModel>.Filter.And(filter, Builders<EffectsModel>.Filter.Lt(e => e.Apex, apex));
                 else
-                    filter = Builders<EffectModel>.Filter.And(filter, Builders<EffectModel>.Filter.Gt(e => e.Id, c));
+                    filter = Builders<EffectsModel>.Filter.And(filter, Builders<EffectsModel>.Filter.Gt(e => e.Apex, apex));
             }
 
             var query = effectsCollection
@@ -219,10 +216,10 @@ namespace Centaurus.DAL.Mongo
 
             if (isDesc)
                 query = query
-                    .SortByDescending(e => e.Id);
+                    .SortByDescending(e => e.Apex);
             else
                 query = query
-                    .SortBy(e => e.Id);
+                    .SortBy(e => e.Apex);
 
             var effects = await query
                 .Limit(limit)
@@ -302,21 +299,9 @@ namespace Centaurus.DAL.Mongo
                             if (orderUpdates != null)
                                 updateTasks.Add(ordersCollection.BulkWriteAsync(session, orderUpdates));
 
-                            var batchSize = 10000;
+                            SaveQuanta(ref updateTasks, update.Quanta.Keys, session);
 
-                            var savedQuantaCount = 0; 
-                            while (savedQuantaCount < update.Quanta.Count)
-                            {
-                                updateTasks.Add(quantaCollection.InsertManyAsync(session, update.Quanta.Skip(savedQuantaCount).Take(batchSize), new InsertManyOptions { BypassDocumentValidation = true, IsOrdered = false }));
-                                savedQuantaCount += batchSize;
-                            }
-
-                            var savedEffectsCount = 0;
-                            while (savedEffectsCount < update.Effects.Count)
-                            {
-                                updateTasks.Add(effectsCollection.InsertManyAsync(session, update.Effects.Skip(savedEffectsCount).Take(batchSize), new InsertManyOptions { BypassDocumentValidation = true, IsOrdered = false }));
-                                savedEffectsCount += batchSize;
-                            }
+                            SaveEffects(ref updateTasks, update.Quanta.Values.SelectMany(v => v.Values), session);
 
                             await Task.WhenAll(updateTasks);
 
@@ -349,6 +334,40 @@ namespace Centaurus.DAL.Mongo
                         new Exception($"Unable to commit transaction after {tries} tries", exc);
                     }
                 }
+            }
+        }
+
+        private void SaveQuanta(ref List<Task> updateTasks, IEnumerable<QuantumModel> quanta, IClientSessionHandle session)
+        {
+            var batchSize = 10000;
+
+            var savedQuantaCount = 0;
+            var quantaCount = quanta.Count();
+            while (savedQuantaCount < quantaCount)
+            {
+                updateTasks.Add(quantaCollection.InsertManyAsync(
+                    session,
+                    quanta.Skip(savedQuantaCount).Take(batchSize),
+                    new InsertManyOptions { BypassDocumentValidation = true, IsOrdered = false })
+                );
+                savedQuantaCount += batchSize;
+            }
+        }
+
+        private void SaveEffects(ref List<Task> updateTasks, IEnumerable<EffectsModel> effects, IClientSessionHandle session)
+        {
+            var batchSize = 1000;
+            var savedEffectsCount = 0;
+            var effectsCount = effects.Count();
+            while (savedEffectsCount < effectsCount)
+            {
+                updateTasks.Add(
+                    effectsCollection.InsertManyAsync(
+                        session,
+                        effects.Skip(savedEffectsCount).Take(batchSize),
+                        new InsertManyOptions { BypassDocumentValidation = true, IsOrdered = false })
+                    );
+                savedEffectsCount += batchSize;
             }
         }
 
@@ -465,8 +484,8 @@ namespace Centaurus.DAL.Mongo
                     updates[i] = new InsertOneModel<BalanceModel>(new BalanceModel
                     {
                         Id = balance.Id,
-                        Amount = balance.Amount,
-                        Liabilities = balance.Liabilities
+                        Amount = balance.AmountDiff,
+                        Liabilities = balance.LiabilitiesDiff
                     });
                 else if (balance.IsDeleted)
                     updates[i] = new DeleteOneModel<BalanceModel>(currentBalanceFilter);
@@ -475,8 +494,8 @@ namespace Centaurus.DAL.Mongo
                     updates[i] = new UpdateOneModel<BalanceModel>(
                         currentBalanceFilter,
                         update
-                            .Inc(b => b.Amount, balance.Amount)
-                            .Inc(b => b.Liabilities, balance.Liabilities)
+                            .Inc(b => b.Amount, balance.AmountDiff)
+                            .Inc(b => b.Liabilities, balance.LiabilitiesDiff)
                         );
                 }
             }

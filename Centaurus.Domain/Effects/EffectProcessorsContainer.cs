@@ -14,14 +14,18 @@ namespace Centaurus.Domain
         public EffectProcessorsContainer(MessageEnvelope quantum, DiffObject pendingDiffObject)
         {
             Envelope = quantum ?? throw new ArgumentNullException(nameof(quantum));
-            this.pendingDiffObject = pendingDiffObject ?? throw new ArgumentNullException(nameof(pendingDiffObject));
+            PendingDiffObject = pendingDiffObject ?? throw new ArgumentNullException(nameof(pendingDiffObject));
         }
 
         public MessageEnvelope Envelope { get; }
 
         public List<Effect> Effects { get; } = new List<Effect>();
 
-        private readonly DiffObject pendingDiffObject;
+        public Dictionary<int, EffectsModel> EffectsModels { get; } = new Dictionary<int, EffectsModel>();
+
+        public bool OrderWasPlaced { get; set; }
+
+        public DiffObject PendingDiffObject { get; }
 
         public Quantum Quantum => (Quantum)Envelope.Message;
 
@@ -37,7 +41,7 @@ namespace Centaurus.Domain
         {
             Effects.Add(effectProcessor.Effect);
             effectProcessor.CommitEffect();
-            pendingDiffObject.Aggregate(Envelope, effectProcessor.Effect, Effects.Count - 1);
+            this.Aggregate(Envelope, effectProcessor.Effect, Effects.Count - 1);
         }
 
         /// <summary>
@@ -60,9 +64,9 @@ namespace Centaurus.Domain
             //we mustn't save orders that were closed immediately without adding to order-book
             if (Quantum is RequestQuantum request
                 && request.RequestMessage is OrderRequest orderRequest
-                && !Effects.Any(e => e.EffectType == EffectTypes.OrderPlaced))
+                && !OrderWasPlaced)
             {
-                pendingDiffObject.Orders.Remove(OrderIdConverter.FromRequest(orderRequest, Quantum.Apex));
+                PendingDiffObject.Orders.Remove(OrderIdConverter.FromRequest(orderRequest, Quantum.Apex));
             }
             pendingDiffObject.Quanta.Add(QuantumModelExtensions.FromQuantum(Envelope));
         }

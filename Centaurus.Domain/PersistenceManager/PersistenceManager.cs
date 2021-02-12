@@ -33,21 +33,25 @@ namespace Centaurus.Domain
             if (account == default)
                 throw new ArgumentNullException(nameof(account));
 
-            var cursor = ByteArrayExtensions.FromHexString(rawCursor);
-            if (cursor != null && cursor.Length != 12)
+            //var cursor = ByteArrayExtensions.FromHexString(rawCursor);
+            //if (cursor != null && cursor.Length != 12)
+            //    throw new ArgumentException("Cursor is invalid.");
+            if (!long.TryParse(rawCursor, out var apex))
                 throw new ArgumentException("Cursor is invalid.");
-            var effectModels = (await storage.LoadEffects(cursor, isDesc, limit, account));
+            var accountEffectModels = (await storage.LoadEffects(apex, isDesc, limit, account));
+            var effectModels = accountEffectModels
+                .OrderBy(e => e.Apex)
+                .SelectMany(ae => ae.Effects.Select(e => e.ToEffect(account)))
+                .ToList();
             if (isDesc)
-                effectModels = effectModels.OrderByDescending(e => e.Id).ToList();
-            else
-                effectModels = effectModels.OrderBy(o => o.Id).ToList();
+                effectModels.Reverse();
             return new EffectsResponse
             {
                 CurrentPagingToken = rawCursor,
                 Order = isDesc ? EffectsRequest.Desc : EffectsRequest.Asc,
-                Items = effectModels.Select(e => e.ToEffect()).ToList(),
-                NextPageToken = (effectModels.LastOrDefault()?.Id.Value.ToByteArray()).ToHex(),
-                PrevPageToken = (effectModels.FirstOrDefault()?.Id.Value.ToByteArray()).ToHex(),
+                Items = effectModels,
+                NextPageToken = effectModels.LastOrDefault()?.Apex.ToString(),
+                PrevPageToken = effectModels.FirstOrDefault()?.Apex.ToString(),
                 Limit = limit
             };
         }
@@ -184,10 +188,20 @@ namespace Centaurus.Domain
 
             var withdrawalsStorage = new WithdrawalStorage(withdrawals, false);
 
-            var effectModels = await storage.LoadEffectsAboveApex(apex);
-            for (var i = effectModels.Count - 1; i >= 0; i--)
+            var accountEffectModels = await storage.LoadEffectsAboveApex(apex);
+
+            var effectModels = new Effect[accountEffectModels.Sum(a => a.Effects.Count)];
+            foreach (var accountEffects in accountEffectModels)
             {
-                var currentEffect = effectModels[i].ToEffect();
+                foreach (var rawEffect in accountEffects.Effects)
+                {
+                    var effect = rawEffect.ToEffect(accountEffects.Account);
+                    effectModels[rawEffect.ApexIndex] = effect;
+                }
+            }
+            for (var i = effectModels.Length - 1; i >= 0; i--)
+            {
+                var currentEffect = effectModels[i];
                 var accountId = currentEffect.Account;
                 var account = new Lazy<AccountWrapper>(() => accountStorage.GetAccount(accountId));
                 IEffectProcessor<Effect> processor = null;

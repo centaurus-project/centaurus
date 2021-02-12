@@ -126,6 +126,7 @@ namespace Centaurus.Domain
             var reminderOrderbook = market.GetOrderbook(side);
             //record maker trade effect
             resultEffects.AddOrderPlaced(reminderOrderbook, takerOrder);
+            resultEffects.OrderWasPlaced = true;
             return true;
         }
 

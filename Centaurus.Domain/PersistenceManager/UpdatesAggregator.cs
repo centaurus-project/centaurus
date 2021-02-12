@@ -15,8 +15,13 @@ namespace Centaurus.Domain
 {
     public static class UpdatesAggregator
     {
-        public static void Aggregate(this DiffObject pendingDiffObject, MessageEnvelope quantumEnvelope, Effect quatumEffect, int effectIndex)
+        public static void Aggregate(this EffectProcessorsContainer processorsContainer, MessageEnvelope quantumEnvelope, Effect quatumEffect, int effectIndex)
         {
+            if (processorsContainer == null)
+                throw new ArgumentNullException(nameof(processorsContainer));
+
+            var pendingDiffObject = processorsContainer.PendingDiffObject;
+
             if (pendingDiffObject == null)
                 throw new ArgumentNullException(nameof(pendingDiffObject));
 
@@ -26,9 +31,21 @@ namespace Centaurus.Domain
             if (quatumEffect == null)
                 throw new ArgumentNullException(nameof(quatumEffect));
 
-            var quantum = (Quantum)quantumEnvelope.Message;
+            var account = quatumEffect.Account;
+            var apex = processorsContainer.Apex;
 
-            pendingDiffObject.Effects.Add(quatumEffect.FromEffect(effectIndex, quantum.Timestamp));
+            if (!processorsContainer.EffectsModels.TryGetValue(account, out var accountEffects))
+            {
+                accountEffects = new EffectsModel
+                {
+                    Id = EffectModelIdConverter.EncodeId(apex, account),
+                    Apex = processorsContainer.Apex,
+                    Account = account,
+                    Effects = new List<SingleEffectModel>()
+                };
+                processorsContainer.EffectsModels.Add(account, accountEffects);
+            }
+            accountEffects.Effects.Add(quatumEffect.FromEffect(effectIndex));
 
             switch (quatumEffect)
             {

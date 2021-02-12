@@ -144,8 +144,12 @@ namespace Centaurus.Domain
 
         public void TryRefreshContainer()
         {
-            if (Current.Effects.Count > 30_000)
+            var effectsCount = Current.Quanta.Values.Sum(ea => ea.Values.Select(a => a.Effects.Count).Sum());
+            if (effectsCount > 75_000)
+            {
+                Debugger.Launch();
                 RefreshUpdatesUnlocked();
+            }
         }
 
         private void RefreshUpdatesUnlocked()
@@ -172,7 +176,7 @@ namespace Centaurus.Domain
                 sw.Start();
                 await Global.PersistenceManager.ApplyUpdates(updates);
                 sw.Stop();
-                //logger.Warn($"Saved {updates.Quanta.Count} quanta ({updates.Effects.Count} effects) in {sw.ElapsedMilliseconds} ms");
+                logger.Warn($"Saved {updates.Quanta.Count} quanta ({updates.Quanta.Values.Sum(ea => ea.Values.Select(a => a.Effects.Count).Sum())} effects) in {sw.ElapsedMilliseconds} ms");
             }
             catch (Exception exc)
             {
