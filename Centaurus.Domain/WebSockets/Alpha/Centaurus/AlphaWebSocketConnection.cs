@@ -37,7 +37,6 @@ namespace Centaurus
 
         private async void InvalidationTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
-
             await CloseConnection(WebSocketCloseStatus.PolicyViolation, "Connection is inactive");
         }
 

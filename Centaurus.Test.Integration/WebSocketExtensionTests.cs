@@ -16,15 +16,17 @@ namespace Centaurus.Test
         [Test]
         public async Task GetInputStreamReaderTest()
         {
-            using (var res = await new FakeWebSocket(Enumerable.Repeat((byte)1, 10240).ToArray()).GetWebsocketBuffer(CancellationToken.None))
+            var result = await new FakeWebSocket(Enumerable.Repeat((byte)1, 10240).ToArray()).GetWebsocketBuffer(20480, CancellationToken.None);
+            using (result.messageBuffer)
             {
-                Assert.AreEqual(10240, res.Length);
+                Assert.AreEqual(10240, result.messageBuffer.Length);
             }
-            using (var res = await new FakeWebSocket(Enumerable.Repeat((byte)1, 20480).ToArray()).GetWebsocketBuffer(CancellationToken.None))
+            result = await new FakeWebSocket(Enumerable.Repeat((byte)1, 20480).ToArray()).GetWebsocketBuffer(20480, CancellationToken.None);
+            using (result.messageBuffer)
             {
-                Assert.AreEqual(20480, res.Length);
+                Assert.AreEqual(20480, result.messageBuffer.Length);
             }
-            Assert.ThrowsAsync<Exception>(async () => await new FakeWebSocket(Enumerable.Repeat((byte)1, 25000).ToArray()).GetWebsocketBuffer(CancellationToken.None));
+            Assert.ThrowsAsync<Exception>(async () => await new FakeWebSocket(Enumerable.Repeat((byte)1, 25000).ToArray()).GetWebsocketBuffer(20480, CancellationToken.None));
         }
     }
 }

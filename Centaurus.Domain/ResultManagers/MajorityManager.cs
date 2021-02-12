@@ -10,7 +10,6 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    //TODO: add validation timeout
     public abstract class MajorityManager : IDisposable
     {
         public MajorityManager()
@@ -20,7 +19,11 @@ namespace Centaurus.Domain
 
         public void Add(MessageEnvelope envelope)
         {
-            Aggregate(envelope);
+            var id = GetId(envelope);
+            ConsensusAggregate aggregate = GetConsensusAggregate(id);
+
+            //add the signature to the aggregate
+            aggregate.Add(envelope);
         }
 
         public virtual void Dispose()
@@ -74,19 +77,13 @@ namespace Centaurus.Domain
         {
             lock (syncRoot)
             {
-                if (!pendingAggregates.ContainsKey(id))
-                    pendingAggregates[id] = new ConsensusAggregate(id, this);
-                return pendingAggregates[id];
+                if (!pendingAggregates.TryGetValue(id, out var consensusAggregate))
+                {
+                    consensusAggregate = new ConsensusAggregate(id, this);
+                    pendingAggregates[id] = consensusAggregate;
+                }
+                return consensusAggregate;
             }
-        }
-
-        protected void Aggregate(MessageEnvelope envelope)
-        {
-            var id = GetId(envelope);
-            ConsensusAggregate aggregate = GetConsensusAggregate(id);
-
-            //add the signature to the aggregate
-            aggregate.Add(envelope);
         }
 
         /// <summary>
@@ -147,14 +144,13 @@ namespace Centaurus.Domain
                 lock (syncRoot)
                 {
                     var envelopeHash = majorityManager.GetHash(envelope);
-                    var resultStorageEnvelope = envelope;
-                    if (!storage.ContainsKey(envelopeHash))//first result with such hash
-                        storage[envelopeHash] = envelope;
-                    else
+                    if (!storage.TryGetValue(envelopeHash, out var resultStorageEnvelope))//first result with such hash
                     {
-                        resultStorageEnvelope = storage[envelopeHash];
-                        resultStorageEnvelope.AggregateEnvelopUnsafe(envelope);//we can use AggregateEnvelopUnsafe, we compute hash for every envelope above
+                        resultStorageEnvelope = envelope;
+                        storage[envelopeHash] = envelope;
                     }
+                    else
+                        resultStorageEnvelope.AggregateEnvelopUnsafe(envelope);//we can use AggregateEnvelopUnsafe, we compute hash for every envelope above
 
                     if (IsProcessed)
                     {
@@ -202,7 +198,10 @@ namespace Centaurus.Domain
                 }
                 //failed to rich consensus
                 consensus = null;
-                if (maxVotes - totalOpposition < requiredMajority)
+
+                var maxPossibleVotes = (maxVotes - totalOpposition) + maxConsensus;
+
+                if (maxPossibleVotes < requiredMajority)
                 {//no chances to reach the majority
                     return MajorityResults.Unreachable;
                 }

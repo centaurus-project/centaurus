@@ -54,10 +54,11 @@ namespace Centaurus.Domain
             Global.ExtensionsManager.BeforeNewConnection(webSocket, ip);
             if (webSocket == null)
                 throw new ArgumentNullException(nameof(webSocket));
-
-            var connection = new AlphaWebSocketConnection(webSocket, ip);
-            Subscribe(connection);
-            await connection.Listen();
+            using (var connection = new AlphaWebSocketConnection(webSocket, ip))
+            {
+                Subscribe(connection);
+                await connection.Listen();
+            }
         }
 
         /// <summary>
@@ -106,7 +107,6 @@ namespace Centaurus.Domain
         {
             Unsubscribe(connection);
             await connection.CloseConnection();
-            connection.Dispose();
             logger.Trace($"{connection.ClientPubKey} is disconnected.");
         }
 

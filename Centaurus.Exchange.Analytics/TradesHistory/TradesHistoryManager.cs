@@ -23,25 +23,29 @@ namespace Centaurus.Exchange.Analytics
         {
             if (exchangeUpdate == null)
                 throw new ArgumentNullException(nameof(exchangeUpdate));
+            if (exchangeUpdate.Trades == null)
+                throw new ArgumentNullException(nameof(exchangeUpdate.Trades));
 
             var market = exchangeUpdate.Market;
             var trades = exchangeUpdate.Trades;
             var updateDate = exchangeUpdate.UpdateDate;
-            if (!managers.ContainsKey(market))
-                throw new ArgumentException($"Market {market} is not supported.");
-            if (trades == null)
-                throw new ArgumentNullException(nameof(trades));
 
             lock (managers)
-                managers[market].OnTrade(trades, updateDate);
+            {
+                if (!managers.TryGetValue(market, out var tradesHistoryManager))
+                    throw new ArgumentException($"Market {market} is not supported.");
+                tradesHistoryManager.OnTrade(trades, updateDate);
+            }
         }
 
         public List<Trade> GetTrades(int market)
         {
-            if (!managers.ContainsKey(market))
-                throw new ArgumentException($"Market {market} is not supported.");
             lock (managers)
-                return managers[market].GetLastTrades();
+            {
+                if (!managers.TryGetValue(market, out var tradesHistoryManager))
+                    throw new ArgumentException($"Market {market} is not supported.");
+                return tradesHistoryManager.GetLastTrades();
+            }
         }
     }
 }

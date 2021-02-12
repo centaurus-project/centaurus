@@ -48,12 +48,10 @@ namespace Centaurus.Exchange.Analytics
             var market = exchangeUpdate.Market;
             var orderUpdates = exchangeUpdate.OrderUpdates;
             var updateDate = exchangeUpdate.UpdateDate;
-            if (!marketDepths.ContainsKey(market))
+            if (!marketDepths.TryGetValue(market, out var depths))
                 throw new ArgumentException($"Market {market} is not supported.");
-            foreach (var depthManager in marketDepths[market].Values)
-            {
+            foreach (var depthManager in depths.Values)
                 depthManager.OnOrderUpdates(orderUpdates, updateDate);
-            }
         }
 
         public MarketDepth GetDepth(int market, double precision)

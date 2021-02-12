@@ -21,6 +21,8 @@ namespace Centaurus.Domain
         /// </summary>
         public const int MaxTxSubmitDelay = 5 * 60; //5 minutes
 
+        public const int MaxMessageBatchSize = 100;
+
         /// <summary>
         /// Setups Global object
         /// </summary>
@@ -85,7 +87,7 @@ namespace Centaurus.Domain
                 || state == ApplicationState.WaitingForInit))
             PendingUpdatesManager?.Start();
             if (state != ApplicationState.Ready 
-                && stateChangedEventArgs.PrevState == ApplicationState.Running) //close all connections (except auditors) if Alpha is not in Ready state
+                && stateChangedEventArgs.PrevState == ApplicationState.Ready) //close all connections (except auditors) if Alpha is not in Ready state
                 ConnectionManager.CloseAllConnections(false).Wait();
         }
 
@@ -120,7 +122,7 @@ namespace Centaurus.Domain
             {
                 AuditLedgerManager?.Dispose(); AuditLedgerManager = new AuditLedgerManager();
 
-                AuditResultManager?.Dispose(); AuditResultManager = new AuditResultManager();
+                AuditResultManager?.Dispose(); AuditResultManager = new ResultManager();
 
                 await DisposeAnalyticsManager();
 
@@ -168,7 +170,7 @@ namespace Centaurus.Domain
         public static WithdrawalStorage WithdrawalStorage { get; private set; }
         public static QuantumHandler QuantumHandler { get; private set; }
         public static AuditLedgerManager AuditLedgerManager { get; private set; }
-        public static AuditResultManager AuditResultManager { get; private set; }
+        public static ResultManager AuditResultManager { get; private set; }
         public static TxListenerBase TxListener { get; private set; }
         public static TxCursorManager TxCursorManager { get; private set; }
         public static ExtensionsManager ExtensionsManager { get; private set; }

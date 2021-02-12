@@ -12,7 +12,7 @@ namespace Centaurus.Models
         [XdrField(0)]
         public List<Balance> Balances { get; set; }
 
-        [XdrField(0)]
+        [XdrField(1)]
         public List<Order> Orders { get; set; }
     }
 }

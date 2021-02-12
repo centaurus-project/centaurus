@@ -82,34 +82,34 @@ namespace Centaurus.Domain
 
         public async Task CloseConnection(WebSocketCloseStatus status = WebSocketCloseStatus.NormalClosure, string desc = null)
         {
-            if (webSocket == null)
-                return;
             try
             {
-                if (webSocket.State == WebSocketState.Open || webSocket.State == WebSocketState.Connecting)
+                if (webSocket.State == WebSocketState.Open)
                 {
-                    desc = desc ?? status.ToString();
+                    await sendMessageSemaphore.WaitAsync();
                     try
                     {
-                        cancellationTokenSource?.Cancel();
-                        await webSocket.CloseAsync(status, desc, CancellationToken.None);
+                        var timeoutTokenSource = new CancellationTokenSource(1000);
+                        await webSocket.CloseAsync(status, desc, timeoutTokenSource.Token);
+                        cancellationTokenSource.Cancel();
                     }
                     catch (WebSocketException exc)
                     {
                         //ignore client disconnection
-                        if (exc.WebSocketErrorCode != WebSocketError.ConnectionClosedPrematurely)
+                        if (exc.WebSocketErrorCode != WebSocketError.ConnectionClosedPrematurely
+                            && exc.WebSocketErrorCode != WebSocketError.InvalidState)
                             throw;
                     }
+                    catch (OperationCanceledException) { }
+                    finally
+                    {
+                        sendMessageSemaphore.Release();
+                    }
                 }
-                Dispose();
             }
             catch (Exception e)
             {
-                logger.Error(e);
-            }
-            finally
-            {
-                OnClosed?.Invoke(this, new EventArgs { });
+                logger.Error(e, "Error on close connection");
             }
         }
 
@@ -119,58 +119,98 @@ namespace Centaurus.Domain
         {
             try
             {
-                while (true)
+                while (webSocket.State != WebSocketState.Closed && webSocket.State != WebSocketState.Aborted && !cancellationToken.IsCancellationRequested)
                 {
-                    using var message = await webSocket.GetWebsocketBuffer(cancellationToken);
-                    BaseCommand command = null;
-                    try
-                    {
-                        command = BaseCommand.Deserialize(message.AsSpan());
-                        var result = await commandHandlers.HandleCommand(this, command);
-                        await SendMessage(result);
-                    }
-                    catch (Exception exc)
-                    {
-                        if (exc is ConnectionCloseException)
-                            throw;
-                        var statusCode = exc.GetStatusCode();
-                        await SendMessage(new ErrorResponse
+                    var result = await webSocket.GetWebsocketBuffer(512, cancellationToken);
+                    using (result.messageBuffer)
+                        if (!cancellationToken.IsCancellationRequested)
                         {
-                            RequestId = command?.RequestId ?? 0,
-                            Status = (int)statusCode,
-                            Error = (int)statusCode < 500 ? exc.Message : statusCode.ToString()
-                        });
+                            //the client send close message
+                            if (result.messageType == WebSocketMessageType.Close)
+                            {
+                                if (webSocket.State != WebSocketState.CloseReceived)
+                                    continue;
+                                await sendMessageSemaphore.WaitAsync();
+                                try
+                                {
+                                    var timeoutTokenSource = new CancellationTokenSource(1000);
+                                    await webSocket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "Close", CancellationToken.None);
+                                }
+                                finally
+                                {
+                                    sendMessageSemaphore.Release();
+                                    cancellationTokenSource.Cancel();
+                                }
+                            }
+                            else
+                            {
+                                BaseCommand command = null;
+                                try
+                                {
+                                    command = BaseCommand.Deserialize(result.messageBuffer.AsSpan());
+                                    var handlerResult = await commandHandlers.HandleCommand(this, command);
+                                    await SendMessage(handlerResult);
+                                }
+                                catch (Exception exc)
+                                {
+                                    if (exc is ConnectionCloseException)
+                                        throw;
+                                    var statusCode = exc.GetStatusCode();
+                                    await SendMessage(new ErrorResponse
+                                    {
+                                        RequestId = command?.RequestId ?? 0,
+                                        Status = (int)statusCode,
+                                        Error = (int)statusCode < 500 ? exc.Message : statusCode.ToString()
+                                    });
 
-                        if (statusCode == ResultStatusCodes.InternalError || !Global.IsAlpha)
-                            logger.Error(exc);
-                    }
-
+                                    if (statusCode == ResultStatusCodes.InternalError || !Global.IsAlpha)
+                                        logger.Error(exc);
+                                }
+                            }
+                        }
                 }
             }
-            catch (ConnectionCloseException e)
-            {
-                await CloseConnection(e.Status, e.Description);
-            }
-            catch (WebSocketException e)
-            {
-                var closureStatus = WebSocketCloseStatus.InternalServerError;
-                if (e.WebSocketErrorCode == WebSocketError.ConnectionClosedPrematurely)
-                    closureStatus = WebSocketCloseStatus.NormalClosure;
-                else
-                    logger.Error(e);
-                await CloseConnection(closureStatus);
-            }
+            catch (OperationCanceledException) { }
             catch (Exception e)
             {
-                if (e is OperationCanceledException)
+                var closureStatus = WebSocketCloseStatus.InternalServerError;
+                var desc = default(string);
+                if (e is WebSocketException webSocketException
+                    && webSocketException.WebSocketErrorCode == WebSocketError.ConnectionClosedPrematurely) //connection already closed by the other side
                     return;
-                logger.Error(e);
+                else if (e is ConnectionCloseException closeException)
+                {
+                    closureStatus = closeException.Status;
+                    desc = closeException.Description;
+                }
+                else if (e is FormatException)
+                    closureStatus = WebSocketCloseStatus.ProtocolError;
+                else
+                    logger.Error(e);
+                await CloseConnection(closureStatus, desc);
+            }
+            finally
+            {
+                //make sure the socket is closed
+                if (webSocket.State != WebSocketState.Closed)
+                    webSocket.Abort();
+                OnClosed?.Invoke(this, new EventArgs { });
             }
         }
 
+        private SemaphoreSlim sendMessageSemaphore = new SemaphoreSlim(1);
+
         public async Task SendMessage(object message)
         {
-            await webSocket.SendAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(message)), WebSocketMessageType.Text, true, CancellationToken.None);
+            await sendMessageSemaphore.WaitAsync();
+            try
+            {
+                await webSocket.SendAsync(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(message)), WebSocketMessageType.Text, true, CancellationToken.None);
+            }
+            finally
+            {
+                sendMessageSemaphore.Release();
+            }
         }
 
         public void Dispose()
@@ -178,8 +218,6 @@ namespace Centaurus.Domain
             cancellationTokenSource?.Dispose();
             cancellationTokenSource = null;
 
-            webSocket?.Dispose();
-            webSocket = null;
             if (locks != null)
             {
                 foreach (var @lock in locks)

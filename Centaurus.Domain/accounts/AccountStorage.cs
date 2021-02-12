@@ -62,11 +62,11 @@ namespace Centaurus.Domain
                 throw new InvalidOperationException($"Account with public key {pubkey} already exists");
 
             var acc = new AccountWrapper(new Account
-                {
-                    Id = id,
-                    Pubkey = pubkey,
-                    Balances = new List<Balance>()
-                },
+            {
+                Id = id,
+                Pubkey = pubkey,
+                Balances = new List<Balance>()
+            },
                 Global.Constellation.RequestRateLimits
             );
             accountIds.Add(pubkey, id);
@@ -85,19 +85,14 @@ namespace Centaurus.Domain
             if (pubkey == null)
                 throw new ArgumentNullException(nameof(pubkey));
 
-            if (!accountIds.ContainsKey(pubkey))
+            if (!accountIds.TryGetValue(pubkey, out var id))
                 throw new InvalidOperationException($"Account with public key {pubkey} doesn't exist");
 
-            var id = accountIds[pubkey];
-
-            if (!accounts.ContainsKey(id))
+            if (!accounts.Remove(id))
                 throw new InvalidOperationException($"Account with id {id} doesn't exist");
 
-            if (!accounts.Remove(id))
-                throw new Exception($"Unable to remove the account with id {id}");
-
             if (!accountIds.Remove(pubkey))
-                throw new Exception($"Unable to remove the account with public key {pubkey}");
+                throw new Exception($"Account with public key {pubkey} doesn't exist");
         }
 
         public IEnumerable<AccountWrapper> GetAll()

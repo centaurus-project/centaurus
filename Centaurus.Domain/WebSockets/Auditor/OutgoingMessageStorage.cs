@@ -1,15 +1,18 @@
-﻿using Centaurus.Domain;
-using Centaurus.Models;
+﻿using Centaurus.Models;
+using NLog;
 using System;
 using System.Collections.Concurrent;
-using System.Diagnostics;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
 
     public static class OutgoingMessageStorage
     {
-        private readonly static ConcurrentQueue<MessageEnvelope> outgoingMessages = new ConcurrentQueue<MessageEnvelope>();
+        private readonly static Queue<MessageEnvelope> outgoingMessages = new Queue<MessageEnvelope>();
 
         public static void OnTransaction(TxNotification tx)
         {
@@ -27,17 +30,74 @@ namespace Centaurus.Domain
         {
             if (message == null)
                 throw new ArgumentNullException(nameof(message));
-            outgoingMessages.Enqueue(message);
+            lock (outgoingMessages)
+                outgoingMessages.Enqueue(message);
         }
 
         public static bool TryPeek(out MessageEnvelope message)
         {
-            return outgoingMessages.TryPeek(out message);
+            lock (outgoingMessages)
+                return outgoingMessages.TryPeek(out message);
         }
 
         public static bool TryDequeue(out MessageEnvelope message)
         {
-            return outgoingMessages.TryDequeue(out message);
+            lock (outgoingMessages)
+                return outgoingMessages.TryDequeue(out message);
+        }
+    }
+
+    public static class OutgoingResultsStorage
+    {
+        static Logger logger = LogManager.GetCurrentClassLogger();
+
+        private readonly static List<AuditorResultMessage> results = new List<AuditorResultMessage>();
+
+        static OutgoingResultsStorage()
+        {
+            _ = Task.Factory.StartNew(RunWorker);
+        }
+
+        private static void RunWorker()
+        {
+            while (true)
+            {
+                try
+                {
+                    var resultsBatch = default(List<AuditorResultMessage>);
+                    lock (results)
+                    {
+                        if (results.Count != 0)
+                        {
+                            resultsBatch = results.Take(Global.MaxMessageBatchSize).ToList();
+                            var removeCount = Math.Min(Global.MaxMessageBatchSize, results.Count);
+                            results.RemoveRange(0, removeCount);
+                        }
+                    }
+                    if (resultsBatch != default)
+                    {
+                        OutgoingMessageStorage.EnqueueMessage(new AuditorResultsBatch { AuditorResultMessages = resultsBatch });
+                        continue;
+                    }
+                    Thread.Sleep(50);
+                }
+                catch (Exception exc)
+                {
+                    logger.Error(exc);
+                }
+            }
+        }
+
+        public static void EnqueueResult(ResultMessage result)
+        {
+            if (result == null)
+                throw new ArgumentNullException(nameof(result));
+
+            var resultEnvelope = result.CreateEnvelope();
+            resultEnvelope.Sign(Global.Settings.KeyPair);
+
+            lock (results)
+                results.Add(new AuditorResultMessage { Apex = result.MessageId, Signature = resultEnvelope.Signatures[0].Signature });
         }
     }
 }
