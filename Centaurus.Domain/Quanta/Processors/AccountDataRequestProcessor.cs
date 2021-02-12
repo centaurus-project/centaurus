@@ -4,7 +4,6 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Centaurus.Models;
-using Centaurus.Models.Extensions;
 
 namespace Centaurus.Domain
 {

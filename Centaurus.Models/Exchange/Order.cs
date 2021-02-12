@@ -21,5 +21,10 @@ namespace Centaurus.Models
         public Order Next { get; set; }
 
         public Order Prev { get; set; }
+
+        public Order Clone()
+        {
+            return (Order)MemberwiseClone();
+        }
     }
 }
