@@ -83,14 +83,14 @@ namespace Centaurus.Domain
                     {
                         var accId = balanceUpdateEffect.Account;
                         var balanceId = BalanceModelIdConverter.EncodeId(accId, balanceUpdateEffect.Asset);
-                        GetBalance(pendingDiffObject.Balances, balanceId).Amount += balanceUpdateEffect.Amount;
+                        GetBalance(pendingDiffObject.Balances, balanceId).AmountDiff += balanceUpdateEffect.Amount;
                     }
                     break;
                 case UpdateLiabilitiesEffect lockLiabilitiesEffect:
                     {
                         var accId = lockLiabilitiesEffect.Account;
                         var balanceId = BalanceModelIdConverter.EncodeId(accId, lockLiabilitiesEffect.Asset);
-                        GetBalance(pendingDiffObject.Balances, balanceId).Liabilities += lockLiabilitiesEffect.Amount;
+                        GetBalance(pendingDiffObject.Balances, balanceId).LiabilitiesDiff += lockLiabilitiesEffect.Amount;
                     }
                     break;
                 case RequestRateLimitUpdateEffect requestRateLimitUpdateEffect:
