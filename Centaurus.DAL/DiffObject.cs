@@ -1,13 +1,46 @@
 ﻿using Centaurus.DAL.Models;
+using Centaurus.Models;
 using MongoDB.Bson;
 using System.Collections.Generic;
 using System.Diagnostics;
 
 namespace Centaurus.DAL
 {
+    public class QuantumItem
+    {
+        public QuantumItem(QuantumModel quantum)
+        {
+            Quantum = quantum;
+            Effects = new Dictionary<int, EffectsModel>();
+        }
+
+        public QuantumModel Quantum { get; }
+
+        public Dictionary<int, EffectsModel> Effects { get; }
+
+        public int EffectsCount { get; private set; }
+
+        public void AddEffect(int account, SingleEffectModel singleEffectModel)
+        {
+            if (!Effects.TryGetValue(account, out var effects))
+            {
+                effects = new EffectsModel
+                {
+                    Id = EffectModelIdConverter.EncodeId(Quantum.Apex, account),
+                    Apex = Quantum.Apex,
+                    Account = account,
+                    Effects = new List<SingleEffectModel>()
+                };
+                Effects.Add(account, effects);
+            }
+            effects.Effects.Add(singleEffectModel);
+            EffectsCount++;
+        }
+    }
+
     public class DiffObject
     {
-        public Dictionary<QuantumModel, Dictionary<int, EffectsModel>> Quanta { get; set; } = new Dictionary<QuantumModel, Dictionary<int, EffectsModel>>();
+        public List<QuantumItem> Quanta { get; set; } = new List<QuantumItem>();
 
         public SettingsModel ConstellationSettings { get; set; }
 

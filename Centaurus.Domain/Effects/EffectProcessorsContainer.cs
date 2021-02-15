@@ -15,6 +15,7 @@ namespace Centaurus.Domain
         {
             Envelope = quantum ?? throw new ArgumentNullException(nameof(quantum));
             PendingDiffObject = pendingDiffObject ?? throw new ArgumentNullException(nameof(pendingDiffObject));
+            QuantumModel = new QuantumItem(QuantumModelExtensions.FromQuantum(Envelope));
         }
 
         public MessageEnvelope Envelope { get; }
@@ -26,6 +27,8 @@ namespace Centaurus.Domain
         public bool OrderWasPlaced { get; set; }
 
         public DiffObject PendingDiffObject { get; }
+
+        public QuantumItem QuantumModel { get; }
 
         public Quantum Quantum => (Quantum)Envelope.Message;
 
@@ -68,7 +71,7 @@ namespace Centaurus.Domain
             {
                 PendingDiffObject.Orders.Remove(OrderIdConverter.FromRequest(orderRequest, Quantum.Apex));
             }
-            pendingDiffObject.Quanta.Add(QuantumModelExtensions.FromQuantum(Envelope));
+            this.PendingDiffObject.Quanta.Add(QuantumModel);
         }
     }
 }

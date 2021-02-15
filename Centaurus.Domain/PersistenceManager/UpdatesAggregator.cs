@@ -34,18 +34,7 @@ namespace Centaurus.Domain
             var account = quatumEffect.Account;
             var apex = processorsContainer.Apex;
 
-            if (!processorsContainer.EffectsModels.TryGetValue(account, out var accountEffects))
-            {
-                accountEffects = new EffectsModel
-                {
-                    Id = EffectModelIdConverter.EncodeId(apex, account),
-                    Apex = processorsContainer.Apex,
-                    Account = account,
-                    Effects = new List<SingleEffectModel>()
-                };
-                processorsContainer.EffectsModels.Add(account, accountEffects);
-            }
-            accountEffects.Effects.Add(quatumEffect.FromEffect(effectIndex));
+            processorsContainer.QuantumModel.AddEffect(account, quatumEffect.FromEffect(effectIndex));
 
             switch (quatumEffect)
             {

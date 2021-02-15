@@ -150,9 +150,9 @@ namespace Centaurus.Test
 
             UpdateOrders(update.Orders.Values.ToList());
 
-            UpdateQuanta(update.Quanta.Keys.ToList());
+            UpdateQuanta(update.Quanta.Select(q => q.Quantum).ToList());
 
-            UpdateEffects(update.Quanta.Values.SelectMany(v => v.Values).ToList());
+            UpdateEffects(update.Quanta.SelectMany(v => v.Effects.Values).ToList());
 
             return Task.CompletedTask;
         }

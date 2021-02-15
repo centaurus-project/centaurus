@@ -191,13 +191,20 @@ namespace Centaurus.Domain
             var accountEffectModels = await storage.LoadEffectsAboveApex(apex);
 
             var effectModels = new Effect[accountEffectModels.Sum(a => a.Effects.Count)];
-            foreach (var accountEffects in accountEffectModels)
+            var currentApexIndexOffset = 0;
+            foreach (var quantumEffect in accountEffectModels.GroupBy(a => a.Apex))
             {
-                foreach (var rawEffect in accountEffects.Effects)
+                var effectsCount = 0;
+                foreach (var accountEffects in quantumEffect)
                 {
-                    var effect = rawEffect.ToEffect(accountEffects.Account);
-                    effectModels[rawEffect.ApexIndex] = effect;
+                    foreach (var rawEffect in accountEffects.Effects)
+                    {
+                        var effect = rawEffect.ToEffect(accountEffects.Account);
+                        effectModels[currentApexIndexOffset + rawEffect.ApexIndex] = effect;
+                        effectsCount++;
+                    }
                 }
+                currentApexIndexOffset += effectsCount;
             }
             for (var i = effectModels.Length - 1; i >= 0; i--)
             {

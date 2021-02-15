@@ -179,7 +179,7 @@ namespace Centaurus.DAL.Mongo
         public async Task<List<EffectsModel>> LoadEffectsAboveApex(long apex)
         {
             return await effectsCollection
-                .Find(e => e.Apex >= apex)
+                .Find(e => e.Apex > apex)
                 .SortBy(e => e.Apex)
                 .ToListAsync();
         }
@@ -266,6 +266,8 @@ namespace Centaurus.DAL.Mongo
             var accountUpdates = GetAccountUpdates(update.Accounts.Values.ToList());
             var balanceUpdates = GetBalanceUpdates(update.Balances.Values.ToList());
             var orderUpdates = GetOrderUpdates(update.Orders.Values.ToList());
+            var quanta = update.Quanta.Select(a => a.Quantum);
+            var effects = update.Quanta.SelectMany(a => a.Effects.Values);
 
             var tries = 0;
             var maxTries = 5;
@@ -299,9 +301,9 @@ namespace Centaurus.DAL.Mongo
                             if (orderUpdates != null)
                                 updateTasks.Add(ordersCollection.BulkWriteAsync(session, orderUpdates));
 
-                            SaveQuanta(ref updateTasks, update.Quanta.Keys, session);
+                            SaveQuanta(ref updateTasks, quanta, session);
 
-                            SaveEffects(ref updateTasks, update.Quanta.Values.SelectMany(v => v.Values), session);
+                            SaveEffects(ref updateTasks, effects, session);
 
                             await Task.WhenAll(updateTasks);
 

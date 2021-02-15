@@ -120,7 +120,8 @@ namespace Centaurus.Domain
             await Global.PendingUpdatesManager.UpdatesSyncRoot.WaitAsync();
             try
             {
-                Global.PendingUpdatesManager.TryRefreshContainer();
+                if (Global.QuantumStorage.CurrentApex % 50 == 0) //avoid often refresh check
+                    Global.PendingUpdatesManager.TryRefreshContainer();
                 return Global.IsAlpha
                     ? await AlphaHandleQuantum(quantumEnvelope, timestamp)
                     : await AuditorHandleQuantum(quantumEnvelope);
