@@ -4,6 +4,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
@@ -11,7 +12,7 @@ namespace Centaurus.Domain
     {
         public ResultManager()
         {
-            InitCleanupTimer();
+            InitTimers();
         }
 
         public void Register(ResultMessage resultMessage, Dictionary<int, Message> notifications)
@@ -51,7 +52,7 @@ namespace Centaurus.Domain
             acknowledgmentTimer = null;
         }
 
-        private void InitCleanupTimer()
+        private void InitTimers()
         {
             cleanupTimer = new System.Timers.Timer();
             cleanupTimer.Interval = 30 * 1000;
@@ -73,7 +74,7 @@ namespace Centaurus.Domain
                 .Where(a => !a.IsAcknowledgmentSent && DateTime.UtcNow - a.CreatedAt > acknowledgmentTimeout)
                 .ToArray();
             foreach (var resultItem in resultsToSend)
-                resultItem.SendResult();
+                Task.Factory.StartNew(() => resultItem.SendResult(true));
             acknowledgmentTimer.Start();
         }
 
@@ -106,6 +107,7 @@ namespace Centaurus.Domain
                 this.resultMessageItem = resultMessageItem;
                 this.resultManager = resultManager;
                 CreatedAt = DateTime.UtcNow;
+                IsAcknowledgmentSent = resultMessageItem.AccountPubKey == null;
             }
 
             public bool IsProcessed { get; private set; }
@@ -116,9 +118,11 @@ namespace Centaurus.Domain
             private ResultManager resultManager;
             private List<RawPubKey> processedAuditors = new List<RawPubKey>();
 
+            private object syncRoot = new { };
+
             public void Add(AuditorResultMessage result, RawPubKey auditor)
             {
-                lock (this)
+                lock (syncRoot)
                 {
                     if (IsProcessed || processedAuditors.Any(a => a.Equals(auditor)))
                         return;
@@ -139,24 +143,13 @@ namespace Centaurus.Domain
                 }
             }
 
-            public void SendResult()
+            public void SendResult(bool isAcknowledgment = false)
             {
-                lock (this)
+                lock (syncRoot)
                 {
-                    if (IsProcessed)
+                    if (IsProcessed || (isAcknowledgment && IsAcknowledgmentSent))
                         return;
-                    var originalEnvelope = resultMessageItem.ResultMessage.OriginalMessage;
-                    SequentialRequestMessage requestMessage = null;
-                    if (originalEnvelope.Message is SequentialRequestMessage)
-                        requestMessage = (SequentialRequestMessage)originalEnvelope.Message;
-                    else if (originalEnvelope.Message is RequestQuantum)
-                        requestMessage = ((RequestQuantum)originalEnvelope.Message).RequestEnvelope.Message as SequentialRequestMessage;
 
-                    if (requestMessage != null)
-                    {
-                        var aPubKey = Global.AccountStorage.GetAccount(requestMessage.Account).Account.Pubkey;
-                        Notifier.Notify(aPubKey, resultMessageItem.ResultEnvelope);
-                    }
                     if (!IsAcknowledgmentSent)
                     {
                         foreach (var notification in resultMessageItem.Notifications)
@@ -164,8 +157,12 @@ namespace Centaurus.Domain
                             var aPubKey = Global.AccountStorage.GetAccount(notification.Key).Account.Pubkey;
                             Notifier.Notify(aPubKey, notification.Value.CreateEnvelope());
                         }
-                        IsAcknowledgmentSent = true;
                     }
+
+                    if (resultMessageItem.AccountPubKey != null)
+                        Notifier.Notify(resultMessageItem.AccountPubKey, resultMessageItem.ResultEnvelope);
+
+                    IsAcknowledgmentSent = true;
                 }
             }
 
@@ -173,7 +170,18 @@ namespace Centaurus.Domain
             {
                 if (majorityResult == MajorityResults.Unreachable)
                 {
-                    var exc = new Exception("Majority is unreachable. The constellation collapsed.");
+                    var votesCount = resultMessageItem.ResultEnvelope.Signatures.Count;
+                    if (resultMessageItem.ResultEnvelope.IsSignedBy(Global.Settings.KeyPair))
+                        votesCount--;
+
+                    var originalEnvelope = resultMessageItem.ResultMessage.OriginalMessage;
+                    NonceRequestMessage requestMessage = null;
+                    if (originalEnvelope.Message is NonceRequestMessage)
+                        requestMessage = (NonceRequestMessage)originalEnvelope.Message;
+                    else if (originalEnvelope.Message is RequestQuantum)
+                        requestMessage = ((RequestQuantum)originalEnvelope.Message).RequestEnvelope.Message as NonceRequestMessage;
+
+                    var exc = new Exception($"Majority for quantum {resultMessageItem.Apex} ({requestMessage.MessageType}) is unreachable. Results received count is {processedAuditors.Count}, valid results count is {votesCount}. The constellation collapsed.");
                     logger.Error(exc);
                     Global.AppState.State = ApplicationState.Failed;
                     throw exc;
@@ -186,8 +194,11 @@ namespace Centaurus.Domain
             {
                 int requiredMajority = MajorityHelper.GetMajorityCount(),
                     maxVotes = MajorityHelper.GetTotalAuditorsCount();
-                //try to find the majority
+
+                //if envelope contains Alpha signature we need to exclude it from count
                 var votesCount = resultMessageItem.ResultEnvelope.Signatures.Count;
+                if (resultMessageItem.ResultEnvelope.IsSignedBy(Global.Settings.KeyPair))
+                    votesCount--;
 
                 //check if we have the majority
                 if (votesCount >= requiredMajority)
@@ -211,6 +222,7 @@ namespace Centaurus.Domain
                     throw new ArgumentNullException(nameof(resultMessage));
                 ResultEnvelope = resultMessage.CreateEnvelope();
                 Hash = ResultEnvelope.ComputeMessageHash();
+                AccountPubKey = GetMessageAccount();
                 Notifications = notifications ?? throw new ArgumentNullException(nameof(notifications));
             }
 
@@ -223,6 +235,22 @@ namespace Centaurus.Domain
             public byte[] Hash { get; }
 
             public Dictionary<int, Message> Notifications { get; }
+
+            public RawPubKey AccountPubKey { get; }
+
+            private RawPubKey GetMessageAccount()
+            {
+                var originalEnvelope = ResultMessage.OriginalMessage;
+                NonceRequestMessage requestMessage = null;
+                if (originalEnvelope.Message is NonceRequestMessage)
+                    requestMessage = (NonceRequestMessage)originalEnvelope.Message;
+                else if (originalEnvelope.Message is RequestQuantum)
+                    requestMessage = ((RequestQuantum)originalEnvelope.Message).RequestEnvelope.Message as NonceRequestMessage;
+
+                if (requestMessage == null)
+                    return null;
+                return Global.AccountStorage.GetAccount(requestMessage.Account).Account.Pubkey;
+            }
         }
     }
 }
