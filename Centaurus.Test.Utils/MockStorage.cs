@@ -254,8 +254,8 @@ namespace Centaurus.Test
                     ordersCollection.Add(new OrderModel
                     {
                         Id = (long)order.OrderId,
-                        Amount = order.Amount,
-                        QuoteAmount = order.QuoteAmount,
+                        Amount = order.AmountDiff,
+                        QuoteAmount = order.QuoteAmountDiff,
                         Price = order.Price,
                         Account = order.Account
                     });
@@ -265,8 +265,8 @@ namespace Centaurus.Test
                 }
                 else
                 {
-                    currentOrder.Amount += order.Amount;
-                    currentOrder.QuoteAmount += order.QuoteAmount;
+                    currentOrder.Amount += order.AmountDiff;
+                    currentOrder.QuoteAmount += order.QuoteAmountDiff;
                 }
             }
         }

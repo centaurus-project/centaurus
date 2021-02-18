@@ -119,7 +119,7 @@ namespace Centaurus.DAL
 
             public long AmountDiff { get; set; }
 
-            public long QuoteAmount { get; set; }
+            public long QuoteAmountDiff { get; set; }
 
             public int Account { get; set; }
         }

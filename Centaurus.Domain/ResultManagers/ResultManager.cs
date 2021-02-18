@@ -175,11 +175,11 @@ namespace Centaurus.Domain
                         votesCount--;
 
                     var originalEnvelope = resultMessageItem.ResultMessage.OriginalMessage;
-                    NonceRequestMessage requestMessage = null;
-                    if (originalEnvelope.Message is NonceRequestMessage)
-                        requestMessage = (NonceRequestMessage)originalEnvelope.Message;
+                    SequentialRequestMessage requestMessage = null;
+                    if (originalEnvelope.Message is SequentialRequestMessage)
+                        requestMessage = (SequentialRequestMessage)originalEnvelope.Message;
                     else if (originalEnvelope.Message is RequestQuantum)
-                        requestMessage = ((RequestQuantum)originalEnvelope.Message).RequestEnvelope.Message as NonceRequestMessage;
+                        requestMessage = ((RequestQuantum)originalEnvelope.Message).RequestEnvelope.Message as SequentialRequestMessage;
 
                     var exc = new Exception($"Majority for quantum {resultMessageItem.Apex} ({requestMessage.MessageType}) is unreachable. Results received count is {processedAuditors.Count}, valid results count is {votesCount}. The constellation collapsed.");
                     logger.Error(exc);
@@ -241,11 +241,11 @@ namespace Centaurus.Domain
             private RawPubKey GetMessageAccount()
             {
                 var originalEnvelope = ResultMessage.OriginalMessage;
-                NonceRequestMessage requestMessage = null;
-                if (originalEnvelope.Message is NonceRequestMessage)
-                    requestMessage = (NonceRequestMessage)originalEnvelope.Message;
+                SequentialRequestMessage requestMessage = null;
+                if (originalEnvelope.Message is SequentialRequestMessage)
+                    requestMessage = (SequentialRequestMessage)originalEnvelope.Message;
                 else if (originalEnvelope.Message is RequestQuantum)
-                    requestMessage = ((RequestQuantum)originalEnvelope.Message).RequestEnvelope.Message as NonceRequestMessage;
+                    requestMessage = ((RequestQuantum)originalEnvelope.Message).RequestEnvelope.Message as SequentialRequestMessage;
 
                 if (requestMessage == null)
                     return null;
