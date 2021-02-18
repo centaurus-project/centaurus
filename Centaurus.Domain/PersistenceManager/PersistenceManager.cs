@@ -56,12 +56,12 @@ namespace Centaurus.Domain
             };
         }
 
-        public async Task ApplyUpdates(DiffObject updates)
+        public async Task<int> ApplyUpdates(DiffObject updates)
         {
             await saveSnapshotSemaphore.WaitAsync();
             try
             {
-                await storage.Update(updates);
+                return await storage.Update(updates);
             }
             finally
             {

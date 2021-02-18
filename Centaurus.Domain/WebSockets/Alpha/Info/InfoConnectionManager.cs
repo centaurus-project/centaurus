@@ -79,6 +79,14 @@ namespace Centaurus.Domain
             }
         }
 
+        public static void SendSubscriptionUpdate(BaseSubscription subscription, SubscriptionUpdateBase subsUpdates)
+        {
+            foreach (var connection in connections)
+            {
+                Task.Factory.StartNew(async () => await SendSubscriptionUpdate(subscription, subsUpdates, connection.Value));
+            }
+        }
+
         static async Task SendSubscriptionUpdate(BaseSubscription subscription, SubscriptionUpdateBase update, InfoWebSocketConnection connection)
         {
             await connection.SendSubscriptionUpdate(subscription, update);

@@ -84,7 +84,12 @@ namespace Centaurus.DAL
 
         public Task<ConstellationState> LoadConstellationState();
 
-        public Task Update(DiffObject update);
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="update"></param>
+        /// <returns>Tries count. (MongoDb often throws transaction exception and update command must be repeated)</returns>
+        public Task<int> Update(DiffObject update);
 
         public Task DropDatabase();
     }

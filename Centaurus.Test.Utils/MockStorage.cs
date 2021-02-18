@@ -138,7 +138,7 @@ namespace Centaurus.Test
             return Task.FromResult(constellationState);
         }
 
-        public Task Update(DiffObject update)
+        public Task<int> Update(DiffObject update)
         {
             UpdateSettings(update.ConstellationSettings, update.Assets);
 
@@ -154,7 +154,7 @@ namespace Centaurus.Test
 
             UpdateEffects(update.Quanta.SelectMany(v => v.Effects.Values).ToList());
 
-            return Task.CompletedTask;
+            return Task.FromResult(1);
         }
 
         private void UpdateEffects(List<EffectsModel> effects)

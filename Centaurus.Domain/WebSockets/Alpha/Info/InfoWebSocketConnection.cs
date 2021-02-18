@@ -121,7 +121,7 @@ namespace Centaurus.Domain
             {
                 while (webSocket.State != WebSocketState.Closed && webSocket.State != WebSocketState.Aborted && !cancellationToken.IsCancellationRequested)
                 {
-                    var result = await webSocket.GetWebsocketBuffer(512, cancellationToken);
+                    var result = await webSocket.GetWebsocketBuffer(WebSocketExtension.ChunkSize, cancellationToken);
                     using (result.messageBuffer)
                         if (!cancellationToken.IsCancellationRequested)
                         {
@@ -139,7 +139,7 @@ namespace Centaurus.Domain
                                 finally
                                 {
                                     sendMessageSemaphore.Release();
-                                    cancellationTokenSource.Cancel();
+                                    cancellationTokenSource?.Cancel();
                                 }
                             }
                             else

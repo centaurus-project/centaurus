@@ -260,7 +260,7 @@ namespace Centaurus.DAL.Mongo
 
         #region Updates
 
-        public async Task Update(DiffObject update)
+        public async Task<int> Update(DiffObject update)
         {
             var stellarUpdates = GetStellarDataUpdate(update.StellarInfoData);
             var accountUpdates = GetAccountUpdates(update.Accounts.Values.ToList());
@@ -269,7 +269,7 @@ namespace Centaurus.DAL.Mongo
             var quanta = update.Quanta.Select(a => a.Quantum);
             var effects = update.Quanta.SelectMany(a => a.Effects.Values);
 
-            var tries = 0;
+            var tries = 1;
             var maxTries = 5;
             var isCommitInvoked = false;
             while (true)
@@ -327,16 +327,17 @@ namespace Centaurus.DAL.Mongo
                     }
                     catch (Exception exc)
                     {
-                        tries++;
                         if (tries <= maxTries)
                         {
-                            logger.Warn(exc, $"Error during update. {tries} try.");
+                            logger.Debug(exc, $"Error during update. {tries} try.");
+                            tries++;
                             continue;
                         }
                         new Exception($"Unable to commit transaction after {tries} tries", exc);
                     }
                 }
             }
+            return tries;
         }
 
         private void SaveQuanta(ref List<Task> updateTasks, IEnumerable<QuantumModel> quanta, IClientSessionHandle session)
@@ -397,7 +398,7 @@ namespace Centaurus.DAL.Mongo
                         logger.Warn(exc, $"Error on commit. Labels: {string.Join(',', mongoException.ErrorLabels)}. {tries} try.");
                         continue;
                     }
-                    throw new UnknownCommitResultException($"UnknownTransactionCommitResult or TransientTransactionError errors occured in {tries} tries", exc);
+                    throw new UnknownCommitResultException($"UnknownTransactionCommitResult or TransientTransactionError errors occurred in {tries} tries", exc);
                 }
             }
         }
