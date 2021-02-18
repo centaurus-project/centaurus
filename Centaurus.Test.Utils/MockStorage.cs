@@ -260,14 +260,18 @@ namespace Centaurus.Test
                     {
                         Id = (long)order.OrderId,
                         Amount = order.Amount,
+                        QuoteAmount = order.QuoteAmount,
                         Price = order.Price,
                         Account = order.Account
                     });
                 else if (order.IsDeleted)
+                {
                     ordersCollection.Remove(currentOrder);
+                }
                 else
                 {
                     currentOrder.Amount += order.Amount;
+                    currentOrder.QuoteAmount += order.QuoteAmount;
                 }
             }
         }

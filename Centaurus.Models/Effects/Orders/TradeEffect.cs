@@ -13,5 +13,8 @@ namespace Centaurus.Models
 
         [XdrField(1)]
         public long AssetAmount { get; set; }
+
+        [XdrField(2)]
+        public long QuoteAmount { get; set; }
     }
 }

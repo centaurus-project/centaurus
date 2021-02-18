@@ -174,7 +174,7 @@ namespace Centaurus.Test
             }, () => $"({rounds} rounds, {iterations} iterations)");
         }
 
-        [TestCase(1, 10000000)]
+        [TestCase(1, 1000000)]
         [TestCase(100000, 100)]
         [Explicit]
         [Category("Performance")]

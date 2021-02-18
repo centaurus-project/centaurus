@@ -10,6 +10,8 @@ namespace Centaurus.Models
             RequestCounter = new AccountRequestCounter(Account, requestRateLimits);
         }
 
+        public int Id => Account.Id;
+
         public Account Account { get; }
 
         public AccountRequestCounter RequestCounter { get; }

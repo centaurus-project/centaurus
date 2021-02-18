@@ -64,7 +64,7 @@ namespace Centaurus.Domain
             {
                 pendingDiffObject.Orders.Remove(OrderIdConverter.FromRequest(orderRequest, Quantum.Apex));
             }
-            this.pendingDiffObject.Quanta.Add(QuantumModelExtensions.FromQuantum(Envelope));
+            pendingDiffObject.Quanta.Add(QuantumModelExtensions.FromQuantum(Envelope));
         }
     }
 }

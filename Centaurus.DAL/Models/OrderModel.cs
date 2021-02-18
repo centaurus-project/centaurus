@@ -12,6 +12,8 @@ namespace Centaurus.DAL.Models
 
         public long Amount { get; set; }
 
+        public long QuoteAmount { get; set; }
+
         public int Account { get; set; }
     }
 }

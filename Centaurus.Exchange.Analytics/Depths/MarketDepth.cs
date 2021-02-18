@@ -176,7 +176,7 @@ namespace Centaurus.Exchange
             var currentPrice = source.FirstOrDefault(p => p.Price == price);
             if (currentPrice == null)
                 return false;
-            currentPrice.Amount += -(order.Amount);
+            currentPrice.Amount -= order.Amount;
             currentPrice.Orders.Remove(order.OrderId);
             if (currentPrice.Amount == 0)
                 source.Remove(currentPrice);
@@ -193,7 +193,7 @@ namespace Centaurus.Exchange
             var currentPrice = source.FirstOrDefault(p => p.Price == price);
             if (currentPrice == null)
                 return false;
-            currentPrice.Amount += -(order.Amount);
+            currentPrice.Amount -= order.Amount;
             return true;
         }
     }

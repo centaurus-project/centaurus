@@ -16,15 +16,13 @@ namespace Centaurus.Models
         [XdrField(2)]
         public long Amount { get; set; }
 
+        [XdrField(3)]
+        public long QuoteAmount { get; set; }
+
         public Account Account { get; set; }
 
         public Order Next { get; set; }
 
         public Order Prev { get; set; }
-
-        public Order Clone()
-        {
-            return (Order)MemberwiseClone();
-        }
     }
 }

@@ -23,6 +23,8 @@ namespace Centaurus.Models
 
         public long Amount { get; set; }
 
+        public long QuoteAmount { get; set; }
+
         public OrderState State { get; set; }
     }
 }

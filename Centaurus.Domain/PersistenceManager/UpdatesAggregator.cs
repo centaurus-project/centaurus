@@ -92,6 +92,7 @@ namespace Centaurus.Domain
                         pendingDiffObject.Orders[orderId] = new DiffObject.Order
                         {
                             Amount = orderPlacedEffect.Amount,
+                            QuoteAmount = orderPlacedEffect.QuoteAmount,
                             IsInserted = true,
                             OrderId = orderId,
                             Price = orderPlacedEffect.Price,
@@ -101,14 +102,14 @@ namespace Centaurus.Domain
                     break;
                 case OrderRemovedEffect orderRemovedEffect:
                     {
-                        var orderId = orderRemovedEffect.OrderId;
-                        GetOrder(pendingDiffObject.Orders, orderId).IsDeleted = true;
+                        GetOrder(pendingDiffObject.Orders, orderRemovedEffect.OrderId).IsDeleted = true;
                     }
                     break;
                 case TradeEffect tradeEffect:
                     {
-                        var orderId = tradeEffect.OrderId;
-                        GetOrder(pendingDiffObject.Orders, orderId).Amount += -(tradeEffect.AssetAmount);
+                        var order = GetOrder(pendingDiffObject.Orders, tradeEffect.OrderId);
+                        order.Amount -= tradeEffect.AssetAmount;
+                        order.QuoteAmount -= tradeEffect.QuoteAmount;
                     }
                     break;
                 case TxCursorUpdateEffect cursorUpdateEffect:

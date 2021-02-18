@@ -37,9 +37,9 @@ namespace Centaurus.Domain
             return map.Values;
         }
 
-        public IEnumerable<Order> GetAllAccountOrders(Account account)
+        public IEnumerable<Order> GetAllAccountOrders(int accountId)
         {
-            return map.Values.Where(o => o.Account == account);
+            return map.Values.Where(o => o.Account.Id == accountId);
         }
     }
 }

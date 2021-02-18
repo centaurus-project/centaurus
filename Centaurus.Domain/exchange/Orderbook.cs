@@ -104,7 +104,7 @@ namespace Centaurus.Domain
             //increment count
             Count++;
             TotalAmount += order.Amount;
-            Volume += (long)(order.Amount * order.Price);
+            Volume += order.QuoteAmount;
             //add to the map
             orderMap.AddOrder(order);
         }

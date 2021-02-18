@@ -506,6 +506,7 @@ namespace Centaurus.DAL.Mongo
                         {
                             Id = (long)order.OrderId,
                             Amount = order.Amount,
+                            QuoteAmount = order.QuoteAmount,
                             Price = order.Price,
                             Account = order.Account
                         });
@@ -515,7 +516,7 @@ namespace Centaurus.DAL.Mongo
                     {
                         updates[i] = new UpdateOneModel<OrderModel>(
                             currentOrderFilter,
-                            update.Inc(b => b.Amount, order.Amount)
+                            update.Inc(b => b.Amount, order.Amount).Inc(b => b.QuoteAmount, order.QuoteAmount)
                         );
                     }
                 }

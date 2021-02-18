@@ -90,6 +90,7 @@ namespace Centaurus.Domain
                 Account = order.Account.Id,
                 Asset = decodedOrderId.Asset,
                 Amount = order.Amount,
+                QuoteAmount = order.QuoteAmount,
                 Price = order.Price,
                 OrderId = order.OrderId,
                 OrderSide = decodedOrderId.Side
@@ -98,20 +99,19 @@ namespace Centaurus.Domain
             effectProcessors.Add(new OrderPlacedEffectProcessor(effect, orderBook, order));
         }
 
-
-        public static void AddTrade(this EffectProcessorsContainer effectProcessors, Order order, long assetAmount)
+        public static void AddTrade(this EffectProcessorsContainer effectProcessors, Order order, long assetAmount, long quoteAmount)
         {
             var trade = new TradeEffect
             {
                 Apex = effectProcessors.Apex,
                 Account = order.Account.Id,
                 AssetAmount = assetAmount,
+                QuoteAmount = quoteAmount,
                 OrderId = order.OrderId,
             };
 
             effectProcessors.Add(new TradeEffectProcessor(trade, order));
         }
-
 
         public static void AddOrderRemoved(this EffectProcessorsContainer effectProcessors, Orderbook orderbook, Order order)
         {
@@ -120,14 +120,15 @@ namespace Centaurus.Domain
                 {
                     Apex = effectProcessors.Apex,
                     OrderId = order.OrderId,
-                    Account = order.Account.Id
+                    Account = order.Account.Id,
+                    Amount = order.Amount,
+                    QuoteAmount = order.QuoteAmount,
+                    Price = order.Price
                 },
                 orderbook,
                 order.Account
             ));
         }
-
-
 
         public static void AddNonceUpdate(this EffectProcessorsContainer effectProcessors, Account account, long newNonce, long currentNonce)
         {

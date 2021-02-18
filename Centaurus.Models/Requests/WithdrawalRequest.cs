@@ -3,7 +3,7 @@ using Centaurus.Xdr;
 
 namespace Centaurus.Models
 {
-    public class WithdrawalRequest : NonceRequestMessage, ITransaction
+    public class WithdrawalRequest : SequentialRequestMessage, ITransaction
     {
         public override MessageTypes MessageType => MessageTypes.WithdrawalRequest;
 

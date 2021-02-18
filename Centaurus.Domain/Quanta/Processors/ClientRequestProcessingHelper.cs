@@ -25,9 +25,9 @@ namespace Centaurus.Domain
             if (requestQuantum == null)
                 throw new BadRequestException($"Invalid message type. Client quantum message should be of type {typeof(RequestQuantum).Name}.");
 
-            var requestMessage = requestQuantum.RequestEnvelope.Message as NonceRequestMessage;
+            var requestMessage = requestQuantum.RequestEnvelope.Message as SequentialRequestMessage;
             if (requestMessage == null)
-                throw new BadRequestException($"Invalid message type. {typeof(RequestQuantum).Name} should contain message of type {typeof(NonceRequestMessage).Name}.");
+                throw new BadRequestException($"Invalid message type. {typeof(RequestQuantum).Name} should contain message of type {typeof(SequentialRequestMessage).Name}.");
 
             var currentUser = requestMessage.AccountWrapper.Account;
             if (currentUser == null)

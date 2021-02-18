@@ -14,6 +14,7 @@ namespace Centaurus.Domain
                 OrderId = OrderIdConverter.FromRequest(orderRequest, effectsContainer.Apex),
                 Account = orderRequest.AccountWrapper.Account,
                 Amount = orderRequest.Amount,
+                QuoteAmount = orderRequest.QuoteAmount,
                 Price = orderRequest.Price
             };
             timeInForce = orderRequest.TimeInForce;
@@ -63,7 +64,7 @@ namespace Centaurus.Domain
                 nextOrder = counterOrder?.Next;
                 //check that counter order price matches our order
                 if (side == OrderSide.Sell && counterOrder.Price < takerOrder.Price
-                    || side == OrderSide.Buy && counterOrder.Price > takerOrder.Price) 
+                    || side == OrderSide.Buy && counterOrder.Price > takerOrder.Price)
                     break;
 
                 var match = new OrderMatch(this, counterOrder);
@@ -85,16 +86,37 @@ namespace Centaurus.Domain
             return updates;
         }
 
+        /// <summary>
+        /// Estimate quote amount that will be traded based on the asset amount and its price.
+        /// </summary>
+        /// <param name="assetAmountToTrade">Amount of an asset to trade</param>
+        /// <param name="price">Asset price</param>
+        /// <returns></returns>
+        public static long EstimateQuoteAmount(long amount, double price, OrderSide side)
+        {
+            var amt = price * amount;
+            switch (side)
+            { //add 0.1% to compensate possible rounding errors
+                case OrderSide.Buy:
+                    return (long)Math.Ceiling(amt * 1.001);
+                case OrderSide.Sell:
+                    return (long)Math.Floor(amt * 0.999);
+                default:
+                    throw new InvalidOperationException();
+            }
+        }
+
         private bool PlaceReminderOrder()
         {
             if (takerOrder.Amount <= 0) return false;
-            var xlmAmount = EstimateTradedXlmAmount(takerOrder.Amount, takerOrder.Price);
-            if (xlmAmount <= 0) return false;
+            var remainingQuoteAmount = EstimateQuoteAmount(takerOrder.Amount, takerOrder.Price, side);
+            if (remainingQuoteAmount <= 0) return false;
+            takerOrder.QuoteAmount = remainingQuoteAmount;
             //lock order reserve
             if (side == OrderSide.Buy)
             {
                 //TODO: check this - potential rounding error with multiple trades
-                resultEffects.AddUpdateLiabilities(takerOrder.Account, 0, xlmAmount);
+                resultEffects.AddUpdateLiabilities(takerOrder.Account, 0, remainingQuoteAmount);
             }
             else
             {
@@ -123,16 +145,16 @@ namespace Centaurus.Domain
                 this.makerOrder = makerOrder;
                 //amount of asset we are going to buy/sell
                 AssetAmount = Math.Min(matcher.takerOrder.Amount, makerOrder.Amount);
-                xlmAmount = EstimateTradedXlmAmount(AssetAmount, makerOrder.Price);
+                QuoteAmount = EstimateQuoteAmount(AssetAmount, makerOrder.Price, matcher.side);
             }
 
             public long AssetAmount { get; }
 
+            public long QuoteAmount;
+
             private OrderMatcher matcher;
 
             private Order makerOrder;
-
-            private long xlmAmount;
 
             /// <summary>
             /// Process matching.
@@ -150,21 +172,21 @@ namespace Centaurus.Domain
                     matcher.resultEffects.AddBalanceUpdate(matcher.takerOrder.Account, matcher.asset, AssetAmount);
 
                     //transfer XLM from taker to maker
-                    matcher.resultEffects.AddBalanceUpdate(matcher.takerOrder.Account, 0, -xlmAmount);
-                    matcher.resultEffects.AddBalanceUpdate(makerOrder.Account, 0, xlmAmount);
+                    matcher.resultEffects.AddBalanceUpdate(matcher.takerOrder.Account, 0, -QuoteAmount);
+                    matcher.resultEffects.AddBalanceUpdate(makerOrder.Account, 0, QuoteAmount);
                 }
                 else
                 {
                     //unlock required XLM amount on maker's side
-                    matcher.resultEffects.AddUpdateLiabilities(makerOrder.Account, 0, -xlmAmount);
+                    matcher.resultEffects.AddUpdateLiabilities(makerOrder.Account, 0, -QuoteAmount);
 
                     //transfer asset from taker to maker
                     matcher.resultEffects.AddBalanceUpdate(matcher.takerOrder.Account, matcher.asset, -AssetAmount);
                     matcher.resultEffects.AddBalanceUpdate(makerOrder.Account, matcher.asset, AssetAmount);
 
                     //transfer XLM from maker to taker
-                    matcher.resultEffects.AddBalanceUpdate(makerOrder.Account, 0, -xlmAmount);
-                    matcher.resultEffects.AddBalanceUpdate(matcher.takerOrder.Account, 0, xlmAmount);
+                    matcher.resultEffects.AddBalanceUpdate(makerOrder.Account, 0, -QuoteAmount);
+                    matcher.resultEffects.AddBalanceUpdate(matcher.takerOrder.Account, 0, QuoteAmount);
                 }
 
                 //record trade effects
@@ -180,7 +202,7 @@ namespace Centaurus.Domain
                     counterOrder.State = OrderState.Updated;
                     //TODO: add diff field for this purpose
                     //it's not amount but difference with existing amount 
-                    counterOrder.Amount = trade.Amount; 
+                    counterOrder.Amount = trade.Amount;
                 }
 
                 return (trade, counterOrder);
@@ -191,20 +213,22 @@ namespace Centaurus.Domain
                 //record maker trade effect
                 matcher.resultEffects.AddTrade(
                          makerOrder,
-                         AssetAmount
+                         AssetAmount,
+                         QuoteAmount
                      );
 
                 //record taker trade effect
                 matcher.resultEffects.AddTrade(
                          matcher.takerOrder,
-                         AssetAmount
+                         AssetAmount,
+                         QuoteAmount
                      );
 
                 return new Trade
                 {
                     Amount = AssetAmount,
                     Asset = matcher.asset,
-                    BaseAmount = xlmAmount,
+                    BaseAmount = QuoteAmount,
                     Price = makerOrder.Price,
                     TradeDate = new DateTime(matcher.resultEffects.Quantum.Timestamp, DateTimeKind.Utc)
                 };
@@ -212,20 +236,13 @@ namespace Centaurus.Domain
 
             private void RecordOrderRemoved()
             {
-                //record remove maker's order effect
+                var info = makerOrder.ToOrderInfo();
+                if (makerOrder.QuoteAmount > 0 && info.Side == OrderSide.Buy)
+                {
+                    matcher.resultEffects.AddUpdateLiabilities(makerOrder.Account, 0, -makerOrder.QuoteAmount);
+                }
                 matcher.resultEffects.AddOrderRemoved(matcher.orderbook, makerOrder);
             }
-        }
-
-        /// <summary>
-        /// Estimate XLM amount that will be traded based on the asset amount and its price.
-        /// </summary>
-        /// <param name="assetAmountToTrade">Amount of an asset to trade</param>
-        /// <param name="price">Asset price</param>
-        /// <returns></returns>
-        public static long EstimateTradedXlmAmount(long assetAmountToTrade, double price)
-        {
-            return (long)Math.Ceiling(price * assetAmountToTrade);
         }
     }
 }

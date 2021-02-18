@@ -27,7 +27,7 @@ namespace Centaurus.Domain
             //unlock order reserve
             if (context.OrderSide == OrderSide.Buy)
                 //TODO: check this - potential rounding error with multiple trades
-                context.EffectProcessors.AddUpdateLiabilities(orderRequest.AccountWrapper.Account, 0, -context.XlmAmount);
+                context.EffectProcessors.AddUpdateLiabilities(orderRequest.AccountWrapper.Account, 0, -context.Order.QuoteAmount);
             else
                 context.EffectProcessors.AddUpdateLiabilities(orderRequest.AccountWrapper.Account, context.Asset, -context.Order.Amount);
 
@@ -56,22 +56,20 @@ namespace Centaurus.Domain
             if (context.Order is null)
                 throw new BadRequestException($"Order {orderRequest.OrderId} is not found.{(quantum.Apex != default ? $" Apex {quantum.Apex}" : "")}");
 
-            //TODO: check that lot size is greater than minimum allowed lot
             if (context.Order.Account.Id != orderRequest.Account)
                 throw new ForbiddenException();
 
             if (context.OrderSide == OrderSide.Buy)
             {
-                context.XlmAmount = OrderMatcher.EstimateTradedXlmAmount(context.Order.Amount, context.Order.Price);
                 var balance = orderRequest.AccountWrapper.Account.GetBalance(0);
-                if (balance.Liabilities < context.XlmAmount)
-                    throw new BadRequestException("Xlm liabilities is less than order size.");
+                if (balance.Liabilities < context.Order.QuoteAmount)
+                    throw new BadRequestException("Quote liabilities is less than order size.");
             }
             else
             {
                 var balance = orderRequest.AccountWrapper.Account.GetBalance(orderData.Asset);
                 if (balance == null)
-                    throw new BadRequestException("Balance for asset is not found.");
+                    throw new BadRequestException("Balance for asset not found.");
                 if (balance.Liabilities < context.Order.Amount)
                     throw new BadRequestException("Asset liabilities is less than order size.");
             }

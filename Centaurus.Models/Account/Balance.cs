@@ -19,10 +19,5 @@ namespace Centaurus.Models
         {
             return $"Asset: {Asset}, amount: {Amount}, liabilities: {Liabilities}.";
         }
-
-        public Balance Clone()
-        {
-            return (Balance)MemberwiseClone();
-        }
     }
 }
