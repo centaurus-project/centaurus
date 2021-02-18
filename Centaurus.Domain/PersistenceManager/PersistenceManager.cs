@@ -32,19 +32,24 @@ namespace Centaurus.Domain
         {
             if (account == default)
                 throw new ArgumentNullException(nameof(account));
-
-            //var cursor = ByteArrayExtensions.FromHexString(rawCursor);
-            //if (cursor != null && cursor.Length != 12)
-            //    throw new ArgumentException("Cursor is invalid.");
+            if (string.IsNullOrEmpty(rawCursor))
+                rawCursor = "0";
             if (!long.TryParse(rawCursor, out var apex))
                 throw new ArgumentException("Cursor is invalid.");
             var accountEffectModels = (await storage.LoadEffects(apex, isDesc, limit, account));
             var effectModels = accountEffectModels
                 .OrderBy(e => e.Apex)
-                .SelectMany(ae => ae.Effects.Select(e => e.ToEffect(account)))
+                .Select(ae => new ApexEffects
+                {
+                    Apex = ae.Apex,
+                    Items = ae.Effects.Select(e => e.ToEffect(ae.Account)).ToList()
+                })
                 .ToList();
             if (isDesc)
+            {
                 effectModels.Reverse();
+                effectModels.ForEach(ae => ae.Items.Reverse());
+            }
             return new EffectsResponse
             {
                 CurrentPagingToken = rawCursor,

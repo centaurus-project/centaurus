@@ -41,27 +41,30 @@ namespace Centaurus.Test
             //check ordering
             for (int i = 0, opI = allEffectsResult.Count - 1; i < allEffectsResult.Count; i++, opI--)
             {
-                var leftEffect = allEffectsResult[i];
-                var rightEffect = opositeOrderedResult[opI];
-                var areEqual = ByteArrayPrimitives.Equals(leftEffect.ComputeHash(), rightEffect.ComputeHash());
-                Assert.AreEqual(true, areEqual, "Ordering doesn't work as expected.");
+                var leftEffect = allEffectsResult[i].Items;
+                var rightEffect = opositeOrderedResult[opI].Items;
+                var effectsCount = leftEffect.Count;
+                for (int c = 0, opC = effectsCount - 1; c < effectsCount; c++, opC--)
+                {
+                    var areEqual = ByteArrayPrimitives.Equals(leftEffect[c].ComputeHash(), rightEffect[opC].ComputeHash());
+                    Assert.AreEqual(true, areEqual, "Ordering doesn't work as expected.");
+                }
             }
 
-            var zeroId = EffectModelIdConverter.EncodeId(0, 0);
-            var zeroHexCursor = zeroId.Value.ToByteArray().ToHex();
+            var zeroCursor = "0";
             //check fetching
             var limit = 1;
-            await TestFetching(allEffectsResult, zeroHexCursor, isDesc, limit, account.Account.Id);
+            await TestFetching(allEffectsResult, zeroCursor, isDesc, limit, account.Account.Id);
 
             //check reverse fetching
-            await TestFetching(allEffectsResult, zeroHexCursor, !isDesc, limit, account.Account.Id, true);
+            allEffectsResult.Reverse();
+            allEffectsResult.ForEach(ae => ae.Items.Reverse());
+            await TestFetching(allEffectsResult, zeroCursor, !isDesc, limit, account.Account.Id, true);
         }
 
-        private async Task TestFetching(List<Effect> allEffects, string cursor, bool isDesc, int limit, int account, bool isReverseDirection = false)
+        private async Task TestFetching(List<ApexEffects> allEffects, string cursor, bool isDesc, int limit, int account, bool isReverseDirection = false)
         {
             var nextCursor = cursor;
-            var increment = isReverseDirection ? -1 : 1;
-            var index = isReverseDirection ? allEffects.Count - 1 : 0;
             var totalCount = 0;
             while (nextCursor != null)
             {
@@ -74,9 +77,12 @@ namespace Centaurus.Test
                 else
                 {
                     Assert.AreEqual(1, currentEffectsResult.Items.Count, "Effects are not loaded.");
-                    var areEqual = ByteArrayPrimitives.Equals(allEffects[index].ComputeHash(), currentEffectsResult.Items[0].ComputeHash());
-                    Assert.AreEqual(true, areEqual, "Effects are not equal.");
-                    index += increment;
+                    var apexEffects = currentEffectsResult.Items[0].Items;
+                    for (var i = 0; i < apexEffects.Count; i++)
+                    {
+                        var areEqual = ByteArrayPrimitives.Equals(allEffects[totalCount].Items[i].ComputeHash(), apexEffects[i].ComputeHash());
+                        Assert.AreEqual(true, areEqual, "Effects are not equal.");
+                    }
                     totalCount++;
                     nextCursor = currentEffectsResult.NextPageToken;
                 }
