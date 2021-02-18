@@ -4,10 +4,10 @@ using Centaurus.Xdr;
 
 namespace Centaurus.Models
 {
-    public class OrderRequest : NonceRequestMessage
+    public class OrderRequest : SequentialRequestMessage
     {
         public override MessageTypes MessageType => MessageTypes.OrderRequest;
-        
+
         [XdrField(0)]
         public TimeInForce TimeInForce { get; set; }
 
@@ -22,5 +22,7 @@ namespace Centaurus.Models
 
         [XdrField(4)]
         public double Price { get; set; }
+
+        public long QuoteAmount { get; set; }
     }
 }

@@ -146,11 +146,11 @@ namespace Centaurus.Domain
                     if (IsProcessed)
                         return;
                     var originalEnvelope = resultMessageItem.ResultMessage.OriginalMessage;
-                    NonceRequestMessage requestMessage = null;
-                    if (originalEnvelope.Message is NonceRequestMessage)
-                        requestMessage = (NonceRequestMessage)originalEnvelope.Message;
+                    SequentialRequestMessage requestMessage = null;
+                    if (originalEnvelope.Message is SequentialRequestMessage)
+                        requestMessage = (SequentialRequestMessage)originalEnvelope.Message;
                     else if (originalEnvelope.Message is RequestQuantum)
-                        requestMessage = ((RequestQuantum)originalEnvelope.Message).RequestEnvelope.Message as NonceRequestMessage;
+                        requestMessage = ((RequestQuantum)originalEnvelope.Message).RequestEnvelope.Message as SequentialRequestMessage;
 
                     if (requestMessage != null)
                     {

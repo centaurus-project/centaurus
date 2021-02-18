@@ -88,6 +88,8 @@ namespace Centaurus.DAL
 
             public long Amount { get; set; }
 
+            public long QuoteAmount { get; set; }
+
             public int Account { get; set; }
         }
         public class ConstellationState : BaseDiffModel

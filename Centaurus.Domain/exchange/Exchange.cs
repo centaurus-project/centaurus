@@ -31,8 +31,10 @@ namespace Centaurus.Domain
         {
             try
             {
-                foreach (var updates in awaitedUpdates.GetConsumingEnumerable(cancellationToken))
-                    OnUpdates?.Invoke(updates);
+                if (OnUpdates != null) {
+                    foreach (var updates in awaitedUpdates.GetConsumingEnumerable(cancellationToken))
+                        OnUpdates.Invoke(updates);
+                }
             }
             catch (Exception exc)
             {

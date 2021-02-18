@@ -75,131 +75,45 @@ namespace Centaurus.Test
             //Global.AccountStorage.Clear();
         }
 
-        [Test]
-        [TestCase(OrderSide.Buy)]
-        [TestCase(OrderSide.Sell)]
-        public void SimpleMatchingTest(OrderSide side)
-        {
-            var acc1XlmLiabilities = account1.Balances[0].Liabilities;
-            var acc1XlmAmount = account1.Balances[0].Amount;
-            var acc1AssetLiabilities = account1.Balances[1].Liabilities;
-            var acc1AssetAmount = account1.Balances[1].Amount;
-
-            var acc2XlmLiabilities = account2.Balances[0].Liabilities;
-            var acc2XlmAmount = account2.Balances[0].Amount;
-            var acc2AssetLiabilities = account2.Balances[1].Liabilities;
-            var acc2AssetAmount = account2.Balances[1].Amount;
-
-            var account = Global.AccountStorage.GetAccount(account1.Pubkey);
-
-            var orderRequest1 = new OrderRequest
-            {
-                Account = account.Account.Id,
-                Nonce = 1,
-                Amount = 10,
-                Asset = 1,
-                Price = 2.5,
-                Side = side,
-                AccountWrapper = account
-            };
-
-            var order = new RequestQuantum
-            {
-                Apex = 1,
-                RequestEnvelope = new MessageEnvelope
-                {
-                    Message = orderRequest1,
-                    Signatures = new List<Ed25519Signature>()
-                },
-                Timestamp = DateTime.UtcNow.Ticks
-            };
-
-            var diffObject = new DiffObject();
-
-            var orderEffectsContainer = new EffectProcessorsContainer(order.CreateEnvelope(), diffObject);
-            Global.Exchange.ExecuteOrder(orderEffectsContainer);
-            var effects = orderEffectsContainer.Effects;
-            Assert.AreEqual(effects.Count, 2);
-            Assert.AreEqual(effects[0].EffectType, EffectTypes.UpdateLiabilities);
-            Assert.AreEqual(effects[1].EffectType, EffectTypes.OrderPlaced);
-            if (side == OrderSide.Sell)
-            {
-                Assert.AreEqual(account1.Balances[1].Liabilities, acc1AssetLiabilities + orderRequest1.Amount);
-                Assert.AreEqual(account1.Balances[1].Amount, acc1AssetAmount);
-            }
-            else
-            {
-                Assert.AreEqual(account1.Balances[0].Liabilities, acc1XlmLiabilities + orderRequest1.Amount * orderRequest1.Price);
-                Assert.AreEqual(account1.Balances[0].Amount, acc1XlmAmount);
-            }
-
-            account = Global.AccountStorage.GetAccount(account2.Pubkey);
-
-            var orderRequest2 = new OrderRequest
-            {
-                Account = account.Account.Id,
-                Nonce = 2,
-                Amount = 20,
-                Asset = 1,
-                Price = 2,
-                Side = side.Inverse(),
-                AccountWrapper = account
-            };
-
-            var conterOrder = new RequestQuantum
-            {
-                Apex = 2,
-                RequestEnvelope = new MessageEnvelope
-                {
-                    Message = orderRequest2,
-                    Signatures = new List<Ed25519Signature>()
-                },
-                Timestamp = DateTime.UtcNow.Ticks
-            };
-
-            var conterOrderEffectsContainer = new EffectProcessorsContainer(conterOrder.CreateEnvelope(), diffObject);
-            Global.Exchange.ExecuteOrder(conterOrderEffectsContainer);
-            if (orderRequest2.Side == OrderSide.Sell)
-            {
-                Assert.AreEqual(account2.Balances[1].Liabilities, acc2AssetLiabilities + (orderRequest2.Amount - orderRequest1.Amount));
-                Assert.AreEqual(account2.Balances[1].Amount, acc2AssetAmount - orderRequest1.Amount);
-            }
-            else
-            {
-                Assert.AreEqual(account2.Balances[0].Liabilities, acc2XlmLiabilities + orderRequest2.Amount * orderRequest2.Price);
-                Assert.AreEqual(account2.Balances[0].Amount, acc2XlmAmount);
-            }
-        }
-
-        [Test]
-        [Explicit]
-        [Category("Performance")]
-        [TestCase(100000)]
-        [TestCase(1000000, true)]
-        public void OrderbookPerformanceTest(int iterations, bool useNormalDistribution = false)
+        private void ExecuteWithOrderbook(int iterations, bool useNormalDistribution, Action<Action> executor)
         {
             var rnd = new Random();
-            var account = Global.AccountStorage.GetAccount(account2.Pubkey);
+
+            var a1 = Global.AccountStorage.GetAccount(account1.Pubkey);
+            var a2 = Global.AccountStorage.GetAccount(account2.Pubkey);
+
+            var market = Global.Exchange.GetMarket(1);
 
             var testTradeResults = new Dictionary<RequestQuantum, EffectProcessorsContainer>();
             for (var i = 1; i < iterations; i++)
             {
                 var price = useNormalDistribution ? rnd.NextNormallyDistributed() + 50 : rnd.NextDouble() * 100;
+                var request = new OrderRequest
+                {
+                    Nonce = i,
+                    Amount = rnd.Next(1, 20),
+                    Asset = 1,
+                    Price = Math.Round(price * 27) / 13
+                };
+                if (rnd.NextDouble() >= 0.5)
+                {
+                    request.Account = a1.Id;
+                    request.AccountWrapper = a1;
+                    request.Side = OrderSide.Buy;
+                }
+                else
+                {
+                    request.Account = a2.Id;
+                    request.AccountWrapper = a2;
+                    request.Side = OrderSide.Sell;
+                }
+
                 var trade = new RequestQuantum
                 {
                     Apex = i,
                     RequestEnvelope = new MessageEnvelope
                     {
-                        Message = new OrderRequest
-                        {
-                            Account = account.Account.Id,
-                            Nonce = i,
-                            Amount = rnd.Next(1, 20),
-                            Asset = 1,
-                            Price = Math.Round(price * 10) / 10,
-                            Side = rnd.NextDouble() >= 0.5 ? OrderSide.Buy : OrderSide.Sell,
-                            AccountWrapper = account
-                        },
+                        Message = request,
                         Signatures = new List<Ed25519Signature>()
                     },
                     Timestamp = DateTime.UtcNow.Ticks
@@ -209,15 +123,75 @@ namespace Centaurus.Test
                 testTradeResults.Add(trade, conterOrderEffectsContainer);
             }
 
-            PerfCounter.MeasureTime(() =>
+            var xlmStartBalance = account1.GetBalance(0).Amount + account2.GetBalance(0).Amount;
+            var assetStartBalance = account1.GetBalance(1).Amount + account2.GetBalance(1).Amount;
+
+            executor(() =>
             {
                 foreach (var trade in testTradeResults)
+                {
                     Global.Exchange.ExecuteOrder(trade.Value);
-            }, () =>
+                }
+            });
+
+            //cleanup orders
+            foreach (var account in new[] { account1, account2 })
+            {
+                var activeOrders = Global.Exchange.OrderMap.GetAllAccountOrders(account.Id);
+                foreach (var order in activeOrders)
+                {
+                    var orderInfo = order.ToOrderInfo();
+                    //unlock order reserve
+                    if (orderInfo.Side == OrderSide.Buy)
+                    {
+                        new UpdateLiabilitiesEffectProcessor(new UpdateLiabilitiesEffect
+                        {
+                            Amount = -order.QuoteAmount,
+                            Asset = 0,
+                            Account = account.Id
+                        }, account).CommitEffect();
+                    }
+                    else
+                    {
+                        new UpdateLiabilitiesEffectProcessor(new UpdateLiabilitiesEffect
+                        {
+                            Amount = -order.Amount,
+                            Asset = orderInfo.Market,
+                            Account = account.Id
+                        }, account).CommitEffect();
+                    }
+                    order.Amount = 0;
+                    order.QuoteAmount = 0;
+
+                    new OrderRemovedEffectProccessor(new OrderRemovedEffect { OrderId = order.OrderId, Amount = order.Amount, QuoteAmount = order.QuoteAmount, Price = order.Price, Asset = orderInfo.Market, Account = account.Id }, market.GetOrderbook(orderInfo.Side), account).CommitEffect();
+                }
+            }
+            Assert.AreEqual(xlmStartBalance, account1.GetBalance(0).Amount + account2.GetBalance(0).Amount);
+            Assert.AreEqual(assetStartBalance, account1.GetBalance(1).Amount + account2.GetBalance(1).Amount);
+            Assert.AreEqual(0, account1.GetBalance(0).Liabilities);
+            Assert.AreEqual(0, account1.GetBalance(1).Liabilities);
+            Assert.AreEqual(0, account2.GetBalance(0).Liabilities);
+            Assert.AreEqual(0, account2.GetBalance(1).Liabilities);
+        }
+
+        [Test]
+        public void MatchingTest()
+        {
+            ExecuteWithOrderbook(10, false, executeOrders => executeOrders());
+        }
+
+        [Test]
+        [Explicit]
+        [Category("Performance")]
+        [TestCase(10000)]
+        [TestCase(100000, true)]
+        public void OrderbookPerformanceTest(int iterations, bool useNormalDistribution = false)
+        {
+            ExecuteWithOrderbook(iterations, useNormalDistribution, executeOrders => PerfCounter.MeasureTime(executeOrders, () =>
             {
                 var market = Global.Exchange.GetMarket(1);
                 return $"{iterations} iterations, orderbook size: {market.Bids.Count} bids,  {market.Asks.Count} asks, {market.Bids.GetBestPrice().ToString("G3")}/{market.Asks.GetBestPrice().ToString("G3")} spread.";
-            });
+            }));
         }
     }
 }

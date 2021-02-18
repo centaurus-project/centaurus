@@ -131,7 +131,8 @@ namespace Centaurus.Test
         [TestCase(1, 1, 0, OrderSide.Sell, typeof(BadRequestException))]
         [TestCase(1, 1, 1000000000, OrderSide.Sell, typeof(BadRequestException))]
         [TestCase(1, 1, 100, OrderSide.Sell, null)]
-        [TestCase(1, 1, 100, OrderSide.Buy, null)]
+        [TestCase(1, 1, 100, OrderSide.Buy, typeof(BadRequestException))]
+        [TestCase(1, 1, 98, OrderSide.Buy, null)]
         public async Task OrderQuantumTest(int nonce, int asset, int amount, OrderSide side, Type excpectedException)
         {
             var accountWrapper = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
@@ -156,26 +157,26 @@ namespace Centaurus.Test
                 envelope.Sign(TestEnvironment.AlphaKeyPair);
             }
 
-            await AssertQuantumHandling(envelope, excpectedException);
+            var res = await AssertQuantumHandling(envelope, excpectedException);
             if (excpectedException == null)
             {
                 var currentMarket = Global.Exchange.GetMarket(asset);
                 Assert.IsTrue(currentMarket != null);
 
                 var requests = side == OrderSide.Buy ? currentMarket.Bids : currentMarket.Asks;
-                Assert.AreEqual(requests.Count, 1);
+                Assert.AreEqual(1, requests.Count);
 
                 Assert.AreEqual(requests.TotalAmount, amount);
-                Assert.AreEqual(requests.Volume, amount * order.Price);
+                Assert.AreEqual((res.Effects.Find(e => e.EffectType == EffectTypes.OrderPlaced) as OrderPlacedEffect).QuoteAmount, requests.Volume);
             }
         }
 
         [Test]
         [TestCase(1, 100, OrderSide.Sell, 111, false, typeof(BadRequestException))]
-        [TestCase(1, 100, OrderSide.Buy, 111, false, typeof(BadRequestException))]
+        [TestCase(1, 98, OrderSide.Buy, 111, false, typeof(BadRequestException))]
         [TestCase(1, 100, OrderSide.Sell, 0, true, typeof(UnauthorizedAccessException))]
         [TestCase(1, 100, OrderSide.Sell, 0, false, null)]
-        [TestCase(1, 100, OrderSide.Buy, 0, false, null)]
+        [TestCase(1, 98, OrderSide.Buy, 0, false, null)]
         public async Task OrderCancellationQuantumTest(int asset, int amount, OrderSide side, int apexMod, bool useFakeSigner, Type excpectedException)
         {
             var acc = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
@@ -201,9 +202,9 @@ namespace Centaurus.Test
                 envelope.Sign(TestEnvironment.AlphaKeyPair);
             }
 
-            var result = await AssertQuantumHandling(envelope, excpectedException);
+            var submitResult = await AssertQuantumHandling(envelope, excpectedException);
 
-            var apex = ((Quantum)result.OriginalMessage.Message).Apex + apexMod;
+            var apex = ((Quantum)submitResult.OriginalMessage.Message).Apex + apexMod;
 
             var orderCancellation = new OrderCancellationRequest
             {
@@ -223,7 +224,7 @@ namespace Centaurus.Test
                 envelope.Sign(TestEnvironment.AlphaKeyPair);
             }
 
-            await AssertQuantumHandling(envelope, excpectedException);
+            var cancelResult = await AssertQuantumHandling(envelope, excpectedException);
 
             if (excpectedException == null)
             {
@@ -233,8 +234,9 @@ namespace Centaurus.Test
                 var requests = side == OrderSide.Buy ? currentMarket.Bids : currentMarket.Asks;
                 Assert.AreEqual(requests.Count, 1);
 
-                Assert.AreEqual(requests.TotalAmount, amount);
-                Assert.AreEqual(requests.Volume, amount * order.Price);
+                Assert.AreEqual(amount, requests.TotalAmount);
+                var effect = cancelResult.Effects.Find(e => e.EffectType == EffectTypes.OrderRemoved) as OrderRemovedEffect;
+                Assert.AreEqual(effect.QuoteAmount, requests.Volume);
             }
         }
 
@@ -458,8 +460,6 @@ namespace Centaurus.Test
                     await AssertQuantumHandling(envelope, null);
             }
         }
-
-
 
         protected async Task<ResultMessage> AssertQuantumHandling(MessageEnvelope quantum, Type excpectedException = null)
         {

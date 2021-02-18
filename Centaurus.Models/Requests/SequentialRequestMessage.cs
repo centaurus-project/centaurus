@@ -4,11 +4,11 @@ using Centaurus.Xdr;
 
 namespace Centaurus.Models
 {
-    public abstract class NonceRequestMessage: RequestMessage
+    public abstract class SequentialRequestMessage : RequestMessage
     {
         /// <summary>
         /// Account nonce.
         /// </summary>
-        public long Nonce { get { return RequestId; } set { RequestId = value; } }
+        public long Nonce { get => RequestId; set => RequestId = value; }
     }
 }

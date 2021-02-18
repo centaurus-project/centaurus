@@ -31,15 +31,17 @@ namespace Centaurus.Domain
             context.ValidateNonce();
 
             var quantum = context.Envelope.Message as RequestQuantum;
-            var orderRequest = (OrderRequest)quantum.RequestEnvelope.Message;
+            var orderRequest = quantum.RequestEnvelope.Message as OrderRequest;
 
-            if (orderRequest.Asset <= 0) throw new InvalidOperationException("Invalid asset for the orderbook: " + orderRequest.Asset);
+            if (orderRequest.Asset <= 0 || !Global.AssetIds.Contains(orderRequest.Asset))
+                throw new InvalidOperationException("Invalid asset identifier: " + orderRequest.Asset);
 
-            //estimate price in XLM
-            var totalXlmAmountToTrade = OrderMatcher.EstimateTradedXlmAmount(orderRequest.Amount, orderRequest.Price);
+            //estimate XLM amount
+            var quoteAmount = OrderMatcher.EstimateQuoteAmount(orderRequest.Amount, orderRequest.Price, orderRequest.Side);
 
             //check that lot size is greater than minimum allowed lot
-            if (totalXlmAmountToTrade < Global.Constellation.MinAllowedLotSize) throw new BadRequestException("Lot size is smaller than the minimum allowed lot.");
+            if (quoteAmount <= Global.Constellation.MinAllowedLotSize)
+                throw new BadRequestException("Lot size is smaller than the minimum allowed lot.");
 
             //fetch user's account record
             var account = orderRequest.AccountWrapper.Account;
@@ -48,12 +50,14 @@ namespace Centaurus.Domain
             if (orderRequest.Side == OrderSide.Sell)
             {
                 var balance = account.GetBalance(orderRequest.Asset);
-                if (!balance.HasSufficientBalance(orderRequest.Amount)) throw new BadRequestException("Insufficient funds");
+                if (!balance.HasSufficientBalance(orderRequest.Amount))
+                    throw new BadRequestException("Insufficient funds");
             }
             else
             {
                 var balance = account.GetBalance(0);
-                if (!balance.HasSufficientBalance(totalXlmAmountToTrade)) throw new BadRequestException("Insufficient funds");
+                if (!balance.HasSufficientBalance(quoteAmount))
+                    throw new BadRequestException("Insufficient funds");
             }
 
             return Task.CompletedTask;

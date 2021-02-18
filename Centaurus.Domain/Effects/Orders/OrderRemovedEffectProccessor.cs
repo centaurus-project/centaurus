@@ -27,7 +27,14 @@ namespace Centaurus.Domain
         public override void RevertEffect()
         {
             MarkAsProcessed();
-            var order = new Order { OrderId = Effect.OrderId, Amount = 0, Account = account };
+            var order = new Order
+            {
+                OrderId = Effect.OrderId,
+                Amount = Effect.Amount,
+                QuoteAmount = Effect.QuoteAmount,
+                Price = Effect.Price,
+                Account = account
+            };
             orderbook.InsertOrder(order);
         }
     }

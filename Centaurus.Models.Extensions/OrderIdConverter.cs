@@ -16,7 +16,7 @@ namespace Centaurus
 
         public static ulong Encode(ulong apex, int market, OrderSide side)
         {
-            return ((apex << 16) + (ulong)((market & 0x7FFF) << 1) + (ulong)(side == OrderSide.Sell ? 0 : 1));
+            return (apex << 16) + (ulong)((market & 0x7FFF) << 1) + (ulong)(side == OrderSide.Sell ? 0 : 1);
         }
 
         public static DecodedOrder Decode(ulong orderId)

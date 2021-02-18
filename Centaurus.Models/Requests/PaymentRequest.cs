@@ -4,7 +4,7 @@ using System.Linq;
 
 namespace Centaurus.Models
 {
-    public class PaymentRequest : NonceRequestMessage
+    public class PaymentRequest : SequentialRequestMessage
     {
         public override MessageTypes MessageType => MessageTypes.PaymentRequest;
 

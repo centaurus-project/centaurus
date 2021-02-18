@@ -16,6 +16,7 @@ namespace Centaurus.Domain
             {
                 OrderId = order.OrderId,
                 Amount = order.Amount,
+                QuoteAmount = order.QuoteAmount,
                 Market = decodedId.Asset,
                 Price = order.Price,
                 Side = decodedId.Side
