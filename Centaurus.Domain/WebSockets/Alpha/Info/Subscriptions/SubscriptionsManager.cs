@@ -15,5 +15,10 @@ namespace Centaurus.Domain
         {
             return subscriptions.GetOrAdd(subscription.Name, subscription);
         }
+
+        public static bool TryGetSubscription(string name, out BaseSubscription subscription)
+        {
+            return subscriptions.TryGetValue(name, out subscription);
+        }
     }
 }

@@ -48,18 +48,18 @@ namespace Centaurus.DAL
         /// <returns></returns>
         public Task<long> GetFirstEffectApex();
 
-        public Task<List<EffectModel>> LoadEffectsForApex(long apex);
+        public Task<List<EffectsModel>> LoadEffectsForApex(long apex);
 
-        public Task<List<EffectModel>> LoadEffectsAboveApex(long apex);
+        public Task<List<EffectsModel>> LoadEffectsAboveApex(long apex);
 
         /// <summary>
         /// Fetches effects
         /// </summary>
-        /// <param name="cursor">Effect id.</param>
+        /// <param name="cursor">Effects apex.</param>
         /// <param name="isDesc">Is reverse ordering.</param>
         /// <param name="limit">Item per request.</param>
         /// <returns></returns>
-        public Task<List<EffectModel>> LoadEffects(byte[] cursor, bool isDesc, int limit, int account);
+        public Task<List<EffectsModel>> LoadEffects(long apex, bool isDesc, int limit, int account);
 
         public Task<List<AccountModel>> LoadAccounts();
 
@@ -84,7 +84,12 @@ namespace Centaurus.DAL
 
         public Task<ConstellationState> LoadConstellationState();
 
-        public Task Update(DiffObject update);
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="update"></param>
+        /// <returns>Retries count. (MongoDb often throws transaction exception and update command must be repeated)</returns>
+        public Task<int> Update(DiffObject update);
 
         public Task DropDatabase();
     }

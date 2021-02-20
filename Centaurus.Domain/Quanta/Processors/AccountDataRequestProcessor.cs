@@ -23,17 +23,16 @@ namespace Centaurus.Domain
             var account = requestMessage.AccountWrapper.Account;
 
             var resultMessage = (AccountDataResponse)context.Envelope.CreateResult(ResultStatusCodes.Success, accountEffects);
-            resultMessage.Balances = new List<Balance>();
-            foreach (var balance in account.Balances)
-            {
-                resultMessage.Balances.Add(new Balance { Amount = balance.Amount, Asset = balance.Asset, Liabilities = balance.Liabilities });
-            }
+            resultMessage.Balances = account.Balances
+                .Select(balance => new Balance { Amount = balance.Amount, Asset = balance.Asset, Liabilities = balance.Liabilities })
+                .OrderBy(balance => balance.Asset)
+                .ToList();
+
             //TODO: create property in Account object
-            resultMessage.Orders = new List<Order>();
-            foreach (var order in Global.Exchange.OrderMap.GetAllAccountOrders(account.Id))
-            {
-                resultMessage.Orders.Add(new Order { Account = order.Account, Amount = order.Amount, QuoteAmount = order.QuoteAmount, Price = order.Price, OrderId = order.OrderId });
-            }
+            resultMessage.Orders = Global.Exchange.OrderMap.GetAllAccountOrders(account.Id)
+                .Select(order => new Order { Account = order.Account, Amount = order.Amount, QuoteAmount = order.QuoteAmount, Price = order.Price, OrderId = order.OrderId })
+                .OrderBy(order => order.OrderId)
+                .ToList();
 
             return Task.FromResult((ResultMessage)resultMessage);
         }

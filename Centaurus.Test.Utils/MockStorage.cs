@@ -20,7 +20,7 @@ namespace Centaurus.Test
         private List<AccountModel> accountsCollection = new List<AccountModel>();
         private List<BalanceModel> balancesCollection = new List<BalanceModel>();
         private List<QuantumModel> quantaCollection = new List<QuantumModel>();
-        private List<EffectModel> effectsCollection = new List<EffectModel>();
+        private List<EffectsModel> effectsCollection = new List<EffectsModel>();
         private List<SettingsModel> settingsCollection = new List<SettingsModel>();
         private List<AssetModel> assetSettings = new List<AssetModel>();
         private List<PriceHistoryFrameModel> frames = new List<PriceHistoryFrameModel>();
@@ -74,33 +74,28 @@ namespace Centaurus.Test
         public Task<long> GetFirstEffectApex()
         {
             var firstEffect = effectsCollection
-                   .OrderBy(e => e.Id)
+                   .OrderBy(e => e.Apex)
                    .FirstOrDefault();
 
             if (firstEffect == null)
                 return Task.FromResult((long)-1);
 
-            var decodedId = EffectModelIdConverter.DecodeId(firstEffect.Id);
-            return Task.FromResult(decodedId.apex);
+            return Task.FromResult(firstEffect.Apex);
         }
 
-        public Task<List<EffectModel>> LoadEffectsAboveApex(long apex)
+        public Task<List<EffectsModel>> LoadEffectsAboveApex(long apex)
         {
-            var cursor = EffectModelIdConverter.EncodeId(apex + 1, 0);
             var effects = effectsCollection
-                .OrderBy(e => e.Id)
-                .Where(e => e.Id >= cursor)
+                .OrderBy(e => e.Apex)
+                .Where(e => e.Apex > apex)
                 .ToList();
             return Task.FromResult(effects);
         }
 
-        public Task<List<EffectModel>> LoadEffectsForApex(long apex)
+        public Task<List<EffectsModel>> LoadEffectsForApex(long apex)
         {
-            var cursorFrom = EffectModelIdConverter.EncodeId(apex, 0);
-            var cursorTo = EffectModelIdConverter.EncodeId(apex + 1, 0);
             var effects = effectsCollection
-                .OrderBy(e => e.Id)
-                .Where(e => e.Id >= cursorFrom && e.Id < cursorTo)
+                .Where(e => e.Apex == apex)
                 .ToList();
             return Task.FromResult(effects);
         }
@@ -143,7 +138,7 @@ namespace Centaurus.Test
             return Task.FromResult(constellationState);
         }
 
-        public Task Update(DiffObject update)
+        public Task<int> Update(DiffObject update)
         {
             UpdateSettings(update.ConstellationSettings, update.Assets);
 
@@ -155,14 +150,14 @@ namespace Centaurus.Test
 
             UpdateOrders(update.Orders.Values.ToList());
 
-            UpdateQuanta(update.Quanta);
+            UpdateQuanta(update.Quanta.Select(q => q.Quantum).ToList());
 
-            UpdateEffects(update.Effects);
+            UpdateEffects(update.Quanta.SelectMany(v => v.Effects.Values).ToList());
 
-            return Task.CompletedTask;
+            return Task.FromResult(1);
         }
 
-        private void UpdateEffects(List<EffectModel> effects)
+        private void UpdateEffects(List<EffectsModel> effects)
         {
             effectsCollection.AddRange(effects);
         }
@@ -232,15 +227,15 @@ namespace Centaurus.Test
                     balancesCollection.Add(new BalanceModel
                     {
                         Id = balance.Id,
-                        Amount = balance.Amount,
-                        Liabilities = balance.Liabilities
+                        Amount = balance.AmountDiff,
+                        Liabilities = balance.LiabilitiesDiff
                     });
                 else if (balance.IsDeleted)
                     balancesCollection.Remove(currentBalance);
                 else
                 {
-                    currentBalance.Amount += balance.Amount;
-                    currentBalance.Liabilities += balance.Liabilities;
+                    currentBalance.Amount += balance.AmountDiff;
+                    currentBalance.Liabilities += balance.LiabilitiesDiff;
                 }
             }
         }
@@ -259,8 +254,8 @@ namespace Centaurus.Test
                     ordersCollection.Add(new OrderModel
                     {
                         Id = (long)order.OrderId,
-                        Amount = order.Amount,
-                        QuoteAmount = order.QuoteAmount,
+                        Amount = order.AmountDiff,
+                        QuoteAmount = order.QuoteAmountDiff,
                         Price = order.Price,
                         Account = order.Account
                     });
@@ -270,33 +265,32 @@ namespace Centaurus.Test
                 }
                 else
                 {
-                    currentOrder.Amount += order.Amount;
-                    currentOrder.QuoteAmount += order.QuoteAmount;
+                    currentOrder.Amount += order.AmountDiff;
+                    currentOrder.QuoteAmount += order.QuoteAmountDiff;
                 }
             }
         }
 
-        public Task<List<EffectModel>> LoadEffects(byte[] cursor, bool isDesc, int limit, int account)
+        public Task<List<EffectsModel>> LoadEffects(long apex, bool isDesc, int limit, int account)
         {
             if (account == default)
                 throw new ArgumentNullException(nameof(account));
-            IEnumerable<EffectModel> query = effectsCollection
+            IEnumerable<EffectsModel> query = effectsCollection
                     .Where(e => e.Account == account);
 
             if (isDesc)
-                query = query.OrderByDescending(e => e.Id);
+                query = query.OrderByDescending(e => e.Apex);
             else
-                query = query.OrderBy(e => e.Id);
+                query = query.OrderBy(e => e.Apex);
 
-            if (cursor != null && cursor.Any(x => x != 0))
+            if (apex > 0)
             {
-                var c = new BsonObjectId(new ObjectId(cursor));
                 if (isDesc)
                     query = query
-                        .Where(e => e.Id < c);
+                        .Where(e => e.Apex < apex);
                 else
                     query = query
-                        .Where(e => e.Id > c);
+                        .Where(e => e.Apex > apex);
             }
 
             var effects = query

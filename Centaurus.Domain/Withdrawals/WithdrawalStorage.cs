@@ -136,7 +136,7 @@ namespace Centaurus.Domain
 
         private async Task<List<byte[]>> GetUnhandledTx()
         {
-            var tries = 1;
+            var retries = 1;
             while (true)
             {
                 try
@@ -155,10 +155,10 @@ namespace Centaurus.Domain
                 }
                 catch
                 {
-                    if (tries == 5)
+                    if (retries == 5)
                         throw;
-                    await Task.Delay(tries * 1000); 
-                    tries++;
+                    await Task.Delay(retries * 1000); 
+                    retries++;
                 }
             }
         }

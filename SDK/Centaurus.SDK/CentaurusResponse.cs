@@ -103,15 +103,15 @@ namespace Centaurus.SDK
                 if (envelope.HasMajority(Auditors.Length))
                 {
                     if (finalizeSource.Task.IsCompleted)
-                        throw new RequestException(envelope, "Result message was already received.");
+                        throw new RequestException(envelope, "Finalize result message was already received.");
                     if (!acknowledgmentSource.Task.IsCompleted) //complete acknowledgment task if it's not completed yet
                         AssignResponseToSource(acknowledgmentSource, envelope);
                     AssignResponseToSource(finalizeSource, envelope);
                 }
                 else
                 {
-                    if (!acknowledgmentSource.Task.IsCompleted)
-                        throw new Exception("Result message was already received.");
+                    if (acknowledgmentSource.Task.IsCompleted)
+                        throw new RequestException(envelope, "Acknowledgment result message was already received.");
                     AssignResponseToSource(acknowledgmentSource, envelope);
                 }
             }

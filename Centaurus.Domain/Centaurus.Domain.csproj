@@ -23,6 +23,7 @@
     <Compile Include="WebSockets\Alpha\Info\Subscriptions\BaseSubscription.cs" />
     <Compile Include="WebSockets\Alpha\Info\Subscriptions\DepthsSubscription.cs" />
     <Compile Include="WebSockets\Alpha\Info\Subscriptions\MarketTickerSubscription.cs" />
+    <Compile Include="WebSockets\Alpha\Info\Subscriptions\PerformanceStatisticsSubscription.cs" />
     <Compile Include="WebSockets\Alpha\Info\Subscriptions\PriceHistorySubscription.cs" />
     <Compile Include="WebSockets\Alpha\Info\Subscriptions\SubscriptionsManager.cs" />
     <Compile Include="WebSockets\Alpha\Info\Subscriptions\TradesFeedSubscription.cs" />

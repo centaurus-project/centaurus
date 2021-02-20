@@ -10,7 +10,7 @@ namespace Centaurus.Models
         public override MessageTypes MessageType => MessageTypes.EffectsResponse;
 
         [XdrField(0)]
-        public List<Effect> Items { get; set; }
+        public List<ApexEffects> Items { get; set; }
 
         [XdrField(1)]
         public string CurrentPagingToken { get; set; }
@@ -26,5 +26,15 @@ namespace Centaurus.Models
 
         [XdrField(3)]
         public int Limit { get; set; }
+    }
+
+    [XdrContract]
+    public class ApexEffects
+    {
+        [XdrField(0)]
+        public long Apex { get; set; }
+
+        [XdrField(1)]
+        public List<Effect> Items { get; set; }
     }
 }

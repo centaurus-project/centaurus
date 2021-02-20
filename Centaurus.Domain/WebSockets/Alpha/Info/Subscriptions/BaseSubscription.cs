@@ -35,6 +35,9 @@ namespace Centaurus.Domain
                 case nameof(TradesFeedSubscription):
                     subscription = new TradesFeedSubscription();
                     break;
+                case nameof(PerformanceStatisticsSubscription):
+                    subscription = new PerformanceStatisticsSubscription();
+                    break;
                 default:
                     throw new ArgumentException($"Subscription {subscriptionTypeStr} is not supported.");
             }

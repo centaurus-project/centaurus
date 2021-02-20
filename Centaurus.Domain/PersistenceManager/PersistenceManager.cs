@@ -32,32 +32,41 @@ namespace Centaurus.Domain
         {
             if (account == default)
                 throw new ArgumentNullException(nameof(account));
-
-            var cursor = ByteArrayExtensions.FromHexString(rawCursor);
-            if (cursor != null && cursor.Length != 12)
+            if (string.IsNullOrEmpty(rawCursor))
+                rawCursor = "0";
+            if (!long.TryParse(rawCursor, out var apex))
                 throw new ArgumentException("Cursor is invalid.");
-            var effectModels = (await storage.LoadEffects(cursor, isDesc, limit, account));
+            var accountEffectModels = (await storage.LoadEffects(apex, isDesc, limit, account));
+            var effectModels = accountEffectModels
+                .OrderBy(e => e.Apex)
+                .Select(ae => new ApexEffects
+                {
+                    Apex = ae.Apex,
+                    Items = ae.Effects.Select(e => e.ToEffect(ae.Account)).ToList()
+                })
+                .ToList();
             if (isDesc)
-                effectModels = effectModels.OrderByDescending(e => e.Id).ToList();
-            else
-                effectModels = effectModels.OrderBy(o => o.Id).ToList();
+            {
+                effectModels.Reverse();
+                effectModels.ForEach(ae => ae.Items.Reverse());
+            }
             return new EffectsResponse
             {
                 CurrentPagingToken = rawCursor,
                 Order = isDesc ? EffectsRequest.Desc : EffectsRequest.Asc,
-                Items = effectModels.Select(e => e.ToEffect()).ToList(),
-                NextPageToken = (effectModels.LastOrDefault()?.Id.Value.ToByteArray()).ToHex(),
-                PrevPageToken = (effectModels.FirstOrDefault()?.Id.Value.ToByteArray()).ToHex(),
+                Items = effectModels,
+                NextPageToken = effectModels.LastOrDefault()?.Apex.ToString(),
+                PrevPageToken = effectModels.FirstOrDefault()?.Apex.ToString(),
                 Limit = limit
             };
         }
 
-        public async Task ApplyUpdates(DiffObject updates)
+        public async Task<int> ApplyUpdates(DiffObject updates)
         {
             await saveSnapshotSemaphore.WaitAsync();
             try
             {
-                await storage.Update(updates);
+                return await storage.Update(updates);
             }
             finally
             {
@@ -184,10 +193,27 @@ namespace Centaurus.Domain
 
             var withdrawalsStorage = new WithdrawalStorage(withdrawals, false);
 
-            var effectModels = await storage.LoadEffectsAboveApex(apex);
-            for (var i = effectModels.Count - 1; i >= 0; i--)
+            var accountEffectModels = await storage.LoadEffectsAboveApex(apex);
+
+            var effectModels = new Effect[accountEffectModels.Sum(a => a.Effects.Count)];
+            var currentApexIndexOffset = 0;
+            foreach (var quantumEffect in accountEffectModels.GroupBy(a => a.Apex))
             {
-                var currentEffect = effectModels[i].ToEffect();
+                var effectsCount = 0;
+                foreach (var accountEffects in quantumEffect)
+                {
+                    foreach (var rawEffect in accountEffects.Effects)
+                    {
+                        var effect = rawEffect.ToEffect(accountEffects.Account);
+                        effectModels[currentApexIndexOffset + rawEffect.ApexIndex] = effect;
+                        effectsCount++;
+                    }
+                }
+                currentApexIndexOffset += effectsCount;
+            }
+            for (var i = effectModels.Length - 1; i >= 0; i--)
+            {
+                var currentEffect = effectModels[i];
                 var accountId = currentEffect.Account;
                 var account = new Lazy<AccountWrapper>(() => accountStorage.GetAccount(accountId));
                 IEffectProcessor<Effect> processor = null;

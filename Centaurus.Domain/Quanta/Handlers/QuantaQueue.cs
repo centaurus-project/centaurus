@@ -29,7 +29,7 @@ namespace Centaurus.Domain
         }
 
         /// <summary>
-        /// Tries to remove and return the quantum at the beginning of the queue.
+        /// Trying to remove and return the quantum at the beginning of the queue.
         /// </summary>
         /// <param name="envelope"></param>
         /// <returns>true if a quantum was find; otherwise, false.</returns>

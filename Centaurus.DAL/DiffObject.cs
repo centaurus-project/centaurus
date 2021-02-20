@@ -1,15 +1,46 @@
 ﻿using Centaurus.DAL.Models;
+using Centaurus.Models;
 using MongoDB.Bson;
 using System.Collections.Generic;
 using System.Diagnostics;
 
 namespace Centaurus.DAL
 {
+    public class QuantumItem
+    {
+        public QuantumItem(QuantumModel quantum)
+        {
+            Quantum = quantum;
+            Effects = new Dictionary<int, EffectsModel>();
+        }
+
+        public QuantumModel Quantum { get; }
+
+        public Dictionary<int, EffectsModel> Effects { get; }
+
+        public int EffectsCount { get; private set; }
+
+        public void AddEffect(int account, AtomicEffectModel singleEffectModel)
+        {
+            if (!Effects.TryGetValue(account, out var effects))
+            {
+                effects = new EffectsModel
+                {
+                    Id = EffectModelIdConverter.EncodeId(Quantum.Apex, account),
+                    Apex = Quantum.Apex,
+                    Account = account,
+                    Effects = new List<AtomicEffectModel>()
+                };
+                Effects.Add(account, effects);
+            }
+            effects.Effects.Add(singleEffectModel);
+            EffectsCount++;
+        }
+    }
+
     public class DiffObject
     {
-        public List<QuantumModel> Quanta { get; set; } = new List<QuantumModel>();
-
-        public List<EffectModel> Effects { get; set; } = new List<EffectModel>();
+        public List<QuantumItem> Quanta { get; set; } = new List<QuantumItem>();
 
         public SettingsModel ConstellationSettings { get; set; }
 
@@ -58,15 +89,6 @@ namespace Centaurus.DAL
             }
         }
 
-        public class Balance : BaseDiffModel
-        {
-            public BsonObjectId Id { get; set; }
-
-            public long Amount { get; set; }
-
-            public long Liabilities { get; set; }
-        }
-
         public class Account : BaseDiffModel
         {
             public int Id { get; set; }
@@ -80,18 +102,28 @@ namespace Centaurus.DAL
             public RequestRateLimitsModel RequestRateLimits { get; set; }
         }
 
+        public class Balance : BaseDiffModel
+        {
+            public BsonObjectId Id { get; set; }
+
+            public long AmountDiff { get; set; }
+
+            public long LiabilitiesDiff { get; set; }
+        }
+
         public class Order : BaseDiffModel
         {
             public ulong OrderId { get; set; }
 
             public double Price { get; set; }
 
-            public long Amount { get; set; }
+            public long AmountDiff { get; set; }
 
-            public long QuoteAmount { get; set; }
+            public long QuoteAmountDiff { get; set; }
 
             public int Account { get; set; }
         }
+
         public class ConstellationState : BaseDiffModel
         {
             public long TxCursor { get; set; }

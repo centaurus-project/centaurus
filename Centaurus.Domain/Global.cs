@@ -47,6 +47,7 @@ namespace Centaurus.Domain
             QuantumProcessor = new QuantumProcessorsStorage();
 
             PendingUpdatesManager = new PendingUpdatesManager();
+            PendingUpdatesManager.OnBatchSaved += PendingUpdatesManager_OnBatchSaved;
 
             AppState = IsAlpha ? new AlphaStateManager() : (StateManager)new AuditorStateManager();
             AppState.StateChanged += AppState_StateChanged;
@@ -82,25 +83,25 @@ namespace Centaurus.Domain
         {
             var state = stateChangedEventArgs.State;
             if (!(PendingUpdatesManager?.IsRunning ?? true) &&
-                (state == ApplicationState.Running 
+                (state == ApplicationState.Running
                 || state == ApplicationState.Ready
                 || state == ApplicationState.WaitingForInit))
-            PendingUpdatesManager?.Start();
-            if (state != ApplicationState.Ready 
+                PendingUpdatesManager?.Start();
+            if (state != ApplicationState.Ready
                 && stateChangedEventArgs.PrevState == ApplicationState.Ready) //close all connections (except auditors) if Alpha is not in Ready state
                 ConnectionManager.CloseAllConnections(false).Wait();
         }
 
         public static async Task TearDown()
         {
-            PendingUpdatesManager?.Stop(); PendingUpdatesManager?.Dispose(); 
+            PendingUpdatesManager?.Stop(); PendingUpdatesManager?.Dispose();
             AuditLedgerManager?.Dispose();
             AuditResultManager?.Dispose();
             await DisposeAnalyticsManager();
 
             AuditLedgerManager?.Dispose();
-            AuditResultManager?.Dispose(); 
-            ExtensionsManager?.Dispose(); 
+            AuditResultManager?.Dispose();
+            ExtensionsManager?.Dispose();
             WithdrawalStorage?.Dispose();
         }
 
@@ -110,6 +111,11 @@ namespace Centaurus.Domain
 
             AccountStorage = new AccountStorage(snapshot.Accounts, Constellation.RequestRateLimits);
 
+            if (Exchange != null)
+            {
+                Exchange.OnUpdates -= Exchange_OnUpdates;
+                Exchange?.Dispose();
+            }
             Exchange = Exchange.RestoreExchange(snapshot.Settings.Assets, snapshot.Orders, IsAlpha);
 
             WithdrawalStorage?.Dispose(); WithdrawalStorage = new WithdrawalStorage(snapshot.Withdrawals, (!EnvironmentHelper.IsTest && IsAlpha));
@@ -139,10 +145,32 @@ namespace Centaurus.Domain
                 AnalyticsManager.OnError += AnalyticsManager_OnError;
                 AnalyticsManager.OnUpdate += AnalyticsManager_OnUpdate;
                 Exchange.OnUpdates += Exchange_OnUpdates;
+
+                DisposePerformanceStatisticsManager();
+
+                PerformanceStatisticsManager = new PerformanceStatisticsManager();
+                PerformanceStatisticsManager.OnUpdates += PerformanceStatisticsManager_OnUpdates;
             }
 
             ExtensionsManager?.Dispose(); ExtensionsManager = new ExtensionsManager();
             ExtensionsManager.RegisterAllExtensions();
+        }
+
+        private static void PendingUpdatesManager_OnBatchSaved(PendingUpdatesManager.BatchSavedInfo batchInfo)
+        {
+            var message = $"Batch saved on the {batchInfo.Retries} try. Quanta count: {batchInfo.QuantaCount}; effects count: {batchInfo.EffectsCount}.";
+            if (batchInfo.Retries > 1)
+                logger.Warn(message);
+            else
+                logger.Trace(message);
+            PerformanceStatisticsManager?.OnBatchSaved(batchInfo);
+        }
+
+        private static void PerformanceStatisticsManager_OnUpdates(PerformanceStatisticsManager.PerformanceStatisticsManagerUpdate updates)
+        {
+            if (!SubscriptionsManager.TryGetSubscription(PerformanceStatisticsSubscription.SubscriptionName, out var subscription))
+                return;
+            InfoConnectionManager.SendSubscriptionUpdate(subscription, PerformanceStatisticsUpdate.Generate(updates, PerformanceStatisticsSubscription.SubscriptionName));
         }
 
         public static Exchange Exchange { get; private set; }
@@ -177,11 +205,22 @@ namespace Centaurus.Domain
         public static StateManager AppState { get; private set; }
         public static QuantumProcessorsStorage QuantumProcessor { get; private set; }
         public static AnalyticsManager AnalyticsManager { get; private set; }
+        public static PerformanceStatisticsManager PerformanceStatisticsManager { get; private set; }
         public static bool IsAlpha { get; private set; }
         public static IStorage PermanentStorage { get; private set; }
         public static BaseSettings Settings { get; private set; }
         public static StellarNetwork StellarNetwork { get; private set; }
         public static HashSet<int> AssetIds { get; private set; }
+
+
+        private static void DisposePerformanceStatisticsManager()
+        {
+            if (PerformanceStatisticsManager != null)
+            {
+                PerformanceStatisticsManager.OnUpdates -= PerformanceStatisticsManager_OnUpdates;
+                PerformanceStatisticsManager.Dispose();
+            }
+        }
 
         //TODO: move it to separate class
         #region Analytics
@@ -229,8 +268,6 @@ namespace Centaurus.Domain
                                 update = MarketTickerUpdate.Generate(marketTicker, marketTickerSubscription.Name);
                             }
                             break;
-                        default:
-                            throw new Exception($"{subscription.Name} subscription is not supported.");
                     }
                     if (update != null)
                         updates.Add(subscription, update);
@@ -272,7 +309,8 @@ namespace Centaurus.Domain
         {
             if (updates == null)
                 return;
-            await AnalyticsManager.OnUpdates(updates);
+            if (AnalyticsManager != null)
+                await AnalyticsManager.OnUpdates(updates);
         }
 
         #endregion

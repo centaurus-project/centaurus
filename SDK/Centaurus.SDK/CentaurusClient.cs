@@ -566,7 +566,7 @@ namespace Centaurus.SDK
                 if (request == null || request.MessageId != 0)
                     return;
                 var currentTicks = DateTime.UtcNow.Ticks;
-                request.RequestId = request is NonceRequestMessage ? currentTicks : -currentTicks;
+                request.RequestId = request is SequentialRequestMessage ? currentTicks : -currentTicks;
             }
 
             private void AssignAccountId(MessageEnvelope envelope)
@@ -582,7 +582,7 @@ namespace Centaurus.SDK
                 lock (Requests)
                 {
                     var messageId = envelope.Message.MessageId;
-                    var response = envelope.Message is NonceRequestMessage ? new CentaurusQuantumResponse(constellationInfo.VaultPubKey, constellationInfo.AuditorPubKeys, timeout) : new CentaurusResponse(constellationInfo.VaultPubKey, constellationInfo.AuditorPubKeys, timeout);
+                    var response = envelope.Message is SequentialRequestMessage ? new CentaurusQuantumResponse(constellationInfo.VaultPubKey, constellationInfo.AuditorPubKeys, timeout) : new CentaurusResponse(constellationInfo.VaultPubKey, constellationInfo.AuditorPubKeys, timeout);
                     if (!Requests.TryAdd(messageId, response))
                         throw new Exception("Unable to add request to pending requests.");
                     return response;

@@ -11,22 +11,36 @@ namespace Centaurus.Domain
 {
     public static class EffectModelExtensions
     {
-        public static EffectModel FromEffect(this Effect effect, int index, long timestamp)
+        public static EffectsModel FromEffect(long apex, int account)
         {
-            return new EffectModel
+            return new EffectsModel
             {
-                Id = EffectModelIdConverter.EncodeId(effect.Apex, index),
-                Account = effect.Account,
-                EffectType = (int)effect.EffectType,
-                RawEffect = XdrConverter.Serialize(effect),
-                Timestamp = timestamp
+                Id = EffectModelIdConverter.EncodeId(apex, account),
+                Account = account,
+                Apex = apex,
+                Effects = new List<AtomicEffectModel>()
             };
         }
 
-        public static Effect ToEffect(this EffectModel effectModel)
+        public static List<Effect> ToEffects(this EffectsModel effectsModel)
+        {
+            var account = effectsModel.Account;
+            return effectsModel.Effects.Select(e => e.ToEffect(account)).ToList();
+        }
+
+        public static AtomicEffectModel FromEffect(this Effect effect, int index)
+        {
+            return new AtomicEffectModel
+            {
+                ApexIndex = index,
+                RawEffect = XdrConverter.Serialize(effect)
+            };
+        }
+
+        public static Effect ToEffect(this AtomicEffectModel effectModel, int account)
         {
             var effect = XdrConverter.Deserialize<Effect>(effectModel.RawEffect);
-            effect.Account = effectModel.Account;
+            effect.Account = account;
             return effect;
         }
     }

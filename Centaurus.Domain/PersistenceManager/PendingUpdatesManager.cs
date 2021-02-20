@@ -65,6 +65,8 @@ namespace Centaurus.Domain
 
         public DiffObject Current { get; private set; } = new DiffObject();
 
+        public event Action<BatchSavedInfo> OnBatchSaved;
+
         public SemaphoreSlim UpdatesSyncRoot = new SemaphoreSlim(1);
 
         private System.Timers.Timer refreshUpdatesTimer;
@@ -144,8 +146,11 @@ namespace Centaurus.Domain
 
         public void TryRefreshContainer()
         {
-            if (Current.Effects.Count > 30_000)
+            var effectsCount = Current.Quanta.Sum(ea => ea.EffectsCount);
+            if (effectsCount > 75_000)
+            {
                 RefreshUpdatesUnlocked();
+            }
         }
 
         private void RefreshUpdatesUnlocked()
@@ -170,9 +175,18 @@ namespace Centaurus.Domain
             {
                 var sw = new Stopwatch();
                 sw.Start();
-                await Global.PersistenceManager.ApplyUpdates(updates);
+                var retries = await Global.PersistenceManager.ApplyUpdates(updates);
                 sw.Stop();
-                //logger.Warn($"Saved {updates.Quanta.Count} quanta ({updates.Effects.Count} effects) in {sw.ElapsedMilliseconds} ms");
+
+                var batchInfo = new BatchSavedInfo
+                {
+                    SavedAt = DateTime.UtcNow,
+                    QuantaCount = updates.Quanta.Count,
+                    EffectsCount = updates.Quanta.Sum(ea => ea.EffectsCount),
+                    ElapsedMilliseconds = sw.ElapsedMilliseconds,
+                    Retries = retries
+                };
+                _ = Task.Factory.StartNew(() => OnBatchSaved?.Invoke(batchInfo));
             }
             catch (Exception exc)
             {
@@ -197,6 +211,19 @@ namespace Centaurus.Domain
             cancellationTokenSource = null;
             UpdatesSyncRoot?.Dispose();
             UpdatesSyncRoot = null;
+        }
+
+        public class BatchSavedInfo
+        {
+            public int QuantaCount { get; set; }
+
+            public int EffectsCount { get; set; }
+
+            public int Retries { get; set; }
+
+            public long ElapsedMilliseconds { get; set; }
+
+            public DateTime SavedAt { get; set; }
         }
     }
 }

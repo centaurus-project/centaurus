@@ -15,8 +15,13 @@ namespace Centaurus.Domain
 {
     public static class UpdatesAggregator
     {
-        public static void Aggregate(this DiffObject pendingDiffObject, MessageEnvelope quantumEnvelope, Effect quatumEffect, int effectIndex)
+        public static void Aggregate(this EffectProcessorsContainer processorsContainer, MessageEnvelope quantumEnvelope, Effect quatumEffect, int effectIndex)
         {
+            if (processorsContainer == null)
+                throw new ArgumentNullException(nameof(processorsContainer));
+
+            var pendingDiffObject = processorsContainer.PendingDiffObject;
+
             if (pendingDiffObject == null)
                 throw new ArgumentNullException(nameof(pendingDiffObject));
 
@@ -26,9 +31,10 @@ namespace Centaurus.Domain
             if (quatumEffect == null)
                 throw new ArgumentNullException(nameof(quatumEffect));
 
-            var quantum = (Quantum)quantumEnvelope.Message;
+            var account = quatumEffect.Account;
+            var apex = processorsContainer.Apex;
 
-            pendingDiffObject.Effects.Add(quatumEffect.FromEffect(effectIndex, quantum.Timestamp));
+            processorsContainer.QuantumModel.AddEffect(account, quatumEffect.FromEffect(effectIndex));
 
             switch (quatumEffect)
             {
@@ -66,14 +72,14 @@ namespace Centaurus.Domain
                     {
                         var accId = balanceUpdateEffect.Account;
                         var balanceId = BalanceModelIdConverter.EncodeId(accId, balanceUpdateEffect.Asset);
-                        GetBalance(pendingDiffObject.Balances, balanceId).Amount += balanceUpdateEffect.Amount;
+                        GetBalance(pendingDiffObject.Balances, balanceId).AmountDiff += balanceUpdateEffect.Amount;
                     }
                     break;
                 case UpdateLiabilitiesEffect lockLiabilitiesEffect:
                     {
                         var accId = lockLiabilitiesEffect.Account;
                         var balanceId = BalanceModelIdConverter.EncodeId(accId, lockLiabilitiesEffect.Asset);
-                        GetBalance(pendingDiffObject.Balances, balanceId).Liabilities += lockLiabilitiesEffect.Amount;
+                        GetBalance(pendingDiffObject.Balances, balanceId).LiabilitiesDiff += lockLiabilitiesEffect.Amount;
                     }
                     break;
                 case RequestRateLimitUpdateEffect requestRateLimitUpdateEffect:
@@ -91,8 +97,8 @@ namespace Centaurus.Domain
                         var orderId = orderPlacedEffect.OrderId;
                         pendingDiffObject.Orders[orderId] = new DiffObject.Order
                         {
-                            Amount = orderPlacedEffect.Amount,
-                            QuoteAmount = orderPlacedEffect.QuoteAmount,
+                            AmountDiff = orderPlacedEffect.Amount,
+                            QuoteAmountDiff = orderPlacedEffect.QuoteAmount,
                             IsInserted = true,
                             OrderId = orderId,
                             Price = orderPlacedEffect.Price,
@@ -108,8 +114,8 @@ namespace Centaurus.Domain
                 case TradeEffect tradeEffect:
                     {
                         var order = GetOrder(pendingDiffObject.Orders, tradeEffect.OrderId);
-                        order.Amount -= tradeEffect.AssetAmount;
-                        order.QuoteAmount -= tradeEffect.QuoteAmount;
+                        order.AmountDiff -= tradeEffect.AssetAmount;
+                        order.QuoteAmountDiff -= tradeEffect.QuoteAmount;
                     }
                     break;
                 case TxCursorUpdateEffect cursorUpdateEffect:
