@@ -158,8 +158,8 @@ namespace Centaurus.Domain
 
         private static void PendingUpdatesManager_OnBatchSaved(PendingUpdatesManager.BatchSavedInfo batchInfo)
         {
-            var message = $"Batch saved on the {batchInfo.Tries} try. Quanta count: {batchInfo.QuantaCount}; effects count: {batchInfo.EffectsCount}.";
-            if (batchInfo.Tries > 1)
+            var message = $"Batch saved on the {batchInfo.Retries} try. Quanta count: {batchInfo.QuantaCount}; effects count: {batchInfo.EffectsCount}.";
+            if (batchInfo.Retries > 1)
                 logger.Warn(message);
             else
                 logger.Trace(message);

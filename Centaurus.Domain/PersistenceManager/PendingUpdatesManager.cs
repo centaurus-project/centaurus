@@ -175,7 +175,7 @@ namespace Centaurus.Domain
             {
                 var sw = new Stopwatch();
                 sw.Start();
-                var tries = await Global.PersistenceManager.ApplyUpdates(updates);
+                var retries = await Global.PersistenceManager.ApplyUpdates(updates);
                 sw.Stop();
 
                 var batchInfo = new BatchSavedInfo
@@ -184,7 +184,7 @@ namespace Centaurus.Domain
                     QuantaCount = updates.Quanta.Count,
                     EffectsCount = updates.Quanta.Sum(ea => ea.EffectsCount),
                     ElapsedMilliseconds = sw.ElapsedMilliseconds,
-                    Tries = tries
+                    Retries = retries
                 };
                 _ = Task.Factory.StartNew(() => OnBatchSaved?.Invoke(batchInfo));
             }
@@ -219,7 +219,7 @@ namespace Centaurus.Domain
 
             public int EffectsCount { get; set; }
 
-            public int Tries { get; set; }
+            public int Retries { get; set; }
 
             public long ElapsedMilliseconds { get; set; }
 

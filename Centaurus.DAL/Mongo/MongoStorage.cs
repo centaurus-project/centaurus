@@ -269,7 +269,7 @@ namespace Centaurus.DAL.Mongo
             var quanta = update.Quanta.Select(a => a.Quantum);
             var effects = update.Quanta.SelectMany(a => a.Effects.Values);
 
-            var tries = 1;
+            var retries = 1;
             var maxTries = 5;
             var isCommitInvoked = false;
             while (true)
@@ -327,22 +327,22 @@ namespace Centaurus.DAL.Mongo
                     }
                     catch (Exception exc)
                     {
-                        if (tries <= maxTries)
+                        if (retries <= maxTries)
                         {
-                            logger.Debug(exc, $"Error during update. {tries} try.");
-                            tries++;
+                            logger.Debug(exc, $"Error during update. {retries} try.");
+                            retries++;
                             continue;
                         }
-                        new Exception($"Unable to commit transaction after {tries} tries", exc);
+                        new Exception($"Unable to commit transaction after {retries} retries", exc);
                     }
                 }
             }
-            return tries;
+            return retries;
         }
 
         private void SaveQuanta(ref List<Task> updateTasks, IEnumerable<QuantumModel> quanta, IClientSessionHandle session)
         {
-            var batchSize = 10000;
+            var batchSize = 20_000;
 
             var savedQuantaCount = 0;
             var quantaCount = quanta.Count();
@@ -359,18 +359,27 @@ namespace Centaurus.DAL.Mongo
 
         private void SaveEffects(ref List<Task> updateTasks, IEnumerable<EffectsModel> effects, IClientSessionHandle session)
         {
-            var batchSize = 1000;
+            var maxBatchEffectsCount = 20_000;
             var savedEffectsCount = 0;
             var effectsCount = effects.Count();
             while (savedEffectsCount < effectsCount)
             {
+                var currentBatchEffectsCount = 0;
+                var currentBatchEffects = effects.Skip(savedEffectsCount).TakeWhile(e =>
+                {
+                    if (currentBatchEffectsCount > maxBatchEffectsCount)
+                        return false;
+                    currentBatchEffectsCount += e.Effects.Count;
+                    return true;
+                }).ToList();
+
                 updateTasks.Add(
                     effectsCollection.InsertManyAsync(
                         session,
-                        effects.Skip(savedEffectsCount).Take(batchSize),
+                        currentBatchEffects,
                         new InsertManyOptions { BypassDocumentValidation = true, IsOrdered = false })
                     );
-                savedEffectsCount += batchSize;
+                savedEffectsCount += currentBatchEffects.Count;
             }
         }
 
@@ -379,7 +388,7 @@ namespace Centaurus.DAL.Mongo
         private static async Task CommitWithRetry(IClientSessionHandle session)
         {
             var maxTries = 5;
-            var tries = 0;
+            var retries = 0;
             while (true)
             {
                 try
@@ -392,13 +401,13 @@ namespace Centaurus.DAL.Mongo
                     if (!(exc is MongoException mongoException
                             && mongoException.ErrorLabels.Any(l => retriableCommitErrors.Contains(l))))
                         throw;
-                    tries++;
-                    if (tries < maxTries)
+                    retries++;
+                    if (retries < maxTries)
                     {
-                        logger.Warn(exc, $"Error on commit. Labels: {string.Join(',', mongoException.ErrorLabels)}. {tries} try.");
+                        logger.Warn(exc, $"Error on commit. Labels: {string.Join(',', mongoException.ErrorLabels)}. {retries} try.");
                         continue;
                     }
-                    throw new UnknownCommitResultException($"UnknownTransactionCommitResult or TransientTransactionError errors occurred in {tries} tries", exc);
+                    throw new UnknownCommitResultException($"UnknownTransactionCommitResult or TransientTransactionError errors occurred after {retries} retries", exc);
                 }
             }
         }

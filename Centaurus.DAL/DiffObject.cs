@@ -20,7 +20,7 @@ namespace Centaurus.DAL
 
         public int EffectsCount { get; private set; }
 
-        public void AddEffect(int account, SingleEffectModel singleEffectModel)
+        public void AddEffect(int account, AtomicEffectModel singleEffectModel)
         {
             if (!Effects.TryGetValue(account, out var effects))
             {
@@ -29,7 +29,7 @@ namespace Centaurus.DAL
                     Id = EffectModelIdConverter.EncodeId(Quantum.Apex, account),
                     Apex = Quantum.Apex,
                     Account = account,
-                    Effects = new List<SingleEffectModel>()
+                    Effects = new List<AtomicEffectModel>()
                 };
                 Effects.Add(account, effects);
             }

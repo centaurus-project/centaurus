@@ -13,7 +13,7 @@ namespace Centaurus.DAL.Models
 
         public int Account { get; set; }
 
-        public List<SingleEffectModel> Effects { get; set; }
+        public List<AtomicEffectModel> Effects { get; set; }
 
         public override string ToString()
         {
@@ -21,7 +21,7 @@ namespace Centaurus.DAL.Models
         }
     }
 
-    public class SingleEffectModel
+    public class AtomicEffectModel
     {
         public int ApexIndex { get; set; }
 

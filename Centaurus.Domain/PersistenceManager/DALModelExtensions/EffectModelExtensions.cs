@@ -18,7 +18,7 @@ namespace Centaurus.Domain
                 Id = EffectModelIdConverter.EncodeId(apex, account),
                 Account = account,
                 Apex = apex,
-                Effects = new List<SingleEffectModel>()
+                Effects = new List<AtomicEffectModel>()
             };
         }
 
@@ -28,16 +28,16 @@ namespace Centaurus.Domain
             return effectsModel.Effects.Select(e => e.ToEffect(account)).ToList();
         }
 
-        public static SingleEffectModel FromEffect(this Effect effect, int index)
+        public static AtomicEffectModel FromEffect(this Effect effect, int index)
         {
-            return new SingleEffectModel
+            return new AtomicEffectModel
             {
                 ApexIndex = index,
                 RawEffect = XdrConverter.Serialize(effect)
             };
         }
 
-        public static Effect ToEffect(this SingleEffectModel effectModel, int account)
+        public static Effect ToEffect(this AtomicEffectModel effectModel, int account)
         {
             var effect = XdrConverter.Deserialize<Effect>(effectModel.RawEffect);
             effect.Account = account;

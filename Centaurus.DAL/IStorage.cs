@@ -88,7 +88,7 @@ namespace Centaurus.DAL
         /// 
         /// </summary>
         /// <param name="update"></param>
-        /// <returns>Tries count. (MongoDb often throws transaction exception and update command must be repeated)</returns>
+        /// <returns>Retries count. (MongoDb often throws transaction exception and update command must be repeated)</returns>
         public Task<int> Update(DiffObject update);
 
         public Task DropDatabase();
