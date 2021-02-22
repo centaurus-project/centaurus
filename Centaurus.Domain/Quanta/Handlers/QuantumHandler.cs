@@ -144,20 +144,31 @@ namespace Centaurus.Domain
             quantum.PrevHash = Global.QuantumStorage.LastQuantumHash;
             quantum.Timestamp = timestamp == default ? DateTime.UtcNow.Ticks : timestamp;//it could be assigned, if this quantum was handled already and we handle it during the server rising
 
-            //we need to sign the quantum here to prevent multiple signatures that can occur if we sign it when sending
-            quantumEnvelope.Sign(Global.Settings.KeyPair);
-
             var effectsContainer = GetEffectProcessorsContainer(quantumEnvelope);
 
             var context = processor.GetContext(effectsContainer);
 
             await processor.Validate(context);
 
-            var resultMessage = await processor.Process(context);
+            ResultMessage resultMessage;
+            try
+            {
+                resultMessage = await processor.Process(context);
+            }
+            catch (Exception exc)
+            {
+                Debugger.Launch();
+                throw;
+            }
 
-            Global.QuantumStorage.AddQuantum(quantumEnvelope);
+            quantum.EffectsHash = GetEffectsHash(effectsContainer.Effects);
+
+            //we need to sign the quantum here to prevent multiple signatures that can occur if we sign it when sending
+            quantumEnvelope.Sign(Global.Settings.KeyPair);
 
             Global.AuditResultManager.Register(resultMessage, processor.GetNotificationMessages(context));
+
+            Global.QuantumStorage.AddQuantum(quantumEnvelope);
 
             effectsContainer.Complete();
 
@@ -192,6 +203,10 @@ namespace Centaurus.Domain
             ProcessTransaction(context, result);
 
             effectsContainer.Complete();
+
+            var effectsHash = GetEffectsHash(effectsContainer.Effects);
+            if (!EnvironmentHelper.IsTest && !ByteArrayPrimitives.Equals(effectsHash, quantum.EffectsHash))
+                throw new Exception("Calculated effects hash is not equal to the effects hash provided by Alpha.");
 
             logger.Trace($"Message of type {messageType} with apex {((Quantum)envelope.Message).Apex} is handled.");
 
@@ -239,6 +254,11 @@ namespace Centaurus.Domain
                 //TODO: do not fail here - return unsupported error message;
                 throw new InvalidOperationException($"Quantum {messageType} is not supported.");
             return processor;
+        }
+
+        byte[] GetEffectsHash(List<Effect> effects)
+        { 
+            return new EffectsContainer { Effects = effects }.ComputeHash();
         }
 
         /// <summary>

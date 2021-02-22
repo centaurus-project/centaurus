@@ -9,7 +9,6 @@ namespace Centaurus.Models
     [XdrUnion((int)EffectTypes.NonceUpdate, typeof(NonceUpdateEffect))]
     [XdrUnion((int)EffectTypes.BalanceCreate, typeof(BalanceCreateEffect))]
     [XdrUnion((int)EffectTypes.BalanceUpdate, typeof(BalanceUpdateEffect))]
-    [XdrUnion((int)EffectTypes.UpdateLiabilities, typeof(UpdateLiabilitiesEffect))]
     [XdrUnion((int)EffectTypes.OrderPlaced, typeof(OrderPlacedEffect))]
     [XdrUnion((int)EffectTypes.OrderRemoved, typeof(OrderRemovedEffect))]
     [XdrUnion((int)EffectTypes.Trade, typeof(TradeEffect))]
@@ -24,7 +23,7 @@ namespace Centaurus.Models
         public abstract EffectTypes EffectType { get; }
 
         //ignore it during the serialization - we need it only to decide which effects to send back to a particular user
-        public int Account { get; set; }
+        public AccountWrapper AccountWrapper { get; set; }
 
         [XdrField(0)]
         public long Apex { get; set; }

@@ -1,6 +1,7 @@
 ﻿using Centaurus.Models;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
 
 namespace Centaurus.Domain
@@ -8,13 +9,11 @@ namespace Centaurus.Domain
     public class OrderRemovedEffectProccessor : EffectProcessor<OrderRemovedEffect>
     {
         private Orderbook orderbook;
-        private Account account;
 
-        public OrderRemovedEffectProccessor(OrderRemovedEffect effect, Orderbook orderbook, Account account)
+        public OrderRemovedEffectProccessor(OrderRemovedEffect effect, Orderbook orderbook)
             : base(effect)
         {
             this.orderbook = orderbook ?? throw new ArgumentNullException(nameof(orderbook));
-            this.account = account ?? throw new ArgumentNullException(nameof(account));
         }
 
         public override void CommitEffect()
@@ -22,18 +21,31 @@ namespace Centaurus.Domain
             MarkAsProcessed();
             if (!orderbook.RemoveOrder(Effect.OrderId))
                 throw new Exception($"Unable to remove order with id {Effect.OrderId}");
+
+            var decodedId = OrderIdConverter.Decode(Effect.OrderId);
+            if (decodedId.Side == OrderSide.Buy)
+                Effect.AccountWrapper.Account.GetBalance(0).UpdateLiabilities(-Effect.QuoteAmount);
+            else
+                Effect.AccountWrapper.Account.GetBalance(decodedId.Asset).UpdateLiabilities(-Effect.Amount);
         }
 
         public override void RevertEffect()
         {
             MarkAsProcessed();
+
+            var decodedId = OrderIdConverter.Decode(Effect.OrderId);
+            if (decodedId.Side == OrderSide.Buy)
+                Effect.AccountWrapper.Account.GetBalance(0).UpdateLiabilities(Effect.QuoteAmount);
+            else
+                Effect.AccountWrapper.Account.GetBalance(decodedId.Asset).UpdateLiabilities(Effect.Amount);
+
             var order = new Order
             {
                 OrderId = Effect.OrderId,
                 Amount = Effect.Amount,
                 QuoteAmount = Effect.QuoteAmount,
                 Price = Effect.Price,
-                Account = account
+                AccountWrapper = Effect.AccountWrapper
             };
             orderbook.InsertOrder(order);
         }

@@ -13,7 +13,6 @@ namespace Centaurus.Models
         NonceUpdate = 2,
         BalanceCreate = 3,
         BalanceUpdate = 4,
-        UpdateLiabilities = 5,
         RequestRateLimitUpdate = 6,
 
         OrderPlaced = 10,

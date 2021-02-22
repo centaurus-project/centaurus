@@ -87,7 +87,7 @@ namespace Centaurus.Test.Exchange.Analytics
                         Message = new OrderRequest
                         {
                             Account = accountWrapper.Account.Id,
-                            Nonce = i,
+                            RequestId = i,
                             Amount = rnd.Next(1, 20),
                             Asset = 1,
                             Price = Math.Round(price * 10) / 10,

@@ -65,7 +65,7 @@ namespace Centaurus.Test
                 {
                     Account = accountWrapper.Account.Id,
                     TransactionXdr = txStream.ToArray(),
-                    Nonce = DateTime.UtcNow.Ticks,
+                    RequestId = DateTime.UtcNow.Ticks,
                     AccountWrapper = accountWrapper
                 };
 
@@ -139,7 +139,7 @@ namespace Centaurus.Test
             var order = new OrderRequest
             {
                 Account = accountWrapper.Account.Id,
-                Nonce = nonce,
+                RequestId = nonce,
                 Amount = amount,
                 Asset = asset,
                 Price = 100,
@@ -165,9 +165,6 @@ namespace Centaurus.Test
 
                 var requests = side == OrderSide.Buy ? currentMarket.Bids : currentMarket.Asks;
                 Assert.AreEqual(1, requests.Count);
-
-                Assert.AreEqual(requests.TotalAmount, amount);
-                Assert.AreEqual((res.Effects.Find(e => e.EffectType == EffectTypes.OrderPlaced) as OrderPlacedEffect).QuoteAmount, requests.Volume);
             }
         }
 
@@ -184,7 +181,7 @@ namespace Centaurus.Test
             var order = new OrderRequest
             {
                 Account = acc.Account.Id,
-                Nonce = 1,
+                RequestId = 1,
                 Amount = amount,
                 Asset = asset,
                 Price = 100,
@@ -209,7 +206,7 @@ namespace Centaurus.Test
             var orderCancellation = new OrderCancellationRequest
             {
                 Account = acc.Account.Id,
-                Nonce = 2,
+                RequestId = 2,
                 OrderId = OrderIdConverter.Encode((ulong)apex, asset, side),
                 AccountWrapper = Global.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair)
             };
@@ -232,11 +229,7 @@ namespace Centaurus.Test
                 Assert.IsTrue(currentMarket != null);
 
                 var requests = side == OrderSide.Buy ? currentMarket.Bids : currentMarket.Asks;
-                Assert.AreEqual(requests.Count, 1);
-
-                Assert.AreEqual(amount, requests.TotalAmount);
-                var effect = cancelResult.Effects.Find(e => e.EffectType == EffectTypes.OrderRemoved) as OrderRemovedEffect;
-                Assert.AreEqual(effect.QuoteAmount, requests.Volume);
+                Assert.AreEqual(requests.Count, 0);
             }
         }
 
@@ -265,7 +258,7 @@ namespace Centaurus.Test
             var withdrawal = new WithdrawalRequest
             {
                 Account = account.Account.Id,
-                Nonce = 1,
+                RequestId = 1,
                 TransactionXdr = outputStream.ToArray(),
                 AccountWrapper = account
             };
@@ -311,7 +304,7 @@ namespace Centaurus.Test
             var withdrawal = new WithdrawalRequest
             {
                 Account = acc.Account.Id,
-                Nonce = 1,
+                RequestId = 1,
                 TransactionXdr = outputStream.ToArray(),
                 AccountWrapper = account
             };
@@ -370,7 +363,7 @@ namespace Centaurus.Test
             var withdrawal = new PaymentRequest
             {
                 Account = account.Account.Id,
-                Nonce = 1,
+                RequestId = 1,
                 Asset = 0,
                 Destination = TestEnvironment.Client2KeyPair,
                 Amount = amount,
@@ -407,7 +400,7 @@ namespace Centaurus.Test
             var order = new AccountDataRequest
             {
                 Account = accountWrapper.Account.Id,
-                Nonce = nonce,
+                RequestId = nonce,
                 AccountWrapper = accountWrapper
             };
 
@@ -443,7 +436,7 @@ namespace Centaurus.Test
                 var envelope = new AccountDataRequest
                 {
                     Account = account.Account.Id,
-                    Nonce = i + 1,
+                    RequestId = i + 1,
                     AccountWrapper = account
                 }.CreateEnvelope();
                 envelope.Sign(clientKeyPair);

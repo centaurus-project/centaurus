@@ -29,7 +29,7 @@ namespace Centaurus.Test
             {
                 Account = 1,
                 Amount = 2131231,
-                Nonce = 1,
+                RequestId = 1,
                 TimeInForce = TimeInForce.ImmediateOrCancel,
                 Asset = 5,
                 Price = 23423.4325

@@ -22,12 +22,6 @@ namespace Centaurus.Domain
             };
         }
 
-        public static List<Effect> ToEffects(this EffectsModel effectsModel)
-        {
-            var account = effectsModel.Account;
-            return effectsModel.Effects.Select(e => e.ToEffect(account)).ToList();
-        }
-
         public static AtomicEffectModel FromEffect(this Effect effect, int index)
         {
             return new AtomicEffectModel
@@ -37,10 +31,10 @@ namespace Centaurus.Domain
             };
         }
 
-        public static Effect ToEffect(this AtomicEffectModel effectModel, int account)
+        public static Effect ToEffect(this AtomicEffectModel effectModel, AccountWrapper accountWrapper)
         {
             var effect = XdrConverter.Deserialize<Effect>(effectModel.RawEffect);
-            effect.Account = account;
+            effect.AccountWrapper = accountWrapper;
             return effect;
         }
     }

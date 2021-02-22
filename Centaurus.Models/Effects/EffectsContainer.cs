@@ -6,8 +6,9 @@ using System.Text;
 namespace Centaurus.Models
 {
     [XdrContract]
-    public class UpdateLiabilitiesEffect : BaseBalanceEffect
+    public class EffectsContainer
     {
-        public override EffectTypes EffectType => EffectTypes.UpdateLiabilities;
+        [XdrField(0)]
+        public List<Effect> Effects { get; set; }
     }
 }

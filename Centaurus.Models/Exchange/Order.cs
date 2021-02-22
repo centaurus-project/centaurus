@@ -19,7 +19,7 @@ namespace Centaurus.Models
         [XdrField(3)]
         public long QuoteAmount { get; set; }
 
-        public Account Account { get; set; }
+        public AccountWrapper AccountWrapper { get; set; }
 
         public Order Next { get; set; }
 

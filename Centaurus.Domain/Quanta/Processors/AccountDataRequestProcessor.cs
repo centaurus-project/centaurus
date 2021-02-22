@@ -29,8 +29,8 @@ namespace Centaurus.Domain
                 .ToList();
 
             //TODO: create property in Account object
-            resultMessage.Orders = Global.Exchange.OrderMap.GetAllAccountOrders(account.Id)
-                .Select(order => new Order { Account = order.Account, Amount = order.Amount, QuoteAmount = order.QuoteAmount, Price = order.Price, OrderId = order.OrderId })
+            resultMessage.Orders = Global.Exchange.OrderMap.GetAllAccountOrders(requestMessage.AccountWrapper)
+                .Select(order => new Order { AccountWrapper = order.AccountWrapper, Amount = order.Amount, QuoteAmount = order.QuoteAmount, Price = order.Price, OrderId = order.OrderId })
                 .OrderBy(order => order.OrderId)
                 .ToList();
 

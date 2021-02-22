@@ -104,7 +104,7 @@ namespace Centaurus.Domain
             if (deposit.PaymentResult == PaymentResults.Failed)
                 return;
 
-            var account = Global.AccountStorage.GetAccount(deposit.Destination)?.Account;
+            var account = Global.AccountStorage.GetAccount(deposit.Destination);
             if (account == null)
             {
                 //ignore registration with non-native asset or with amount that is less than MinAccountBalance
@@ -112,10 +112,10 @@ namespace Centaurus.Domain
                     return;
                 var accId = Global.AccountStorage.GetNextAccountId();
                 context.EffectProcessors.AddAccountCreate(Global.AccountStorage, accId, deposit.Destination);
-                account = Global.AccountStorage.GetAccount(accId).Account;
+                account = Global.AccountStorage.GetAccount(accId);
             }
 
-            if (!account.HasBalance(deposit.Asset))
+            if (!account.Account.HasBalance(deposit.Asset))
             {
                 context.EffectProcessors.AddBalanceCreate(account, deposit.Asset);
             }
@@ -138,13 +138,11 @@ namespace Centaurus.Domain
         {
             var withdrawal = context.Withdrawals[withdrawalModel];
             var isSuccess = withdrawalModel.PaymentResult == PaymentResults.Success;
-            foreach (var withdrawalItem in withdrawal.Withdrawals)
-            {
-                context.EffectProcessors.AddUpdateLiabilities(withdrawal.Source.Account, withdrawalItem.Asset, -withdrawalItem.Amount);
-                if (isSuccess)
-                    context.EffectProcessors.AddBalanceUpdate(withdrawal.Source.Account, withdrawalItem.Asset, -withdrawalItem.Amount);
-            }
-            if (!isSuccess)
+
+            if (isSuccess)
+                foreach (var withdrawalItem in withdrawal.Withdrawals)
+                    context.EffectProcessors.AddBalanceUpdate(withdrawal.Source, withdrawalItem.Asset, -withdrawalItem.Amount);
+            else
             {
                 //TODO: we need to notify client that something went wrong
             }

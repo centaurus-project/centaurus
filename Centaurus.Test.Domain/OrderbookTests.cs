@@ -14,8 +14,8 @@ namespace Centaurus.Test
 {
     public class OrderbookTests
     {
-        Models.Account account1;
-        Models.Account account2;
+        AccountWrapper account1;
+        AccountWrapper account2;
 
         [SetUp]
         public void Setup()
@@ -29,7 +29,7 @@ namespace Centaurus.Test
             };
             Global.Setup(settings, new MockStorage()).Wait();
 
-            account1 = new Models.Account()
+            var account1 = new Models.Account()
             {
                 Id = 1,
                 Pubkey = new RawPubKey() { Data = KeyPair.Random().PublicKey },
@@ -41,7 +41,7 @@ namespace Centaurus.Test
             account1.CreateBalance(1);
             account1.GetBalance(1).UpdateBalance(10000000000);
 
-            account2 = new Models.Account()
+            var account2 = new Models.Account()
             {
                 Id = 2,
                 Pubkey = new RawPubKey() { Data = KeyPair.Random().PublicKey },
@@ -66,6 +66,9 @@ namespace Centaurus.Test
                     RequestRateLimits = new RequestRateLimits { HourLimit = 1000, MinuteLimit = 100 }
                 },
             }).Wait();
+
+            this.account1 = Global.AccountStorage.GetAccount(account1.Id);
+            this.account2 = Global.AccountStorage.GetAccount(account2.Id);
         }
 
         [TearDown]
@@ -79,9 +82,6 @@ namespace Centaurus.Test
         {
             var rnd = new Random();
 
-            var a1 = Global.AccountStorage.GetAccount(account1.Pubkey);
-            var a2 = Global.AccountStorage.GetAccount(account2.Pubkey);
-
             var market = Global.Exchange.GetMarket(1);
 
             var testTradeResults = new Dictionary<RequestQuantum, EffectProcessorsContainer>();
@@ -90,21 +90,21 @@ namespace Centaurus.Test
                 var price = useNormalDistribution ? rnd.NextNormallyDistributed() + 50 : rnd.NextDouble() * 100;
                 var request = new OrderRequest
                 {
-                    Nonce = i,
+                    RequestId = i,
                     Amount = rnd.Next(1, 20),
                     Asset = 1,
                     Price = Math.Round(price * 27) / 13
                 };
                 if (rnd.NextDouble() >= 0.5)
                 {
-                    request.Account = a1.Id;
-                    request.AccountWrapper = a1;
+                    request.Account = account1.Id;
+                    request.AccountWrapper = account1;
                     request.Side = OrderSide.Buy;
                 }
                 else
                 {
-                    request.Account = a2.Id;
-                    request.AccountWrapper = a2;
+                    request.Account = account2.Id;
+                    request.AccountWrapper = account2;
                     request.Side = OrderSide.Sell;
                 }
 
@@ -123,8 +123,8 @@ namespace Centaurus.Test
                 testTradeResults.Add(trade, conterOrderEffectsContainer);
             }
 
-            var xlmStartBalance = account1.GetBalance(0).Amount + account2.GetBalance(0).Amount;
-            var assetStartBalance = account1.GetBalance(1).Amount + account2.GetBalance(1).Amount;
+            var xlmStartBalance = account1.Account.GetBalance(0).Amount + account2.Account.GetBalance(0).Amount;
+            var assetStartBalance = account1.Account.GetBalance(1).Amount + account2.Account.GetBalance(1).Amount;
 
             executor(() =>
             {
@@ -137,41 +137,28 @@ namespace Centaurus.Test
             //cleanup orders
             foreach (var account in new[] { account1, account2 })
             {
-                var activeOrders = Global.Exchange.OrderMap.GetAllAccountOrders(account.Id);
+                var activeOrders = Global.Exchange.OrderMap.GetAllAccountOrders(account);
                 foreach (var order in activeOrders)
                 {
-                    var orderInfo = order.ToOrderInfo();
-                    //unlock order reserve
-                    if (orderInfo.Side == OrderSide.Buy)
-                    {
-                        new UpdateLiabilitiesEffectProcessor(new UpdateLiabilitiesEffect
-                        {
-                            Amount = -order.QuoteAmount,
-                            Asset = 0,
-                            Account = account.Id
-                        }, account).CommitEffect();
-                    }
-                    else
-                    {
-                        new UpdateLiabilitiesEffectProcessor(new UpdateLiabilitiesEffect
-                        {
-                            Amount = -order.Amount,
-                            Asset = orderInfo.Market,
-                            Account = account.Id
-                        }, account).CommitEffect();
-                    }
-                    order.Amount = 0;
-                    order.QuoteAmount = 0;
+                    var decodedOrderId = OrderIdConverter.Decode(order.OrderId);
 
-                    new OrderRemovedEffectProccessor(new OrderRemovedEffect { OrderId = order.OrderId, Amount = order.Amount, QuoteAmount = order.QuoteAmount, Price = order.Price, Asset = orderInfo.Market, Account = account.Id }, market.GetOrderbook(orderInfo.Side), account).CommitEffect();
+                    new OrderRemovedEffectProccessor(new OrderRemovedEffect
+                    {
+                        OrderId = order.OrderId,
+                        Amount = order.Amount,
+                        QuoteAmount = order.QuoteAmount,
+                        Price = order.Price,
+                        Asset = decodedOrderId.Asset,
+                        AccountWrapper = account
+                    }, market.GetOrderbook(decodedOrderId.Side)).CommitEffect();
                 }
             }
-            Assert.AreEqual(xlmStartBalance, account1.GetBalance(0).Amount + account2.GetBalance(0).Amount);
-            Assert.AreEqual(assetStartBalance, account1.GetBalance(1).Amount + account2.GetBalance(1).Amount);
-            Assert.AreEqual(0, account1.GetBalance(0).Liabilities);
-            Assert.AreEqual(0, account1.GetBalance(1).Liabilities);
-            Assert.AreEqual(0, account2.GetBalance(0).Liabilities);
-            Assert.AreEqual(0, account2.GetBalance(1).Liabilities);
+            Assert.AreEqual(xlmStartBalance, account1.Account.GetBalance(0).Amount + account2.Account.GetBalance(0).Amount);
+            Assert.AreEqual(assetStartBalance, account1.Account.GetBalance(1).Amount + account2.Account.GetBalance(1).Amount);
+            Assert.AreEqual(0, account1.Account.GetBalance(0).Liabilities);
+            Assert.AreEqual(0, account1.Account.GetBalance(1).Liabilities);
+            Assert.AreEqual(0, account2.Account.GetBalance(0).Liabilities);
+            Assert.AreEqual(0, account2.Account.GetBalance(1).Liabilities);
         }
 
         [Test]
@@ -192,6 +179,57 @@ namespace Centaurus.Test
                 var market = Global.Exchange.GetMarket(1);
                 return $"{iterations} iterations, orderbook size: {market.Bids.Count} bids,  {market.Asks.Count} asks, {market.Bids.GetBestPrice().ToString("G3")}/{market.Asks.GetBestPrice().ToString("G3")} spread.";
             }));
+        }
+
+        [Test]
+        [TestCase(true)]
+        [TestCase(false)]
+        public void OrderbookRemoveTest(bool isOrderedByPrice)
+        {
+            var orders = new List<Order>();
+            var random = new Random();
+            var price = 1D;
+            var side = OrderSide.Buy;
+            var asset = 1;
+
+            var orderbook = Global.Exchange.GetOrderbook(asset, side);
+            var ordersCount = 1000;
+            for (var i = 1; i <= ordersCount; i++)
+            {
+                if (isOrderedByPrice)
+                    price = price * 1.01;
+                else
+                    price = 1 + random.NextDouble();
+                var orderId = OrderIdConverter.Encode((ulong)i, asset, side);
+                var amount = 1000;
+                var order = new Order { OrderId = orderId, Amount = 1000, Price = price, QuoteAmount = OrderMatcher.EstimateQuoteAmount(amount, price, side) };
+                orders.Add(order);
+                orderbook.InsertOrder(order);
+            }
+
+            Func<int> getOrdersCount = () =>
+            {
+                var ordersCounter = 0;
+                foreach (var o in orderbook)
+                    ordersCounter++;
+                return ordersCounter;
+            };
+
+            Debug.WriteLine($"BeforeNull: {orderbook.BeforeNull}, BeforeIsHead: {orderbook.BeforeIsHead}, BeforeNotNull: {orderbook.BeforeNotNull}, TailNotNull: {orderbook.TailNotNull}, TailIsNull: {orderbook.TailIsNull}");
+
+            var count = getOrdersCount();
+            Assert.AreEqual(count, getOrdersCount());
+            Assert.AreEqual(count, orderbook.BeforeNull + orderbook.BeforeIsHead, "Count is not equal to Orderbook.BeforeNull + Orderbook.BeforeIsHead");
+            Assert.AreEqual(orderbook.Count, getOrdersCount(), "Orderbook.Count and order-book items count are not equal.");
+            Assert.AreEqual(getOrdersCount(), ordersCount);
+
+            foreach (var order in orders)
+            {
+                orderbook.RemoveOrder(order.OrderId);
+                ordersCount--;
+                Assert.AreEqual(orderbook.Count, ordersCount);
+                Assert.AreEqual(getOrdersCount(), ordersCount);
+            }
         }
     }
 }

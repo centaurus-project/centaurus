@@ -11,5 +11,7 @@ namespace Centaurus.Models
         public override EffectTypes EffectType => EffectTypes.AccountCreate;
 
         public RawPubKey Pubkey { get; set; }
+
+        public int AccountId { get; set; }
     }
 }
