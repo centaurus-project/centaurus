@@ -113,6 +113,10 @@ namespace Centaurus.Domain
                     BeforeIsHead++;
                     Head = order;
                 }
+                else
+                {
+                    order.Prev.Next = order;
+                }
             }
             //increment count
             Count++;

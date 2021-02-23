@@ -218,18 +218,19 @@ namespace Centaurus.Test
             Debug.WriteLine($"BeforeNull: {orderbook.BeforeNull}, BeforeIsHead: {orderbook.BeforeIsHead}, BeforeNotNull: {orderbook.BeforeNotNull}, TailNotNull: {orderbook.TailNotNull}, TailIsNull: {orderbook.TailIsNull}");
 
             var count = getOrdersCount();
-            Assert.AreEqual(count, getOrdersCount());
-            Assert.AreEqual(count, orderbook.BeforeNull + orderbook.BeforeIsHead, "Count is not equal to Orderbook.BeforeNull + Orderbook.BeforeIsHead");
+            Assert.AreEqual(count, orderbook.BeforeNull + orderbook.BeforeNotNull, "Count is not equal to Orderbook.BeforeNull + Orderbook.BeforeNotNull");
             Assert.AreEqual(orderbook.Count, getOrdersCount(), "Orderbook.Count and order-book items count are not equal.");
-            Assert.AreEqual(getOrdersCount(), ordersCount);
+            Assert.AreEqual(ordersCount, getOrdersCount());
 
             foreach (var order in orders)
             {
                 orderbook.RemoveOrder(order.OrderId);
                 ordersCount--;
-                Assert.AreEqual(orderbook.Count, ordersCount);
-                Assert.AreEqual(getOrdersCount(), ordersCount);
+                Assert.AreEqual(ordersCount, orderbook.Count);
+                Assert.AreEqual(ordersCount, getOrdersCount());
             }
+            Assert.IsNull(orderbook.Head);
+            Assert.IsNull(orderbook.Tail);
         }
     }
 }
