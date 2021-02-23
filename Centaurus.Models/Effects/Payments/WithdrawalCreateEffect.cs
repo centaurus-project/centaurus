@@ -5,8 +5,7 @@ using System.Text;
 
 namespace Centaurus.Models
 {
-    [XdrContract]
-    public class WithdrawalCreateEffect: Effect
+    public class WithdrawalCreateEffect: WithdrawalBaseEffect
     {
         public override EffectTypes EffectType => EffectTypes.WithdrawalCreate;
     }

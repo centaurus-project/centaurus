@@ -13,5 +13,8 @@ namespace Centaurus.Models
 
         [XdrField(1)]
         public byte[] Signature { get; set; }
+
+        [XdrField(2, Optional = true)]
+        public byte[] TxSignature { get; set; }
     }
 }

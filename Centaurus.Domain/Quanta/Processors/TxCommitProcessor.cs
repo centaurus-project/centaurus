@@ -137,16 +137,11 @@ namespace Centaurus.Domain
         private void ProcessWithdrawal(Withdrawal withdrawalModel, LedgerCommitProcessorContext context)
         {
             var withdrawal = context.Withdrawals[withdrawalModel];
-            var isSuccess = withdrawalModel.PaymentResult == PaymentResults.Success;
-
-            if (isSuccess)
-                foreach (var withdrawalItem in withdrawal.Withdrawals)
-                    context.EffectProcessors.AddBalanceUpdate(withdrawal.Source, withdrawalItem.Asset, -withdrawalItem.Amount);
-            else
+            if (withdrawalModel.PaymentResult != PaymentResults.Success)
             {
                 //TODO: we need to notify client that something went wrong
             }
-            context.EffectProcessors.AddWithdrawalRemove(withdrawal, Global.WithdrawalStorage);
+            context.EffectProcessors.AddWithdrawalRemove(withdrawal, withdrawalModel.PaymentResult == PaymentResults.Success, Global.WithdrawalStorage);
         }
 
         public override LedgerCommitProcessorContext GetContext(EffectProcessorsContainer container)

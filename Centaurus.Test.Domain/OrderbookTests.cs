@@ -215,12 +215,9 @@ namespace Centaurus.Test
                 return ordersCounter;
             };
 
-            Debug.WriteLine($"BeforeNull: {orderbook.BeforeNull}, BeforeIsHead: {orderbook.BeforeIsHead}, BeforeNotNull: {orderbook.BeforeNotNull}, TailNotNull: {orderbook.TailNotNull}, TailIsNull: {orderbook.TailIsNull}");
-
             var count = getOrdersCount();
-            Assert.AreEqual(count, orderbook.BeforeNull + orderbook.BeforeNotNull, "Count is not equal to Orderbook.BeforeNull + Orderbook.BeforeNotNull");
-            Assert.AreEqual(orderbook.Count, getOrdersCount(), "Orderbook.Count and order-book items count are not equal.");
-            Assert.AreEqual(ordersCount, getOrdersCount());
+            Assert.AreEqual(orderbook.Count, count, "Orderbook.Count and order-book items count are not equal.");
+            Assert.AreEqual(ordersCount, count);
 
             foreach (var order in orders)
             {

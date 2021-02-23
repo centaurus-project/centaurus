@@ -67,12 +67,6 @@ namespace Centaurus.Domain
             InsertOrderBefore(order, cursor);
         }
 
-        public int BeforeNull { get; set; }
-        public int BeforeIsHead { get; set; }
-        public int BeforeNotNull { get; set; }
-        public int TailNotNull { get; set; }
-        public int TailIsNull { get; set; }
-
         /// <summary>
         /// Insert order before the specific offer.
         /// </summary>
@@ -83,11 +77,9 @@ namespace Centaurus.Domain
         {
             if (before == null)
             {
-                BeforeNull++;
                 //append to the end
                 if (Tail != null)
                 {
-                    TailNotNull++;
                     //insert after the tail
                     Tail.Next = order;
                     order.Prev = Tail;
@@ -95,14 +87,12 @@ namespace Centaurus.Domain
                 }
                 else
                 {
-                    TailIsNull++;
                     //it's the first order entry
                     Head = Tail = order;
                 }
             }
             else
             {
-                BeforeNotNull++;
                 //insert order into the linked list before the cursor
                 order.Prev = before.Prev;
                 order.Next = before;
@@ -110,7 +100,6 @@ namespace Centaurus.Domain
                 //update the reference if we are inserting before the head entry
                 if (before == Head)
                 {
-                    BeforeIsHead++;
                     Head = order;
                 }
                 else

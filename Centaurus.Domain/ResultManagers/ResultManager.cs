@@ -107,7 +107,7 @@ namespace Centaurus.Domain
                 this.resultMessageItem = resultMessageItem;
                 this.resultManager = resultManager;
                 CreatedAt = DateTime.UtcNow;
-                IsAcknowledgmentSent = resultMessageItem.AccountPubKey == null;
+                IsAcknowledgmentSent = resultMessageItem.AccountPubKey == null && resultMessageItem.Notifications.Count < 1;
             }
 
             public bool IsProcessed { get; private set; }
@@ -130,9 +130,16 @@ namespace Centaurus.Domain
                     processedAuditors.Add(auditor);
 
                     var signature = new Ed25519Signature { Signature = result.Signature, Signer = auditor };
-                    if (signature.IsValid(resultMessageItem.Hash))
+                    if (signature.IsValid(resultMessageItem.Hash)
+                        && !(resultMessageItem.IsTxResultMessage && result.TxSignature == null))
+                    {
                         resultMessageItem.ResultEnvelope.Signatures.Add(signature);
-
+                        if (resultMessageItem.IsTxResultMessage)
+                        {
+                            var txSignature = new Ed25519Signature { Signature = result.TxSignature, Signer = auditor };
+                            ((ITransactionResultMessage)resultMessageItem.ResultMessage).TxSignatures.Add(txSignature);
+                        }
+                    }
                     var majorityResult = CheckMajority();
                     if (majorityResult == MajorityResults.Unknown)
                         return;
@@ -221,12 +228,15 @@ namespace Centaurus.Domain
                 if (resultMessage == null)
                     throw new ArgumentNullException(nameof(resultMessage));
                 ResultEnvelope = resultMessage.CreateEnvelope();
+                IsTxResultMessage = resultMessage is ITransactionResultMessage;
                 Hash = ResultEnvelope.ComputeMessageHash();
                 AccountPubKey = GetMessageAccount();
                 Notifications = notifications ?? throw new ArgumentNullException(nameof(notifications));
             }
 
             public MessageEnvelope ResultEnvelope { get; }
+
+            public bool IsTxResultMessage { get; }
 
             public ResultMessage ResultMessage => (ResultMessage)ResultEnvelope.Message;
 

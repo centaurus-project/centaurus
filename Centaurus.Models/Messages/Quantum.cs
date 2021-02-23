@@ -20,15 +20,9 @@ namespace Centaurus.Models
         public byte[] PrevHash { get; set; }
 
         /// <summary>
-        /// Current quantum effects hash.
-        /// </summary>
-        [XdrField(2)]
-        public byte[] EffectsHash { get; set; }
-
-        /// <summary>
         /// Operation time stamp. Assigned by Alpha server when it finishes processing a quantum.
         /// </summary>
-        [XdrField(3)]
+        [XdrField(2)]
         public long Timestamp { get; set; }
     }
 }

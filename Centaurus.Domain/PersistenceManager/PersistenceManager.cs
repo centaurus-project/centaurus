@@ -278,12 +278,21 @@ namespace Centaurus.Domain
 
             var lastQuantum = (await storage.LoadQuantum(apex)).ToMessageEnvelope();
 
+            //TODO: refactor restore exchange
+            //we need to clean all order links to be able to restore exchange
+            var allOrders = exchange.OrderMap.GetAllOrders();
+            foreach (var order in orders)
+            {
+                order.Next = null;
+                order.Prev = null;
+            }
+
             return new Snapshot
             {
                 Apex = apex,
                 Accounts = accountStorage.GetAll().OrderBy(a => a.Account.Id).Select(a => a.Account).ToList(),
                 TxCursor = stellarData?.TxCursor ?? 0,
-                Orders = exchange.OrderMap.GetAllOrders().OrderBy(o => o.OrderId).ToList(),
+                Orders = allOrders.OrderBy(o => o.OrderId).ToList(),
                 Settings = settings,
                 Withdrawals = withdrawalsStorage.GetAll().OrderBy(w => w.Apex).ToList(),
                 LastHash = lastQuantum.Message.ComputeHash()

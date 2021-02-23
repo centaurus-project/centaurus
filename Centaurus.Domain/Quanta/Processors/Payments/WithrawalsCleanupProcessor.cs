@@ -18,7 +18,7 @@ namespace Centaurus.Domain
 
         public override Task<ResultMessage> Process(WithdrawalCleanupProcessorContext context)
         {
-            context.EffectProcessors.AddWithdrawalRemove(context.Withdrawal, Global.WithdrawalStorage);
+            context.EffectProcessors.AddWithdrawalRemove(context.Withdrawal, false, Global.WithdrawalStorage);
             return Task.FromResult(context.Envelope.CreateResult(ResultStatusCodes.Success, context.EffectProcessors.Effects));
         }
 

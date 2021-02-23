@@ -1,6 +1,7 @@
 ﻿using Centaurus.Models;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace Centaurus.Domain
@@ -12,17 +13,20 @@ namespace Centaurus.Domain
             var effect = new WithdrawalCreateEffect
             {
                 Apex = effectProcessors.Apex,
-                AccountWrapper = withdrawal.Source
+                AccountWrapper = withdrawal.Source,
+                Items = withdrawal.Withdrawals.Select(w => new WithdrawalEffectItem { Asset = w.Asset, Amount = w.Amount }).OrderBy(a => a.Asset).ToList()
             };
             effectProcessors.Add(new WithdrawalCreateEffectProcessor(effect, withdrawal, withdrawalStorage));
         }
 
-        public static void AddWithdrawalRemove(this EffectProcessorsContainer effectProcessors, WithdrawalWrapper withdrawal, WithdrawalStorage withdrawalStorage)
+        public static void AddWithdrawalRemove(this EffectProcessorsContainer effectProcessors, WithdrawalWrapper withdrawal, bool isSuccessful, WithdrawalStorage withdrawalStorage)
         {
             var effect = new WithdrawalRemoveEffect
             {
                 Apex = effectProcessors.Apex,
-                AccountWrapper = withdrawal.Source
+                AccountWrapper = withdrawal.Source,
+                IsSuccessful = isSuccessful,
+                Items = withdrawal.Withdrawals.Select(w => new WithdrawalEffectItem { Asset = w.Asset, Amount = w.Amount }).OrderBy(a => a.Asset).ToList()
             };
             effectProcessors.Add(new WithdrawalRemoveEffectProcessor(effect, withdrawal, withdrawalStorage));
         }
