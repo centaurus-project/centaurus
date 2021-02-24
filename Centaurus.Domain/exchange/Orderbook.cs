@@ -1,7 +1,9 @@
 ﻿using Centaurus.Models;
+using NLog;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
 
 namespace Centaurus.Domain
@@ -9,6 +11,7 @@ namespace Centaurus.Domain
     public class Orderbook : IEnumerable// : IXdrSerializableModel
     {
         private OrderMap orderMap;
+        private static Logger logger = LogManager.GetCurrentClassLogger();
 
         public Orderbook(OrderMap orderMap)
         {
@@ -22,10 +25,6 @@ namespace Centaurus.Domain
         public Order Tail { get; set; }
 
         public int Count { get; set; }
-
-        public long TotalAmount { get; set; }
-
-        public long Volume { get; set; }
 
         public IEnumerator<Order> GetEnumerator()
         {
@@ -74,18 +73,21 @@ namespace Centaurus.Domain
         /// <param name="orderbook">Orderbook</param>
         /// <param name="order">An order to insert</param>
         /// <param name="before"></param>
-        public void InsertOrderBefore(Order order, Order before)
+        private void InsertOrderBefore(Order order, Order before)
         {
             if (before == null)
-            {//append to the end
+            {
+                //append to the end
                 if (Tail != null)
-                { //insert after the tail
+                {
+                    //insert after the tail
                     Tail.Next = order;
                     order.Prev = Tail;
                     Tail = order;
                 }
                 else
-                { //it's the first order entry
+                {
+                    //it's the first order entry
                     Head = Tail = order;
                 }
             }
@@ -100,35 +102,15 @@ namespace Centaurus.Domain
                 {
                     Head = order;
                 }
+                else
+                {
+                    order.Prev.Next = order;
+                }
             }
             //increment count
             Count++;
-            TotalAmount += order.Amount;
-            Volume += order.QuoteAmount;
             //add to the map
             orderMap.AddOrder(order);
-        }
-
-
-        /// <summary>
-        /// Remove the first executed order from the orderbook.
-        /// </summary>
-        public void RemoveEmptyHeadOrder()
-        {
-            var currentHead = Head;
-            if (currentHead.Amount > 0L) throw new Exception($"Requested order removal for the non-empty order {Head.OrderId}.");
-            var newHead = currentHead.Next;
-            if (newHead != null)
-            {
-                newHead.Prev = null;
-                Head = newHead;
-            }
-            else
-            {
-                Head = Tail = null;
-            }
-            Count--;
-            orderMap.RemoveOrder(currentHead.OrderId);
         }
 
         /// <summary>
@@ -147,19 +129,22 @@ namespace Centaurus.Domain
         /// <returns>Removal result.</returns>
         public bool RemoveOrder(ulong orderId)
         {
-            var order = orderMap.GetOrder(orderId);
+            var order = GetOrder(orderId);
             if (order == null)
                 return false;
+            var next = order.Next;
+            var prev = order.Prev;
             if (Head == order)
-                Head = order.Next;
+                Head = next;
             if (Tail == order)
-                Tail = order.Prev;
-            if (order.Prev != null)
-                order.Prev.Next = order.Next;
-            if (order.Next != null)
-                order.Next.Prev = order.Prev;
+                Tail = prev;
+            if (prev != null)
+                prev.Next = next;
+            if (next != null)
+                next.Prev = prev;
 
             orderMap.RemoveOrder(orderId);
+            Count--;
             return true;
         }
 

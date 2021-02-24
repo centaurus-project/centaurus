@@ -102,16 +102,6 @@ namespace Centaurus.Domain
             return GetMarket(asset).GetOrderbook(side);
         }
 
-        public Order GetOrder(ulong offerId)
-        {
-            return GetOrderbook(offerId).GetOrder(offerId);
-        }
-
-        public bool RemoveOrder(ulong offerId)
-        {
-            return GetOrderbook(offerId).RemoveOrder(offerId);
-        }
-
         public static Exchange RestoreExchange(List<AssetSettings> assets, List<Order> orders, bool observeTrades)
         {
             var exchange = new Exchange(observeTrades);

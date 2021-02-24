@@ -42,7 +42,7 @@ namespace Centaurus.Domain
                 .Select(ae => new ApexEffects
                 {
                     Apex = ae.Apex,
-                    Items = ae.Effects.Select(e => e.ToEffect(ae.Account)).ToList()
+                    Items = ae.Effects.Select(e => e.ToEffect(null)).ToList() //we can ignore account here, because it's used only in domain
                 })
                 .ToList();
             if (isDesc)
@@ -202,9 +202,12 @@ namespace Centaurus.Domain
                 var effectsCount = 0;
                 foreach (var accountEffects in quantumEffect)
                 {
+                    var account = accountStorage.GetAccount(accountEffects.Account);
+                    if (account == null)
+                        throw new Exception($"Account {accountEffects.Account} is not found.");
                     foreach (var rawEffect in accountEffects.Effects)
                     {
-                        var effect = rawEffect.ToEffect(accountEffects.Account);
+                        var effect = rawEffect.ToEffect(account);
                         effectModels[currentApexIndexOffset + rawEffect.ApexIndex] = effect;
                         effectsCount++;
                     }
@@ -214,8 +217,7 @@ namespace Centaurus.Domain
             for (var i = effectModels.Length - 1; i >= 0; i--)
             {
                 var currentEffect = effectModels[i];
-                var accountId = currentEffect.Account;
-                var account = new Lazy<AccountWrapper>(() => accountStorage.GetAccount(accountId));
+                var account = currentEffect.AccountWrapper;
                 IEffectProcessor<Effect> processor = null;
                 switch (currentEffect)
                 {
@@ -223,19 +225,16 @@ namespace Centaurus.Domain
                         processor = new AccountCreateEffectProcessor(accountCreateEffect, accountStorage);
                         break;
                     case NonceUpdateEffect nonceUpdateEffect:
-                        processor = new NonceUpdateEffectProcessor(nonceUpdateEffect, account.Value.Account);
+                        processor = new NonceUpdateEffectProcessor(nonceUpdateEffect);
                         break;
                     case BalanceCreateEffect balanceCreateEffect:
-                        processor = new BalanceCreateEffectProcessor(balanceCreateEffect, account.Value.Account);
+                        processor = new BalanceCreateEffectProcessor(balanceCreateEffect);
                         break;
                     case BalanceUpdateEffect balanceUpdateEffect:
-                        processor = new BalanceUpdateEffectProcesor(balanceUpdateEffect, account.Value.Account);
-                        break;
-                    case UpdateLiabilitiesEffect updateLiabilitiesEffect:
-                        processor = new UpdateLiabilitiesEffectProcessor(updateLiabilitiesEffect, account.Value.Account);
+                        processor = new BalanceUpdateEffectProcesor(balanceUpdateEffect);
                         break;
                     case RequestRateLimitUpdateEffect requestRateLimitUpdateEffect:
-                        processor = new RequestRateLimitUpdateEffectProcessor(requestRateLimitUpdateEffect, account.Value, settings.RequestRateLimits);
+                        processor = new RequestRateLimitUpdateEffectProcessor(requestRateLimitUpdateEffect, settings.RequestRateLimits);
                         break;
                     case OrderPlacedEffect orderPlacedEffect:
                         {
@@ -247,7 +246,7 @@ namespace Centaurus.Domain
                     case OrderRemovedEffect orderRemovedEffect:
                         {
                             var orderBook = exchange.GetOrderbook(orderRemovedEffect.OrderId);
-                            processor = new OrderRemovedEffectProccessor(orderRemovedEffect, orderBook, account.Value.Account);
+                            processor = new OrderRemovedEffectProccessor(orderRemovedEffect, orderBook);
                         }
                         break;
                     case TradeEffect tradeEffect:
@@ -279,12 +278,21 @@ namespace Centaurus.Domain
 
             var lastQuantum = (await storage.LoadQuantum(apex)).ToMessageEnvelope();
 
+            //TODO: refactor restore exchange
+            //we need to clean all order links to be able to restore exchange
+            var allOrders = exchange.OrderMap.GetAllOrders();
+            foreach (var order in orders)
+            {
+                order.Next = null;
+                order.Prev = null;
+            }
+
             return new Snapshot
             {
                 Apex = apex,
                 Accounts = accountStorage.GetAll().OrderBy(a => a.Account.Id).Select(a => a.Account).ToList(),
                 TxCursor = stellarData?.TxCursor ?? 0,
-                Orders = exchange.OrderMap.GetAllOrders().OrderBy(o => o.OrderId).ToList(),
+                Orders = allOrders.OrderBy(o => o.OrderId).ToList(),
                 Settings = settings,
                 Withdrawals = withdrawalsStorage.GetAll().OrderBy(w => w.Apex).ToList(),
                 LastHash = lastQuantum.Message.ComputeHash()

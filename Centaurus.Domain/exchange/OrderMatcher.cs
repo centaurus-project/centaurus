@@ -12,9 +12,8 @@ namespace Centaurus.Domain
             takerOrder = new Order
             {
                 OrderId = OrderIdConverter.FromRequest(orderRequest, effectsContainer.Apex),
-                Account = orderRequest.AccountWrapper.Account,
+                AccountWrapper = orderRequest.AccountWrapper,
                 Amount = orderRequest.Amount,
-                QuoteAmount = orderRequest.QuoteAmount,
                 Price = orderRequest.Price
             };
             timeInForce = orderRequest.TimeInForce;
@@ -27,8 +26,8 @@ namespace Centaurus.Domain
             market = Global.Exchange.GetMarket(asset);
             orderbook = market.GetOrderbook(side.Inverse());
             //fetch balances
-            if (!takerOrder.Account.HasBalance(asset))
-                resultEffects.AddBalanceCreate(orderRequest.AccountWrapper.Account, asset);
+            if (!takerOrder.AccountWrapper.Account.HasBalance(asset))
+                resultEffects.AddBalanceCreate(orderRequest.AccountWrapper, asset);
         }
 
         private readonly Order takerOrder;
@@ -64,7 +63,7 @@ namespace Centaurus.Domain
                 nextOrder = counterOrder?.Next;
                 //check that counter order price matches our order
                 if (side == OrderSide.Sell && counterOrder.Price < takerOrder.Price
-                    || side == OrderSide.Buy && counterOrder.Price > takerOrder.Price)
+                    || side == OrderSide.Buy && counterOrder.Price > takerOrder.Price) 
                     break;
 
                 var match = new OrderMatch(this, counterOrder);
@@ -108,20 +107,13 @@ namespace Centaurus.Domain
 
         private bool PlaceReminderOrder()
         {
-            if (takerOrder.Amount <= 0) return false;
+            if (takerOrder.Amount <= 0) 
+                return false;
             var remainingQuoteAmount = EstimateQuoteAmount(takerOrder.Amount, takerOrder.Price, side);
-            if (remainingQuoteAmount <= 0) return false;
+            if (remainingQuoteAmount <= 0) 
+                return false;
             takerOrder.QuoteAmount = remainingQuoteAmount;
-            //lock order reserve
-            if (side == OrderSide.Buy)
-            {
-                //TODO: check this - potential rounding error with multiple trades
-                resultEffects.AddUpdateLiabilities(takerOrder.Account, 0, remainingQuoteAmount);
-            }
-            else
-            {
-                resultEffects.AddUpdateLiabilities(takerOrder.Account, asset, takerOrder.Amount);
-            }
+
             //select the market to add new order
             var reminderOrderbook = market.GetOrderbook(side);
             //record maker trade effect
@@ -162,34 +154,6 @@ namespace Centaurus.Domain
             /// </summary>
             public (Trade trade, OrderInfo counterOrder) ProcessOrderMatch()
             {
-                //trade assets
-                if (matcher.side == OrderSide.Buy)
-                {
-                    //unlock required asset amount on maker's side
-                    matcher.resultEffects.AddUpdateLiabilities(makerOrder.Account, matcher.asset, -AssetAmount);
-
-                    //transfer asset from maker to taker
-                    matcher.resultEffects.AddBalanceUpdate(makerOrder.Account, matcher.asset, -AssetAmount);
-                    matcher.resultEffects.AddBalanceUpdate(matcher.takerOrder.Account, matcher.asset, AssetAmount);
-
-                    //transfer XLM from taker to maker
-                    matcher.resultEffects.AddBalanceUpdate(matcher.takerOrder.Account, 0, -QuoteAmount);
-                    matcher.resultEffects.AddBalanceUpdate(makerOrder.Account, 0, QuoteAmount);
-                }
-                else
-                {
-                    //unlock required XLM amount on maker's side
-                    matcher.resultEffects.AddUpdateLiabilities(makerOrder.Account, 0, -QuoteAmount);
-
-                    //transfer asset from taker to maker
-                    matcher.resultEffects.AddBalanceUpdate(matcher.takerOrder.Account, matcher.asset, -AssetAmount);
-                    matcher.resultEffects.AddBalanceUpdate(makerOrder.Account, matcher.asset, AssetAmount);
-
-                    //transfer XLM from maker to taker
-                    matcher.resultEffects.AddBalanceUpdate(makerOrder.Account, 0, -QuoteAmount);
-                    matcher.resultEffects.AddBalanceUpdate(matcher.takerOrder.Account, 0, QuoteAmount);
-                }
-
                 //record trade effects
                 var trade = RecordTrade();
                 var counterOrder = makerOrder.ToOrderInfo();
@@ -203,7 +167,7 @@ namespace Centaurus.Domain
                     counterOrder.State = OrderState.Updated;
                     //TODO: add diff field for this purpose
                     //it's not amount but difference with existing amount 
-                    counterOrder.Amount = trade.Amount;
+                    counterOrder.Amount = trade.Amount; 
                 }
 
                 return (trade, counterOrder);
@@ -215,14 +179,16 @@ namespace Centaurus.Domain
                 matcher.resultEffects.AddTrade(
                          makerOrder,
                          AssetAmount,
-                         QuoteAmount
+                         QuoteAmount,
+                         false
                      );
 
                 //record taker trade effect
                 matcher.resultEffects.AddTrade(
                          matcher.takerOrder,
                          AssetAmount,
-                         QuoteAmount
+                         QuoteAmount,
+                         true
                      );
 
                 return new Trade
@@ -237,11 +203,6 @@ namespace Centaurus.Domain
 
             private void RecordOrderRemoved()
             {
-                var info = makerOrder.ToOrderInfo();
-                if (makerOrder.QuoteAmount > 0 && info.Side == OrderSide.Buy)
-                {
-                    matcher.resultEffects.AddUpdateLiabilities(makerOrder.Account, 0, -makerOrder.QuoteAmount);
-                }
                 matcher.resultEffects.AddOrderRemoved(matcher.orderbook, makerOrder);
             }
         }

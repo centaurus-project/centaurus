@@ -30,8 +30,8 @@ namespace Centaurus.Domain
             lock (syncRoot)
             {
                 LastBatchInfos.Add(batchInfo);
-                if (LastApexes.Count > 5)
-                    LastApexes.RemoveAt(0);
+                if (LastBatchInfos.Count > 20)
+                    LastBatchInfos.RemoveAt(0);
             }
         }
 
@@ -67,7 +67,7 @@ namespace Centaurus.Domain
         private int GetItemsPerSecond()
         {
             LastApexes.Add(new Apex { UpdatedAt = DateTime.UtcNow, CurrentApex = Global.QuantumStorage.CurrentApex });
-            if (LastApexes.Count > 5)
+            if (LastApexes.Count > 20)
                 LastApexes.RemoveAt(0);
 
             if (LastApexes.Count < 2) //intervals for 

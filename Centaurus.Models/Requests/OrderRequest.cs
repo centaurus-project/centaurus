@@ -22,7 +22,5 @@ namespace Centaurus.Models
 
         [XdrField(4)]
         public double Price { get; set; }
-
-        public long QuoteAmount { get; set; }
     }
 }

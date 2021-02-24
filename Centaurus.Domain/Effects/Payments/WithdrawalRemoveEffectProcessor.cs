@@ -23,6 +23,14 @@ namespace Centaurus.Domain
             withdrawal.Source.Account.Withdrawal = 0;
             withdrawal.Source.Withdrawal = null;
             withdrawalStorage.Remove(withdrawal.Hash);
+
+            foreach (var withdrawalItem in Effect.Items)
+            {
+                var balance = Effect.AccountWrapper.Account.GetBalance(withdrawalItem.Asset);
+                if (Effect.IsSuccessful)
+                    balance.UpdateBalance(-withdrawalItem.Amount);
+                balance.UpdateLiabilities(-withdrawalItem.Amount);
+            }
         }
 
         public override void RevertEffect()
@@ -31,6 +39,14 @@ namespace Centaurus.Domain
             withdrawalStorage.Add(withdrawal);
             withdrawal.Source.Withdrawal = withdrawal;
             withdrawal.Source.Account.Withdrawal = withdrawal.Apex;
+
+            foreach (var withdrawalItem in Effect.Items)
+            {
+                var balance = Effect.AccountWrapper.Account.GetBalance(withdrawalItem.Asset);
+                if (Effect.IsSuccessful)
+                    balance.UpdateBalance(withdrawalItem.Amount);
+                balance.UpdateLiabilities(withdrawalItem.Amount);
+            }
         }
     }
 }

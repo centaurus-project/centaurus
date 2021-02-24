@@ -24,13 +24,6 @@ namespace Centaurus.Domain
 
             context.UpdateNonce();
 
-            //unlock order reserve
-            if (context.OrderSide == OrderSide.Buy)
-                //TODO: check this - potential rounding error with multiple trades
-                context.EffectProcessors.AddUpdateLiabilities(orderRequest.AccountWrapper.Account, 0, -context.Order.QuoteAmount);
-            else
-                context.EffectProcessors.AddUpdateLiabilities(orderRequest.AccountWrapper.Account, context.Asset, -context.Order.Amount);
-
             context.EffectProcessors.AddOrderRemoved(context.Orderbook, context.Order);
 
             var resultMessage = context.Envelope.CreateResult(ResultStatusCodes.Success, context.EffectProcessors.Effects);
@@ -56,7 +49,8 @@ namespace Centaurus.Domain
             if (context.Order is null)
                 throw new BadRequestException($"Order {orderRequest.OrderId} is not found.{(quantum.Apex != default ? $" Apex {quantum.Apex}" : "")}");
 
-            if (context.Order.Account.Id != orderRequest.Account)
+            //TODO: check that lot size is greater than minimum allowed lot
+            if (context.Order.AccountWrapper.Account.Id != orderRequest.Account)
                 throw new ForbiddenException();
 
             if (context.OrderSide == OrderSide.Buy)

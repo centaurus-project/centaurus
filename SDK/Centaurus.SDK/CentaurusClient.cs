@@ -7,6 +7,7 @@ using stellar_dotnet_sdk;
 using stellar_dotnet_sdk.xdr;
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
@@ -226,47 +227,104 @@ namespace Centaurus.SDK
         private ConstellationInfo constellation;
         private TaskCompletionSource<int> handshakeResult;
 
+        private List<long> processedEffectsMessages = new List<long>();
+
+        private void RegisterNewEffectsMessage(long messageId)
+        {
+            processedEffectsMessages.Add(messageId);
+            if (processedEffectsMessages.Count > 100_000)
+                processedEffectsMessages.RemoveAt(0);
+        }
+
         private void ResultMessageHandler(MessageEnvelope envelope)
         {
-            if (AccountData == null || envelope.Signatures.Count != 1) //ignore if AccountData is null or if it's audit result
-                return;
-            var resultMessage = envelope.Message as IEffectsContainer;
-            try
+            lock (processedEffectsMessages)
             {
-                foreach (var effect in resultMessage.Effects)
+                if (AccountData == null
+                   || !(envelope.Message is IEffectsContainer effectsMessage)
+                   || processedEffectsMessages.Any(r => r == envelope.Message.MessageId))
+                    return;
+                RegisterNewEffectsMessage(envelope.Message.MessageId);
+                try
                 {
-                    switch (effect)
+                    foreach (var effect in effectsMessage.Effects)
                     {
-                        case NonceUpdateEffect nonceUpdateEffect:
-                            AccountData.Nonce = nonceUpdateEffect.Nonce;
-                            break;
-                        case BalanceCreateEffect balanceCreateEffect:
-                            AccountData.AddBalance(balanceCreateEffect.Asset, constellation);
-                            break;
-                        case BalanceUpdateEffect balanceUpdateEffect:
-                            AccountData.UpdateBalance(balanceUpdateEffect.Asset, balanceUpdateEffect.Amount);
-                            break;
-                        case UpdateLiabilitiesEffect updateLiabilitiesEffect:
-                            AccountData.UpdateLiabilities(updateLiabilitiesEffect.Asset, updateLiabilitiesEffect.Amount);
-                            break;
-                        case OrderPlacedEffect orderPlacedEffect:
-                            AccountData.AddOrder(orderPlacedEffect.OrderId, orderPlacedEffect.Amount, orderPlacedEffect.Price, constellation);
-                            break;
-                        case OrderRemovedEffect orderRemoveEffect:
-                            AccountData.RemoveOrder(orderRemoveEffect.OrderId);
-                            break;
-                        case TradeEffect tradeEffect:
-                            AccountData.UpdateOrder(tradeEffect.OrderId, tradeEffect.AssetAmount);
-                            break;
-                        default:
-                            break;
+                        switch (effect)
+                        {
+                            case NonceUpdateEffect nonceUpdateEffect:
+                                AccountData.Nonce = nonceUpdateEffect.Nonce;
+                                break;
+                            case BalanceCreateEffect balanceCreateEffect:
+                                AccountData.AddBalance(balanceCreateEffect.Asset, constellation);
+                                break;
+                            case BalanceUpdateEffect balanceUpdateEffect:
+                                AccountData.UpdateBalance(balanceUpdateEffect.Asset, balanceUpdateEffect.Amount);
+                                break;
+                            case OrderPlacedEffect orderPlacedEffect:
+                                {
+                                    AccountData.AddOrder(orderPlacedEffect.OrderId, orderPlacedEffect.Amount, orderPlacedEffect.Price, constellation);
+                                    var decodedId = OrderIdConverter.Decode(orderPlacedEffect.OrderId);
+                                    if (decodedId.Side == OrderSide.Buy)
+                                        AccountData.UpdateLiabilities(0, orderPlacedEffect.QuoteAmount);
+                                    else
+                                        AccountData.UpdateLiabilities(decodedId.Asset, orderPlacedEffect.Amount);
+                                }
+                                break;
+                            case OrderRemovedEffect orderRemoveEffect:
+                                {
+                                    AccountData.RemoveOrder(orderRemoveEffect.OrderId);
+                                    var decodedId = OrderIdConverter.Decode(orderRemoveEffect.OrderId);
+                                    if (decodedId.Side == OrderSide.Buy)
+                                        AccountData.UpdateLiabilities(0, -orderRemoveEffect.QuoteAmount);
+                                    else
+                                        AccountData.UpdateLiabilities(decodedId.Asset, -orderRemoveEffect.Amount);
+                                }
+                                break;
+                            case TradeEffect tradeEffect:
+                                {
+                                    AccountData.UpdateOrder(tradeEffect.OrderId, tradeEffect.AssetAmount);
+
+                                    var decodedId = OrderIdConverter.Decode(tradeEffect.OrderId);
+                                    if (decodedId.Side == OrderSide.Buy)
+                                    {
+                                        if (!tradeEffect.IsNewOrder)
+                                            AccountData.UpdateLiabilities(0, -tradeEffect.QuoteAmount);
+                                        AccountData.UpdateBalance(0, -tradeEffect.QuoteAmount);
+                                        AccountData.UpdateBalance(decodedId.Asset, tradeEffect.AssetAmount);
+                                    }
+                                    else
+                                    {
+                                        if (!tradeEffect.IsNewOrder)
+                                            AccountData.UpdateLiabilities(decodedId.Asset, -tradeEffect.AssetAmount);
+                                        AccountData.UpdateBalance(decodedId.Asset, -tradeEffect.AssetAmount);
+                                        AccountData.UpdateBalance(0, tradeEffect.QuoteAmount);
+                                    }
+                                }
+                                break;
+                            case WithdrawalCreateEffect withdrawalCreateEffect:
+                                foreach (var withdrawalItem in withdrawalCreateEffect.Items)
+                                {
+                                    AccountData.UpdateLiabilities(withdrawalItem.Asset, withdrawalItem.Amount);
+                                }
+                                break;
+                            case WithdrawalRemoveEffect withdrawalRemoveEffect:
+                                foreach (var withdrawalItem in withdrawalRemoveEffect.Items)
+                                {
+                                    if (withdrawalRemoveEffect.IsSuccessful)
+                                        AccountData.UpdateBalance(withdrawalItem.Asset, -withdrawalItem.Amount);
+                                    AccountData.UpdateLiabilities(withdrawalItem.Asset, -withdrawalItem.Amount);
+                                }
+                                break;
+                            default:
+                                break;
+                        }
                     }
+                    OnAccountUpdate?.Invoke(AccountData);
                 }
-                OnAccountUpdate?.Invoke(AccountData);
-            }
-            catch (Exception exc)
-            {
-                OnException?.Invoke(exc);
+                catch (Exception exc)
+                {
+                    OnException?.Invoke(exc);
+                }
             }
         }
 

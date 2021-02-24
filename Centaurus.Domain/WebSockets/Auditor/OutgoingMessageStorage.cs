@@ -93,11 +93,24 @@ namespace Centaurus.Domain
             if (result == null)
                 throw new ArgumentNullException(nameof(result));
 
+            var signature = default(byte[]);
+            var txSignature = default(byte[]);
+            if (result is ITransactionResultMessage txResult)
+            {
+                txSignature = txResult.TxSignatures.FirstOrDefault()?.Signature;
+                if (txSignature == null)
+                    throw new Exception("Tx signature is missing in ITransactionResultMessage.");
+                //TODO: create special envelope for storing tx signature
+                //ugly solution 
+                txResult.TxSignatures.Clear();
+            }
+
             var resultEnvelope = result.CreateEnvelope();
             resultEnvelope.Sign(Global.Settings.KeyPair);
+            signature = resultEnvelope.Signatures[0].Signature;
 
             lock (results)
-                results.Add(new AuditorResultMessage { Apex = result.MessageId, Signature = resultEnvelope.Signatures[0].Signature });
+                results.Add(new AuditorResultMessage { Apex = result.MessageId, Signature = signature, TxSignature = txSignature });
         }
     }
 }

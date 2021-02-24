@@ -195,7 +195,7 @@ namespace Centaurus.Test
             var envelope = new OrderRequest
             {
                 Account = account.Account.Id,
-                Nonce = 1
+                RequestId = 1
             }.CreateEnvelope();
             envelope.Sign(TestEnvironment.Client1KeyPair);
 
@@ -225,7 +225,7 @@ namespace Centaurus.Test
             var envelope = new AccountDataRequest
             {
                 Account = account.Account.Id,
-                Nonce = 1
+                RequestId = 1
             }.CreateEnvelope();
             envelope.Sign(TestEnvironment.Client1KeyPair);
 
@@ -248,12 +248,12 @@ namespace Centaurus.Test
             {
                 //TODO: replace it with quantum
                 var effect = new RequestRateLimitUpdateEffect { 
-                    Account = account.Account.Id, 
+                    AccountWrapper = account, 
                     RequestRateLimits = new RequestRateLimits { 
                         HourLimit = (uint)requestLimit.Value, 
                         MinuteLimit = (uint)requestLimit.Value }
                 };
-                var effectProcessor = new RequestRateLimitUpdateEffectProcessor(effect, account, Global.Constellation.RequestRateLimits);
+                var effectProcessor = new RequestRateLimitUpdateEffectProcessor(effect, Global.Constellation.RequestRateLimits);
                 effectProcessor.CommitEffect();
             }
             var clientConnection = new AlphaWebSocketConnection(new FakeWebSocket(), "127.0.0.1")
@@ -270,7 +270,7 @@ namespace Centaurus.Test
                 var envelope = new AccountDataRequest
                 {
                     Account = account.Account.Id,
-                    Nonce = i + 1
+                    RequestId = i + 1
                 }.CreateEnvelope();
                 envelope.Sign(clientKeyPair);
                 if (i + 1 > minuteLimit)

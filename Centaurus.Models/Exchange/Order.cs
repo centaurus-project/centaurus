@@ -19,10 +19,24 @@ namespace Centaurus.Models
         [XdrField(3)]
         public long QuoteAmount { get; set; }
 
-        public Account Account { get; set; }
+        public AccountWrapper AccountWrapper { get; set; }
 
         public Order Next { get; set; }
 
         public Order Prev { get; set; }
+
+        public override string ToString()
+        {
+            var res = $"Order {OrderId}, amount {Amount}, quote {QuoteAmount}, price {Price}";
+            if (Prev != null)
+            {
+                res += $", prev {Prev.OrderId}";
+            }
+            if (Next != null)
+            {
+                res += $", prev {Next.OrderId}";
+            }
+            return res;
+        }
     }
 }

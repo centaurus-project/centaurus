@@ -144,9 +144,6 @@ namespace Centaurus.Domain
             quantum.PrevHash = Global.QuantumStorage.LastQuantumHash;
             quantum.Timestamp = timestamp == default ? DateTime.UtcNow.Ticks : timestamp;//it could be assigned, if this quantum was handled already and we handle it during the server rising
 
-            //we need to sign the quantum here to prevent multiple signatures that can occur if we sign it when sending
-            quantumEnvelope.Sign(Global.Settings.KeyPair);
-
             var effectsContainer = GetEffectProcessorsContainer(quantumEnvelope);
 
             var context = processor.GetContext(effectsContainer);
@@ -155,9 +152,12 @@ namespace Centaurus.Domain
 
             var resultMessage = await processor.Process(context);
 
-            Global.QuantumStorage.AddQuantum(quantumEnvelope);
+            //we need to sign the quantum here to prevent multiple signatures that can occur if we sign it when sending
+            quantumEnvelope.Sign(Global.Settings.KeyPair);
 
             Global.AuditResultManager.Register(resultMessage, processor.GetNotificationMessages(context));
+
+            Global.QuantumStorage.AddQuantum(quantumEnvelope);
 
             effectsContainer.Complete();
 

@@ -16,5 +16,8 @@ namespace Centaurus.Models
 
         [XdrField(2)]
         public long QuoteAmount { get; set; }
+
+        [XdrField(3)]
+        public bool IsNewOrder { get; set; }
     }
 }

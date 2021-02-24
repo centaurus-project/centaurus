@@ -1,6 +1,7 @@
 ﻿using Centaurus.DAL.Models;
 using Centaurus.Models;
 using MongoDB.Bson;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 
@@ -8,14 +9,14 @@ namespace Centaurus.DAL
 {
     public class QuantumItem
     {
-        public QuantumItem(QuantumModel quantum)
+        public QuantumItem(long apex)
         {
-            Quantum = quantum;
+            Apex = apex;
             Effects = new Dictionary<int, EffectsModel>();
         }
 
-        public QuantumModel Quantum { get; }
-
+        public QuantumModel Quantum { get; private set; }
+        public long Apex { get; }
         public Dictionary<int, EffectsModel> Effects { get; }
 
         public int EffectsCount { get; private set; }
@@ -26,8 +27,8 @@ namespace Centaurus.DAL
             {
                 effects = new EffectsModel
                 {
-                    Id = EffectModelIdConverter.EncodeId(Quantum.Apex, account),
-                    Apex = Quantum.Apex,
+                    Id = EffectModelIdConverter.EncodeId(Apex, account),
+                    Apex = Apex,
                     Account = account,
                     Effects = new List<AtomicEffectModel>()
                 };
@@ -35,6 +36,11 @@ namespace Centaurus.DAL
             }
             effects.Effects.Add(singleEffectModel);
             EffectsCount++;
+        }
+
+        public void Complete(QuantumModel quantum)
+        {
+            Quantum = quantum ?? throw new ArgumentNullException(nameof(quantum));
         }
     }
 

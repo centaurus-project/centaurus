@@ -5,9 +5,11 @@ using System.Text;
 
 namespace Centaurus.Models
 {
-    [XdrContract]
-    public class WithdrawalRemoveEffect: Effect
+    public class WithdrawalRemoveEffect: WithdrawalBaseEffect
     {
         public override EffectTypes EffectType => EffectTypes.WithdrawalRemove;
+
+        [XdrField(0)]
+        public bool IsSuccessful { get; set; }
     }
 }

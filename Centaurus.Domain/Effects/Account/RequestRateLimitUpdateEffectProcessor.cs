@@ -8,13 +8,11 @@ namespace Centaurus.Domain
     public class RequestRateLimitUpdateEffectProcessor : BaseAccountEffectProcessor<RequestRateLimitUpdateEffect>
     {
         private RequestRateLimits globalRateLimits;
-        private AccountWrapper accountWrapper;
 
-        public RequestRateLimitUpdateEffectProcessor(RequestRateLimitUpdateEffect effect, AccountWrapper accountWrapper, RequestRateLimits globalRateLimits)
-            : base(effect, accountWrapper?.Account)
+        public RequestRateLimitUpdateEffectProcessor(RequestRateLimitUpdateEffect effect, RequestRateLimits globalRateLimits)
+            : base(effect)
         {
             this.globalRateLimits = globalRateLimits ?? throw new ArgumentNullException(nameof(globalRateLimits)); 
-            this.accountWrapper = accountWrapper;
         }
 
         private void Update(RequestRateLimits newValue)
@@ -28,7 +26,7 @@ namespace Centaurus.Domain
             if (Account.RequestRateLimits == null)
             {
                 Account.RequestRateLimits = new RequestRateLimits();
-                accountWrapper.RequestCounter.SetLimits(Account.RequestRateLimits); //update reference
+                Effect.AccountWrapper.RequestCounter.SetLimits(Account.RequestRateLimits); //update reference
             }
             //update values
             Account.RequestRateLimits.Update(newValue);

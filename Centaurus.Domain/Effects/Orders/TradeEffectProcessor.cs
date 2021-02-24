@@ -20,11 +20,48 @@ namespace Centaurus.Domain
             MarkAsProcessed();
             order.Amount -= Effect.AssetAmount;
             order.QuoteAmount -= Effect.QuoteAmount;
+
+            var decodedId = OrderIdConverter.Decode(Effect.OrderId);
+            var quoteBalance = Effect.AccountWrapper.Account.GetBalance(0);
+            var assetBalance = Effect.AccountWrapper.Account.GetBalance(decodedId.Asset);
+            if (decodedId.Side == OrderSide.Buy)
+            {
+                if (!Effect.IsNewOrder)
+                    quoteBalance.UpdateLiabilities(-Effect.QuoteAmount);
+                quoteBalance.UpdateBalance(-Effect.QuoteAmount);
+                assetBalance.UpdateBalance(Effect.AssetAmount);
+            }
+            else
+            {
+                if (!Effect.IsNewOrder)
+                    assetBalance.UpdateLiabilities(-Effect.AssetAmount);
+                assetBalance.UpdateBalance(-Effect.AssetAmount);
+                quoteBalance.UpdateBalance(Effect.QuoteAmount);
+            }
         }
 
         public override void RevertEffect()
         {
             MarkAsProcessed();
+
+            var decodedId = OrderIdConverter.Decode(Effect.OrderId);
+            var quoteBalance = Effect.AccountWrapper.Account.GetBalance(0);
+            var assetBalance = Effect.AccountWrapper.Account.GetBalance(decodedId.Asset);
+            if (decodedId.Side == OrderSide.Buy)
+            {
+                if (!Effect.IsNewOrder)
+                    quoteBalance.UpdateLiabilities(Effect.QuoteAmount);
+                quoteBalance.UpdateBalance(Effect.QuoteAmount);
+                assetBalance.UpdateBalance(-Effect.AssetAmount);
+            }
+            else
+            {
+                if (!Effect.IsNewOrder)
+                    assetBalance.UpdateLiabilities(Effect.AssetAmount);
+                assetBalance.UpdateBalance(Effect.AssetAmount);
+                quoteBalance.UpdateBalance(-Effect.QuoteAmount);
+            }
+
             order.Amount += Effect.AssetAmount;
             order.QuoteAmount += Effect.QuoteAmount;
         }

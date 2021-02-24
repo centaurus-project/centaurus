@@ -11,20 +11,20 @@ namespace Centaurus.Domain
             : base(effectProcessors)
         {
             Payment = (PaymentRequest)Request.RequestEnvelope.Message;
-            SourceAccount = Payment.AccountWrapper.Account;
+            SourceAccount = Payment.AccountWrapper;
         }
 
         public PaymentRequest Payment { get; }
 
-        public Account SourceAccount { get; }
+        public AccountWrapper SourceAccount { get; }
 
-        private Account destinationAccount;
-        public Account DestinationAccount
+        private AccountWrapper destinationAccount;
+        public AccountWrapper DestinationAccount
         {
             get
             {
                 if (destinationAccount == null)
-                    destinationAccount = Global.AccountStorage.GetAccount(Payment.Destination)?.Account;
+                    destinationAccount = Global.AccountStorage.GetAccount(Payment.Destination);
 
                 return destinationAccount;
             }

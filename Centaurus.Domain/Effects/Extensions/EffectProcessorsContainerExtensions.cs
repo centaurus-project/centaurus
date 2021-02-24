@@ -1,6 +1,7 @@
 ﻿using Centaurus.Models;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace Centaurus.Domain
@@ -12,17 +13,20 @@ namespace Centaurus.Domain
             var effect = new WithdrawalCreateEffect
             {
                 Apex = effectProcessors.Apex,
-                Account = withdrawal.Source.Account.Id
+                AccountWrapper = withdrawal.Source,
+                Items = withdrawal.Withdrawals.Select(w => new WithdrawalEffectItem { Asset = w.Asset, Amount = w.Amount }).OrderBy(a => a.Asset).ToList()
             };
             effectProcessors.Add(new WithdrawalCreateEffectProcessor(effect, withdrawal, withdrawalStorage));
         }
 
-        public static void AddWithdrawalRemove(this EffectProcessorsContainer effectProcessors, WithdrawalWrapper withdrawal, WithdrawalStorage withdrawalStorage)
+        public static void AddWithdrawalRemove(this EffectProcessorsContainer effectProcessors, WithdrawalWrapper withdrawal, bool isSuccessful, WithdrawalStorage withdrawalStorage)
         {
             var effect = new WithdrawalRemoveEffect
             {
                 Apex = effectProcessors.Apex,
-                Account = withdrawal.Source.Account.Id
+                AccountWrapper = withdrawal.Source,
+                IsSuccessful = isSuccessful,
+                Items = withdrawal.Withdrawals.Select(w => new WithdrawalEffectItem { Asset = w.Asset, Amount = w.Amount }).OrderBy(a => a.Asset).ToList()
             };
             effectProcessors.Add(new WithdrawalRemoveEffectProcessor(effect, withdrawal, withdrawalStorage));
         }
@@ -32,7 +36,7 @@ namespace Centaurus.Domain
             effectProcessors.Add(new AccountCreateEffectProcessor(
                 new AccountCreateEffect
                 {
-                    Account = accountId,
+                    AccountId = accountId,
                     Pubkey = publicKey,
                     Apex = effectProcessors.Apex
                 },
@@ -40,44 +44,28 @@ namespace Centaurus.Domain
             ));
         }
 
-        public static void AddBalanceCreate(this EffectProcessorsContainer effectProcessors, Account account, int asset)
+        public static void AddBalanceCreate(this EffectProcessorsContainer effectProcessors, AccountWrapper account, int asset)
         {
             effectProcessors.Add(new BalanceCreateEffectProcessor(
                 new BalanceCreateEffect
                 {
-                    Account = account.Id,
+                    AccountWrapper = account,
                     Asset = asset,
                     Apex = effectProcessors.Apex
-                },
-                account
+                }
             ));
         }
 
-        public static void AddBalanceUpdate(this EffectProcessorsContainer effectProcessors, Account account, int asset, long amount)
+        public static void AddBalanceUpdate(this EffectProcessorsContainer effectProcessors, AccountWrapper account, int asset, long amount)
         {
             effectProcessors.Add(new BalanceUpdateEffectProcesor(
                 new BalanceUpdateEffect
                 {
-                    Account = account.Id,
+                    AccountWrapper = account,
                     Amount = amount,
                     Asset = asset,
                     Apex = effectProcessors.Apex
-                },
-                account
-            ));
-        }
-
-        public static void AddUpdateLiabilities(this EffectProcessorsContainer effectProcessors, Account account, int asset, long amount)
-        {
-            effectProcessors.Add(new UpdateLiabilitiesEffectProcessor(
-                new UpdateLiabilitiesEffect
-                {
-                    Amount = amount,
-                    Asset = asset,
-                    Account = account.Id,
-                    Apex = effectProcessors.Apex
-                },
-                account
+                }
             ));
         }
 
@@ -87,7 +75,7 @@ namespace Centaurus.Domain
             var effect = new OrderPlacedEffect
             {
                 Apex = effectProcessors.Apex,
-                Account = order.Account.Id,
+                AccountWrapper = order.AccountWrapper,
                 Asset = decodedOrderId.Asset,
                 Amount = order.Amount,
                 QuoteAmount = order.QuoteAmount,
@@ -99,19 +87,21 @@ namespace Centaurus.Domain
             effectProcessors.Add(new OrderPlacedEffectProcessor(effect, orderBook, order));
         }
 
-        public static void AddTrade(this EffectProcessorsContainer effectProcessors, Order order, long assetAmount, long quoteAmount)
+        public static void AddTrade(this EffectProcessorsContainer effectProcessors, Order order, long assetAmount, long quoteAmount, bool isNewOrder)
         {
             var trade = new TradeEffect
             {
                 Apex = effectProcessors.Apex,
-                Account = order.Account.Id,
+                AccountWrapper = order.AccountWrapper,
                 AssetAmount = assetAmount,
                 QuoteAmount = quoteAmount,
                 OrderId = order.OrderId,
+                IsNewOrder = isNewOrder
             };
 
             effectProcessors.Add(new TradeEffectProcessor(trade, order));
         }
+
 
         public static void AddOrderRemoved(this EffectProcessorsContainer effectProcessors, Orderbook orderbook, Order order)
         {
@@ -120,27 +110,27 @@ namespace Centaurus.Domain
                 {
                     Apex = effectProcessors.Apex,
                     OrderId = order.OrderId,
-                    Account = order.Account.Id,
+                    AccountWrapper = order.AccountWrapper,
                     Amount = order.Amount,
                     QuoteAmount = order.QuoteAmount,
                     Price = order.Price
                 },
-                orderbook,
-                order.Account
+                orderbook
             ));
         }
 
-        public static void AddNonceUpdate(this EffectProcessorsContainer effectProcessors, Account account, long newNonce, long currentNonce)
+
+
+        public static void AddNonceUpdate(this EffectProcessorsContainer effectProcessors, AccountWrapper account, long newNonce, long currentNonce)
         {
             effectProcessors.Add(new NonceUpdateEffectProcessor(
                 new NonceUpdateEffect
                 {
                     Nonce = newNonce,
                     PrevNonce = currentNonce,
-                    Account = account.Id,
+                    AccountWrapper = account,
                     Apex = effectProcessors.Apex
-                },
-                account
+                }
             ));
         }
 

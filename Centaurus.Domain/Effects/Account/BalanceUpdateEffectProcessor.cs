@@ -7,8 +7,8 @@ namespace Centaurus.Domain
 {
     public class BalanceUpdateEffectProcesor : BaseAccountEffectProcessor<BalanceUpdateEffect>
     {
-        public BalanceUpdateEffectProcesor(BalanceUpdateEffect effect, Account account)
-            : base(effect, account)
+        public BalanceUpdateEffectProcesor(BalanceUpdateEffect effect)
+            : base(effect)
         {
 
         }

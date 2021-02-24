@@ -29,14 +29,14 @@ namespace Centaurus.Domain
                 context.EffectProcessors.AddAccountCreate(Global.AccountStorage, accId, payment.Destination);
             }
 
-            if (!context.DestinationAccount.HasBalance(payment.Asset))
+            if (!context.DestinationAccount.Account.HasBalance(payment.Asset))
                 context.EffectProcessors.AddBalanceCreate(context.DestinationAccount, payment.Asset);
             context.EffectProcessors.AddBalanceUpdate(context.DestinationAccount, payment.Asset, payment.Amount);
 
             context.EffectProcessors.AddBalanceUpdate(context.SourceAccount, payment.Asset, -payment.Amount);
             var effects = context.EffectProcessors.Effects;
 
-            var accountEffects = effects.Where(e => e.Account == payment.Account).ToList();
+            var accountEffects = effects.Where(e => e.AccountWrapper.Id == payment.Account).ToList();
             return Task.FromResult(context.Envelope.CreateResult(ResultStatusCodes.Success, accountEffects));
         }
 

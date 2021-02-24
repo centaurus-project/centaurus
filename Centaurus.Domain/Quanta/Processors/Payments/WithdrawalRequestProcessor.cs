@@ -26,12 +26,9 @@ namespace Centaurus.Domain
             };
             context.EffectProcessors.AddWithdrawalCreate(withdrawal, Global.WithdrawalStorage);
 
-            foreach (var withdrawalItem in context.WithdrawalItems)
-                context.EffectProcessors.AddUpdateLiabilities(context.WithdrawalRequest.AccountWrapper.Account, withdrawalItem.Asset, withdrawalItem.Amount);
-
             var effects = context.EffectProcessors.Effects;
 
-            var accountEffects = effects.Where(e => e.Account == context.WithdrawalRequest.Account).ToList();
+            var accountEffects = effects.Where(e => e.AccountWrapper?.Account.Id == context.WithdrawalRequest.Account).ToList();
             return Task.FromResult(context.Envelope.CreateResult(ResultStatusCodes.Success, accountEffects));
         }
 
