@@ -104,8 +104,8 @@ namespace Centaurus.Exchange.Analytics
             }
             //increment count
             Count++;
-            TotalAmount += orderWrapper.Order.Amount;
-            Volume += (long)(orderWrapper.Order.Amount * orderWrapper.Order.Price);
+            TotalAmount += orderWrapper.Order.AmountDiff;
+            Volume += (long)(orderWrapper.Order.AmountDiff * orderWrapper.Order.Price);
             //add to the map
             orderMap.AddOrder(orderWrapper);
         }

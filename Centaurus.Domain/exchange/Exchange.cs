@@ -31,10 +31,8 @@ namespace Centaurus.Domain
         {
             try
             {
-                if (OnUpdates != null) {
-                    foreach (var updates in awaitedUpdates.GetConsumingEnumerable(cancellationToken))
-                        OnUpdates.Invoke(updates);
-                }
+                foreach (var updates in awaitedUpdates.GetConsumingEnumerable(cancellationToken))
+                    OnUpdates?.Invoke(updates);
             }
             catch (Exception exc)
             {
@@ -44,7 +42,7 @@ namespace Centaurus.Domain
             }
         }
 
-        private Dictionary<int, Market> Markets = new Dictionary<int, Market>();
+        private Dictionary<int, ExchangeMarket> Markets = new Dictionary<int, ExchangeMarket>();
 
         private BlockingCollection<ExchangeUpdate> awaitedUpdates;
 
@@ -65,11 +63,23 @@ namespace Centaurus.Domain
             awaitedUpdates?.Add(updates);
         }
 
+        public void RemoveOrder(EffectProcessorsContainer effectsContainer, Orderbook orderbook, Order order)
+        {
+            effectsContainer.AddOrderRemoved(orderbook, order);
+            if (awaitedUpdates != null)
+            {
+                var updateTime = new DateTime(((Quantum)effectsContainer.Envelope.Message).Timestamp, DateTimeKind.Utc);
+                var exchangeItem = new ExchangeUpdate(orderbook.Market, updateTime);
+                exchangeItem.OrderUpdates.Add(order.ToOrderInfo(OrderState.Deleted));
+                awaitedUpdates.Add(exchangeItem);
+            }
+        }
+
         public event Action<ExchangeUpdate> OnUpdates;
 
-        public Market GetMarket(int asset)
+        public ExchangeMarket GetMarket(int asset)
         {
-            if (Markets.TryGetValue(asset, out Market market)) return market;
+            if (Markets.TryGetValue(asset, out ExchangeMarket market)) return market;
             throw new InvalidOperationException($"Asset {asset} is not supported");
         }
 
@@ -78,7 +88,7 @@ namespace Centaurus.Domain
             return Markets.ContainsKey(asset);
         }
 
-        public Market AddMarket(AssetSettings asset)
+        public ExchangeMarket AddMarket(AssetSettings asset)
         {
             var market = asset.CreateMarket(OrderMap);
             Markets.Add(asset.Id, market);

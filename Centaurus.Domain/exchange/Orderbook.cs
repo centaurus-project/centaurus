@@ -13,13 +13,16 @@ namespace Centaurus.Domain
         private OrderMap orderMap;
         private static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public Orderbook(OrderMap orderMap)
+        public Orderbook(OrderMap orderMap, int market, OrderSide side)
         {
             this.orderMap = orderMap;
+            Side = side;
+            Market = market;
         }
 
-        public OrderSide Side { get; set; }
+        public OrderSide Side { get; }
 
+        public int Market { get; }
         public Order Head { get; set; }
 
         public Order Tail { get; set; }

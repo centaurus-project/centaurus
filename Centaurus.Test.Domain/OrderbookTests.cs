@@ -29,33 +29,33 @@ namespace Centaurus.Test
             };
             Global.Setup(settings, new MockStorage()).Wait();
 
-            var account1 = new Models.Account()
+            var account1 = new AccountWrapper(new Models.Account
             {
                 Id = 1,
                 Pubkey = new RawPubKey() { Data = KeyPair.Random().PublicKey },
                 Balances = new List<Balance>()
-            };
+            }, Global.Constellation.RequestRateLimits);
 
-            account1.CreateBalance(0);
-            account1.GetBalance(0).UpdateBalance(10000000000);
-            account1.CreateBalance(1);
-            account1.GetBalance(1).UpdateBalance(10000000000);
+            account1.Account.CreateBalance(0);
+            account1.Account.GetBalance(0).UpdateBalance(10000000000);
+            account1.Account.CreateBalance(1);
+            account1.Account.GetBalance(1).UpdateBalance(10000000000);
 
-            var account2 = new Models.Account()
+            var account2 = new AccountWrapper(new Models.Account
             {
                 Id = 2,
                 Pubkey = new RawPubKey() { Data = KeyPair.Random().PublicKey },
                 Balances = new List<Balance>()
-            };
+            }, Global.Constellation.RequestRateLimits);
 
-            account2.CreateBalance(0);
-            account2.GetBalance(0).UpdateBalance(10000000000);
-            account2.CreateBalance(1);
-            account2.GetBalance(1).UpdateBalance(10000000000);
+            account2.Account.CreateBalance(0);
+            account2.Account.GetBalance(0).UpdateBalance(10000000000);
+            account2.Account.CreateBalance(1);
+            account2.Account.GetBalance(1).UpdateBalance(10000000000);
 
             Global.Setup(new Snapshot
             {
-                Accounts = new List<Models.Account> { account1, account2 },
+                Accounts = new List<AccountWrapper> { account1, account2 },
                 Apex = 0,
                 TxCursor = 1,
                 Orders = new List<Order>(),

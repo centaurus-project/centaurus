@@ -18,22 +18,23 @@ namespace Centaurus.Domain
         public override void CommitEffect()
         {
             MarkAsProcessed();
-            order.Amount -= Effect.AssetAmount;
-            order.QuoteAmount -= Effect.QuoteAmount;
+            order.Amount += -Effect.AssetAmount;
+            if (!Effect.IsNewOrder) //new order doesn't have this value yet
+                order.QuoteAmount += -Effect.QuoteAmount;
 
             var decodedId = OrderIdConverter.Decode(Effect.OrderId);
             var quoteBalance = Effect.AccountWrapper.Account.GetBalance(0);
             var assetBalance = Effect.AccountWrapper.Account.GetBalance(decodedId.Asset);
             if (decodedId.Side == OrderSide.Buy)
             {
-                if (!Effect.IsNewOrder)
+                if (!Effect.IsNewOrder) //liabilities wasn't locked for new order yet
                     quoteBalance.UpdateLiabilities(-Effect.QuoteAmount);
                 quoteBalance.UpdateBalance(-Effect.QuoteAmount);
                 assetBalance.UpdateBalance(Effect.AssetAmount);
             }
             else
             {
-                if (!Effect.IsNewOrder)
+                if (!Effect.IsNewOrder) //liabilities wasn't locked for new order yet
                     assetBalance.UpdateLiabilities(-Effect.AssetAmount);
                 assetBalance.UpdateBalance(-Effect.AssetAmount);
                 quoteBalance.UpdateBalance(Effect.QuoteAmount);
@@ -62,8 +63,9 @@ namespace Centaurus.Domain
                 quoteBalance.UpdateBalance(-Effect.QuoteAmount);
             }
 
-            order.Amount += Effect.AssetAmount;
-            order.QuoteAmount += Effect.QuoteAmount;
+            order.Amount += Effect.AssetAmount; 
+            if (!Effect.IsNewOrder)
+                order.QuoteAmount += Effect.QuoteAmount;
         }
     }
 }

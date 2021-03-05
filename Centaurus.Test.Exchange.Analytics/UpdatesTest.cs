@@ -15,8 +15,8 @@ namespace Centaurus.Test.Exchange.Analytics
 {
     public class UpdatesTest
     {
-        Models.Account account1;
-        Models.Account account2;
+        AccountWrapper account1;
+        AccountWrapper account2;
 
         [SetUp]
         public void Setup()
@@ -30,34 +30,34 @@ namespace Centaurus.Test.Exchange.Analytics
             };
             Global.Setup(settings, new MockStorage()).Wait();
 
-            account1 = new Models.Account()
+            account1 = new AccountWrapper(new Models.Account
             {
                 Id = 1,
                 Pubkey = new RawPubKey() { Data = KeyPair.Random().PublicKey },
                 Balances = new List<Balance>()
-            };
+            }, Global.Constellation.RequestRateLimits);
 
-            account1.CreateBalance(0);
-            account1.GetBalance(0).UpdateBalance(10000000000);
+            account1.Account.CreateBalance(0);
+            account1.Account.GetBalance(0).UpdateBalance(10000000000);
 
-            account1.CreateBalance(1);
-            account1.GetBalance(1).UpdateBalance(10000000000);
+            account1.Account.CreateBalance(1);
+            account1.Account.GetBalance(1).UpdateBalance(10000000000);
 
-            account2 = new Models.Account()
+            account2 = new AccountWrapper(new Models.Account
             {
                 Id = 2,
                 Pubkey = new RawPubKey() { Data = KeyPair.Random().PublicKey },
                 Balances = new List<Balance>()
-            };
+            }, Global.Constellation.RequestRateLimits);
 
-            account2.CreateBalance(0);
-            account2.GetBalance(0).UpdateBalance(10000000000);
+            account2.Account.CreateBalance(0);
+            account2.Account.GetBalance(0).UpdateBalance(10000000000);
 
-            account2.CreateBalance(1);
-            account2.GetBalance(1).UpdateBalance(10000000000);
+            account2.Account.CreateBalance(1);
+            account2.Account.GetBalance(1).UpdateBalance(10000000000);
             Global.Setup(new Snapshot
             {
-                Accounts = new List<Models.Account> { account1, account2 },
+                Accounts = new List<AccountWrapper> { account1, account2 },
                 Apex = 0,
                 TxCursor = 1,
                 Orders = new List<Order>(),
@@ -78,7 +78,7 @@ namespace Centaurus.Test.Exchange.Analytics
             for (var i = 1; i < iterations; i++)
             {
                 var price = useNormalDistribution ? rnd.NextNormallyDistributed() + 50 : rnd.NextDouble() * 100;
-                var accountWrapper = Global.AccountStorage.GetAccount(account1.Pubkey);
+                var accountWrapper = Global.AccountStorage.GetAccount(account1.Account.Pubkey);
                 var trade = new RequestQuantum
                 {
                     Apex = i,
@@ -92,7 +92,7 @@ namespace Centaurus.Test.Exchange.Analytics
                             Asset = 1,
                             Price = Math.Round(price * 10) / 10,
                             Side = rnd.NextDouble() >= 0.5 ? OrderSide.Buy : OrderSide.Sell,
-                            AccountWrapper = Global.AccountStorage.GetAccount(account1.Pubkey)
+                            AccountWrapper = Global.AccountStorage.GetAccount(account1.Account.Pubkey)
                         },
                         Signatures = new List<Ed25519Signature>()
                     },

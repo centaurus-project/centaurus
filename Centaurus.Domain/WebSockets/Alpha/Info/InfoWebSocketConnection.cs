@@ -91,7 +91,7 @@ namespace Centaurus.Domain
                     {
                         var timeoutTokenSource = new CancellationTokenSource(1000);
                         await webSocket.CloseAsync(status, desc, timeoutTokenSource.Token);
-                        cancellationTokenSource.Cancel();
+                        cancellationTokenSource?.Cancel();
                     }
                     catch (WebSocketException exc)
                     {
@@ -103,7 +103,7 @@ namespace Centaurus.Domain
                     catch (OperationCanceledException) { }
                     finally
                     {
-                        sendMessageSemaphore.Release();
+                        sendMessageSemaphore?.Release();
                     }
                 }
             }
@@ -217,6 +217,8 @@ namespace Centaurus.Domain
         {
             cancellationTokenSource?.Dispose();
             cancellationTokenSource = null;
+            sendMessageSemaphore?.Dispose();
+            sendMessageSemaphore = null;
 
             if (locks != null)
             {

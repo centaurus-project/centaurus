@@ -78,7 +78,7 @@ namespace Centaurus.Exchange.Analytics
             if (!HadTrades) //register first trade
             {
                 Open = High = Low = Close = trade.Price;
-                BaseVolume = trade.BaseAmount;
+                BaseVolume = trade.QuoteAmount;
                 CounterVolume = trade.Amount;
                 HadTrades = true;
                 return;
@@ -88,7 +88,7 @@ namespace Centaurus.Exchange.Analytics
             if (Low > trade.Price)
                 Low = trade.Price;
             Close = trade.Price;
-            BaseVolume += trade.BaseAmount;
+            BaseVolume += trade.QuoteAmount;
             CounterVolume += trade.Amount;
         }
 

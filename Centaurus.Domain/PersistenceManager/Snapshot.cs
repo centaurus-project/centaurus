@@ -15,7 +15,7 @@ namespace Centaurus.Domain
 
         public long TxCursor { get; set; }
 
-        public List<Account> Accounts { get; set; }
+        public List<AccountWrapper> Accounts { get; set; }
 
         public List<Order> Orders { get; set; }
 

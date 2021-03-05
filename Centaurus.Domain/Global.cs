@@ -109,7 +109,7 @@ namespace Centaurus.Domain
         {
             Constellation = snapshot.Settings;
 
-            AccountStorage = new AccountStorage(snapshot.Accounts, Constellation.RequestRateLimits);
+            AccountStorage = new AccountStorage(snapshot.Accounts);
 
             if (Exchange != null)
             {

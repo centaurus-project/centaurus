@@ -21,9 +21,9 @@ namespace Centaurus.Models
 
         public double Price { get; set; }
 
-        public long Amount { get; set; }
+        public long AmountDiff { get; set; }
 
-        public long QuoteAmount { get; set; }
+        public long QuoteAmountDiff { get; set; }
 
         public OrderState State { get; set; }
     }

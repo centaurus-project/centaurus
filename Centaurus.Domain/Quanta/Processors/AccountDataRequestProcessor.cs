@@ -28,7 +28,6 @@ namespace Centaurus.Domain
                 .OrderBy(balance => balance.Asset)
                 .ToList();
 
-            //TODO: create property in Account object
             resultMessage.Orders = Global.Exchange.OrderMap.GetAllAccountOrders(requestMessage.AccountWrapper)
                 .Select(order => new Order { AccountWrapper = order.AccountWrapper, Amount = order.Amount, QuoteAmount = order.QuoteAmount, Price = order.Price, OrderId = order.OrderId })
                 .OrderBy(order => order.OrderId)

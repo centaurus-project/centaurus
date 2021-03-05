@@ -12,7 +12,7 @@ namespace Centaurus.Models
 
         public double Price { get; set; }
 
-        public double BaseAmount { get; set; }
+        public long QuoteAmount { get; set; }
 
         public DateTime TradeDate { get; set; } 
     }
