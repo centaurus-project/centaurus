@@ -29,13 +29,14 @@ namespace Centaurus.Test.Exchange.Analytics
                 CWD = "AppData"
             };
             Global.Setup(settings, new MockStorage()).Wait();
+            var requestsLimit = new RequestRateLimits();
 
             account1 = new AccountWrapper(new Models.Account
             {
                 Id = 1,
                 Pubkey = new RawPubKey() { Data = KeyPair.Random().PublicKey },
                 Balances = new List<Balance>()
-            }, Global.Constellation.RequestRateLimits);
+            }, requestsLimit);
 
             account1.Account.CreateBalance(0);
             account1.Account.GetBalance(0).UpdateBalance(10000000000);
@@ -48,7 +49,7 @@ namespace Centaurus.Test.Exchange.Analytics
                 Id = 2,
                 Pubkey = new RawPubKey() { Data = KeyPair.Random().PublicKey },
                 Balances = new List<Balance>()
-            }, Global.Constellation.RequestRateLimits);
+            }, requestsLimit);
 
             account2.Account.CreateBalance(0);
             account2.Account.GetBalance(0).UpdateBalance(10000000000);
