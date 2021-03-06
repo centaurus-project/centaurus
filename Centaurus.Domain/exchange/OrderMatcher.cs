@@ -40,7 +40,7 @@ namespace Centaurus.Domain
 
         private readonly Orderbook orderbook;
 
-        private readonly Market market;
+        private readonly ExchangeMarket market;
 
         private readonly EffectProcessorsContainer resultEffects;
 
@@ -118,7 +118,6 @@ namespace Centaurus.Domain
             var reminderOrderbook = market.GetOrderbook(side);
             //record maker trade effect
             resultEffects.AddOrderPlaced(reminderOrderbook, takerOrder);
-            resultEffects.OrderWasPlaced = true;
             return true;
         }
 
@@ -165,9 +164,8 @@ namespace Centaurus.Domain
                 else
                 {
                     counterOrder.State = OrderState.Updated;
-                    //TODO: add diff field for this purpose
-                    //it's not amount but difference with existing amount 
-                    counterOrder.Amount = trade.Amount; 
+                    counterOrder.AmountDiff = -trade.Amount;
+                    counterOrder.QuoteAmountDiff = -trade.QuoteAmount;
                 }
 
                 return (trade, counterOrder);
@@ -194,8 +192,8 @@ namespace Centaurus.Domain
                 return new Trade
                 {
                     Amount = AssetAmount,
+                    QuoteAmount = QuoteAmount,
                     Asset = matcher.asset,
-                    BaseAmount = QuoteAmount,
                     Price = makerOrder.Price,
                     TradeDate = new DateTime(matcher.resultEffects.Quantum.Timestamp, DateTimeKind.Utc)
                 };

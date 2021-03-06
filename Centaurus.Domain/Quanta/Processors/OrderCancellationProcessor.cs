@@ -20,11 +20,10 @@ namespace Centaurus.Domain
         public override Task<ResultMessage> Process(OrderCancellationProcessorContext context)
         {
             var quantum = (RequestQuantum)context.Envelope.Message;
-            var orderRequest = (OrderCancellationRequest)quantum.RequestMessage;
 
             context.UpdateNonce();
 
-            context.EffectProcessors.AddOrderRemoved(context.Orderbook, context.Order);
+            Global.Exchange.RemoveOrder(context.EffectProcessors, context.Orderbook, context.Order);
 
             var resultMessage = context.Envelope.CreateResult(ResultStatusCodes.Success, context.EffectProcessors.Effects);
             return Task.FromResult(resultMessage);

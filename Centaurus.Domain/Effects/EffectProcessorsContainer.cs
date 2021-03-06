@@ -24,8 +24,6 @@ namespace Centaurus.Domain
 
         public Dictionary<int, EffectsModel> EffectsModels { get; } = new Dictionary<int, EffectsModel>();
 
-        public bool OrderWasPlaced { get; set; }
-
         public DiffObject PendingDiffObject { get; }
 
         public QuantumItem QuantumModel { get; }
@@ -63,14 +61,6 @@ namespace Centaurus.Domain
         /// </summary>
         public void Complete()
         {
-            //TODO: find more elegant way to handle this scenario
-            //we mustn't save orders that were closed immediately without adding to order-book
-            if (Quantum is RequestQuantum request
-                && request.RequestMessage is OrderRequest orderRequest
-                && !OrderWasPlaced)
-            {
-                PendingDiffObject.Orders.Remove(OrderIdConverter.FromRequest(orderRequest, Quantum.Apex));
-            }
             QuantumModel.Complete(QuantumModelExtensions.FromQuantum(Envelope));
             PendingDiffObject.Quanta.Add(QuantumModel);
         }

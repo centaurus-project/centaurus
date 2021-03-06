@@ -48,7 +48,7 @@ namespace Centaurus.Test.Exchange.Analytics
                         Amount = amount,
                         Asset = market,
                         Price = price,
-                        BaseAmount = amount * price,
+                        QuoteAmount = amount * price,
                         TradeDate = now
                     });
                     if (minPrice == 0)

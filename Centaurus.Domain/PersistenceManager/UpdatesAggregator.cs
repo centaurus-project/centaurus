@@ -98,32 +98,50 @@ namespace Centaurus.Domain
                             Price = orderPlacedEffect.Price,
                             Account = accId
                         };
-                        //update liabilities
-                        var decodedId = OrderIdConverter.Decode(orderId);
-                        if (decodedId.Side == OrderSide.Buy)
-                            GetBalance(pendingDiffObject.Balances, BalanceModelIdConverter.EncodeId(accId, 0)).LiabilitiesDiff += orderPlacedEffect.QuoteAmount;
-                        else
-                            GetBalance(pendingDiffObject.Balances, BalanceModelIdConverter.EncodeId(accId, decodedId.Asset)).LiabilitiesDiff += orderPlacedEffect.Amount;
+                        UpdateLiabilities(pendingDiffObject.Accounts, pendingDiffObject.Balances, accId, orderId, orderPlacedEffect.QuoteAmount, orderPlacedEffect.Amount);
                     }
                     break;
                 case OrderRemovedEffect orderRemovedEffect:
                     {
                         var accId = orderRemovedEffect.AccountWrapper.Account.Id;
                         var orderId = orderRemovedEffect.OrderId;
+                        var quoteAmount = -orderRemovedEffect.QuoteAmount;
+                        var assetAmount = -orderRemovedEffect.Amount;
                         GetOrder(pendingDiffObject.Orders, orderId).IsDeleted = true;
-                        //update liabilities
-                        var decodedId = OrderIdConverter.Decode(orderId);
-                        if (decodedId.Side == OrderSide.Buy)
-                            GetBalance(pendingDiffObject.Balances, BalanceModelIdConverter.EncodeId(accId, 0)).LiabilitiesDiff -= orderRemovedEffect.QuoteAmount;
-                        else
-                            GetBalance(pendingDiffObject.Balances, BalanceModelIdConverter.EncodeId(accId, decodedId.Asset)).LiabilitiesDiff -= orderRemovedEffect.Amount;
+                        UpdateLiabilities(pendingDiffObject.Accounts, pendingDiffObject.Balances, accId, orderId, quoteAmount, assetAmount);
                     }
                     break;
                 case TradeEffect tradeEffect:
                     {
-                        var order = GetOrder(pendingDiffObject.Orders, tradeEffect.OrderId);
-                        order.AmountDiff -= tradeEffect.AssetAmount;
-                        order.QuoteAmountDiff -= tradeEffect.QuoteAmount;
+                        var accId = tradeEffect.AccountWrapper.Account.Id;
+                        var orderId = tradeEffect.OrderId;
+                        var assetAmount = tradeEffect.AssetAmount;
+                        var quoteAmount = tradeEffect.QuoteAmount;
+
+                        var decodedId = OrderIdConverter.Decode(orderId);
+                        var quoteBalance = GetBalance(pendingDiffObject.Balances, BalanceModelIdConverter.EncodeId(accId, 0));
+                        var assetBalance = GetBalance(pendingDiffObject.Balances, BalanceModelIdConverter.EncodeId(accId, decodedId.Asset));
+                        if (decodedId.Side == OrderSide.Buy)
+                        {
+                            if (!tradeEffect.IsNewOrder)
+                                quoteBalance.LiabilitiesDiff += -quoteAmount;
+                            quoteBalance.AmountDiff += -quoteAmount;
+                            assetBalance.AmountDiff += assetAmount;
+
+                        }
+                        else
+                        {
+                            if (!tradeEffect.IsNewOrder)
+                                assetBalance.LiabilitiesDiff += -assetAmount;
+                            assetBalance.AmountDiff += -assetAmount;
+                            quoteBalance.AmountDiff += quoteAmount;
+                        }
+
+                        if (tradeEffect.IsNewOrder)
+                            return;
+                        var order = GetOrder(pendingDiffObject.Orders, orderId);
+                        order.AmountDiff += -assetAmount;
+                        order.QuoteAmountDiff += -quoteAmount;
                     }
                     break;
                 case TxCursorUpdateEffect cursorUpdateEffect:
@@ -150,14 +168,23 @@ namespace Centaurus.Domain
                         {
                             var balance = GetBalance(pendingDiffObject.Balances, BalanceModelIdConverter.EncodeId(accId, withdrawalItem.Asset));
                             if (withdrawalRemoveEffect.IsSuccessful)
-                                balance.AmountDiff -= withdrawalItem.Amount;
-                            balance.LiabilitiesDiff -= withdrawalItem.Amount;
+                                balance.AmountDiff += -withdrawalItem.Amount;
+                            balance.LiabilitiesDiff += -withdrawalItem.Amount;
                         }
                     }
                     break;
                 default:
                     break;
             }
+        }
+
+        private static void UpdateLiabilities(Dictionary<int, DiffObject.Account> accounts, Dictionary<BsonObjectId, DiffObject.Balance> balances, int accountId, ulong orderId, long quoteAmount, long assetAmount)
+        {
+            var decodedId = OrderIdConverter.Decode(orderId);
+            if (decodedId.Side == OrderSide.Buy)
+                GetBalance(balances, BalanceModelIdConverter.EncodeId(accountId, 0)).LiabilitiesDiff += quoteAmount;
+            else
+                GetBalance(balances, BalanceModelIdConverter.EncodeId(accountId, decodedId.Asset)).LiabilitiesDiff += assetAmount;
         }
 
         private static DiffObject.Account GetAccount(Dictionary<int, DiffObject.Account> accounts, int accountId)

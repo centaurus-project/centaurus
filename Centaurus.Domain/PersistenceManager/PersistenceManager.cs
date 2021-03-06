@@ -121,7 +121,7 @@ namespace Centaurus.Domain
             var snapshot = new Snapshot
             {
                 Apex = constellationInitEffect.Apex,
-                Accounts = new List<Account>(),
+                Accounts = new List<AccountWrapper>(),
                 Orders = new List<Order>(),
                 Withdrawals = new List<WithdrawalWrapper>(),
                 Settings = new ConstellationSettings
@@ -181,9 +181,9 @@ namespace Centaurus.Domain
 
             var stellarData = await storage.LoadConstellationState();
 
-            var accounts = await GetAccounts();
+            var accounts = (await GetAccounts()).Select(a => new AccountWrapper(a, settings.RequestRateLimits));
 
-            var accountStorage = new AccountStorage(accounts, settings.RequestRateLimits);
+            var accountStorage = new AccountStorage(accounts);
 
             var withdrawals = await GetWithdrawals(accountStorage, settings);
 
@@ -290,7 +290,7 @@ namespace Centaurus.Domain
             return new Snapshot
             {
                 Apex = apex,
-                Accounts = accountStorage.GetAll().OrderBy(a => a.Account.Id).Select(a => a.Account).ToList(),
+                Accounts = accountStorage.GetAll().OrderBy(a => a.Account.Id).ToList(),
                 TxCursor = stellarData?.TxCursor ?? 0,
                 Orders = allOrders.OrderBy(o => o.OrderId).ToList(),
                 Settings = settings,

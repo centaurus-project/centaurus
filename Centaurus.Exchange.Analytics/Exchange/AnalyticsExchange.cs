@@ -81,7 +81,7 @@ namespace Centaurus.Exchange.Analytics
                         market.GetOrderbook(order.Side).InsertOrder(new OrderInfoWrapper { Order = order });
                         break;
                     case OrderState.Updated:
-                        GetOrder(order.OrderId).Order.Amount = order.Amount;
+                        GetOrder(order.OrderId).Order.AmountDiff = order.AmountDiff;
                         break;
                     case OrderState.Deleted:
                         RemoveOrder(order.OrderId);

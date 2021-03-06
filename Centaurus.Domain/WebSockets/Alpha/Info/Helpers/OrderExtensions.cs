@@ -7,7 +7,7 @@ namespace Centaurus.Domain
 {
     public static class OrderExtensions
     {
-        public static OrderInfo ToOrderInfo(this Order order)
+        public static OrderInfo ToOrderInfo(this Order order, OrderState state = OrderState.New)
         {
             if (order == null)
                 throw new ArgumentNullException(nameof(order));
@@ -15,11 +15,12 @@ namespace Centaurus.Domain
             return new OrderInfo
             {
                 OrderId = order.OrderId,
-                Amount = order.Amount,
-                QuoteAmount = order.QuoteAmount,
+                AmountDiff = order.Amount,
+                QuoteAmountDiff = order.QuoteAmount,
                 Market = decodedId.Asset,
                 Price = order.Price,
-                Side = decodedId.Side
+                Side = decodedId.Side,
+                State = state
             };
         }
     }

@@ -9,11 +9,6 @@ namespace Centaurus.Domain
 {
     public class AccountStorage
     {
-        public AccountStorage(IEnumerable<Account> accounts, RequestRateLimits defaultRequestRateLimits)
-            : this(accounts.Select(a => new AccountWrapper(a, a.RequestRateLimits ?? defaultRequestRateLimits)))
-        {
-
-        }
         public AccountStorage(IEnumerable<AccountWrapper> accounts)
         {
             if (accounts == null)

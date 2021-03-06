@@ -71,7 +71,7 @@ namespace Centaurus.SDK
 
         public async Task UpdateAccountData()
         {
-            AccountData = await GetAccountData();
+            AccountData = await GetAccountData(false);
         }
 
         public async Task CloseConnection()
@@ -231,6 +231,8 @@ namespace Centaurus.SDK
 
         private void RegisterNewEffectsMessage(long messageId)
         {
+            if (messageId == 0) //if message id is zero, than it's EffectsNotification message
+                return;
             processedEffectsMessages.Add(messageId);
             if (processedEffectsMessages.Count > 100_000)
                 processedEffectsMessages.RemoveAt(0);
@@ -242,7 +244,7 @@ namespace Centaurus.SDK
             {
                 if (AccountData == null
                    || !(envelope.Message is IEffectsContainer effectsMessage)
-                   || processedEffectsMessages.Any(r => r == envelope.Message.MessageId))
+                   || processedEffectsMessages.Any(r => r == envelope.Message.MessageId)) //result message could arrive twice (Acknowledgment and Finalize)
                     return;
                 RegisterNewEffectsMessage(envelope.Message.MessageId);
                 try
