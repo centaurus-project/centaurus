@@ -36,13 +36,13 @@ namespace Centaurus.Domain
                 rawCursor = "0";
             if (!long.TryParse(rawCursor, out var apex))
                 throw new ArgumentException("Cursor is invalid.");
-            var accountEffectModels = (await storage.LoadEffects(apex, isDesc, limit, account));
-            var effectModels = accountEffectModels
+            var accountQuanta = (await storage.LoadEffects(apex, isDesc, limit, account));
+            var effectModels = accountQuanta
                 .OrderBy(e => e.Apex)
                 .Select(ae => new ApexEffects
                 {
                     Apex = ae.Apex,
-                    Items = ae.Effects.Select(e => e.ToEffect(null)).ToList() //we can ignore account here, because it's used only in domain
+                    Items = ae.ToQuantumData().effects.Effects.Where(a => a.Account == account).ToList()
                 })
                 .ToList();
             if (isDesc)
@@ -193,30 +193,19 @@ namespace Centaurus.Domain
 
             var withdrawalsStorage = new WithdrawalStorage(withdrawals, false);
 
-            var accountEffectModels = await storage.LoadEffectsAboveApex(apex);
-
-            var effectModels = new Effect[accountEffectModels.Sum(a => a.Effects.Count)];
-            var currentApexIndexOffset = 0;
-            foreach (var quantumEffect in accountEffectModels.GroupBy(a => a.Apex))
+            var batchSize = 1000;
+            var effects = new List<Effect>();
+            while (true)
             {
-                var effectsCount = 0;
-                foreach (var accountEffects in quantumEffect)
-                {
-                    var account = accountStorage.GetAccount(accountEffects.Account);
-                    if (account == null)
-                        throw new Exception($"Account {accountEffects.Account} is not found.");
-                    foreach (var rawEffect in accountEffects.Effects)
-                    {
-                        var effect = rawEffect.ToEffect(account);
-                        effectModels[currentApexIndexOffset + rawEffect.ApexIndex] = effect;
-                        effectsCount++;
-                    }
-                }
-                currentApexIndexOffset += effectsCount;
+                var quanta = await storage.LoadQuantaAboveApex(apex, batchSize);
+                effects.AddRange(quanta.SelectMany(q => q.ToQuantumData(accountStorage).effects.Effects));
+                if (quanta.Count < batchSize)
+                    break;
             }
-            for (var i = effectModels.Length - 1; i >= 0; i--)
+
+            for (var i = effects.Count - 1; i >= 0; i--)
             {
-                var currentEffect = effectModels[i];
+                var currentEffect = effects[i];
                 var account = currentEffect.AccountWrapper;
                 IEffectProcessor<Effect> processor = null;
                 switch (currentEffect)
@@ -276,7 +265,7 @@ namespace Centaurus.Domain
                 processor.RevertEffect();
             }
 
-            var lastQuantum = (await storage.LoadQuantum(apex)).ToMessageEnvelope();
+            var lastQuantumData = (await storage.LoadQuantum(apex)).ToQuantumData();
 
             //TODO: refactor restore exchange
             //we need to clean all order links to be able to restore exchange
@@ -295,7 +284,7 @@ namespace Centaurus.Domain
                 Orders = allOrders.OrderBy(o => o.OrderId).ToList(),
                 Settings = settings,
                 Withdrawals = withdrawalsStorage.GetAll().OrderBy(w => w.Apex).ToList(),
-                LastHash = lastQuantum.Message.ComputeHash()
+                LastHash = lastQuantumData.envelope.Message.ComputeHash()
             };
         }
 
@@ -306,7 +295,7 @@ namespace Centaurus.Domain
         public async Task<long> GetMinRevertApex()
         {
             //obtain min apex we can revert to
-            var minApex = await storage.GetFirstEffectApex();
+            var minApex = (await storage.LoadQuantaAboveApex(0, 1)).FirstOrDefault()?.Apex ?? -1;
             if (minApex == -1) //we can't revert at all
                 return -1;
 

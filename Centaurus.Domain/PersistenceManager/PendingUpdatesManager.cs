@@ -144,15 +144,6 @@ namespace Centaurus.Domain
             }
         }
 
-        public void TryRefreshContainer()
-        {
-            var effectsCount = Current.Quanta.Sum(ea => ea.EffectsCount);
-            if (effectsCount > 75_000)
-            {
-                RefreshUpdatesUnlocked();
-            }
-        }
-
         private void RefreshUpdatesUnlocked()
         {
             if (Current.Quanta.Count < 1)
@@ -182,7 +173,7 @@ namespace Centaurus.Domain
                 {
                     SavedAt = DateTime.UtcNow,
                     QuantaCount = updates.Quanta.Count,
-                    EffectsCount = updates.Quanta.Sum(ea => ea.EffectsCount),
+                    EffectsCount = updates.EffectsCount,
                     ElapsedMilliseconds = sw.ElapsedMilliseconds,
                     Retries = retries
                 };

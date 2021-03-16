@@ -95,9 +95,9 @@ namespace Centaurus
                     await sendMessageSemaphore.WaitAsync();
                     try
                     {
+                        cancellationTokenSource?.Cancel();
                         var timeoutTokenSource = new CancellationTokenSource(1000);
                         await webSocket.CloseAsync(status, desc, timeoutTokenSource.Token);
-                        cancellationTokenSource?.Cancel();
                     }
                     catch (WebSocketException exc)
                     {
@@ -236,9 +236,6 @@ namespace Centaurus
             }
             finally
             {
-                //make sure the socket is closed
-                if (webSocket.State != WebSocketState.Closed)
-                    webSocket.Abort();
                 ConnectionState = ConnectionState.Closed;
             }
         }
@@ -252,6 +249,10 @@ namespace Centaurus
 
             cancellationTokenSource?.Dispose();
             cancellationTokenSource = null;
+
+            //make sure the socket is closed
+            if (webSocket.State != WebSocketState.Closed)
+                webSocket.Abort();
         }
     }
 }

@@ -144,6 +144,7 @@ namespace Centaurus.Test
 
                     new OrderRemovedEffectProccessor(new OrderRemovedEffect
                     {
+                        Account = account.Id,
                         OrderId = order.OrderId,
                         Amount = order.Amount,
                         QuoteAmount = order.QuoteAmount,

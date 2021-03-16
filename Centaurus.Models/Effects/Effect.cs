@@ -25,7 +25,9 @@ namespace Centaurus.Models
         //ignore it during the serialization - we need it only to decide which effects to send back to a particular user
         public AccountWrapper AccountWrapper { get; set; }
 
-        [XdrField(0)]
         public long Apex { get; set; }
+
+        [XdrField(0)]
+        public int Account { get; set; }
     }
 }

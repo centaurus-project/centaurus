@@ -120,8 +120,6 @@ namespace Centaurus.Domain
             await Global.PendingUpdatesManager.UpdatesSyncRoot.WaitAsync();
             try
             {
-                if (Global.QuantumStorage.CurrentApex % 50 == 0) //avoid often refresh check
-                    Global.PendingUpdatesManager.TryRefreshContainer();
                 return Global.IsAlpha
                     ? await AlphaHandleQuantum(quantumEnvelope, timestamp)
                     : await AuditorHandleQuantum(quantumEnvelope);
@@ -152,6 +150,10 @@ namespace Centaurus.Domain
 
             var resultMessage = await processor.Process(context);
 
+            var effects = new EffectsContainer { Effects = effectsContainer.Effects }.ToByteArray();
+
+            quantum.EffectsHash = effects.ComputeHash();
+
             //we need to sign the quantum here to prevent multiple signatures that can occur if we sign it when sending
             quantumEnvelope.Sign(Global.Settings.KeyPair);
 
@@ -159,7 +161,7 @@ namespace Centaurus.Domain
 
             Global.QuantumStorage.AddQuantum(quantumEnvelope);
 
-            effectsContainer.Complete();
+            effectsContainer.Complete(effects);
 
             logger.Trace($"Message of type {envelope.Message} with apex {quantum.Apex} is handled.");
 
@@ -187,11 +189,17 @@ namespace Centaurus.Domain
 
             var result = await processor.Process(context);
 
+            var effects = new EffectsContainer { Effects = effectsContainer.Effects }.ToByteArray();
+
+            var effectsHash = effects.ComputeHash();
+            if (!ByteArrayComparer.Default.Equals(effectsHash, quantum.EffectsHash))
+                throw new Exception("Effects hash is not equal to provided by Alpha.");
+
             Global.QuantumStorage.AddQuantum(envelope);
 
             ProcessTransaction(context, result);
 
-            effectsContainer.Complete();
+            effectsContainer.Complete(effects);
 
             logger.Trace($"Message of type {messageType} with apex {((Quantum)envelope.Message).Apex} is handled.");
 

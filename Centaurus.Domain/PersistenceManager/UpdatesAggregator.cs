@@ -31,11 +31,6 @@ namespace Centaurus.Domain
             if (quatumEffect == null)
                 throw new ArgumentNullException(nameof(quatumEffect));
 
-            var accountWrapper = quatumEffect.AccountWrapper;
-            var apex = processorsContainer.Apex;
-
-            processorsContainer.QuantumModel.AddEffect(accountWrapper?.Account.Id ?? 0, quatumEffect.FromEffect(effectIndex));
-
             switch (quatumEffect)
             {
                 case ConstellationInitEffect constellationInit:
@@ -51,7 +46,7 @@ namespace Centaurus.Domain
                 case AccountCreateEffect accountCreateEffect:
                     {
                         var pubKey = accountCreateEffect.Pubkey;
-                        var accId = accountCreateEffect.AccountId;
+                        var accId = accountCreateEffect.Account;
                         pendingDiffObject.Accounts.Add(accId, new DiffObject.Account { PubKey = pubKey, Id = accId, IsInserted = true });
                     }
                     break;

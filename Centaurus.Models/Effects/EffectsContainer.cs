@@ -6,11 +6,9 @@ using System.Text;
 namespace Centaurus.Models
 {
     [XdrContract]
-    public class AccountCreateEffect: Effect
+    public class EffectsContainer
     {
-        public override EffectTypes EffectType => EffectTypes.AccountCreate;
-
         [XdrField(0)]
-        public RawPubKey Pubkey { get; set; }
+        public List<Effect> Effects { get; set; }
     }
 }

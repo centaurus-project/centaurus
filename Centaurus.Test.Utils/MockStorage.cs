@@ -20,7 +20,6 @@ namespace Centaurus.Test
         private List<AccountModel> accountsCollection = new List<AccountModel>();
         private List<BalanceModel> balancesCollection = new List<BalanceModel>();
         private List<QuantumModel> quantaCollection = new List<QuantumModel>();
-        private List<EffectsModel> effectsCollection = new List<EffectsModel>();
         private List<SettingsModel> settingsCollection = new List<SettingsModel>();
         private List<AssetModel> assetSettings = new List<AssetModel>();
         private List<PriceHistoryFrameModel> frames = new List<PriceHistoryFrameModel>();
@@ -69,35 +68,6 @@ namespace Centaurus.Test
                 query = query.Take(count);
             var res = query.ToList();
             return Task.FromResult(res);
-        }
-
-        public Task<long> GetFirstEffectApex()
-        {
-            var firstEffect = effectsCollection
-                   .OrderBy(e => e.Apex)
-                   .FirstOrDefault();
-
-            if (firstEffect == null)
-                return Task.FromResult((long)-1);
-
-            return Task.FromResult(firstEffect.Apex);
-        }
-
-        public Task<List<EffectsModel>> LoadEffectsAboveApex(long apex)
-        {
-            var effects = effectsCollection
-                .OrderBy(e => e.Apex)
-                .Where(e => e.Apex > apex)
-                .ToList();
-            return Task.FromResult(effects);
-        }
-
-        public Task<List<EffectsModel>> LoadEffectsForApex(long apex)
-        {
-            var effects = effectsCollection
-                .Where(e => e.Apex == apex)
-                .ToList();
-            return Task.FromResult(effects);
         }
 
         public Task<List<AccountModel>> LoadAccounts()
@@ -150,16 +120,9 @@ namespace Centaurus.Test
 
             UpdateOrders(update.Orders.Values.ToList());
 
-            UpdateQuanta(update.Quanta.Select(q => q.Quantum).ToList());
-
-            UpdateEffects(update.Quanta.SelectMany(v => v.Effects.Values).ToList());
+            UpdateQuanta(update.Quanta);
 
             return Task.FromResult(1);
-        }
-
-        private void UpdateEffects(List<EffectsModel> effects)
-        {
-            effectsCollection.AddRange(effects);
         }
 
         private void UpdateQuanta(List<QuantumModel> quanta)
@@ -271,12 +234,12 @@ namespace Centaurus.Test
             }
         }
 
-        public Task<List<EffectsModel>> LoadEffects(long apex, bool isDesc, int limit, int account)
+        public Task<List<QuantumModel>> LoadEffects(long apex, bool isDesc, int limit, int account)
         {
             if (account == default)
                 throw new ArgumentNullException(nameof(account));
-            IEnumerable<EffectsModel> query = effectsCollection
-                    .Where(e => e.Account == account);
+            IEnumerable<QuantumModel> query = quantaCollection
+                    .Where(e => e.Accounts.Contains(account));
 
             if (isDesc)
                 query = query.OrderByDescending(e => e.Apex);
@@ -345,7 +308,6 @@ namespace Centaurus.Test
             accountsCollection.Clear();
             balancesCollection.Clear();
             quantaCollection.Clear();
-            effectsCollection.Clear();
             settingsCollection.Clear();
             assetSettings.Clear();
             frames.Clear();

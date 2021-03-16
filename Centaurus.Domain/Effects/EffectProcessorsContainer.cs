@@ -15,18 +15,16 @@ namespace Centaurus.Domain
         {
             Envelope = quantum ?? throw new ArgumentNullException(nameof(quantum));
             PendingDiffObject = pendingDiffObject ?? throw new ArgumentNullException(nameof(pendingDiffObject));
-            QuantumModel = new QuantumItem(Apex);
         }
 
         public MessageEnvelope Envelope { get; }
 
         public List<Effect> Effects { get; } = new List<Effect>();
 
-        public Dictionary<int, EffectsModel> EffectsModels { get; } = new Dictionary<int, EffectsModel>();
+
+        public HashSet<int> AffectedAccounts = new HashSet<int>();
 
         public DiffObject PendingDiffObject { get; }
-
-        public QuantumItem QuantumModel { get; }
 
         public Quantum Quantum => (Quantum)Envelope.Message;
 
@@ -43,6 +41,8 @@ namespace Centaurus.Domain
             Effects.Add(effectProcessor.Effect);
             effectProcessor.CommitEffect();
             this.Aggregate(Envelope, effectProcessor.Effect, Effects.Count - 1);
+            if (effectProcessor.Effect.Account != 0)
+                AffectedAccounts.Add(effectProcessor.Effect.Account);
         }
 
         /// <summary>
@@ -59,10 +59,11 @@ namespace Centaurus.Domain
         /// <summary>
         /// Sends envelope and all effects to specified callback
         /// </summary>
-        public void Complete()
+        public void Complete(byte[] effects)
         {
-            QuantumModel.Complete(QuantumModelExtensions.FromQuantum(Envelope));
-            PendingDiffObject.Quanta.Add(QuantumModel);
+            var quantumModel = QuantumModelExtensions.FromQuantum(Envelope, AffectedAccounts.ToArray(), effects);
+            PendingDiffObject.Quanta.Add(quantumModel);
+            PendingDiffObject.EffectsCount += Effects.Count;
         }
     }
 }

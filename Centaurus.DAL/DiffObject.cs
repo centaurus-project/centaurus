@@ -7,46 +7,9 @@ using System.Diagnostics;
 
 namespace Centaurus.DAL
 {
-    public class QuantumItem
-    {
-        public QuantumItem(long apex)
-        {
-            Apex = apex;
-            Effects = new Dictionary<int, EffectsModel>();
-        }
-
-        public QuantumModel Quantum { get; private set; }
-        public long Apex { get; }
-        public Dictionary<int, EffectsModel> Effects { get; }
-
-        public int EffectsCount { get; private set; }
-
-        public void AddEffect(int account, AtomicEffectModel singleEffectModel)
-        {
-            if (!Effects.TryGetValue(account, out var effects))
-            {
-                effects = new EffectsModel
-                {
-                    Id = EffectModelIdConverter.EncodeId(Apex, account),
-                    Apex = Apex,
-                    Account = account,
-                    Effects = new List<AtomicEffectModel>()
-                };
-                Effects.Add(account, effects);
-            }
-            effects.Effects.Add(singleEffectModel);
-            EffectsCount++;
-        }
-
-        public void Complete(QuantumModel quantum)
-        {
-            Quantum = quantum ?? throw new ArgumentNullException(nameof(quantum));
-        }
-    }
-
     public class DiffObject
     {
-        public List<QuantumItem> Quanta { get; set; } = new List<QuantumItem>();
+        public List<QuantumModel> Quanta { get; set; } = new List<QuantumModel>();
 
         public SettingsModel ConstellationSettings { get; set; }
 
@@ -59,6 +22,8 @@ namespace Centaurus.DAL
         public Dictionary<ulong, Order> Orders { get; } = new Dictionary<ulong, Order>();
 
         public List<AssetModel> Assets { get; set; }
+
+        public int EffectsCount { get; set; }
 
         #region DiffModels
 

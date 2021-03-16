@@ -10,30 +10,45 @@ namespace Centaurus.Domain
 {
     public static class QuantumModelExtensions
     {
-        public static QuantumModel FromQuantum(MessageEnvelope quantum)
+        public static QuantumModel FromQuantum(MessageEnvelope quantum, int[] accounts, byte[] effects)
         {
             if (quantum == null)
                 throw new ArgumentNullException(nameof(quantum));
+            if (accounts == null)
+                throw new ArgumentNullException(nameof(accounts));
+            if (effects == null)
+                throw new ArgumentNullException(nameof(effects));
+
             var quantumMessage = (Quantum)quantum.Message;
-            var account = 0;
-            if (quantumMessage is RequestQuantum requestQuantum)
-                account = requestQuantum.RequestMessage.Account;
 
             return new QuantumModel
             {
                 Apex = quantumMessage.Apex,
-                Account = account,
+                Accounts = accounts,
                 RawQuantum = XdrConverter.Serialize(quantum),
                 Type = (int)quantumMessage.MessageType,
-                TimeStamp = quantumMessage.Timestamp
+                TimeStamp = quantumMessage.Timestamp,
+                Effects = effects
             };
         }
 
-        public static MessageEnvelope ToMessageEnvelope(this QuantumModel quantum)
+        public static (MessageEnvelope envelope, EffectsContainer effects) ToQuantumData(this QuantumModel quantum, AccountStorage accountStorage = null)
         {
             if (quantum == null)
                 throw new ArgumentNullException(nameof(quantum));
-            return XdrConverter.Deserialize<MessageEnvelope>(quantum.RawQuantum);
+
+            var envelope = XdrConverter.Deserialize<MessageEnvelope>(quantum.RawQuantum);
+
+            var effects = XdrConverter.Deserialize<EffectsContainer>(quantum.Effects);
+            if (accountStorage != null)
+                foreach (var effect in effects.Effects)
+                {
+                    if (effect.Account == 0)
+                        continue;
+                    effect.AccountWrapper = accountStorage.GetAccount(effect.Account);
+                }
+
+            return (envelope, effects);
         }
     }
 }

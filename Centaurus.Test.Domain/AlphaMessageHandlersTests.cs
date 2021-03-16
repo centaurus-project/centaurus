@@ -248,6 +248,7 @@ namespace Centaurus.Test
             {
                 //TODO: replace it with quantum
                 var effect = new RequestRateLimitUpdateEffect { 
+                    Account = account.Id,
                     AccountWrapper = account, 
                     RequestRateLimits = new RequestRateLimits { 
                         HourLimit = (uint)requestLimit.Value, 
