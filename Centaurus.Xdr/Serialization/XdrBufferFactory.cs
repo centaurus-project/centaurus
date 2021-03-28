@@ -30,19 +30,19 @@ namespace Centaurus.Xdr
         /// </summary>
         public class RentedBuffer : IDisposable
         {
-            public RentedBuffer(byte[] messageBuffer, int length = 0)
+            public RentedBuffer(byte[] messageBuffer, int capacity)
             {
                 Buffer = messageBuffer;
-                Length = length;
+                Capacity = capacity;
             }
 
-            public readonly byte[] Buffer;
-
+            public byte[] Buffer { get; }
+            public int Capacity { get; }
             public int Length { get; private set; }
 
             public void Resize(int newLength)
             {
-                if (newLength < 0 || newLength > Buffer.Length) throw new IndexOutOfRangeException();
+                if (newLength < 0 || newLength > Capacity) throw new IndexOutOfRangeException();
                 Length = newLength;
             }
 

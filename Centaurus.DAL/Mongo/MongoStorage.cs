@@ -41,6 +41,14 @@ namespace Centaurus.DAL.Mongo
             return database.GetCollection<T>(collectionName);
         }
 
+        private async Task CreateIndexes()
+        {
+            await quantaCollection.Indexes.CreateOneAsync(
+                 new CreateIndexModel<QuantumModel>(Builders<QuantumModel>.IndexKeys.Ascending(a => a.Accounts).Ascending(a => a.Apex),
+                 new CreateIndexOptions { Background = true })
+            );
+        }
+
         public async Task OpenConnection(string connectionString)
         {
             var mongoUrl = new MongoUrl(connectionString);
@@ -55,6 +63,7 @@ namespace Centaurus.DAL.Mongo
             accountsCollection = await GetCollection<AccountModel>("accounts");
             balancesCollection = await GetCollection<BalanceModel>("balances");
             quantaCollection = await GetCollection<QuantumModel>("quanta");
+
             constellationStateCollection = await GetCollection<ConstellationState>("constellationState");
 
             settingsCollection = await GetCollection<SettingsModel>("constellationSettings");
@@ -62,6 +71,8 @@ namespace Centaurus.DAL.Mongo
             assetsCollection = await GetCollection<AssetModel>("assets");
 
             priceHistoryCollection = await GetCollection<PriceHistoryFrameModel>("priceHistory");
+
+            await CreateIndexes();
         }
 
         public Task CloseConnection()
@@ -169,7 +180,7 @@ namespace Centaurus.DAL.Mongo
             if (account == default)
                 throw new ArgumentNullException(nameof(account));
             var fBuilder = Builders<QuantumModel>.Filter;
-            var filter = Builders<QuantumModel>.Filter.AnyEq(e => e.Accounts, account);
+            var filter = fBuilder.AnyEq(e => e.Accounts, account);
 
             if (apex > 0)
             {
@@ -177,6 +188,10 @@ namespace Centaurus.DAL.Mongo
                     filter = fBuilder.And(filter, fBuilder.Lt(e => e.Apex, apex));
                 else
                     filter = fBuilder.And(filter, fBuilder.Gt(e => e.Apex, apex));
+            }
+            else
+            {
+                filter = fBuilder.And(filter, fBuilder.Ne(e => e.Apex, apex)); // 
             }
 
             var query = quantaCollection
@@ -228,6 +243,8 @@ namespace Centaurus.DAL.Mongo
 
         #region Updates
 
+
+        static TransactionOptions txOptions = new TransactionOptions(ReadConcern.Local, writeConcern: WriteConcern.W1.With(journal: false));
         public async Task<int> Update(DiffObject update)
         {
             var stellarUpdates = GetStellarDataUpdate(update.StellarInfoData);
@@ -236,78 +253,52 @@ namespace Centaurus.DAL.Mongo
             var orderUpdates = GetOrderUpdates(update.Orders.Values.ToList());
             var quanta = update.Quanta;
 
-            var retries = 1;
-            var maxTries = 5;
-            var isCommitInvoked = false;
-            while (true)
+            //var retries = 1;
+            //var maxTries = 5;
+            //var isCommitInvoked = false;
+            //while (true)
+            //{
+            using (var session = await client.StartSessionAsync())
             {
-                using (var session = await client.StartSessionAsync())
+                var result = await session.WithTransactionAsync<bool>(async (s, ct) =>
                 {
-                    try
-                    {
-                        session.StartTransaction();
-                        try
-                        {
-                            var updateTasks = new List<Task>();
+                    //try
+                    //{
+                    var updateTasks = new List<Task>();
 
-                            if (stellarUpdates != null)
-                                updateTasks.Add(constellationStateCollection.BulkWriteAsync(session, new WriteModel<ConstellationState>[] { stellarUpdates }));
+                    if (stellarUpdates != null)
+                        updateTasks.Add(constellationStateCollection.BulkWriteAsync(s, new WriteModel<ConstellationState>[] { stellarUpdates }));
 
-                            if (update.ConstellationSettings != null)
-                                updateTasks.Add(settingsCollection.InsertOneAsync(session, update.ConstellationSettings));
+                    if (update.ConstellationSettings != null)
+                        updateTasks.Add(settingsCollection.InsertOneAsync(s, update.ConstellationSettings));
 
-                            if (update.Assets != null && update.Assets.Count > 0)
-                                updateTasks.Add(assetsCollection.InsertManyAsync(session, update.Assets));
+                    if (update.Assets != null && update.Assets.Count > 0)
+                        updateTasks.Add(assetsCollection.InsertManyAsync(s, update.Assets));
 
-                            if (accountUpdates != null)
-                                updateTasks.Add(accountsCollection.BulkWriteAsync(session, accountUpdates));
+                    if (accountUpdates != null)
+                        updateTasks.Add(accountsCollection.BulkWriteAsync(s, accountUpdates));
 
-                            if (balanceUpdates != null)
-                                updateTasks.Add(balancesCollection.BulkWriteAsync(session, balanceUpdates));
+                    if (balanceUpdates != null)
+                        updateTasks.Add(balancesCollection.BulkWriteAsync(s, balanceUpdates));
 
-                            if (orderUpdates != null)
-                                updateTasks.Add(ordersCollection.BulkWriteAsync(session, orderUpdates));
+                    if (orderUpdates != null)
+                        updateTasks.Add(ordersCollection.BulkWriteAsync(s, orderUpdates));
 
-                            SaveQuanta(ref updateTasks, quanta, session);
+                    SaveQuanta(ref updateTasks, quanta, s);
 
-                            await Task.WhenAll(updateTasks);
+                    await Task.WhenAll(updateTasks);
 
-                            isCommitInvoked = true;
-                            await CommitWithRetry(session);
-
-                            break;
-                        }
-                        catch
-                        {
-                            if (!isCommitInvoked)
-                            {
-                                try
-                                {
-                                    await session.AbortTransactionAsync();
-                                }
-                                catch { } //MongoDB best practice ;)
-                            }
-                            throw;
-                        }
-                    }
-                    catch (Exception exc)
-                    {
-                        if (retries <= maxTries)
-                        {
-                            logger.Debug(exc, $"Error during update. {retries} try.");
-                            retries++;
-                            continue;
-                        }
-                        new Exception($"Unable to commit transaction after {retries} retries", exc);
-                    }
-                }
+                    return true;
+                },
+                txOptions,
+                CancellationToken.None);
+                return 1;
             }
-            return retries;
         }
 
         private void SaveQuanta(ref List<Task> updateTasks, IEnumerable<QuantumModel> quanta, IClientSessionHandle session)
         {
-            var batchSize = 20_000;
+            var batchSize = 5_000;
 
             var savedQuantaCount = 0;
             var quantaCount = quanta.Count();
@@ -327,7 +318,7 @@ namespace Centaurus.DAL.Mongo
         private static async Task CommitWithRetry(IClientSessionHandle session)
         {
             var maxTries = 5;
-            var retries = 0;
+            var retries = 1;
             while (true)
             {
                 try
@@ -341,12 +332,10 @@ namespace Centaurus.DAL.Mongo
                             && mongoException.ErrorLabels.Any(l => retriableCommitErrors.Contains(l))))
                         throw;
                     retries++;
-                    if (retries < maxTries)
-                    {
-                        logger.Warn(exc, $"Error on commit. Labels: {string.Join(',', mongoException.ErrorLabels)}. {retries} try.");
-                        continue;
-                    }
-                    throw new UnknownCommitResultException($"UnknownTransactionCommitResult or TransientTransactionError errors occurred after {retries} retries", exc);
+                    if (retries >= maxTries)
+                        throw new UnknownCommitResultException($"UnknownTransactionCommitResult or TransientTransactionError errors occurred after {retries} retries", exc);
+                    logger.Warn(exc, $"Error on commit. Labels: {string.Join(',', mongoException.ErrorLabels)}. {retries} try.");
+                    continue;
                 }
             }
         }

@@ -49,6 +49,8 @@ namespace Centaurus.Domain
 
     public static class OutgoingResultsStorage
     {
+        const int MaxMessageBatchSize = 50;
+
         static Logger logger = LogManager.GetCurrentClassLogger();
 
         private readonly static List<AuditorResultMessage> results = new List<AuditorResultMessage>();
@@ -69,8 +71,8 @@ namespace Centaurus.Domain
                     {
                         if (results.Count != 0)
                         {
-                            resultsBatch = results.Take(Global.MaxMessageBatchSize).ToList();
-                            var removeCount = Math.Min(Global.MaxMessageBatchSize, results.Count);
+                            resultsBatch = results.Take(MaxMessageBatchSize).ToList();
+                            var removeCount = Math.Min(MaxMessageBatchSize, results.Count);
                             results.RemoveRange(0, removeCount);
                         }
                     }

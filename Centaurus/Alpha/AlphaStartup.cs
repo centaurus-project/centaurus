@@ -19,6 +19,7 @@ using System.IO;
 using Microsoft.AspNetCore.Http;
 using System.Collections.Generic;
 using System.Threading;
+using System.Diagnostics;
 
 namespace Centaurus
 {
@@ -33,10 +34,10 @@ namespace Centaurus
             try
             {
                 this.resetEvent = resetEvent;
-                await ConfigureConstellation(settings);
 
                 host = CreateHostBuilder(settings).Build();
                 _ = host.RunAsync();
+                await ConfigureConstellation(settings);
             }
             catch (Exception exc)
             {
@@ -89,12 +90,14 @@ namespace Centaurus
                     logging.ClearProviders();
                     logging.AddConsole();
 
-                    if (settings.Verbose)
-                        logging.SetMinimumLevel(Microsoft.Extensions.Logging.LogLevel.Trace);
-                    else if (settings.Silent)
-                        logging.SetMinimumLevel(Microsoft.Extensions.Logging.LogLevel.Error);
-                    else
-                        logging.SetMinimumLevel(Microsoft.Extensions.Logging.LogLevel.Information);
+                    //if (settings.Verbose)
+                    //    logging.SetMinimumLevel(Microsoft.Extensions.Logging.LogLevel.Trace);
+                    //else if (settings.Silent)
+                    //    logging.SetMinimumLevel(Microsoft.Extensions.Logging.LogLevel.Error);
+                    //else
+                    //    logging.SetMinimumLevel(Microsoft.Extensions.Logging.LogLevel.Information);
+                    logging.SetMinimumLevel(Microsoft.Extensions.Logging.LogLevel.Error);
+
                 })
                 .UseNLog()
                 .ConfigureWebHostDefaults(webBuilder =>

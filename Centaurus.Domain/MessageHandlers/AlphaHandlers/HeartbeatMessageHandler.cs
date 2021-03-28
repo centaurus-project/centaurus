@@ -12,7 +12,7 @@ namespace Centaurus.Domain
 
         public override ConnectionState[] ValidConnectionStates { get; } = null;
 
-        public override Task HandleMessage(AlphaWebSocketConnection connection, MessageEnvelope messageEnvelope)
+        public override Task HandleMessage(AlphaWebSocketConnection connection, IncomingMessage message)
         {
             return Task.CompletedTask;
         }

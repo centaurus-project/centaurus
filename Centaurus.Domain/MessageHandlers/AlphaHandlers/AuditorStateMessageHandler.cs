@@ -15,9 +15,9 @@ namespace Centaurus.Domain.MessageHandlers.AlphaHandlers
                 ConnectionState.Ready
             };
 
-        public override async Task HandleMessage(AlphaWebSocketConnection connection, MessageEnvelope messageEnvelope)
+        public override async Task HandleMessage(AlphaWebSocketConnection connection, IncomingMessage message)
         {
-            await AlphaCatchup.AddAuditorState(connection.ClientPubKey, (AuditorState)messageEnvelope.Message);
+            await AlphaCatchup.AddAuditorState(connection.ClientPubKey, (AuditorState)message.Envelope.Message);
         }
     }
 }

@@ -38,7 +38,7 @@ namespace Centaurus.Domain
 
         private readonly OrderSide side;
 
-        private readonly Orderbook orderbook;
+        private readonly OrderbookBase orderbook;
 
         private readonly ExchangeMarket market;
 

@@ -73,7 +73,7 @@ namespace Centaurus.Domain
             ));
         }
 
-        public static void AddOrderPlaced(this EffectProcessorsContainer effectProcessors, Orderbook orderBook, Order order)
+        public static void AddOrderPlaced(this EffectProcessorsContainer effectProcessors, OrderbookBase orderBook, Order order)
         {
             var decodedOrderId = OrderIdConverter.Decode(order.OrderId);
             var effect = new OrderPlacedEffect
@@ -109,7 +109,7 @@ namespace Centaurus.Domain
         }
 
 
-        public static void AddOrderRemoved(this EffectProcessorsContainer effectProcessors, Orderbook orderbook, Order order)
+        public static void AddOrderRemoved(this EffectProcessorsContainer effectProcessors, OrderbookBase orderbook, Order order)
         {
             effectProcessors.Add(new OrderRemovedEffectProccessor(
                 new OrderRemovedEffect

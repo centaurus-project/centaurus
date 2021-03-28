@@ -11,7 +11,11 @@ namespace Centaurus.Domain
 
         public int Throttling { get; set; }
 
+        public int QuantaQueueLength { get; private set; }
+
         public List<PendingUpdatesManager.BatchSavedInfo> BatchSavedInfos { get; set; }
+
+        public Dictionary<string, int> AuditorsDelay { get; private set; }
 
         public override SubscriptionUpdateBase GetUpdateForDate(DateTime lastUpdateDate)
         {
@@ -25,6 +29,8 @@ namespace Centaurus.Domain
                 Throttling = Throttling,
                 BatchSavedInfos = BatchSavedInfos.Where(b => b.SavedAt > lastUpdateDate).ToList(), //send only new data
                 UpdateDate = UpdateDate,
+                QuantaQueueLength = QuantaQueueLength,
+                AuditorsDelay = AuditorsDelay,
                 ChannelName = ChannelName
             };
         }
@@ -37,6 +43,8 @@ namespace Centaurus.Domain
                 Throttling = update.Trottling,
                 BatchSavedInfos = update.BatchInfos,
                 ChannelName = channelName,
+                QuantaQueueLength = update.QuantaQueueLength,
+                AuditorsDelay = update.AuditorsDelay,
                 UpdateDate = DateTime.UtcNow
             };
         }

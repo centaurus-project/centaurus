@@ -3,6 +3,8 @@ using Centaurus.Models.Analytics;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 using System.Text;
 
 namespace Centaurus.Exchange.Analytics
@@ -11,9 +13,14 @@ namespace Centaurus.Exchange.Analytics
     {
         private AnalyticsOrderMap orderMap;
 
-        public AnalyticsOrderbook(AnalyticsOrderMap orderMap)
+        public List<OrderInfoWrapper> sortedOrders = new List<OrderInfoWrapper>();
+        OrderInfoWrapperComparer comparer;
+
+        public AnalyticsOrderbook(AnalyticsOrderMap orderMap, OrderSide side)
         {
             this.orderMap = orderMap;
+            Side = side;
+            comparer = new OrderInfoWrapperComparer(Side);
         }
 
         public OrderSide Side { get; set; }
@@ -49,21 +56,14 @@ namespace Centaurus.Exchange.Analytics
         /// <param name="order">An order to add</param>
         public void InsertOrder(OrderInfoWrapper order)
         {
-            var price = order.Order.Price;
-            //just set Head reference if it's the first order
-            if (Head == null)
-            {
-                InsertOrderBefore(order, null);
-                return;
-            }
-            //find position to insert the order
-            var cursor = Head;
-            while ((Side == OrderSide.Sell && price >= cursor.Order.Price)
-                || (Side == OrderSide.Buy && price <= cursor.Order.Price))
-            {
-                cursor = cursor.Next;
-                if (cursor == null) break; //the last record
-            }
+
+            var i = ~sortedOrders.BinarySearch(order, comparer);
+            var cursor = default(OrderInfoWrapper);
+            if (i == 0)
+                cursor = sortedOrders.FirstOrDefault();
+            else if (sortedOrders.Count > i)
+                cursor = sortedOrders[i];
+            sortedOrders.Insert(i, order);
 
             //insert order
             InsertOrderBefore(order, cursor);
@@ -130,12 +130,38 @@ namespace Centaurus.Exchange.Analytics
                 order.Next.Prev = order.Prev;
 
             orderMap.RemoveOrder(orderId);
+
+            var index = sortedOrders.BinarySearch(order, comparer);
+            sortedOrders.RemoveAt(index);
+
             return true;
         }
 
         public OrderInfoWrapper GetOrder(ulong orderId)
         {
             return orderMap.GetOrder(orderId);
+        }
+    }
+    public class OrderInfoWrapperComparer : IComparer<OrderInfoWrapper>
+    {
+        private OrderSide side;
+
+        public OrderInfoWrapperComparer(OrderSide side)
+        {
+            this.side = side;
+        }
+
+        public int Compare([NotNull] OrderInfoWrapper x, [NotNull] OrderInfoWrapper y)
+        {
+            if (x == null)
+                throw new ArgumentNullException(nameof(x));
+            if (y == null)
+                throw new ArgumentNullException(nameof(y));
+
+            var priceCompareRes = side == OrderSide.Sell ? x.Order.Price.CompareTo(y.Order.Price) : y.Order.Price.CompareTo(x.Order.Price);
+            if (priceCompareRes == 0)
+                return x.Order.OrderId.CompareTo(y.Order.OrderId);
+            return priceCompareRes;
         }
     }
 }

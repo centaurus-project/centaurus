@@ -40,34 +40,6 @@ namespace Centaurus
         }
 
         /// <summary>
-        /// Verifies that both aggregated envelops contain the same message and merges signatures to the source envelope.
-        /// </summary>
-        /// <param name="envelope">Source envelope</param>
-        /// <param name="anotherEnvelope">Envelope to aggregate</param>
-        public static void AggregateEnvelop(this MessageEnvelope envelope, MessageEnvelope anotherEnvelope)
-        {
-            if (envelope == null)
-                throw new ArgumentNullException(nameof(envelope));
-            if (anotherEnvelope == null)
-                throw new ArgumentNullException(nameof(anotherEnvelope));
-            //TODO: cache hashes to improve performance
-            var hash = envelope.ComputeMessageHash();
-            var anotherHash = anotherEnvelope.ComputeMessageHash();
-            if (!ByteArrayPrimitives.Equals(anotherHash, hash))
-            {
-#if DEBUG
-                var envelopeJson = Newtonsoft.Json.JsonConvert.SerializeObject(envelope);
-                Debug.Print("envelope:\n" + envelopeJson);
-                envelopeJson = Newtonsoft.Json.JsonConvert.SerializeObject(anotherEnvelope);
-                Debug.Print("anotherEnvelope:\n" + envelopeJson);
-#endif
-
-                throw new InvalidOperationException($"Invalid message envelope hash. {hash} != {anotherHash}");
-            }
-            envelope.AggregateEnvelopUnsafe(anotherEnvelope);
-        }
-
-        /// <summary>
         /// Merges signatures to the source envelope. 
         /// THIS METHOD DOESN'T VERIFY THAT ENVELOPS CONTAIN THE SAME MESSAGE!!
         /// </summary>
@@ -105,10 +77,24 @@ namespace Centaurus
         {
             if (envelope == null)
                 throw new ArgumentNullException(nameof(envelope));
+            if (envelope.Signatures.Count < 1)
+                return true;
             var messageHash = envelope.Message.ComputeHash();
-            for (var i = 0; i < envelope.Signatures.Count; i++)
+            return envelope.Signatures.AreSignaturesValid(messageHash);
+        }
+
+        /// <summary>
+        /// Checks that all envelope signatures are valid
+        /// </summary>
+        /// <param name="envelope">Target envelope</param>
+        /// <returns>True if all signatures valid, otherwise false</returns>
+        public static bool AreSignaturesValid(this List<Ed25519Signature> signatures, byte[] hash)
+        {
+            if (signatures == null)
+                throw new ArgumentNullException(nameof(signatures));
+            for (var i = 0; i < signatures.Count; i++)
             {
-                if (!envelope.Signatures[i].IsValid(messageHash))
+                if (!signatures[i].IsValid(hash))
                     return false;
             }
             return true;

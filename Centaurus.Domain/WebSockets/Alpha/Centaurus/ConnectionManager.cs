@@ -123,29 +123,33 @@ namespace Centaurus.Domain
             }
         }
 
-        static void OnConnectionStateChanged(object sender, ConnectionState e)
+        static void OnConnectionStateChanged((BaseWebSocketConnection connection, ConnectionState prev, ConnectionState current) args)
         {
-            switch (e)
+            var connection = (AlphaWebSocketConnection)args.connection;
+            switch (args.current)
             {
                 case ConnectionState.Validated:
-                    Validated((AlphaWebSocketConnection)sender);
+                    if (args.prev != ConnectionState.Ready)
+                        Validated(connection);
+                    else
+                        TrySetAuditorState(connection, args.current);
                     break;
                 case ConnectionState.Closed:
-                    RemoveConnection((AlphaWebSocketConnection)sender);
+                    RemoveConnection(connection);
                     break;
                 case ConnectionState.Ready:
-                    EnsureAuditorConnected((AlphaWebSocketConnection)sender);
+                    TrySetAuditorState(connection, args.current);
                     break;
                 default:
                     break;
             }
         }
 
-        private static void EnsureAuditorConnected(AlphaWebSocketConnection connection)
+        private static void TrySetAuditorState(AlphaWebSocketConnection connection, ConnectionState state)
         {
             if (Global.Constellation.Auditors.Contains(connection.ClientPubKey))
             {
-                AlphaStateManager.AuditorConnected(connection.ClientPubKey);
+                AlphaStateManager.RegisterAuditorState(connection.ClientPubKey, state);
                 logger.Trace($"Auditor {connection.ClientPubKey} is connected.");
             }
         }
@@ -160,7 +164,10 @@ namespace Centaurus.Domain
                 {
                     connections.TryRemove(connection.ClientPubKey, out _);
                     if (Global.Constellation.Auditors.Contains(connection.ClientPubKey))
+                    {
                         AlphaStateManager.AuditorConnectionClosed(connection.ClientPubKey);
+                        AlphaCatchup.RemoveState(connection.ClientPubKey);
+                    }
                 }
             }
         }

@@ -8,15 +8,15 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="NLog" Version="4.7.6"/>
-		<PackageReference Include="stellar-dotnet-sdk" Version="6.0.31"/>
+		<PackageReference Include="NLog" Version="4.7.8" />
+		<PackageReference Include="stellar-dotnet-sdk" Version="7.0.0" />
 	</ItemGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\..\Centaurus.Common\Centaurus.Common.csproj"/>
-		<ProjectReference Include="..\..\Centaurus.DynamicSerializers\Centaurus.DynamicSerializers.csproj"/>
-		<ProjectReference Include="..\..\Centaurus.Models.Extensions\Centaurus.Models.Extensions.csproj"/>
-		<ProjectReference Include="..\..\Centaurus.Models\Centaurus.Models.csproj"/>
+		<ProjectReference Include="..\..\Centaurus.Common\Centaurus.Common.csproj" />
+		<ProjectReference Include="..\..\Centaurus.DynamicSerializers\Centaurus.DynamicSerializers.csproj" />
+		<ProjectReference Include="..\..\Centaurus.Models.Extensions\Centaurus.Models.Extensions.csproj" />
+		<ProjectReference Include="..\..\Centaurus.Models\Centaurus.Models.csproj" />
 	</ItemGroup>
 
 </Project>

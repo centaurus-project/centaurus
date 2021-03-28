@@ -19,7 +19,7 @@ namespace Centaurus.Domain
             context.EffectProcessors.AddConstellationInit(initQuantum);
             var initSnapshot = PersistenceManager.GetSnapshot(
                 (ConstellationInitEffect)context.EffectProcessors.Effects[0],
-                context.Envelope.ComputeHash()
+                context.Envelope.ComputeMessageHash()
             );
             await Global.Setup(initSnapshot);
 

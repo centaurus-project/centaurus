@@ -19,7 +19,7 @@ namespace Centaurus.Domain
             LastQuantumHash = lastQuantumHash;
         }
 
-        public abstract void AddQuantum(MessageEnvelope envelope);
+        public abstract void AddQuantum(MessageEnvelope envelope, byte[] hash);
     }
 
     public class AlphaQuantumStorage : QuantumStorageBase
@@ -29,14 +29,14 @@ namespace Centaurus.Domain
         private List<MessageEnvelope> quanta = new List<MessageEnvelope>();
 
         private int QuantaCacheCapacity = 1_000_000;
-        private int capacityThreshold = 1000;
+        private int capacityThreshold = 100_000;
 
         public AlphaQuantumStorage(long currentApex, byte[] lastQuantumHash)
             : base(currentApex, lastQuantumHash)
         {
         }
 
-        public override void AddQuantum(MessageEnvelope envelope)
+        public override void AddQuantum(MessageEnvelope envelope, byte[] hash)
         {
             lock (this)
             {
@@ -45,10 +45,10 @@ namespace Centaurus.Domain
                     throw new Exception("Quantum has no apex");
 
                 CurrentApex = quantum.Apex;
-                LastQuantumHash = quantum.ComputeHash();
+                LastQuantumHash = hash;
                 apexes.Add(quantum.Apex);
                 quanta.Add(envelope);
-                if (apexes.Count == QuantaCacheCapacity + capacityThreshold) //remove oldest quanta
+                if (apexes.Count >= (QuantaCacheCapacity + capacityThreshold)) //remove oldest quanta
                 {
                     apexes.RemoveRange(0, capacityThreshold);
                     quanta.RemoveRange(0, capacityThreshold);
@@ -85,7 +85,7 @@ namespace Centaurus.Domain
 
         }
 
-        public override void AddQuantum(MessageEnvelope envelope)
+        public override void AddQuantum(MessageEnvelope envelope, byte[] hash)
         {
             lock (this)
             {
@@ -93,7 +93,7 @@ namespace Centaurus.Domain
                 if (quantum.Apex < 1) //when auditor receives quantum, the quantum should already contain apex
                     throw new Exception("Quantum has no apex");
                 CurrentApex = quantum.Apex;
-                LastQuantumHash = quantum.ComputeHash();
+                LastQuantumHash = hash;
             }
         }
     }

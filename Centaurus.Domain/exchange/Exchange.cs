@@ -47,8 +47,6 @@ namespace Centaurus.Domain
         private BlockingCollection<ExchangeUpdate> awaitedUpdates;
 
         public OrderMap OrderMap { get; } = new OrderMap();
-        public Action<OrderInfo> OnNewOrder { get; internal set; }
-        public Action<OrderInfo> OnOrderRemoved { get; internal set; }
 
         /// <summary>
         /// Process customer's order request.
@@ -63,7 +61,7 @@ namespace Centaurus.Domain
             awaitedUpdates?.Add(updates);
         }
 
-        public void RemoveOrder(EffectProcessorsContainer effectsContainer, Orderbook orderbook, Order order)
+        public void RemoveOrder(EffectProcessorsContainer effectsContainer, OrderbookBase orderbook, Order order)
         {
             effectsContainer.AddOrderRemoved(orderbook, order);
             if (awaitedUpdates != null)
@@ -88,9 +86,9 @@ namespace Centaurus.Domain
             return Markets.ContainsKey(asset);
         }
 
-        public ExchangeMarket AddMarket(AssetSettings asset)
+        public ExchangeMarket AddMarket(AssetSettings asset, bool useLegacyOrderbook = false)
         {
-            var market = asset.CreateMarket(OrderMap);
+            var market = asset.CreateMarket(OrderMap, useLegacyOrderbook);
             Markets.Add(asset.Id, market);
             return market;
         }
@@ -101,22 +99,22 @@ namespace Centaurus.Domain
             OrderMap.Clear();
         }
 
-        public Orderbook GetOrderbook(ulong offerId)
+        public OrderbookBase GetOrderbook(ulong offerId)
         {
             var parts = OrderIdConverter.Decode(offerId);
             return GetOrderbook(parts.Asset, parts.Side);
         }
 
-        public Orderbook GetOrderbook(int asset, OrderSide side)
+        public OrderbookBase GetOrderbook(int asset, OrderSide side)
         {
             return GetMarket(asset).GetOrderbook(side);
         }
 
-        public static Exchange RestoreExchange(List<AssetSettings> assets, List<Order> orders, bool observeTrades)
+        public static Exchange RestoreExchange(List<AssetSettings> assets, List<Order> orders, bool observeTrades, bool useLegacyOrderbook = false)
         {
             var exchange = new Exchange(observeTrades);
             foreach (var asset in assets)
-                exchange.AddMarket(asset);
+                exchange.AddMarket(asset, useLegacyOrderbook);
 
             foreach (var order in orders)
             {

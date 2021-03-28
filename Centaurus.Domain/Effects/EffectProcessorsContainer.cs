@@ -52,7 +52,7 @@ namespace Centaurus.Domain
         public Effect[] GetEffects(int account)
         {
             return Effects
-                .Where(e => e.AccountWrapper?.Account.Id == account)
+                .Where(e => e.Account == account)
                 .ToArray();
         }
 

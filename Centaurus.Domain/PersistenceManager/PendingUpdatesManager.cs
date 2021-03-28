@@ -20,7 +20,7 @@ namespace Centaurus.Domain
         /// <summary>
         /// Save interval in ms.
         /// </summary>
-        public const int SaveInterval = 5 * 1000;
+        public const int SaveInterval = 3 * 1000;
 
         public void Start()
         {

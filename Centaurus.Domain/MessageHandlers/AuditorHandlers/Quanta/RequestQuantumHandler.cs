@@ -10,11 +10,11 @@ namespace Centaurus.Domain
     {
         public override MessageTypes SupportedMessageType { get; } = MessageTypes.RequestQuantum;
 
-        public override async Task Validate(AuditorWebSocketConnection connection, MessageEnvelope envelope)
+        public override async Task Validate(AuditorWebSocketConnection connection, IncomingMessage message)
         {
-            await base.Validate(connection, envelope);
+            await base.Validate(connection, message);
 
-            var clientRequest = (envelope.Message as RequestQuantum)?.RequestEnvelope;
+            var clientRequest = (message.Envelope.Message as RequestQuantum)?.RequestEnvelope;
 
             if (clientRequest == null)
                 throw new UnexpectedMessageException("RequestQuantum is expected");

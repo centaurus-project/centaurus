@@ -15,10 +15,11 @@ namespace Centaurus.Controllers
         public ConstellationInfo Info()
         {
             ConstellationInfo info;
-            if (((int)Global.AppState.State) < (int)ApplicationState.Running)
+            var state = (int)(Global.AppState?.State ?? 0);
+            if (state < (int)ApplicationState.Running)
                 info = new ConstellationInfo
                 {
-                    State = Global.AppState.State
+                    State = (ApplicationState)state
                 };
             else
             {

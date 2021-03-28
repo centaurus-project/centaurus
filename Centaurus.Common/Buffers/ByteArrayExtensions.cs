@@ -53,12 +53,18 @@ namespace Centaurus
             if (bytes != null)
                 return bytes;
 
-            using var buffer = XdrBufferFactory.Rent();
-            using var writer = new XdrBufferWriter(buffer.Buffer);
+            using var writer = new XdrBufferWriter();
+            return objToSerialize.ToByteArray(writer);
+        }
+
+        public static byte[] ToByteArray(this object objToSerialize, XdrBufferWriter writer)
+        {
+            var bytes = objToSerialize as byte[];
+            if (bytes != null)
+                return bytes;
+
             XdrConverter.Serialize(objToSerialize, writer);
-            bytes = new byte[writer.Length];
-            Array.Copy(buffer.Buffer, 0, bytes, 0, bytes.Length);
-            return bytes;
+            return writer.ToArray();
         }
 
         public static byte[] FromHexString(string hexString)

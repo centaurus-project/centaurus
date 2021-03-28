@@ -13,7 +13,7 @@ namespace Centaurus.Domain.Quanta.Contexts
         {
         }
 
-        public Orderbook Orderbook { get; set; }
+        public OrderbookBase Orderbook { get; set; }
 
         private Order order;
         public Order Order 

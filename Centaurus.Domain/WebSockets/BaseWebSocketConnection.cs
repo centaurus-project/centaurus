@@ -9,6 +9,7 @@ using Centaurus.Models;
 using Centaurus.Xdr;
 using System.Reflection;
 using System.Diagnostics;
+using stellar_dotnet_sdk;
 
 namespace Centaurus
 {
@@ -37,10 +38,13 @@ namespace Centaurus
         static Logger logger = LogManager.GetCurrentClassLogger();
 
         protected WebSocket webSocket;
-        public BaseWebSocketConnection(WebSocket webSocket, string ip)
+        public BaseWebSocketConnection(WebSocket webSocket, string ip, int inBufferSize, int outBufferSize)
         {
             this.webSocket = webSocket;
             this.Ip = ip;
+
+            incommingBuffer = XdrBufferFactory.Rent(inBufferSize);
+            outgoingBuffer = XdrBufferFactory.Rent(outBufferSize);
 
             cancellationTokenSource = new CancellationTokenSource();
             cancellationToken = cancellationTokenSource.Token;
@@ -52,7 +56,25 @@ namespace Centaurus
         /// </summary>
         public RawPubKey ClientPubKey { get; set; }
 
-        public int MaxMessageSize { get; set; } = WebSocketExtension.ChunkSize;
+        private string clientKPAccountId;
+        public string ClientKPAccountId
+        {
+            get
+            {
+                if (clientKPAccountId == null)
+                    if (ClientPubKey != null)
+                    {
+                        clientKPAccountId = ((KeyPair)ClientPubKey).AccountId;
+                    }
+                    else
+                        return "n/a";
+                return clientKPAccountId;
+            }
+        }
+
+        protected XdrBufferFactory.RentedBuffer incommingBuffer;
+        protected XdrBufferFactory.RentedBuffer outgoingBuffer;
+        public bool IsResultRequired { get; protected set; } = true;
 
         ConnectionState connectionState;
         /// <summary>
@@ -68,8 +90,10 @@ namespace Centaurus
             {
                 if (connectionState != value)
                 {
+                    var prevValue = connectionState;
                     connectionState = value;
-                    OnConnectionStateChanged?.Invoke(this, connectionState);
+                    logger.Trace($"Connection {ClientKPAccountId} is in {connectionState} state. Prev state is {prevValue}.");
+                    OnConnectionStateChanged?.Invoke((this, prevValue, connectionState));
                 }
             }
         }
@@ -77,7 +101,7 @@ namespace Centaurus
         protected CancellationTokenSource cancellationTokenSource;
         protected CancellationToken cancellationToken;
 
-        public event EventHandler<ConnectionState> OnConnectionStateChanged;
+        public event Action<(BaseWebSocketConnection connection, ConnectionState prev, ConnectionState current)> OnConnectionStateChanged;
 
         public async Task CloseConnection(WebSocketCloseStatus status = WebSocketCloseStatus.NormalClosure, string desc = null)
         {
@@ -86,11 +110,8 @@ namespace Centaurus
                 Global.ExtensionsManager.BeforeConnectionClose(this);
                 if (webSocket.State == WebSocketState.Open)
                 {
-                    var connectionPubKey = "no public key";
-                    if (ClientPubKey != null)
-                        connectionPubKey = $"public key {ClientPubKey}";
                     desc = desc ?? status.ToString();
-                    logger.Trace($"Connection with {connectionPubKey} is closed. Status: {status}, description: {desc}");
+                    logger.Trace($"Connection with {ClientKPAccountId} is closed. Status: {status}, description: {desc}");
 
                     await sendMessageSemaphore.WaitAsync();
                     try
@@ -129,22 +150,35 @@ namespace Centaurus
 
         public virtual async Task SendMessage(MessageEnvelope envelope)
         {
+            if (envelope == null)
+                throw new ArgumentNullException(nameof(envelope));
             await sendMessageSemaphore.WaitAsync();
             try
             {
                 Global.ExtensionsManager.BeforeSendMessage(this, envelope);
                 if (!envelope.IsSignedBy(Global.Settings.KeyPair.PublicKey))
-                    envelope.Sign(Global.Settings.KeyPair);
+                {
+                    using (var writer = new XdrBufferWriter(outgoingBuffer.Buffer))
+                    {
+                        XdrConverter.Serialize(envelope.Message, writer);
+                        var signature = ByteArrayExtensions.ComputeHash(writer.ToArray()).Sign(Global.Settings.KeyPair);
+                        envelope.Signatures.Add(signature);
+                    }
+                }
 
-                using var buffer = XdrBufferFactory.Rent();
-                using var writer = new XdrBufferWriter(buffer.Buffer);
-                XdrConverter.Serialize(envelope, writer);
+                logger.Trace($"Connection {ClientKPAccountId}, about to send {envelope.Message.MessageType} message.");
 
-                if (webSocket == null)
-                    throw new ObjectDisposedException(nameof(webSocket));
-                if (webSocket.State == WebSocketState.Open)
-                    await webSocket.SendAsync(buffer.AsSegment(0, writer.Length), WebSocketMessageType.Binary, true, cancellationToken);
-                Global.ExtensionsManager.AfterSendMessage(this, envelope);
+                using (var writer = new XdrBufferWriter(outgoingBuffer.Buffer))
+                {
+                    XdrConverter.Serialize(envelope, writer);
+                    if (webSocket == null)
+                        throw new ObjectDisposedException(nameof(webSocket));
+                    if (webSocket.State == WebSocketState.Open)
+                        await webSocket.SendAsync(outgoingBuffer.Buffer.AsMemory(0, writer.Length), WebSocketMessageType.Binary, true, cancellationToken);
+                    Global.ExtensionsManager.AfterSendMessage(this, envelope);
+
+                    logger.Trace($"Connection {ClientKPAccountId}, message {envelope.Message.MessageType} sent. Size: {writer.Length}");
+                }
             }
             catch (Exception exc)
             {
@@ -166,52 +200,53 @@ namespace Centaurus
             {
                 while (webSocket.State != WebSocketState.Closed && webSocket.State != WebSocketState.Aborted && !cancellationToken.IsCancellationRequested)
                 {
-                    var result = await webSocket.GetWebsocketBuffer(MaxMessageSize, cancellationToken);
-                    using (result.messageBuffer)
-                        if (!cancellationToken.IsCancellationRequested)
+                    var messageType = await webSocket.GetWebsocketBuffer(incommingBuffer, cancellationToken);
+                    if (!cancellationToken.IsCancellationRequested)
+                    {
+                        //the client send close message
+                        if (messageType == WebSocketMessageType.Close)
                         {
-                            //the client send close message
-                            if (result.messageType == WebSocketMessageType.Close)
+                            if (webSocket.State != WebSocketState.CloseReceived)
+                                continue;
+                            await sendMessageSemaphore.WaitAsync();
+                            try
                             {
-                                if (webSocket.State != WebSocketState.CloseReceived)
-                                    continue;
-                                await sendMessageSemaphore.WaitAsync();
-                                try
-                                {
-                                    var timeoutTokenSource = new CancellationTokenSource(1000);
-                                    await webSocket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "Close", CancellationToken.None);
-                                }
-                                finally
-                                {
-                                    sendMessageSemaphore.Release();
-                                    cancellationTokenSource.Cancel();
-                                }
+                                var timeoutTokenSource = new CancellationTokenSource(1000);
+                                await webSocket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "Close", CancellationToken.None);
                             }
-                            else
+                            finally
                             {
-                                MessageEnvelope envelope = null;
-                                try
-                                {
-                                    var reader = new XdrBufferReader(result.messageBuffer.Buffer, result.messageBuffer.Length);
-                                    envelope = XdrConverter.Deserialize<MessageEnvelope>(reader);
-
-                                    if (!await HandleMessage(envelope))
-                                        throw new UnexpectedMessageException($"No handler registered for message type {envelope.Message.MessageType}.");
-                                }
-                                catch (BaseClientException exc)
-                                {
-                                    Global.ExtensionsManager.HandleMessageFailed(this, envelope, exc);
-
-                                    var statusCode = exc.GetStatusCode();
-
-                                    //prevent recursive error sending
-                                    if (!(envelope == null || envelope.Message is ResultMessage))
-                                        _ = SendMessage(envelope.CreateResult(statusCode));
-                                    if (statusCode == ResultStatusCodes.InternalError || !Global.IsAlpha)
-                                        logger.Error(exc);
-                                }
+                                sendMessageSemaphore?.Release();
+                                cancellationTokenSource?.Cancel();
                             }
                         }
+                        else
+                        {
+                            MessageEnvelope envelope = null;
+                            try
+                            {
+                                var reader = new XdrBufferReader(incommingBuffer.Buffer, incommingBuffer.Length);
+                                envelope = XdrConverter.Deserialize<MessageEnvelope>(reader);
+
+                                logger.Trace($"Connection {ClientKPAccountId}, message {envelope.Message.MessageType} received.");
+                                if (!await HandleMessage(envelope))
+                                    throw new UnexpectedMessageException($"No handler registered for message type {envelope.Message.MessageType}.");
+                                logger.Trace($"Connection {ClientKPAccountId}, message {envelope.Message.MessageType} handled.");
+                            }
+                            catch (BaseClientException exc)
+                            {
+                                Global.ExtensionsManager.HandleMessageFailed(this, envelope, exc);
+
+                                var statusCode = exc.GetStatusCode();
+
+                                //prevent recursive error sending
+                                if (IsResultRequired && !(envelope == null || envelope.Message is ResultMessage))
+                                    _ = Task.Factory.StartNew(async () => await SendMessage(envelope.CreateResult(statusCode))).Unwrap();
+                                if (statusCode == ResultStatusCodes.InternalError || !Global.IsAlpha)
+                                    logger.Error(exc);
+                            }
+                        }
+                    }
                 }
             }
             catch (OperationCanceledException) { }
@@ -228,7 +263,7 @@ namespace Centaurus
                     closureStatus = closeException.Status;
                     desc = closeException.Description;
                 }
-                else if (e is FormatException)
+                else if (e is System.FormatException)
                     closureStatus = WebSocketCloseStatus.ProtocolError;
                 else
                     logger.Error(e);
@@ -240,10 +275,12 @@ namespace Centaurus
             }
         }
 
-        protected abstract Task<bool> HandleMessage(MessageEnvelope envelope);
+        protected abstract Task<bool> HandleMessage(MessageEnvelope message);
 
         public virtual void Dispose()
         {
+            Thread.Sleep(100); //wait all tasks to exit
+
             sendMessageSemaphore?.Dispose();
             sendMessageSemaphore = null;
 
@@ -253,6 +290,12 @@ namespace Centaurus
             //make sure the socket is closed
             if (webSocket.State != WebSocketState.Closed)
                 webSocket.Abort();
+
+            incommingBuffer?.Dispose();
+            incommingBuffer = null;
+
+            outgoingBuffer?.Dispose();
+            outgoingBuffer = null;
         }
     }
 }

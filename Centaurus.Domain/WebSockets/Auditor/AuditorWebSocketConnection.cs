@@ -10,6 +10,7 @@ using System.Linq;
 using System.Net.WebSockets;
 using System.Threading;
 using System.Threading.Tasks;
+using Centaurus.Xdr;
 
 namespace Centaurus.Domain
 {
@@ -19,15 +20,13 @@ namespace Centaurus.Domain
         static Logger logger = LogManager.GetCurrentClassLogger();
 
         public AuditorWebSocketConnection(WebSocket webSocket, string ip)
-            : base(webSocket, ip)
+            : base(webSocket, ip, AlphaWebSocketConnection.AuditorBufferSize, AlphaWebSocketConnection.AuditorBufferSize)
         {
             //we don't need to create and sign heartbeat message on every sending
             hearbeatMessage = new Heartbeat().CreateEnvelope();
             hearbeatMessage.Sign(Global.Settings.KeyPair);
-            MaxMessageSize = MaxMessageSize * Global.MaxMessageBatchSize;
-#if !DEBUG
+
             InitTimer();
-#endif
         }
 
         private System.Timers.Timer heartbeatTimer = null;
@@ -73,7 +72,7 @@ namespace Centaurus.Domain
 
         protected override async Task<bool> HandleMessage(MessageEnvelope envelope)
         {
-            return await MessageHandlers<AuditorWebSocketConnection>.HandleMessage(this, envelope);
+            return await MessageHandlers<AuditorWebSocketConnection>.HandleMessage(this, envelope.ToIncomingMessage(incommingBuffer));
         }
 
         private async Task ProcessOutgoingMessageQueue()

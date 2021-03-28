@@ -1,5 +1,6 @@
 ﻿using Centaurus.Domain;
 using Centaurus.Models;
+using Centaurus.Xdr;
 using NUnit.Framework;
 using stellar_dotnet_sdk;
 using System;
@@ -41,9 +42,12 @@ namespace Centaurus.Test
             var message = new HandshakeInit { HandshakeData = clientConnection.HandshakeData };
             var envelope = message.CreateEnvelope();
             envelope.Sign(clientKeyPair);
+
+            using var writer = new XdrBufferWriter();
+            var inMessage = envelope.ToIncomingMessage(writer);
             if (expectedException == null)
             {
-                var isHandled = await MessageHandlers<AlphaWebSocketConnection>.HandleMessage(clientConnection, envelope);
+                var isHandled = await MessageHandlers<AlphaWebSocketConnection>.HandleMessage(clientConnection, inMessage);
 
                 Assert.IsTrue(isHandled);
                 Assert.AreEqual(clientConnection.ClientPubKey, new RawPubKey(clientKeyPair.AccountId));
@@ -53,7 +57,7 @@ namespace Centaurus.Test
                     Assert.AreEqual(clientConnection.ConnectionState, ConnectionState.Ready);
             }
             else
-                Assert.ThrowsAsync(expectedException, async () => await MessageHandlers<AlphaWebSocketConnection>.HandleMessage(clientConnection, envelope));
+                Assert.ThrowsAsync(expectedException, async () => await MessageHandlers<AlphaWebSocketConnection>.HandleMessage(clientConnection, inMessage));
         }
 
         [Test]
@@ -69,7 +73,10 @@ namespace Centaurus.Test
             var envelope = new HandshakeInit { HandshakeData = handshake }.CreateEnvelope();
             envelope.Sign(TestEnvironment.Client1KeyPair);
 
-            Assert.ThrowsAsync<ConnectionCloseException>(async () => await MessageHandlers<AlphaWebSocketConnection>.HandleMessage(clientConnection, envelope));
+            using var writer = new XdrBufferWriter();
+            var inMessage = envelope.ToIncomingMessage(writer);
+
+            Assert.ThrowsAsync<ConnectionCloseException>(async () => await MessageHandlers<AlphaWebSocketConnection>.HandleMessage(clientConnection, inMessage));
         }
 
         [Test]
@@ -81,7 +88,9 @@ namespace Centaurus.Test
 
             var envelope = new Heartbeat().CreateEnvelope();
             envelope.Sign(TestEnvironment.Client1KeyPair);
-            var isHandled = await MessageHandlers<AlphaWebSocketConnection>.HandleMessage(clientConnection, envelope);
+            using var writer = new XdrBufferWriter();
+            var inMessage = envelope.ToIncomingMessage(writer);
+            var isHandled = await MessageHandlers<AlphaWebSocketConnection>.HandleMessage(clientConnection, inMessage);
 
             Assert.IsTrue(isHandled);
         }
@@ -107,8 +116,10 @@ namespace Centaurus.Test
 
             var envelope = new SetApexCursor { Apex = 1 }.CreateEnvelope();
             envelope.Sign(clientKeyPair);
+            using var writer = new XdrBufferWriter();
+            var inMessage = envelope.ToIncomingMessage(writer);
 
-            await AssertMessageHandling(clientConnection, envelope, excpectedException);
+            await AssertMessageHandling(clientConnection, inMessage, excpectedException);
         }
 
         static object[] TxNotificationTestCases =
@@ -136,8 +147,10 @@ namespace Centaurus.Test
                 Payments = new List<PaymentBase>()
             }.CreateEnvelope();
             envelope.Sign(clientKeyPair);
+            using var writer = new XdrBufferWriter();
+            var inMessage = envelope.ToIncomingMessage(writer);
 
-            await AssertMessageHandling(clientConnection, envelope, excpectedException);
+            await AssertMessageHandling(clientConnection, inMessage, excpectedException);
         }
 
         static object[] AuditorStateTestCases =
@@ -166,8 +179,10 @@ namespace Centaurus.Test
             }.CreateEnvelope();
             envelope.Sign(clientKeyPair);
 
+            using var writer = new XdrBufferWriter();
+            var inMessage = envelope.ToIncomingMessage(writer);
 
-            await AssertMessageHandling(clientConnection, envelope, excpectedException);
+            await AssertMessageHandling(clientConnection, inMessage, excpectedException);
             if (excpectedException == null)
                 Assert.AreEqual(Global.AppState.State, ApplicationState.Running);
         }
@@ -198,8 +213,10 @@ namespace Centaurus.Test
                 RequestId = 1
             }.CreateEnvelope();
             envelope.Sign(TestEnvironment.Client1KeyPair);
+            using var writer = new XdrBufferWriter();
+            var inMessage = envelope.ToIncomingMessage(writer);
 
-            await AssertMessageHandling(clientConnection, envelope, excpectedException);
+            await AssertMessageHandling(clientConnection, inMessage, excpectedException);
         }
 
         static object[] AccountDataTestRequestCases =
@@ -228,8 +245,10 @@ namespace Centaurus.Test
                 RequestId = 1
             }.CreateEnvelope();
             envelope.Sign(TestEnvironment.Client1KeyPair);
+            using var writer = new XdrBufferWriter();
+            var inMessage = envelope.ToIncomingMessage(writer);
 
-            await AssertMessageHandling(clientConnection, envelope, excpectedException);
+            await AssertMessageHandling(clientConnection, inMessage, excpectedException);
         }
 
         static object[] AccountRequestRateLimitsCases =
@@ -247,12 +266,15 @@ namespace Centaurus.Test
             if (requestLimit.HasValue)
             {
                 //TODO: replace it with quantum
-                var effect = new RequestRateLimitUpdateEffect { 
+                var effect = new RequestRateLimitUpdateEffect
+                {
                     Account = account.Id,
-                    AccountWrapper = account, 
-                    RequestRateLimits = new RequestRateLimits { 
-                        HourLimit = (uint)requestLimit.Value, 
-                        MinuteLimit = (uint)requestLimit.Value }
+                    AccountWrapper = account,
+                    RequestRateLimits = new RequestRateLimits
+                    {
+                        HourLimit = (uint)requestLimit.Value,
+                        MinuteLimit = (uint)requestLimit.Value
+                    }
                 };
                 var effectProcessor = new RequestRateLimitUpdateEffectProcessor(effect, Global.Constellation.RequestRateLimits);
                 effectProcessor.CommitEffect();
@@ -274,10 +296,12 @@ namespace Centaurus.Test
                     RequestId = i + 1
                 }.CreateEnvelope();
                 envelope.Sign(clientKeyPair);
+                using var writer = new XdrBufferWriter();
+                var inMessage = envelope.ToIncomingMessage(writer);
                 if (i + 1 > minuteLimit)
-                    await AssertMessageHandling(clientConnection, envelope, typeof(TooManyRequestsException));
+                    await AssertMessageHandling(clientConnection, inMessage, typeof(TooManyRequestsException));
                 else
-                    await AssertMessageHandling(clientConnection, envelope);
+                    await AssertMessageHandling(clientConnection, inMessage);
             }
         }
 
@@ -307,7 +331,9 @@ namespace Centaurus.Test
             var envelope = new EffectsRequest { Account = account.Account.Id, AccountWrapper = account }.CreateEnvelope();
             envelope.Sign(client);
 
-            await AssertMessageHandling(clientConnection, envelope, excpectedException);
+            using var writer = new XdrBufferWriter();
+            var inMessage = envelope.ToIncomingMessage(writer);
+            await AssertMessageHandling(clientConnection, inMessage, excpectedException);
         }
     }
 }

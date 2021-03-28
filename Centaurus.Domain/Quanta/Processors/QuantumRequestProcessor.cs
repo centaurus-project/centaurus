@@ -40,13 +40,13 @@ namespace Centaurus.Domain
             var effects = context.EffectProcessors.Effects;
             foreach (var effect in effects)
             {
-                if (effect.AccountWrapper == default
-                    || effect.AccountWrapper.Id == requestAccount)
+                if (effect.Account == 0
+                    || effect.Account == requestAccount)
                     continue;
-                if (!result.TryGetValue(effect.AccountWrapper.Id, out var effectsNotification))
+                if (!result.TryGetValue(effect.Account, out var effectsNotification))
                 {
                     effectsNotification = new EffectsNotification { Effects = new List<Effect>() };
-                    result.Add(effect.AccountWrapper.Id, effectsNotification);
+                    result.Add(effect.Account, effectsNotification);
                 }
                 effectsNotification.Effects.Add(effect);
             }

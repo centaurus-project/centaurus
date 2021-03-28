@@ -10,8 +10,8 @@ namespace Centaurus.Exchange.Analytics
         public AnalyticsMarket(int asset, AnalyticsOrderMap orderMap)
         {
             Asset = asset;
-            Asks = new AnalyticsOrderbook(orderMap) { Side = OrderSide.Sell };
-            Bids = new AnalyticsOrderbook(orderMap) { Side = OrderSide.Buy };
+            Asks = new AnalyticsOrderbook(orderMap, OrderSide.Sell);
+            Bids = new AnalyticsOrderbook(orderMap, OrderSide.Buy);
         }
 
         public int Asset { get; }

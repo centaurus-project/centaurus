@@ -1,6 +1,7 @@
 ﻿using Centaurus.Domain;
 using Centaurus.Models;
 using NLog;
+using stellar_dotnet_sdk;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -16,60 +17,78 @@ namespace Centaurus
         public QuantumSyncWorker(long apexCursor, AlphaWebSocketConnection auditor)
         {
             this.auditor = auditor;
-            this.apexCursor = apexCursor;
+            CurrentApexCursor = apexCursor;
             cancellationTokenSource = new CancellationTokenSource();
             cancellationToken = cancellationTokenSource.Token;
-            SendQuantums();
+            Task.Factory.StartNew(SendQuantums);
         }
 
         private AlphaWebSocketConnection auditor;
 
-        private long apexCursor;
-
         private CancellationTokenSource cancellationTokenSource;
         private CancellationToken cancellationToken;
 
-        private const int batchSize = 25;
+        public long CurrentApexCursor { get; private set; }
 
-        private void SendQuantums()
+        private async Task SendQuantums()
         {
+            var batchSize = ((AlphaSettings)Global.Settings).SyncBatchSize;
             var quantumStorage = (AlphaQuantumStorage)Global.QuantumStorage;
-            Task.Factory.StartNew(async () =>
+            while (!cancellationToken.IsCancellationRequested)
             {
-                while (!cancellationToken.IsCancellationRequested)
+                var apexDiff = quantumStorage.CurrentApex - CurrentApexCursor;
+                if (apexDiff < 0)
                 {
-                    if (auditor.ConnectionState != ConnectionState.Ready
-                        && quantumStorage.CurrentApex - apexCursor <= 100 //the auditor is less than 100 quanta behind
-                        ) //the auditor is not in init state
-                        auditor.ConnectionState = ConnectionState.Ready;
-
-                    if (apexCursor == Global.QuantumStorage.CurrentApex)
-                    {
-                        Thread.Sleep(50);
-                        continue;
-                    }
-                    try
-                    {
-                        List<MessageEnvelope> quanta = null;
-                        if (!quantumStorage.GetQuantaBacth(apexCursor + 1, batchSize, out quanta))
-                            quanta = await Global.PersistenceManager.GetQuantaAboveApex(apexCursor, batchSize); //quanta are not found in the in-memory storage
-
-                        quanta = quanta.OrderBy(q => ((Quantum)q.Message).Apex).ToList();
-
-                        var batchMessage = new QuantaBatch { Quanta = quanta };
-                        await auditor.SendMessage(batchMessage);
- 
-                        apexCursor = ((Quantum)quanta.Last().Message).Apex;
-                    }
-                    catch (Exception exc)
-                    {
-                        if (exc is ObjectDisposedException 
-                        || exc.GetBaseException() is ObjectDisposedException)
-                            throw;
-                        logger.Error(exc);
-                    }
+                    logger.Error($"Auditor {((KeyPair)auditor.ClientPubKey).AccountId} is above current constellation state.");
+                    await auditor.CloseConnection(System.Net.WebSockets.WebSocketCloseStatus.ProtocolError, "Auditor is above all constellation.");
+                    return;
                 }
-            }, TaskCreationOptions.LongRunning);
+                if (auditor.ConnectionState != ConnectionState.Ready && apexDiff <= 100)
+                {
+                    auditor.ConnectionState = ConnectionState.Ready;
+                }
+                else if (auditor.ConnectionState == ConnectionState.Ready && apexDiff >= 10_000) //auditor is too delayed
+                {
+                    auditor.ConnectionState = ConnectionState.Validated;
+                    return;
+                }
+
+                if (CurrentApexCursor == Global.QuantumStorage.CurrentApex)
+                {
+                    Thread.Sleep(50);
+                    continue;
+                }
+                try
+                {
+                    List<MessageEnvelope> quanta = null;
+                    if (!quantumStorage.GetQuantaBacth(CurrentApexCursor + 1, batchSize, out quanta))
+                    {
+                        quanta = await Global.PersistenceManager.GetQuantaAboveApex(CurrentApexCursor, batchSize); //quanta are not found in the in-memory storage
+                        if (quanta.Count < 1)
+                            throw new Exception("No quanta from database.");
+                    }
+
+                    if (quanta.Count < 1)
+                        throw new Exception("No quanta from storage.");
+
+                    var firstApex = ((Quantum)quanta.First().Message).Apex;
+                    var lastApex = ((Quantum)quanta.Last().Message).Apex;
+
+                    logger.Trace($"About to sent {quanta.Count} quanta. Apex from {firstApex} to {lastApex}");
+
+                    var batchMessage = new QuantaBatch { Quanta = quanta };
+                    await auditor.SendMessage(batchMessage);
+
+                    CurrentApexCursor = lastApex;
+                }
+                catch (Exception exc)
+                {
+                    if (exc is ObjectDisposedException
+                    || exc.GetBaseException() is ObjectDisposedException)
+                        throw;
+                    logger.Error(exc, $"Unable to get quanta. Cursor: {CurrentApexCursor}; CurrentApex: {Global.QuantumStorage.CurrentApex}");
+                }
+            }
         }
 
         public void Dispose()

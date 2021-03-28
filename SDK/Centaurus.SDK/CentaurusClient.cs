@@ -16,6 +16,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using static Centaurus.Xdr.XdrBufferFactory;
 
 namespace Centaurus.SDK
 {
@@ -396,6 +397,7 @@ namespace Centaurus.SDK
             }
         }
 
+
         private void Connection_OnSend(MessageEnvelope envelope)
         {
             if (IsConnected)
@@ -433,6 +435,7 @@ namespace Centaurus.SDK
         private void Connection_OnClosed()
         {
             IsConnected = false;
+            handshakeResult.TrySetException(new Exception("Connection closed."));
             OnClosed?.Invoke();
         }
 
@@ -443,6 +446,9 @@ namespace Centaurus.SDK
                 clientKeyPair = _clientKeyPair ?? throw new ArgumentNullException(nameof(_clientKeyPair));
                 websocketAddress = new Uri(_websocketAddress ?? throw new ArgumentNullException(nameof(_websocketAddress)), "centaurus");
                 constellationInfo = _constellationInfo ?? throw new ArgumentNullException(nameof(_constellationInfo));
+
+                readBuffer = XdrBufferFactory.Rent();
+                sendBuffer = XdrBufferFactory.Rent(1024);
 
                 //we don't need to create and sign heartbeat message on every sending
                 hearbeatMessage = new Heartbeat().CreateEnvelope();
@@ -456,6 +462,8 @@ namespace Centaurus.SDK
 
             private CancellationTokenSource cancellationTokenSource;
             private CancellationToken cancellationToken;
+            private RentedBuffer readBuffer;
+            private RentedBuffer sendBuffer;
 
             public event Action<MessageEnvelope> OnMessage;
 
@@ -539,14 +547,11 @@ namespace Centaurus.SDK
                 await sendMessageSemaphore.WaitAsync();
                 try
                 {
-                    var serializedData = XdrConverter.Serialize(envelope);
-
-                    using var buffer = XdrBufferFactory.Rent();
-                    using var writer = new XdrBufferWriter(buffer.Buffer);
+                    var writer = new XdrBufferWriter(sendBuffer.Buffer);
                     XdrConverter.Serialize(envelope, writer);
 
                     if (webSocket.State == WebSocketState.Open)
-                        await webSocket.SendAsync(buffer.AsSegment(0, writer.Length), WebSocketMessageType.Binary, true, cancellationToken);
+                        await webSocket.SendAsync(sendBuffer.Buffer.AsMemory(0, writer.Length), WebSocketMessageType.Binary, true, cancellationToken);
 
                     _ = Task.Factory.StartNew(() => OnSend?.Invoke(envelope));
 
@@ -591,8 +596,17 @@ namespace Centaurus.SDK
                 cancellationTokenSource?.Dispose();
                 cancellationTokenSource = null;
 
+                //make sure the socket is closed
+                if (webSocket?.State != WebSocketState.Closed)
+                    webSocket?.Abort();
                 webSocket?.Dispose();
                 webSocket = null;
+
+                readBuffer?.Dispose();
+                readBuffer = null;
+
+                sendBuffer?.Dispose();
+                sendBuffer = null;
             }
 
             #region Private Members
@@ -681,7 +695,7 @@ namespace Centaurus.SDK
                 return false;
             }
 
-            private MessageEnvelope DeserializeMessage(XdrBufferFactory.RentedBuffer buffer)
+            private MessageEnvelope DeserializeMessage(RentedBuffer buffer)
             {
                 try
                 {
@@ -700,39 +714,38 @@ namespace Centaurus.SDK
                 {
                     while (webSocket.State != WebSocketState.Closed && webSocket.State != WebSocketState.Aborted && !cancellationToken.IsCancellationRequested)
                     {
-                        var result = await webSocket.GetWebsocketBuffer(WebSocketExtension.ChunkSize * 100, cancellationToken);
-                        using (result.messageBuffer)
-                            if (!cancellationToken.IsCancellationRequested)
+                        var messageType = await webSocket.GetWebsocketBuffer(readBuffer, cancellationToken);
+                        if (!cancellationToken.IsCancellationRequested)
+                        {
+                            //the client send close message
+                            if (messageType == WebSocketMessageType.Close)
                             {
-                                //the client send close message
-                                if (result.messageType == WebSocketMessageType.Close)
+                                if (webSocket.State != WebSocketState.CloseReceived)
+                                    continue;
+                                await sendMessageSemaphore.WaitAsync();
+                                try
                                 {
-                                    if (webSocket.State != WebSocketState.CloseReceived)
-                                        continue;
-                                    await sendMessageSemaphore.WaitAsync();
-                                    try
-                                    {
-                                        var timeoutTokenSource = new CancellationTokenSource(1000);
-                                        await webSocket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "Close", CancellationToken.None);
-                                    }
-                                    finally
-                                    {
-                                        sendMessageSemaphore.Release();
-                                        cancellationTokenSource.Cancel();
-                                    }
+                                    var timeoutTokenSource = new CancellationTokenSource(1000);
+                                    await webSocket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "Close", CancellationToken.None);
                                 }
-                                else
+                                finally
                                 {
-                                    try
-                                    {
-                                        HandleMessage(DeserializeMessage(result.messageBuffer));
-                                    }
-                                    catch (UnexpectedMessageException e)
-                                    {
-                                        _ = Task.Factory.StartNew(() => OnException?.Invoke(e));
-                                    }
+                                    sendMessageSemaphore.Release();
+                                    cancellationTokenSource.Cancel();
                                 }
                             }
+                            else
+                            {
+                                try
+                                {
+                                    HandleMessage(DeserializeMessage(readBuffer));
+                                }
+                                catch (UnexpectedMessageException e)
+                                {
+                                    _ = Task.Factory.StartNew(() => OnException?.Invoke(e));
+                                }
+                            }
+                        }
                     }
                 }
                 catch (OperationCanceledException)
@@ -757,9 +770,6 @@ namespace Centaurus.SDK
                 }
                 finally
                 {
-                    //make sure the socket is closed
-                    if (webSocket.State != WebSocketState.Closed)
-                        webSocket.Abort();
                     _ = Task.Factory.StartNew(() => OnClosed?.Invoke());
                 }
             }

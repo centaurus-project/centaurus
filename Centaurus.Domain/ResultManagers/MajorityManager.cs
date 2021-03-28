@@ -55,7 +55,7 @@ namespace Centaurus.Domain
                     .ToArray();
 
                 foreach (var itemKey in itemsToRemove)
-                    pendingAggregates.Remove(itemKey);
+                    Remove(itemKey);
             }
             cleanupTimer?.Start();
         }
@@ -95,9 +95,7 @@ namespace Centaurus.Domain
             lock (syncRoot)
             {
                 if (pendingAggregates.Remove(id))
-                    logger.Error($"Unable to remove item by id '{id}'");
-                else
-                    logger.Trace($"Item with id '{id}' is removed");
+                    logger.Trace($"Unable to remove item by id '{id}'"); //it could be removed by timer
             }
         }
 
@@ -114,7 +112,7 @@ namespace Centaurus.Domain
 
         protected virtual byte[] GetHash(MessageEnvelope envelope)
         {
-            return envelope.Message.ComputeHash();
+            return envelope.ComputeMessageHash();
         }
 
         public class ConsensusAggregate

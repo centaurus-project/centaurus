@@ -8,9 +8,9 @@ namespace Centaurus.Domain
 {
     public class OrderRemovedEffectProccessor : EffectProcessor<OrderRemovedEffect>
     {
-        private Orderbook orderbook;
+        private OrderbookBase orderbook;
 
-        public OrderRemovedEffectProccessor(OrderRemovedEffect effect, Orderbook orderbook)
+        public OrderRemovedEffectProccessor(OrderRemovedEffect effect, OrderbookBase orderbook)
             : base(effect)
         {
             this.orderbook = orderbook ?? throw new ArgumentNullException(nameof(orderbook));
@@ -19,7 +19,7 @@ namespace Centaurus.Domain
         public override void CommitEffect()
         {
             MarkAsProcessed();
-            if (!orderbook.RemoveOrder(Effect.OrderId))
+            if (!orderbook.RemoveOrder(Effect.OrderId, out _))
                 throw new Exception($"Unable to remove order with id {Effect.OrderId}");
 
             var decodedId = OrderIdConverter.Decode(Effect.OrderId);

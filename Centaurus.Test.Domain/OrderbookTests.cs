@@ -2,6 +2,7 @@
 using Centaurus.DAL.Mongo;
 using Centaurus.Domain;
 using Centaurus.Models;
+using Centaurus.Xdr;
 using NUnit.Framework;
 using stellar_dotnet_sdk;
 using System;
@@ -12,10 +13,18 @@ using System.Text;
 
 namespace Centaurus.Test
 {
+    [TestFixture(true)]
+    [TestFixture(false)]
     public class OrderbookTests
     {
+        public OrderbookTests(bool useLegacyOrderbook)
+        {
+            this.useLegacyOrderbook = useLegacyOrderbook;
+        }
+
         AccountWrapper account1;
         AccountWrapper account2;
+        private bool useLegacyOrderbook;
 
         [SetUp]
         public void Setup()
@@ -27,14 +36,16 @@ namespace Centaurus.Test
                 NetworkPassphrase = "Test SDF Network ; September 2015",
                 CWD = "AppData"
             };
-            Global.Setup(settings, new MockStorage()).Wait();
+            Global.Setup(settings, new MockStorage(), useLegacyOrderbook).Wait();
+
+            var requestRateLimits = new RequestRateLimits { HourLimit = 1000, MinuteLimit = 100 };
 
             var account1 = new AccountWrapper(new Models.Account
             {
                 Id = 1,
                 Pubkey = new RawPubKey() { Data = KeyPair.Random().PublicKey },
                 Balances = new List<Balance>()
-            }, Global.Constellation.RequestRateLimits);
+            }, requestRateLimits);
 
             account1.Account.CreateBalance(0);
             account1.Account.GetBalance(0).UpdateBalance(10000000000);
@@ -46,7 +57,7 @@ namespace Centaurus.Test
                 Id = 2,
                 Pubkey = new RawPubKey() { Data = KeyPair.Random().PublicKey },
                 Balances = new List<Balance>()
-            }, Global.Constellation.RequestRateLimits);
+            }, requestRateLimits);
 
             account2.Account.CreateBalance(0);
             account2.Account.GetBalance(0).UpdateBalance(10000000000);
@@ -63,7 +74,7 @@ namespace Centaurus.Test
                 {
                     Vault = KeyPair.Random().PublicKey,
                     Assets = new List<AssetSettings> { new AssetSettings { Id = 1, Code = "X", Issuer = new RawPubKey() } },
-                    RequestRateLimits = new RequestRateLimits { HourLimit = 1000, MinuteLimit = 100 }
+                    RequestRateLimits = requestRateLimits
                 },
             }).Wait();
 
@@ -178,7 +189,7 @@ namespace Centaurus.Test
             ExecuteWithOrderbook(iterations, useNormalDistribution, executeOrders => PerfCounter.MeasureTime(executeOrders, () =>
             {
                 var market = Global.Exchange.GetMarket(1);
-                return $"{iterations} iterations, orderbook size: {market.Bids.Count} bids,  {market.Asks.Count} asks, {market.Bids.GetBestPrice().ToString("G3")}/{market.Asks.GetBestPrice().ToString("G3")} spread.";
+                return $"Is legacy orderbook: {useLegacyOrderbook}, {iterations} iterations, orderbook size: {market.Bids.Count} bids,  {market.Asks.Count} asks, {market.Bids.GetBestPrice().ToString("G3")}/{market.Asks.GetBestPrice().ToString("G3")} spread.";
             }));
         }
 
@@ -222,7 +233,7 @@ namespace Centaurus.Test
 
             foreach (var order in orders)
             {
-                orderbook.RemoveOrder(order.OrderId);
+                orderbook.RemoveOrder(order.OrderId, out _);
                 ordersCount--;
                 Assert.AreEqual(ordersCount, orderbook.Count);
                 Assert.AreEqual(ordersCount, getOrdersCount());

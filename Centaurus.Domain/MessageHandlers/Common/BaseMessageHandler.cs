@@ -24,7 +24,7 @@ namespace Centaurus.Domain
         /// Validates authentication, connection state and message.
         /// </summary>
         /// <param name="envelope">The current message envelope</param>
-        public virtual Task Validate(TConnection connection, MessageEnvelope envelope)
+        public virtual Task Validate(TConnection connection, IncomingMessage message)
         {
             if (ValidConnectionStates != null
                 && ValidConnectionStates.Length > 0
@@ -34,7 +34,7 @@ namespace Centaurus.Domain
                     connection.ConnectionState.ToString(),
                     ValidConnectionStates.Select(s => s.ToString()).ToArray());
 
-            if(!envelope.AreSignaturesValid())
+            if(!message.Envelope.Signatures.AreSignaturesValid(message.MessageHash))
                 throw new UnauthorizedException();
 
             return Task.CompletedTask;
@@ -45,6 +45,20 @@ namespace Centaurus.Domain
         /// </summary>
         /// <param name="messageEnvelope">The current message envelope</param>
         /// <returns>Handle result</returns>
-        public abstract Task HandleMessage(TConnection connection, MessageEnvelope messageEnvelope);
+        public abstract Task HandleMessage(TConnection connection, IncomingMessage message);
+    }
+
+    public class IncomingMessage
+    {
+
+        public IncomingMessage(MessageEnvelope envelope, byte[] messageHash)
+        {
+            Envelope = envelope ?? throw new ArgumentNullException(nameof(Envelope));
+            MessageHash = messageHash ?? throw new ArgumentNullException(nameof(messageHash));
+        }
+
+        public MessageEnvelope Envelope { get; }
+
+        public byte[] MessageHash { get; }  
     }
 }

@@ -15,14 +15,13 @@ namespace Centaurus
     {
         public const int ChunkSize = 1024;
 
-        public static async Task<(XdrBufferFactory.RentedBuffer messageBuffer, WebSocketMessageType messageType)> GetWebsocketBuffer(this WebSocket webSocket, int maxMessageSize, CancellationToken cancellationToken)
+        public static async Task<WebSocketMessageType> GetWebsocketBuffer(this WebSocket webSocket, XdrBufferFactory.RentedBuffer messageBuffer, CancellationToken cancellationToken)
         {
             var length = 0;
             var messageType = default(WebSocketMessageType);
-            var messageBuffer = XdrBufferFactory.Rent(maxMessageSize);
             while (true)
             {
-                if (length + ChunkSize > maxMessageSize) 
+                if (length + ChunkSize > messageBuffer.Capacity) 
                     throw new Exception("Too large message"); //TODO: handle it upstream
                 var chunk = messageBuffer.AsSegment(length, ChunkSize);
                 var result = await webSocket.ReceiveAsync(chunk, cancellationToken);
@@ -34,7 +33,7 @@ namespace Centaurus
                 }
             }
             messageBuffer.Resize(length);
-            return (messageBuffer, messageType);
+            return messageType;
         }
     }
 }

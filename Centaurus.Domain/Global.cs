@@ -8,6 +8,7 @@ using Centaurus.DAL;
 using Centaurus.DAL.Mongo;
 using Centaurus.Exchange.Analytics;
 using Centaurus.Models;
+using Centaurus.Xdr;
 using NLog;
 
 namespace Centaurus.Domain
@@ -21,15 +22,18 @@ namespace Centaurus.Domain
         /// </summary>
         public const int MaxTxSubmitDelay = 5 * 60; //5 minutes
 
-        public const int MaxMessageBatchSize = 100;
+        static bool useLegacyOrderbook;
 
         /// <summary>
         /// Setups Global object
         /// </summary>
         /// <param name="settings">Application config</param>
         /// <param name="storage">Permanent storage object</param>
-        public static async Task Setup(BaseSettings settings, IStorage storage)
+        /// <param name="useLegacyOrderbook"></param>
+        public static async Task Setup(BaseSettings settings, IStorage storage, bool useLegacyOrderbook = false)
         {
+            Global.useLegacyOrderbook = useLegacyOrderbook;
+
             ExtensionsManager = new ExtensionsManager();
 
             Settings = settings ?? throw new ArgumentNullException(nameof(settings));
@@ -58,6 +62,7 @@ namespace Centaurus.Domain
             if (lastApex >= 0)
             {
                 var lastQuantum = await PersistenceManager.GetQuantum(lastApex);
+
                 lastHash = lastQuantum.Message.ComputeHash();
                 logger.Trace($"Last hash is {Convert.ToBase64String(lastHash)}");
                 var snapshot = await PersistenceManager.GetSnapshot(lastApex);
@@ -82,14 +87,14 @@ namespace Centaurus.Domain
         private static void AppState_StateChanged(StateChangedEventArgs stateChangedEventArgs)
         {
             var state = stateChangedEventArgs.State;
+            if (state != ApplicationState.Ready
+                && stateChangedEventArgs.PrevState == ApplicationState.Ready) //close all connections (except auditors) if Alpha is not in Ready state
+                ConnectionManager.CloseAllConnections(false).Wait();
             if (!(PendingUpdatesManager?.IsRunning ?? true) &&
                 (state == ApplicationState.Running
                 || state == ApplicationState.Ready
                 || state == ApplicationState.WaitingForInit))
                 PendingUpdatesManager?.Start();
-            if (state != ApplicationState.Ready
-                && stateChangedEventArgs.PrevState == ApplicationState.Ready) //close all connections (except auditors) if Alpha is not in Ready state
-                ConnectionManager.CloseAllConnections(false).Wait();
         }
 
         public static async Task TearDown()
@@ -116,7 +121,7 @@ namespace Centaurus.Domain
                 Exchange.OnUpdates -= Exchange_OnUpdates;
                 Exchange?.Dispose();
             }
-            Exchange = Exchange.RestoreExchange(snapshot.Settings.Assets, snapshot.Orders, IsAlpha);
+            Exchange = Exchange.RestoreExchange(snapshot.Settings.Assets, snapshot.Orders, IsAlpha, Global.useLegacyOrderbook);
 
             WithdrawalStorage?.Dispose(); WithdrawalStorage = new WithdrawalStorage(snapshot.Withdrawals, (!EnvironmentHelper.IsTest && IsAlpha));
 

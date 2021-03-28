@@ -15,9 +15,9 @@ namespace Centaurus.Domain
 
         public override ConnectionState[] ValidConnectionStates => new ConnectionState[] { ConnectionState.Connected, ConnectionState.Ready };
 
-        public override async Task HandleMessage(AuditorWebSocketConnection connection, MessageEnvelope messageEnvelope)
+        public override async Task HandleMessage(AuditorWebSocketConnection connection, IncomingMessage message)
         {
-            var quantaBatch = (QuantaBatch)messageEnvelope.Message;
+            var quantaBatch = (QuantaBatch)message.Envelope.Message;
             var quanta = quantaBatch.Quanta;
             var quantaBatchCount = quanta.Count;
             for (var i = 0; i < quantaBatchCount; i++)

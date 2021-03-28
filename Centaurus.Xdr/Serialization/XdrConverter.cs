@@ -38,43 +38,6 @@ namespace Centaurus.Xdr
             serializer.SerializeMethod.Invoke(null, new object[] { value, writer });
         }
 
-        /*internal static void SerializeList(IEnumerable value, XdrWriter writer)
-        {
-            //if (value == null) throw new NullReferenceException("Failed to serialize null value. All values should be initialized before the serialization.");
-            //suppose it's a List<T>
-            var genericListType = value.GetType().GenericTypeArguments[0];
-            if (genericListType != null)
-            {
-                var baseSerializer = LookupSerializer(genericListType);
-                foreach (var item in value)
-                {
-                    //if (item == null) throw new NullReferenceException("Failed to serialize null value. All values should be initialized before the serialization.");
-                    var itemType = item.GetType();
-                    //the same type - we don't need to lookup for serializer
-                    if (itemType == genericListType)
-                    {
-                        baseSerializer.DynamicSerializer.Serialize(item, writer);
-                    }
-                    else
-                    {
-                        var serializer = LookupSerializer(itemType);
-                        serializer.DynamicSerializer.Serialize(item, writer);
-                    }
-                }
-            }
-            else
-            {
-                //otherwise we need to lookup for serialization vector each time
-                foreach (XdrContractSerializer item in value)
-                {
-                    if (value == null) 
-                        throw new NullReferenceException("Failed to serialize null value. All values should be initialized before the serialization.");
-                    var serializer = LookupSerializer(item.GetType());
-                    serializer.DynamicSerializer.Serialize(item, writer);
-                }
-            }
-        }*/
-
         public static object Deserialize(XdrReader reader, Type type)
         {
             //find the corresponding serialization vector for a given type

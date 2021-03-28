@@ -14,9 +14,9 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
 
         public override ConnectionState[] ValidConnectionStates { get; } = new ConnectionState[] { ConnectionState.Ready };
 
-        public override Task HandleMessage(AlphaWebSocketConnection connection, MessageEnvelope envelope)
+        public override Task HandleMessage(AlphaWebSocketConnection connection, IncomingMessage message)
         {
-            Global.AuditLedgerManager.Add(envelope);
+            Global.AuditLedgerManager.Add(message.Envelope);
             return Task.CompletedTask;
         }
     }
