@@ -24,29 +24,6 @@ namespace Centaurus
             hd.Randomize();
             HandshakeData = hd;
             _ = SendMessage(new HandshakeInit { HandshakeData = hd });
-
-            InitTimer();
-        }
-
-        private System.Timers.Timer invalidationTimer;
-
-        //If we didn't receive message during specified interval, we should close connection
-        private void InitTimer()
-        {
-            invalidationTimer = new System.Timers.Timer();
-            invalidationTimer.Interval = 10000;
-            invalidationTimer.AutoReset = false;
-            invalidationTimer.Elapsed += InvalidationTimer_Elapsed;
-        }
-
-        private async void InvalidationTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
-        {
-            if (Debugger.IsAttached)
-            {
-                invalidationTimer.Reset();
-                return;
-            }
-            await CloseConnection(WebSocketCloseStatus.PolicyViolation, "Connection is inactive");
         }
 
         public HandshakeData HandshakeData { get; }
@@ -89,18 +66,11 @@ namespace Centaurus
         {
             var isHandled = await MessageHandlers<AlphaWebSocketConnection>.HandleMessage(this, envelope.ToIncomingMessage(incommingBuffer));
 
-            //reset invalidation timer only if message has been handled
-            if (isHandled)
-                invalidationTimer?.Reset();
             return isHandled;
         }
 
         public override void Dispose()
         {
-            invalidationTimer?.Stop();
-            invalidationTimer?.Dispose();
-            invalidationTimer = null;
-
             QuantumWorker?.Dispose();
             base.Dispose();
         }
