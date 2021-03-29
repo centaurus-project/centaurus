@@ -1,4 +1,5 @@
 ﻿using Centaurus.Models;
+using Centaurus.Xdr;
 using NLog;
 using System;
 using System.Collections.Concurrent;
@@ -90,7 +91,12 @@ namespace Centaurus.Domain
             }
         }
 
-        public static void EnqueueResult(ResultMessage result)
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="result"></param>
+        /// <param name="buffer">Buffer to use for serialization</param>
+        public static void EnqueueResult(ResultMessage result, byte[] buffer)
         {
             if (result == null)
                 throw new ArgumentNullException(nameof(result));
@@ -108,11 +114,16 @@ namespace Centaurus.Domain
             }
 
             var resultEnvelope = result.CreateEnvelope();
-            resultEnvelope.Sign(Global.Settings.KeyPair);
+            resultEnvelope.Sign(Global.Settings.KeyPair, buffer);
             signature = resultEnvelope.Signatures[0].Signature;
 
             lock (results)
-                results.Add(new AuditorResultMessage { Apex = result.MessageId, Signature = signature, TxSignature = txSignature });
+                results.Add(new AuditorResultMessage
+                {
+                    Apex = result.MessageId,
+                    Signature = signature,
+                    TxSignature = txSignature
+                });
         }
     }
 }

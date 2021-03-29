@@ -157,14 +157,7 @@ namespace Centaurus
             {
                 Global.ExtensionsManager.BeforeSendMessage(this, envelope);
                 if (!envelope.IsSignedBy(Global.Settings.KeyPair.PublicKey))
-                {
-                    using (var writer = new XdrBufferWriter(outgoingBuffer.Buffer))
-                    {
-                        XdrConverter.Serialize(envelope.Message, writer);
-                        var signature = ByteArrayExtensions.ComputeHash(writer.ToArray()).Sign(Global.Settings.KeyPair);
-                        envelope.Signatures.Add(signature);
-                    }
-                }
+                    envelope.Sign(Global.Settings.KeyPair, outgoingBuffer.Buffer);
 
                 logger.Trace($"Connection {ClientKPAccountId}, about to send {envelope.Message.MessageType} message.");
 

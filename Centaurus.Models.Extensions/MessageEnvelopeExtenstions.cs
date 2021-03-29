@@ -1,5 +1,6 @@
 ﻿using Centaurus.Domain;
 using Centaurus.Models;
+using Centaurus.Xdr;
 using stellar_dotnet_sdk;
 using System;
 using System.Collections.Generic;
@@ -15,12 +16,13 @@ namespace Centaurus
         /// Compute SHA256 hash for the wrapped message.
         /// </summary>
         /// <param name="messageEnvelope">Envelope</param>
+        /// <param name="buffer">Buffer to use for serialization.</param>
         /// <returns>Message hash</returns>
-        public static byte[] ComputeMessageHash(this MessageEnvelope messageEnvelope)
+        public static byte[] ComputeMessageHash(this MessageEnvelope messageEnvelope, byte[] buffer = null)
         {
             if (messageEnvelope == null)
                 throw new ArgumentNullException(nameof(messageEnvelope));
-            return messageEnvelope.Message.ComputeHash();
+            return messageEnvelope.Message.ComputeHash(buffer);
         }
 
         /// <summary>
@@ -35,6 +37,27 @@ namespace Centaurus
             if (keyPair == null)
                 throw new ArgumentNullException(nameof(keyPair));
             var signature = messageEnvelope.ComputeMessageHash().Sign(keyPair);
+            messageEnvelope.Signatures.Add(signature);
+            return messageEnvelope;
+        }
+
+        /// <summary>
+        /// Signs an envelope with a given <see cref="KeyPair"/> and appends the signature to the <see cref="MessageEnvelope.Signatures"/>.
+        /// </summary>
+        /// <param name="messageEnvelope">Envelope to sign</param>
+        /// <param name="keyPair">Key pair to use for signing</param>
+        /// <param name="buffer">Buffer to use for computing hash code.</param>
+        public static MessageEnvelope Sign(this MessageEnvelope messageEnvelope, KeyPair keyPair, byte[] buffer)
+        {
+            if (messageEnvelope == null)
+                throw new ArgumentNullException(nameof(messageEnvelope));
+            if (keyPair == null)
+                throw new ArgumentNullException(nameof(keyPair));
+            if (buffer == null)
+                throw new ArgumentNullException(nameof(buffer));
+            using var writer = new XdrBufferWriter(buffer);
+            XdrConverter.Serialize(messageEnvelope.Message, writer);
+            var signature = writer.ToArray().ComputeHash().Sign(keyPair);
             messageEnvelope.Signatures.Add(signature);
             return messageEnvelope;
         }

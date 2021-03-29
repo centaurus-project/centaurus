@@ -37,10 +37,13 @@ namespace Centaurus.Domain
 
             options = new JsonSerializerOptions { IgnoreNullValues = true };
             options.Converters.Add(new XdrObjectConverter());
+
+            buffer = XdrBufferFactory.Rent(256 * 1024);
         }
 
         BlockingCollection<HandleItem> awaitedQuanta = new BlockingCollection<HandleItem>();
         private JsonSerializerOptions options;
+        private XdrBufferFactory.RentedBuffer buffer;
 
         /// <summary>
         /// Handles the quantum and returns Task.
@@ -160,17 +163,15 @@ namespace Centaurus.Domain
 
             var resultEffectsContainer = new EffectsContainer { Effects = effectsContainer.Effects };
 
-            var effects = resultEffectsContainer.ToByteArray();
+            var effects = resultEffectsContainer.ToByteArray(buffer.Buffer);
 
             quantum.EffectsHash = effects.ComputeHash();
 
-            //logger.Error($"{{ Result: {JsonSerializer.Serialize(resultMessage, options)}, Effects: {JsonSerializer.Serialize(resultEffectsContainer, options)}, Bytes: {string.Join("", effects)}, Hash: {string.Join("", quantum.EffectsHash)} }}");
-
-            var messageHash = quantumEnvelope.ComputeMessageHash();
+            var messageHash = quantumEnvelope.ComputeMessageHash(buffer.Buffer);
             //we need to sign the quantum here to prevent multiple signatures that can occur if we sign it when sending
             quantumEnvelope.Signatures.Add(messageHash.Sign(Global.Settings.KeyPair));
 
-            Global.AuditResultManager.Register(resultMessage, processor.GetNotificationMessages(context));
+            Global.AuditResultManager.Register(resultMessage, resultMessage.ComputeHash(buffer.Buffer), processor.GetNotificationMessages(context));
 
             Global.QuantumStorage.AddQuantum(quantumEnvelope, messageHash);
 
@@ -204,18 +205,16 @@ namespace Centaurus.Domain
 
             var resultEffectsContainer = new EffectsContainer { Effects = effectsContainer.Effects };
 
-            var effects = resultEffectsContainer.ToByteArray();
+            var effects = resultEffectsContainer.ToByteArray(buffer.Buffer);
 
             var effectsHash = effects.ComputeHash();
-
-            //logger.Error($"{{ Result: {JsonSerializer.Serialize(result, options)}, Effects: {JsonSerializer.Serialize(resultEffectsContainer, options)}, Bytes: {string.Join("", effects)}, Hash: {string.Join("", effectsHash)} }}");
 
             if (!ByteArrayComparer.Default.Equals(effectsHash, quantum.EffectsHash) && !EnvironmentHelper.IsTest)
             {
                 throw new Exception("Effects hash is not equal to provided by Alpha.");
             }
 
-            var messageHash = envelope.ComputeMessageHash();
+            var messageHash = envelope.ComputeMessageHash(buffer.Buffer);
 
             Global.QuantumStorage.AddQuantum(envelope, messageHash);
 
@@ -225,7 +224,7 @@ namespace Centaurus.Domain
 
             logger.Trace($"Message of type {messageType} with apex {((Quantum)envelope.Message).Apex} is handled.");
 
-            OutgoingResultsStorage.EnqueueResult(result);
+            OutgoingResultsStorage.EnqueueResult(result, buffer.Buffer);
 
             return result;
         }

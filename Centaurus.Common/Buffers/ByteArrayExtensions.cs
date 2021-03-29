@@ -41,19 +41,31 @@ namespace Centaurus
             return SHA256.Create().ComputeHash(buffer);
         }
 
-        public static byte[] ComputeHash(this object objToSerialize)
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="objToSerialize">Object to serialize</param>
+        /// <param name="buffer">Buffer to use for serialization</param>
+        /// <returns></returns>
+        public static byte[] ComputeHash(this object objToSerialize, byte[] buffer = null)
         {
-            var bytes = objToSerialize.ToByteArray();
+            var bytes = objToSerialize.ToByteArray(buffer);
             return ComputeHash(bytes);
         }
 
-        public static byte[] ToByteArray(this object objToSerialize)
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="objToSerialize">Object to serialize</param>
+        /// <param name="buffer">Buffer to use for serialization</param>
+        /// <returns></returns>
+        public static byte[] ToByteArray(this object objToSerialize, byte[] buffer = null)
         {
             var bytes = objToSerialize as byte[];
             if (bytes != null)
                 return bytes;
 
-            using var writer = new XdrBufferWriter();
+            using var writer = buffer == null ? new XdrBufferWriter() : new XdrBufferWriter(buffer);
             return objToSerialize.ToByteArray(writer);
         }
 

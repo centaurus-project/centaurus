@@ -15,9 +15,9 @@ namespace Centaurus.Domain
             InitTimers();
         }
 
-        public void Register(ResultMessage resultMessage, Dictionary<int, Message> notifications)
+        public void Register(ResultMessage resultMessage, byte[] messageHash, Dictionary<int, Message> notifications)
         {
-            var resultMessageItem = new ResultMessageItem(resultMessage, notifications);
+            var resultMessageItem = new ResultMessageItem(resultMessage, messageHash, notifications);
             if (!pendingAggregates.TryAdd(resultMessageItem.Apex, new ResultConsensusAggregate(resultMessageItem, this)))
                 logger.Error("Unable to add result manager.");
         }
@@ -223,13 +223,13 @@ namespace Centaurus.Domain
 
         class ResultMessageItem
         {
-            public ResultMessageItem(ResultMessage resultMessage, Dictionary<int, Message> notifications)
+            public ResultMessageItem(ResultMessage resultMessage, byte[] messageHash, Dictionary<int, Message> notifications)
             {
                 if (resultMessage == null)
                     throw new ArgumentNullException(nameof(resultMessage));
                 ResultEnvelope = resultMessage.CreateEnvelope();
+                Hash = messageHash;
                 IsTxResultMessage = resultMessage is ITransactionResultMessage;
-                Hash = ResultEnvelope.ComputeMessageHash();
                 AccountPubKey = GetMessageAccount();
                 Notifications = notifications ?? throw new ArgumentNullException(nameof(notifications));
             }

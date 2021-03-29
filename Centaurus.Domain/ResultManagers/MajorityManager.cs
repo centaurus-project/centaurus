@@ -17,13 +17,13 @@ namespace Centaurus.Domain
             InitCleanupTimer();
         }
 
-        public void Add(MessageEnvelope envelope)
+        public void Add(IncomingMessage message)
         {
-            var id = GetId(envelope);
+            var id = GetId(message.Envelope);
             ConsensusAggregate aggregate = GetConsensusAggregate(id);
 
             //add the signature to the aggregate
-            aggregate.Add(envelope);
+            aggregate.Add(message);
         }
 
         public virtual void Dispose()
@@ -135,20 +135,19 @@ namespace Centaurus.Domain
 
             private Dictionary<byte[], MessageEnvelope> storage = new Dictionary<byte[], MessageEnvelope>(ByteArrayComparer.Default);
 
-            public void Add(MessageEnvelope envelope)
+            public void Add(IncomingMessage message)
             {
                 MessageEnvelope consensus = null;
                 MajorityResults majorityResult = MajorityResults.Unknown;
                 lock (syncRoot)
                 {
-                    var envelopeHash = majorityManager.GetHash(envelope);
-                    if (!storage.TryGetValue(envelopeHash, out var resultStorageEnvelope))//first result with such hash
+                    if (!storage.TryGetValue(message.MessageHash, out var resultStorageEnvelope))//first result with such hash
                     {
-                        resultStorageEnvelope = envelope;
-                        storage[envelopeHash] = envelope;
+                        resultStorageEnvelope = message.Envelope;
+                        storage[message.MessageHash] = resultStorageEnvelope;
                     }
                     else
-                        resultStorageEnvelope.AggregateEnvelopUnsafe(envelope);//we can use AggregateEnvelopUnsafe, we compute hash for every envelope above
+                        resultStorageEnvelope.AggregateEnvelopUnsafe(resultStorageEnvelope);//we can use AggregateEnvelopUnsafe, we compute hash for every envelope above
 
                     if (IsProcessed)
                     {
