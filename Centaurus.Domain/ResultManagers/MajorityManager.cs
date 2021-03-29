@@ -147,7 +147,7 @@ namespace Centaurus.Domain
                         storage[message.MessageHash] = resultStorageEnvelope;
                     }
                     else
-                        resultStorageEnvelope.AggregateEnvelopUnsafe(resultStorageEnvelope);//we can use AggregateEnvelopUnsafe, we compute hash for every envelope above
+                        resultStorageEnvelope.AggregateEnvelopUnsafe(message.Envelope);//we can use AggregateEnvelopUnsafe, we compute hash for every envelope above
 
                     if (IsProcessed)
                     {

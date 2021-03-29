@@ -159,7 +159,7 @@ namespace Centaurus.Domain
 
             await processor.Validate(context);
 
-            var resultMessage = await processor.Process(context);
+            var resultMessageEnvelope = (await processor.Process(context)).CreateEnvelope();
 
             var resultEffectsContainer = new EffectsContainer { Effects = effectsContainer.Effects };
 
@@ -171,7 +171,10 @@ namespace Centaurus.Domain
             //we need to sign the quantum here to prevent multiple signatures that can occur if we sign it when sending
             quantumEnvelope.Signatures.Add(messageHash.Sign(Global.Settings.KeyPair));
 
-            Global.AuditResultManager.Register(resultMessage, resultMessage.ComputeHash(buffer.Buffer), processor.GetNotificationMessages(context));
+            var resultMessageHash = resultMessageEnvelope.ComputeMessageHash(buffer.Buffer);
+            resultMessageEnvelope.Signatures.Add(resultMessageHash.Sign(Global.Settings.KeyPair));
+
+            Global.AuditResultManager.Register(resultMessageEnvelope, resultMessageHash, processor.GetNotificationMessages(context));
 
             Global.QuantumStorage.AddQuantum(quantumEnvelope, messageHash);
 
@@ -179,7 +182,7 @@ namespace Centaurus.Domain
 
             logger.Trace($"Message of type {envelope.Message} with apex {quantum.Apex} is handled.");
 
-            return resultMessage;
+            return (ResultMessage)resultMessageEnvelope.Message;
         }
 
         async Task<ResultMessage> AuditorHandleQuantum(MessageEnvelope envelope)
