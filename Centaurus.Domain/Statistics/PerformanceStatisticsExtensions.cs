@@ -1,0 +1,35 @@
+﻿using Centaurus.Models;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+
+namespace Centaurus.Domain
+{
+    public static class PerformanceStatisticsExtensions
+    {
+        public static PerformanceStatistics FromModel(this AuditorPerfStatistics statistics)
+        {
+            if (statistics == null)
+                throw new ArgumentNullException(nameof(statistics));
+            return new PerformanceStatistics
+            {
+                QuantaPerSecond = statistics.QuantaPerSecond,
+                QuantaQueueLength = statistics.QuantaQueueLength,
+                BatchInfos = statistics.BatchInfos.Select(b => b.FromModel()).ToList(),
+                UpdateDate = new DateTime(statistics.UpdateDate, DateTimeKind.Utc)
+            };
+        }
+
+        public static AuditorPerfStatistics ToModel(this PerformanceStatistics statistics)
+        {
+            return new AuditorPerfStatistics
+            {
+                QuantaPerSecond = statistics.QuantaPerSecond,
+                QuantaQueueLength = statistics.QuantaQueueLength,
+                BatchInfos = statistics.BatchInfos.Select(b => b.ToBatchSavedInfoModel()).ToList(),
+                UpdateDate = statistics.UpdateDate.Ticks
+            };
+        }
+    }
+}

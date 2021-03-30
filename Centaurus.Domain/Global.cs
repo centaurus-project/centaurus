@@ -150,18 +150,18 @@ namespace Centaurus.Domain
                 AnalyticsManager.OnError += AnalyticsManager_OnError;
                 AnalyticsManager.OnUpdate += AnalyticsManager_OnUpdate;
                 Exchange.OnUpdates += Exchange_OnUpdates;
-
-                DisposePerformanceStatisticsManager();
-
-                PerformanceStatisticsManager = new PerformanceStatisticsManager();
-                PerformanceStatisticsManager.OnUpdates += PerformanceStatisticsManager_OnUpdates;
             }
+
+            DisposePerformanceStatisticsManager();
+
+            PerformanceStatisticsManager = new PerformanceStatisticsManager();
+            PerformanceStatisticsManager.OnUpdates += PerformanceStatisticsManager_OnUpdates;
 
             ExtensionsManager?.Dispose(); ExtensionsManager = new ExtensionsManager();
             ExtensionsManager.RegisterAllExtensions();
         }
 
-        private static void PendingUpdatesManager_OnBatchSaved(PendingUpdatesManager.BatchSavedInfo batchInfo)
+        private static void PendingUpdatesManager_OnBatchSaved(BatchSavedInfo batchInfo)
         {
             var message = $"Batch saved on the {batchInfo.Retries} try. Quanta count: {batchInfo.QuantaCount}; effects count: {batchInfo.EffectsCount}.";
             if (batchInfo.Retries > 1)
@@ -171,11 +171,18 @@ namespace Centaurus.Domain
             PerformanceStatisticsManager?.OnBatchSaved(batchInfo);
         }
 
-        private static void PerformanceStatisticsManager_OnUpdates(PerformanceStatisticsManager.PerformanceStatisticsManagerUpdate updates)
+        private static void PerformanceStatisticsManager_OnUpdates(PerformanceStatistics statistics)
         {
-            if (!SubscriptionsManager.TryGetSubscription(PerformanceStatisticsSubscription.SubscriptionName, out var subscription))
-                return;
-            InfoConnectionManager.SendSubscriptionUpdate(subscription, PerformanceStatisticsUpdate.Generate(updates, PerformanceStatisticsSubscription.SubscriptionName));
+            if (IsAlpha)
+            {
+                if (!SubscriptionsManager.TryGetSubscription(PerformanceStatisticsSubscription.SubscriptionName, out var subscription))
+                    return;
+                InfoConnectionManager.SendSubscriptionUpdate(subscription, PerformanceStatisticsUpdate.Generate((AlphaPerformanceStatistics)statistics, PerformanceStatisticsSubscription.SubscriptionName));
+            }
+            else
+            {
+                OutgoingMessageStorage.EnqueueMessage(statistics.ToModel());
+            }
         }
 
         public static Exchange Exchange { get; private set; }

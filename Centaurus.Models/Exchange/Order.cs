@@ -34,7 +34,7 @@ namespace Centaurus.Models
             }
             if (Next != null)
             {
-                res += $", prev {Next.OrderId}";
+                res += $", next {Next.OrderId}";
             }
             return res;
         }

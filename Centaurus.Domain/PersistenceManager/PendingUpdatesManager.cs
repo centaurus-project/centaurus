@@ -203,18 +203,5 @@ namespace Centaurus.Domain
             UpdatesSyncRoot?.Dispose();
             UpdatesSyncRoot = null;
         }
-
-        public class BatchSavedInfo
-        {
-            public int QuantaCount { get; set; }
-
-            public int EffectsCount { get; set; }
-
-            public int Retries { get; set; }
-
-            public long ElapsedMilliseconds { get; set; }
-
-            public DateTime SavedAt { get; set; }
-        }
     }
 }

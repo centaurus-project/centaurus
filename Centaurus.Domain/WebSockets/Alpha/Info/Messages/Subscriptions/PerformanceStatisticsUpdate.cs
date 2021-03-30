@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Centaurus.Models;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -13,29 +14,39 @@ namespace Centaurus.Domain
 
         public int QuantaQueueLength { get; private set; }
 
-        public List<PendingUpdatesManager.BatchSavedInfo> BatchSavedInfos { get; set; }
+        public List<BatchSavedInfo> BatchSavedInfos { get; set; }
 
-        public Dictionary<string, int> AuditorsDelay { get; private set; }
+        public List<AuditorDelay> AuditorsDelay { get; private set; }
+
+        public Dictionary<string, List<PerformanceStatistics>> AuditorStatistics { get; private set; }
 
         public override SubscriptionUpdateBase GetUpdateForDate(DateTime lastUpdateDate)
         {
+            var batches = BatchSavedInfos.Where(b => b.SavedAt > lastUpdateDate).ToList();
+            var statistics = new Dictionary<string, List<PerformanceStatistics>>(
+                AuditorStatistics
+                    .Select(@as => KeyValuePair.Create(@as.Key, @as.Value.Where(s => s.UpdateDate > lastUpdateDate)
+                    .ToList()))
+            );
             //all data are new for the client
-            if (BatchSavedInfos.All(b => b.SavedAt > lastUpdateDate))
+            if (batches.Count == BatchSavedInfos.Count 
+                && statistics.Values.Sum(v => v.Count) == AuditorStatistics.Values.Sum(v => v.Count))
                 return this;
 
             return new PerformanceStatisticsUpdate
             {
                 QuantaPerSecond = QuantaPerSecond,
                 Throttling = Throttling,
-                BatchSavedInfos = BatchSavedInfos.Where(b => b.SavedAt > lastUpdateDate).ToList(), //send only new data
+                BatchSavedInfos = batches, //send only new data
                 UpdateDate = UpdateDate,
                 QuantaQueueLength = QuantaQueueLength,
                 AuditorsDelay = AuditorsDelay,
+                AuditorStatistics = statistics,
                 ChannelName = ChannelName
             };
         }
 
-        public static PerformanceStatisticsUpdate Generate(PerformanceStatisticsManager.PerformanceStatisticsManagerUpdate update, string channelName)
+        public static PerformanceStatisticsUpdate Generate(AlphaPerformanceStatistics update, string channelName)
         {
             return new PerformanceStatisticsUpdate
             {
@@ -45,6 +56,7 @@ namespace Centaurus.Domain
                 ChannelName = channelName,
                 QuantaQueueLength = update.QuantaQueueLength,
                 AuditorsDelay = update.AuditorsDelay,
+                AuditorStatistics = update.AuditorStatistics,
                 UpdateDate = DateTime.UtcNow
             };
         }

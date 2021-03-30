@@ -80,19 +80,30 @@ namespace Centaurus.Test
         }
 
         [Test]
-        public async Task HeartbeatTest()
+        public async Task AuditorPerfStatisticsTest()
         {
-            Global.AppState.State = ApplicationState.Ready;
+            var auditorPerf = new AuditorPerfStatistics
+            {
+                BatchInfos = new List<Models.BatchSavedInfo>(),
+                QuantaPerSecond = 1,
+                QuantaQueueLength = 2,
+                UpdateDate = DateTime.UtcNow.Ticks
+            };
 
-            var clientConnection = new AlphaWebSocketConnection(new FakeWebSocket(), "127.0.0.1");
+            var envelope = auditorPerf.CreateEnvelope();
+            envelope.Sign(TestEnvironment.Auditor1KeyPair);
 
-            var envelope = new Heartbeat().CreateEnvelope();
-            envelope.Sign(TestEnvironment.Client1KeyPair);
+
+            var auditorConnection = new AlphaWebSocketConnection(new FakeWebSocket(), "127.0.0.1")
+            {
+                ClientPubKey = TestEnvironment.Auditor1KeyPair
+            };
+
             using var writer = new XdrBufferWriter();
             var inMessage = envelope.ToIncomingMessage(writer);
-            var isHandled = await MessageHandlers<AlphaWebSocketConnection>.HandleMessage(clientConnection, inMessage);
 
-            Assert.IsTrue(isHandled);
+            await AssertMessageHandling(auditorConnection, inMessage, null);
+
         }
 
         static object[] SetApexCursorTestCases =
