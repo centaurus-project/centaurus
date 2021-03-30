@@ -8,12 +8,13 @@ namespace Centaurus.Domain
 {
     public static class PerformanceStatisticsExtensions
     {
-        public static PerformanceStatistics FromModel(this AuditorPerfStatistics statistics)
+        public static AuditorPerformanceStatistics FromModel(this AuditorPerfStatistics statistics, string auditor)
         {
             if (statistics == null)
                 throw new ArgumentNullException(nameof(statistics));
-            return new PerformanceStatistics
+            return new AuditorPerformanceStatistics
             {
+                Auditor = auditor,
                 QuantaPerSecond = statistics.QuantaPerSecond,
                 QuantaQueueLength = statistics.QuantaQueueLength,
                 BatchInfos = statistics.BatchInfos.Select(b => b.FromModel()).ToList(),

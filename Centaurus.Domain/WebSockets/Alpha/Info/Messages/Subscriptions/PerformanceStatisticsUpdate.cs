@@ -16,21 +16,31 @@ namespace Centaurus.Domain
 
         public List<BatchSavedInfo> BatchSavedInfos { get; set; }
 
-        public List<AuditorDelay> AuditorsDelay { get; private set; }
-
-        public Dictionary<string, List<PerformanceStatistics>> AuditorStatistics { get; private set; }
+        public List<AuditorPerformanceStatistics> AuditorStatistics { get; private set; }
 
         public override SubscriptionUpdateBase GetUpdateForDate(DateTime lastUpdateDate)
         {
             var batches = BatchSavedInfos.Where(b => b.SavedAt > lastUpdateDate).ToList();
-            var statistics = new Dictionary<string, List<PerformanceStatistics>>(
-                AuditorStatistics
-                    .Select(@as => KeyValuePair.Create(@as.Key, @as.Value.Where(s => s.UpdateDate > lastUpdateDate)
-                    .ToList()))
-            );
+
+            var statistics = new List<AuditorPerformanceStatistics>();
+            foreach (var auditorStatistic in AuditorStatistics)
+            {
+                if (auditorStatistic.UpdateDate < lastUpdateDate)
+                    continue;
+                var auditorBatches = auditorStatistic.BatchInfos.Where(b => b.SavedAt > lastUpdateDate).ToList();
+                if (auditorBatches.Count == auditorStatistic.BatchInfos.Count)
+                    statistics.Add(auditorStatistic);
+                else
+                {
+                    var statistic = auditorStatistic.Clone();
+                    statistic.BatchInfos = auditorBatches;
+                    statistics.Add(statistic);
+                }
+            }
+
             //all data are new for the client
-            if (batches.Count == BatchSavedInfos.Count 
-                && statistics.Values.Sum(v => v.Count) == AuditorStatistics.Values.Sum(v => v.Count))
+            if (batches.Count == BatchSavedInfos.Count
+                && statistics.Sum(s => s.BatchInfos.Count) == AuditorStatistics.Sum(s => s.BatchInfos.Count))
                 return this;
 
             return new PerformanceStatisticsUpdate
@@ -38,11 +48,10 @@ namespace Centaurus.Domain
                 QuantaPerSecond = QuantaPerSecond,
                 Throttling = Throttling,
                 BatchSavedInfos = batches, //send only new data
-                UpdateDate = UpdateDate,
                 QuantaQueueLength = QuantaQueueLength,
-                AuditorsDelay = AuditorsDelay,
                 AuditorStatistics = statistics,
-                ChannelName = ChannelName
+                ChannelName = ChannelName,
+                UpdateDate = UpdateDate
             };
         }
 
@@ -55,7 +64,6 @@ namespace Centaurus.Domain
                 BatchSavedInfos = update.BatchInfos,
                 ChannelName = channelName,
                 QuantaQueueLength = update.QuantaQueueLength,
-                AuditorsDelay = update.AuditorsDelay,
                 AuditorStatistics = update.AuditorStatistics,
                 UpdateDate = DateTime.UtcNow
             };

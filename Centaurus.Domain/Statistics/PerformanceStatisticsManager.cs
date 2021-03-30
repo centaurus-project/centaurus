@@ -23,24 +23,12 @@ namespace Centaurus.Domain
             updateTimer.Start();
         }
 
-        private Dictionary<string, List<PerformanceStatistics>> auditorsStatistics { get; set; } = new Dictionary<string, List<PerformanceStatistics>>();
+        private Dictionary<string, AuditorPerformanceStatistics> auditorsStatistics { get; set; } = new Dictionary<string, AuditorPerformanceStatistics>();
 
         public void AddAuditorStatistics(string accountId, AuditorPerfStatistics message)
         {
-            var statistics = default(List<PerformanceStatistics>);
             lock (auditorsStatistics)
-                if (!auditorsStatistics.TryGetValue(accountId, out statistics))
-                {
-                    statistics = new List<PerformanceStatistics>();
-                    auditorsStatistics.Add(accountId, statistics);
-                }
-
-            lock (statistics)
-            {
-                statistics.Add(message.FromModel());
-                if (statistics.Count > 20)
-                    statistics.RemoveAt(0);
-            }
+                auditorsStatistics[accountId] = message.FromModel(accountId);
         }
 
         public event Action<PerformanceStatistics> OnUpdates;
@@ -74,17 +62,15 @@ namespace Centaurus.Domain
                     if (Global.IsAlpha)
                     {
                         var throttling = GetThrottling();
-                        var auditorsDelay = GetAuditorsDelay();
                         var auditors = GetAuditorsStatistics();
                         statistics = new AlphaPerformanceStatistics
                         {
-                            AuditorsDelay = auditorsDelay,
                             Trottling = throttling,
                             AuditorStatistics = auditors
                         };
                     }
                     else
-                        statistics = new PerformanceStatistics();
+                        statistics = new AuditorPerformanceStatistics();
 
                     statistics.QuantaPerSecond = quantaPerSecond;
                     statistics.QuantaQueueLength = quantaAvgLength;
@@ -101,28 +87,22 @@ namespace Centaurus.Domain
             }
         }
 
-        private Dictionary<string, List<PerformanceStatistics>> GetAuditorsStatistics()
+        private List<AuditorPerformanceStatistics> GetAuditorsStatistics()
         {
             lock (auditorsStatistics)
-                return auditorsStatistics.ToDictionary(kv => kv.Key, kv => kv.Value.ToList()); //copy dictionary to avoid collection modification exception
-        }
-
-        private List<AuditorDelay> GetAuditorsDelay()
-        {
-            var auditors = ConnectionManager.GetAuditorConnections();
-            var delays = new List<AuditorDelay>();
-            foreach (var auditor in auditors)
             {
-                var client = auditor?.ClientKPAccountId;
-                var auditorApex = auditor?.QuantumWorker?.CurrentApexCursor ?? -1;
-                if (auditorApex >= 0)
-                    delays.Add(new AuditorDelay
-                    {
-                        Auditor = client,
-                        Delay = (int)(auditorApex - Global.QuantumStorage.CurrentApex)
-                    });
+                var auditorConnections = ConnectionManager.GetAuditorConnections();
+                foreach (var auditorConnection in auditorConnections)
+                {
+                    var accountId = auditorConnection?.ClientKPAccountId;
+                    if (!auditorsStatistics.TryGetValue(accountId, out var statistics))
+                        continue;
+                    var auditorApex = auditorConnection?.QuantumWorker?.CurrentApexCursor ?? -1;
+                    if (auditorApex >= 0)
+                        statistics.Delay = (int)(Global.QuantumStorage.CurrentApex - auditorApex);
+                }
+                return auditorsStatistics.Values.ToList();
             }
-            return delays;
         }
 
         private int GetQuantaAvgLength()

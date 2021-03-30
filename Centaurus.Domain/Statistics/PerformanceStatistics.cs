@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace Centaurus.Domain
 {
 
-    public class PerformanceStatistics
+    public abstract class PerformanceStatistics
     {
         public int QuantaPerSecond { get; set; }
 
@@ -19,16 +19,24 @@ namespace Centaurus.Domain
     {
         public int Trottling { get; set; }
 
-        public List<AuditorDelay> AuditorsDelay { get; set; }
+        public List<AuditorPerformanceStatistics> AuditorStatistics { get; set; }
 
-        public Dictionary<string, List<PerformanceStatistics>> AuditorStatistics { get; set; }
+        public AlphaPerformanceStatistics Clone()
+        {
+            return (AlphaPerformanceStatistics)MemberwiseClone();
+        }
     }
 
-    public class AuditorDelay
+    public class AuditorPerformanceStatistics : PerformanceStatistics
     {
         public string Auditor { get; set; }
 
-        public int Delay { get; set; }
+        public int Delay { get; set; } = -1;
+
+        public AuditorPerformanceStatistics Clone()
+        {
+            return (AuditorPerformanceStatistics)MemberwiseClone();
+        }
     }
 
     public class BatchSavedInfo

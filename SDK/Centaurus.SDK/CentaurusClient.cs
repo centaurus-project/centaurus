@@ -450,14 +450,8 @@ namespace Centaurus.SDK
                 readBuffer = XdrBufferFactory.Rent();
                 sendBuffer = XdrBufferFactory.Rent(1024);
 
-                //we don't need to create and sign heartbeat message on every sending
-                hearbeatMessage = new Heartbeat().CreateEnvelope();
-                hearbeatMessage.Sign(_clientKeyPair);
-
                 cancellationTokenSource = new CancellationTokenSource();
                 cancellationToken = cancellationTokenSource.Token;
-
-                InitTimer();
             }
 
             private CancellationTokenSource cancellationTokenSource;
@@ -537,11 +531,8 @@ namespace Centaurus.SDK
                     envelope.Sign(clientKeyPair);
 
                 CentaurusResponse resultTask = null;
-                if (envelope != hearbeatMessage
-                    && envelope.Message.MessageId != default)
-                {
+                if (envelope.Message.MessageId != default)
                     resultTask = RegisterRequest(envelope);
-                }
 
 
                 await sendMessageSemaphore.WaitAsync();
@@ -554,8 +545,6 @@ namespace Centaurus.SDK
                         await webSocket.SendAsync(sendBuffer.Buffer.AsMemory(0, writer.Length), WebSocketMessageType.Binary, true, cancellationToken);
 
                     _ = Task.Factory.StartNew(() => OnSend?.Invoke(envelope));
-
-                    heartbeatTimer?.Reset();
                 }
                 catch (WebSocketException e)
                 {
@@ -586,13 +575,6 @@ namespace Centaurus.SDK
 
             public void Dispose()
             {
-                if (heartbeatTimer != null)
-                {
-                    heartbeatTimer.Elapsed -= HeartbeatTimer_Elapsed;
-                    heartbeatTimer.Dispose();
-                    heartbeatTimer = null;
-                }
-
                 cancellationTokenSource?.Dispose();
                 cancellationTokenSource = null;
 
@@ -611,26 +593,10 @@ namespace Centaurus.SDK
 
             #region Private Members
 
-            private System.Timers.Timer heartbeatTimer = null;
-
-            private void InitTimer()
-            {
-                heartbeatTimer = new System.Timers.Timer();
-                heartbeatTimer.Interval = 5000;
-                heartbeatTimer.AutoReset = false;
-                heartbeatTimer.Elapsed += HeartbeatTimer_Elapsed;
-            }
-
             private KeyPair clientKeyPair;
             private int accountId;
             private Uri websocketAddress;
             private ConstellationInfo constellationInfo;
-            private MessageEnvelope hearbeatMessage;
-
-            private void HeartbeatTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
-            {
-                _ = SendMessage(hearbeatMessage);
-            }
 
             private ClientWebSocket webSocket = new ClientWebSocket();
 
