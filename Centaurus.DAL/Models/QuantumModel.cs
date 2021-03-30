@@ -12,12 +12,6 @@ namespace Centaurus.DAL.Models
 
         public int[] Accounts { get; set; } 
 
-        public int Type { get; set; }
-
         public byte[] RawQuantum { get; set; }
-
-        public byte[] Effects { get; set; }
-
-        public long TimeStamp { get; set; }
     }
 }

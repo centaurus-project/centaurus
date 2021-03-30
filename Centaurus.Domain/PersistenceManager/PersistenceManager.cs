@@ -42,7 +42,7 @@ namespace Centaurus.Domain
                 .Select(ae => new ApexEffects
                 {
                     Apex = ae.Apex,
-                    Items = ae.ToQuantumData().effects.Effects.Where(a => a.Account == account).ToList()
+                    Items = ae.ToQuantumContainer().Effects.Where(a => a.Account == account).ToList()
                 })
                 .ToList();
             if (isDesc)
@@ -198,7 +198,7 @@ namespace Centaurus.Domain
             while (true)
             {
                 var quanta = await storage.LoadQuantaAboveApex(apex, batchSize);
-                effects.AddRange(quanta.SelectMany(q => q.ToQuantumData(accountStorage).effects.Effects));
+                effects.AddRange(quanta.SelectMany(q => q.ToQuantumContainer(accountStorage).Effects));
                 if (quanta.Count < batchSize)
                     break;
             }
@@ -265,7 +265,7 @@ namespace Centaurus.Domain
                 processor.RevertEffect();
             }
 
-            var lastQuantumData = (await storage.LoadQuantum(apex)).ToQuantumData();
+            var lastQuantumData = (await storage.LoadQuantum(apex)).ToQuantumContainer();
 
             //TODO: refactor restore exchange
             //we need to clean all order links to be able to restore exchange
@@ -284,7 +284,7 @@ namespace Centaurus.Domain
                 Orders = allOrders.OrderBy(o => o.OrderId).ToList(),
                 Settings = settings,
                 Withdrawals = withdrawalsStorage.GetAll().OrderBy(w => w.Apex).ToList(),
-                LastHash = lastQuantumData.envelope.Message.ComputeHash()
+                LastHash = lastQuantumData.Quantum.Message.ComputeHash()
             };
         }
 

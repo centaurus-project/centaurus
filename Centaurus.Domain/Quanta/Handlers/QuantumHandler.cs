@@ -178,7 +178,7 @@ namespace Centaurus.Domain
 
             Global.QuantumStorage.AddQuantum(quantumEnvelope, messageHash);
 
-            effectsContainer.Complete(effects);
+            effectsContainer.Complete(buffer.Buffer);
 
             logger.Trace($"Message of type {envelope.Message} with apex {quantum.Apex} is handled.");
 
@@ -223,7 +223,7 @@ namespace Centaurus.Domain
 
             ProcessTransaction(context, result);
 
-            effectsContainer.Complete(effects);
+            effectsContainer.Complete(buffer.Buffer);
 
             logger.Trace($"Message of type {messageType} with apex {((Quantum)envelope.Message).Apex} is handled.");
 

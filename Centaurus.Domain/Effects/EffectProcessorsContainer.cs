@@ -55,13 +55,17 @@ namespace Centaurus.Domain
                 .Where(e => e.Account == account)
                 .ToArray();
         }
-
         /// <summary>
         /// Sends envelope and all effects to specified callback
         /// </summary>
-        public void Complete(byte[] effects)
+        /// <param name="buffer">Buffer to use for serialization</param>
+        public void Complete(byte[] buffer)
         {
-            var quantumModel = QuantumModelExtensions.FromQuantum(Envelope, AffectedAccounts.ToArray(), effects);
+            var quantumModel = QuantumContainerExtensions.FromQuantumContainer(
+                Envelope,
+                Effects, 
+                AffectedAccounts.ToArray(), 
+                buffer);
             PendingDiffObject.Quanta.Add(quantumModel);
             PendingDiffObject.EffectsCount += Effects.Count;
         }
