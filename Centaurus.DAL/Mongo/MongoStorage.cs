@@ -162,6 +162,19 @@ namespace Centaurus.DAL.Mongo
                 .ToListAsync();
         }
 
+        public async Task<long> GetFirstApex()
+        {
+            return (await GetFirstQuantum())?.Apex ?? -1;
+        }
+
+        private async Task<QuantumModel> GetFirstQuantum()
+        {
+            return await quantaCollection
+                   .Find(FilterDefinition<QuantumModel>.Empty)
+                   .SortBy(e => e.Apex)
+                   .FirstOrDefaultAsync();
+        }
+
         public async Task<long> GetLastApex()
         {
             return (await GetLastQuantum())?.Apex ?? -1;

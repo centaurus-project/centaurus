@@ -83,7 +83,7 @@ namespace Centaurus.Domain
         public async Task<List<MessageEnvelope>> GetQuantaAboveApex(long apex, int count = 0)
         {
             var quantaModels = await storage.LoadQuantaAboveApex(apex, count);
-            return quantaModels.OrderBy(q => q.Apex).Select(q => XdrConverter.Deserialize<MessageEnvelope>(q.RawQuantum)).ToList();
+            return quantaModels.OrderBy(q => q.Apex).Select(q => XdrConverter.Deserialize<MessageEnvelope>(q.Bin)).ToList();
         }
 
         public async Task<long> GetLastApex()
@@ -94,7 +94,7 @@ namespace Centaurus.Domain
         public async Task<MessageEnvelope> GetQuantum(long apex)
         {
             var quantumModel = await storage.LoadQuantum(apex);
-            return XdrConverter.Deserialize<MessageEnvelope>(quantumModel.RawQuantum);
+            return XdrConverter.Deserialize<MessageEnvelope>(quantumModel.Bin);
         }
 
         /// <summary>
@@ -295,7 +295,7 @@ namespace Centaurus.Domain
         public async Task<long> GetMinRevertApex()
         {
             //obtain min apex we can revert to
-            var minApex = (await storage.LoadQuantaAboveApex(0, 1)).FirstOrDefault()?.Apex ?? -1;
+            var minApex = await storage.GetFirstApex();
             if (minApex == -1) //we can't revert at all
                 return -1;
 
@@ -336,7 +336,7 @@ namespace Centaurus.Domain
             var withdrawals = withdrawalQuanta
                 .Select(w =>
                 {
-                    var withdrawalQuantum = XdrConverter.Deserialize<MessageEnvelope>(w.RawQuantum);
+                    var withdrawalQuantum = XdrConverter.Deserialize<MessageEnvelope>(w.Bin);
                     var withdrawalRequest = ((WithdrawalRequest)((RequestQuantum)withdrawalQuantum.Message).RequestMessage);
                     withdrawalQuantum.TryAssignAccountWrapper(accountStorage);
                     return WithdrawalWrapperExtensions.GetWithdrawal(withdrawalQuantum, constellationSettings);

@@ -41,6 +41,12 @@ namespace Centaurus.Test
             return Task.FromResult(res);
         }
 
+        public Task<long> GetFirstApex()
+        {
+            var res = quantaCollection.FirstOrDefault()?.Apex ?? -1;
+            return Task.FromResult(res);
+        }
+
         public Task<QuantumModel> LoadQuantum(long apex)
         {
             return Task.FromResult(quantaCollection.First(q => q.Apex == apex));

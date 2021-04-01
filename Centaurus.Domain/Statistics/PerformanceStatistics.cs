@@ -17,7 +17,7 @@ namespace Centaurus.Domain
 
     public class AlphaPerformanceStatistics : PerformanceStatistics
     {
-        public int Trottling { get; set; }
+        public int Throttling { get; set; }
 
         public List<AuditorPerformanceStatistics> AuditorStatistics { get; set; }
 

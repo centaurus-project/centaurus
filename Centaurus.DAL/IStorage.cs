@@ -14,6 +14,11 @@ namespace Centaurus.DAL
         public Task CloseConnection();
 
         /// <summary>
+        /// Fetches first apex presented in DB. Returns -1 if no apex in DB.
+        /// </summary>
+        public Task<long> GetFirstApex();
+
+        /// <summary>
         /// Fetches last apex presented in DB. Returns -1 if no apex in DB.
         /// </summary>
         public Task<long> GetLastApex();

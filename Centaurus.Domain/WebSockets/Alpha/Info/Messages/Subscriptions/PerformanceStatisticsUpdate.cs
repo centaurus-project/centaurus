@@ -60,7 +60,7 @@ namespace Centaurus.Domain
             return new PerformanceStatisticsUpdate
             {
                 QuantaPerSecond = update.QuantaPerSecond,
-                Throttling = update.Trottling,
+                Throttling = update.Throttling,
                 BatchSavedInfos = update.BatchInfos,
                 ChannelName = channelName,
                 QuantaQueueLength = update.QuantaQueueLength,

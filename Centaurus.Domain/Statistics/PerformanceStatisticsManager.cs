@@ -43,7 +43,7 @@ namespace Centaurus.Domain
             }
         }
 
-        private List<Apex> LastApexes = new List<Apex>();
+        private List<Apex> RecentApexes = new List<Apex>();
         private List<BatchSavedInfo> LastBatchInfos = new List<BatchSavedInfo>();
         private List<int> LastQuantaQueueLengths = new List<int>();
 
@@ -65,7 +65,7 @@ namespace Centaurus.Domain
                         var auditors = GetAuditorsStatistics();
                         statistics = new AlphaPerformanceStatistics
                         {
-                            Trottling = throttling,
+                            Throttling = throttling,
                             AuditorStatistics = auditors
                         };
                     }
@@ -120,14 +120,14 @@ namespace Centaurus.Domain
 
         private int GetItemsPerSecond()
         {
-            LastApexes.Add(new Apex { UpdatedAt = DateTime.UtcNow, CurrentApex = Global.QuantumStorage.CurrentApex });
-            if (LastApexes.Count > 20)
-                LastApexes.RemoveAt(0);
+            RecentApexes.Add(new Apex { UpdatedAt = DateTime.UtcNow, CurrentApex = Global.QuantumStorage.CurrentApex });
+            if (RecentApexes.Count > 20)
+                RecentApexes.RemoveAt(0);
 
-            if (LastApexes.Count < 2)
+            if (RecentApexes.Count < 2)
                 return 0;
-            var lastItem = LastApexes.Last();
-            var firstItem = LastApexes.First();
+            var lastItem = RecentApexes.Last();
+            var firstItem = RecentApexes.First();
             var timeDiff = (decimal)(lastItem.UpdatedAt - firstItem.UpdatedAt).TotalMilliseconds;
             return (int)(decimal.Divide(lastItem.CurrentApex - firstItem.CurrentApex, timeDiff) * 1000);
         }

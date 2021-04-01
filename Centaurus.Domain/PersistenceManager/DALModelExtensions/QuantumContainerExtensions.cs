@@ -26,7 +26,7 @@ namespace Centaurus.Domain
             {
                 Apex = quantumMessage.Apex,
                 Accounts = accounts,
-                RawQuantum = writer.ToArray()
+                Bin = writer.ToArray()
             };
         }
 
@@ -35,7 +35,7 @@ namespace Centaurus.Domain
             if (quantum == null)
                 throw new ArgumentNullException(nameof(quantum));
 
-            var quantumContainer = XdrConverter.Deserialize<QuantumContainer>(quantum.RawQuantum);
+            var quantumContainer = XdrConverter.Deserialize<QuantumContainer>(quantum.Bin);
             if (accountStorage != null)
                 foreach (var effect in quantumContainer.Effects)
                 {

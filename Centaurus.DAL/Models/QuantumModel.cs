@@ -12,6 +12,6 @@ namespace Centaurus.DAL.Models
 
         public int[] Accounts { get; set; } 
 
-        public byte[] RawQuantum { get; set; }
+        public byte[] Bin { get; set; }
     }
 }
