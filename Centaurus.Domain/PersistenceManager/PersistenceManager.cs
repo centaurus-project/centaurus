@@ -151,9 +151,7 @@ namespace Centaurus.Domain
             if (settingsModel == null)
                 return null;
 
-            var assets = await storage.LoadAssets(apex);
-
-            return settingsModel.ToSettings(assets);
+            return settingsModel.ToSettings();
         }
 
         /// <summary>
@@ -304,8 +302,8 @@ namespace Centaurus.Domain
 
         private async Task<Exchange> GetRestoredExchange(List<Order> orders)
         {
-            var assets = await storage.LoadAssets(long.MaxValue);//we need to load all assets, otherwise errors could occur during exchange restore
-            return Exchange.RestoreExchange(assets.Select(a => a.ToAssetSettings()).OrderBy(a => a.Id).ToList(), orders, false);
+            var settings = await GetConstellationSettings(long.MaxValue); // load last settings
+            return Exchange.RestoreExchange(settings.Assets, orders, false);
         }
 
         private async Task<List<Account>> GetAccounts()

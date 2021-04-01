@@ -21,7 +21,6 @@ namespace Centaurus.Test
         private List<BalanceModel> balancesCollection = new List<BalanceModel>();
         private List<QuantumModel> quantaCollection = new List<QuantumModel>();
         private List<SettingsModel> settingsCollection = new List<SettingsModel>();
-        private List<AssetModel> assetSettings = new List<AssetModel>();
         private List<PriceHistoryFrameModel> frames = new List<PriceHistoryFrameModel>();
         private ConstellationState constellationState;
 
@@ -94,16 +93,6 @@ namespace Centaurus.Test
             return Task.FromResult(settings);
         }
 
-        public Task<List<AssetModel>> LoadAssets(long apex)
-        {
-            var assets = assetSettings
-                .Where(a => a.Apex <= apex)
-                .OrderBy(a => a.Id)
-                .ToList();
-
-            return Task.FromResult(assets);
-        }
-
         public Task<List<OrderModel>> LoadOrders()
         {
             return Task.FromResult(ordersCollection.OrderBy(o => o.Id).ToList());
@@ -116,7 +105,7 @@ namespace Centaurus.Test
 
         public Task<int> Update(DiffObject update)
         {
-            UpdateSettings(update.ConstellationSettings, update.Assets);
+            UpdateSettings(update.ConstellationSettings);
 
             UpdateStellarData(update.StellarInfoData);
 
@@ -136,18 +125,10 @@ namespace Centaurus.Test
             quantaCollection.AddRange(quanta);
         }
 
-        private void UpdateSettings(SettingsModel settings, List<AssetModel> assets)
+        private void UpdateSettings(SettingsModel settings)
         {
             if (settings != null)
-            {
                 settingsCollection.Add(settings);
-
-                var currentAssets = assetSettings.Select(a => a.Id);
-                var newAssets = assets.Where(a => !currentAssets.Contains(a.Id));
-
-                if (newAssets.Count() > 0)
-                    assetSettings.AddRange(newAssets);
-            }
         }
 
         private void UpdateStellarData(DiffObject.ConstellationState _stellarData)
@@ -315,7 +296,6 @@ namespace Centaurus.Test
             balancesCollection.Clear();
             quantaCollection.Clear();
             settingsCollection.Clear();
-            assetSettings.Clear();
             frames.Clear();
             constellationState = null;
             return Task.CompletedTask;

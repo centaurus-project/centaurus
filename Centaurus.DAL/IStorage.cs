@@ -65,13 +65,6 @@ namespace Centaurus.DAL
         /// <returns></returns>
         public Task<SettingsModel> LoadSettings(long apex);
 
-        /// <summary>
-        /// Fetches assets where apex is equal to or lower than specified one. 
-        /// </summary>
-        /// <param name="apex"></param>
-        /// <returns></returns>
-        public Task<List<AssetModel>> LoadAssets(long apex);
-
         //returns sorted by id orders
         public Task<List<OrderModel>> LoadOrders();
 

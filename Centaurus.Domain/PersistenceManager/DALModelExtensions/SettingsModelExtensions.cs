@@ -9,11 +9,11 @@ namespace Centaurus.Domain
 {
     public static class SettingsModelExtensions
     {
-        public static ConstellationSettings ToSettings(this SettingsModel settings, List<AssetModel> assetSettings)
+        public static ConstellationSettings ToSettings(this SettingsModel settings)
         {
             var assets = new List<AssetSettings>();
             assets.Add(new AssetSettings());//add XLM
-            assets.AddRange(assetSettings.Select(a => a.ToAssetSettings()).OrderBy(a => a.Id));
+            assets.AddRange(settings.Assets.Select(a => a.ToAssetSettings()).OrderBy(a => a.Id));
             var resultSettings = new ConstellationSettings
             {
                 Apex = settings.Apex,

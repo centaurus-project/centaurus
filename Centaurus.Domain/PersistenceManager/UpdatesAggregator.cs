@@ -36,12 +36,10 @@ namespace Centaurus.Domain
                 case ConstellationInitEffect constellationInit:
                     pendingDiffObject.ConstellationSettings = GetConstellationSettings(constellationInit);
                     pendingDiffObject.StellarInfoData = new DiffObject.ConstellationState { TxCursor = constellationInit.TxCursor, IsInserted = true };
-                    pendingDiffObject.Assets = GetAssets(constellationInit, null);
                     break;
                 case ConstellationUpdateEffect constellationUpdate:
                     throw new NotImplementedException();
                     pendingDiffObject.ConstellationSettings = GetConstellationSettings(constellationUpdate);
-                    pendingDiffObject.Assets = GetAssets(constellationUpdate, Global.PermanentStorage.LoadAssets(long.MaxValue).Result);
                     break;
                 case AccountCreateEffect accountCreateEffect:
                     {
@@ -219,7 +217,8 @@ namespace Centaurus.Domain
                 Auditors = constellationInit.Auditors.Select(a => a.Data).ToArray(),
                 MinAccountBalance = constellationInit.MinAccountBalance,
                 MinAllowedLotSize = constellationInit.MinAllowedLotSize,
-                Vault = constellationInit.Vault.Data
+                Vault = constellationInit.Vault.Data,
+                Assets = constellationInit.Assets.Select(a => a.ToAssetModel()).ToList()
             };
 
             if (constellationInit.RequestRateLimits != null)
@@ -230,30 +229,6 @@ namespace Centaurus.Domain
                 };
 
             return settingsModel;
-        }
-
-        /// <summary>
-        /// Builds asset models for only new assets.
-        /// </summary>
-        private static List<AssetModel> GetAssets(ConstellationEffect constellationEffect, List<AssetModel> permanentAssets)
-        {
-            var newAssets = constellationEffect.Assets;
-            if (permanentAssets != null && permanentAssets.Count > 0)
-            {
-                var permanentAssetsIds = permanentAssets.Select(a => a.Id);
-                newAssets = constellationEffect.Assets.Where(a => !permanentAssetsIds.Contains(a.Id)).ToList();
-            }
-
-            var assetsLength = newAssets.Count;
-            var assets = new List<AssetModel>();
-            for (var i = 0; i < assetsLength; i++)
-            {
-                var currentAsset = newAssets[i];
-                var assetModel = new AssetModel { Id = currentAsset.Id, Code = currentAsset.Code, Issuer = currentAsset.Issuer.Data };
-                assets.Add(assetModel);
-            }
-
-            return assets.ToList();
         }
     }
 }

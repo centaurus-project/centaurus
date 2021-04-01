@@ -21,8 +21,6 @@ namespace Centaurus.DAL
 
         public Dictionary<ulong, Order> Orders { get; } = new Dictionary<ulong, Order>();
 
-        public List<AssetModel> Assets { get; set; }
-
         public int EffectsCount { get; set; }
 
         #region DiffModels

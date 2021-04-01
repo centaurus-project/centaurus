@@ -16,6 +16,8 @@ namespace Centaurus.DAL.Models
 
         public long Apex { get; set; }
 
+        public List<AssetModel> Assets { get; set; }
+
         public RequestRateLimitsModel RequestRateLimits { get; set; }
     }
 }

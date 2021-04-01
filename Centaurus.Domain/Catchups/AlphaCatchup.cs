@@ -33,6 +33,9 @@ namespace Centaurus.Domain
             await semaphoreSlim.WaitAsync();
             try
             {
+                if (!applyDataTimer.Enabled) //start timer
+                    applyDataTimer.Start();
+
                 logger.Trace($"Auditor state from {((KeyPair)pubKey).AccountId} received by AlphaCatchup.");
                 if (Global.AppState.State != ApplicationState.Rising)
                 {
@@ -89,11 +92,6 @@ namespace Centaurus.Domain
             {
                 allAuditorStates.Remove(pubKey);
                 validAuditorStates.Remove(pubKey);
-                int majority = MajorityHelper.GetMajorityCount(),
-                 totalAuditorsCount = MajorityHelper.GetTotalAuditorsCount();
-                var completedStatesCount = allAuditorStates.Count(s => !s.Value.HasMorePendingQuanta);
-                if (completedStatesCount < majority)
-                    applyDataTimer.Stop(); //stop timer if don't have majority anymore
             }
             finally
             {
@@ -170,7 +168,6 @@ namespace Centaurus.Domain
             applyDataTimer.Interval = 15000; //15 sec
             applyDataTimer.AutoReset = false;
             applyDataTimer.Elapsed += ApplyDataTimer_Elapsed;
-            applyDataTimer.Start();
         }
 
         private static void ApplyDataTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)

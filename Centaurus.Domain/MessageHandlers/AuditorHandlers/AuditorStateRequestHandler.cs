@@ -32,7 +32,6 @@ namespace Centaurus.Domain
                 await connection.SendMessage(state);
                 var lastQuantum = currentBatch.LastOrDefault();
                 aboveApex = lastQuantum?.Message.MessageId ?? 0;
-                hasQuanta = lastQuantum != null;
             };
         }
     }

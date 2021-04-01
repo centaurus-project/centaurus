@@ -30,7 +30,6 @@ namespace Centaurus.DAL.Mongo
         private IMongoCollection<QuantumModel> quantaCollection;
         private IMongoCollection<ConstellationState> constellationStateCollection;
         private IMongoCollection<SettingsModel> settingsCollection;
-        private IMongoCollection<AssetModel> assetsCollection;
 
         private IMongoCollection<PriceHistoryFrameModel> priceHistoryCollection;
 
@@ -68,8 +67,6 @@ namespace Centaurus.DAL.Mongo
 
             settingsCollection = await GetCollection<SettingsModel>("constellationSettings");
 
-            assetsCollection = await GetCollection<AssetModel>("assets");
-
             priceHistoryCollection = await GetCollection<PriceHistoryFrameModel>("priceHistory");
 
             await CreateIndexes();
@@ -94,14 +91,6 @@ namespace Centaurus.DAL.Mongo
                 .Find(s => s.Apex <= apex)
                 .SortByDescending(s => s.Apex)
                 .FirstOrDefaultAsync();
-        }
-
-        public async Task<List<AssetModel>> LoadAssets(long apex)
-        {
-            return await assetsCollection
-                .Find(a => a.Apex <= apex)
-                .SortBy(a => a.Id)
-                .ToListAsync();
         }
 
         public async Task<List<AccountModel>> LoadAccounts()
@@ -284,9 +273,6 @@ namespace Centaurus.DAL.Mongo
 
                     if (update.ConstellationSettings != null)
                         updateTasks.Add(settingsCollection.InsertOneAsync(s, update.ConstellationSettings));
-
-                    if (update.Assets != null && update.Assets.Count > 0)
-                        updateTasks.Add(assetsCollection.InsertManyAsync(s, update.Assets));
 
                     if (accountUpdates != null)
                         updateTasks.Add(accountsCollection.BulkWriteAsync(s, accountUpdates));
