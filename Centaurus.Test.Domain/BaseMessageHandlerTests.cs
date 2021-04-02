@@ -10,16 +10,16 @@ namespace Centaurus.Test
 {
     public abstract class BaseMessageHandlerTests
     {
-        protected async Task AssertMessageHandling<T>(T connection, MessageEnvelope envelope, Type excpectedException = null)
+        protected async Task AssertMessageHandling<T>(T connection, IncomingMessage message, Type excpectedException = null)
             where T: BaseWebSocketConnection
         {
             if (excpectedException == null)
             {
-                var isHandled = await MessageHandlers<T>.HandleMessage(connection, envelope);
+                var isHandled = await MessageHandlers<T>.HandleMessage(connection, message);
                 Assert.IsTrue(isHandled);
             }
             else
-                Assert.ThrowsAsync(excpectedException, async () => await MessageHandlers<T>.HandleMessage(connection, envelope));
+                Assert.ThrowsAsync(excpectedException, async () => await MessageHandlers<T>.HandleMessage(connection, message));
         }
     }
 }

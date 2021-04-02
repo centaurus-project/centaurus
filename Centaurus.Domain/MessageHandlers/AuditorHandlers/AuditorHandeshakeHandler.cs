@@ -12,10 +12,10 @@ namespace Centaurus.Domain
 
         public override ConnectionState[] ValidConnectionStates { get; } = new ConnectionState[] { ConnectionState.Connected };
 
-        public override async Task HandleMessage(AuditorWebSocketConnection connection, MessageEnvelope envelope)
+        public override async Task HandleMessage(AuditorWebSocketConnection connection, IncomingMessage message)
         {
             //send message back. The message contains handshake data
-            await connection.SendMessage(envelope.Message);
+            await connection.SendMessage(message.Envelope.Message);
         }
     }
 }

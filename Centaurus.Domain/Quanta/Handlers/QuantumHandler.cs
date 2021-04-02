@@ -1,10 +1,12 @@
 ﻿using Centaurus.Models;
+using Centaurus.Xdr;
 using NLog;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -32,9 +34,16 @@ namespace Centaurus.Domain
         {
             LastAddedQuantumApex = lastAddedApex;
             Start();
+
+            options = new JsonSerializerOptions { IgnoreNullValues = true };
+            options.Converters.Add(new XdrObjectConverter());
+
+            buffer = XdrBufferFactory.Rent(256 * 1024);
         }
 
         BlockingCollection<HandleItem> awaitedQuanta = new BlockingCollection<HandleItem>();
+        private JsonSerializerOptions options;
+        private XdrBufferFactory.RentedBuffer buffer;
 
         /// <summary>
         /// Handles the quantum and returns Task.
@@ -53,6 +62,8 @@ namespace Centaurus.Domain
         }
 
         public long LastAddedQuantumApex { get; private set; }
+
+        public int QuantaQueueLenght => awaitedQuanta.Count;
 
         private async Task RunQuantumWorker()
         {
@@ -120,8 +131,6 @@ namespace Centaurus.Domain
             await Global.PendingUpdatesManager.UpdatesSyncRoot.WaitAsync();
             try
             {
-                if (Global.QuantumStorage.CurrentApex % 50 == 0) //avoid often refresh check
-                    Global.PendingUpdatesManager.TryRefreshContainer();
                 return Global.IsAlpha
                     ? await AlphaHandleQuantum(quantumEnvelope, timestamp)
                     : await AuditorHandleQuantum(quantumEnvelope);
@@ -150,20 +159,30 @@ namespace Centaurus.Domain
 
             await processor.Validate(context);
 
-            var resultMessage = await processor.Process(context);
+            var resultMessageEnvelope = (await processor.Process(context)).CreateEnvelope();
 
+            var resultEffectsContainer = new EffectsContainer { Effects = effectsContainer.Effects };
+
+            var effects = resultEffectsContainer.ToByteArray(buffer.Buffer);
+
+            quantum.EffectsHash = effects.ComputeHash();
+
+            var messageHash = quantumEnvelope.ComputeMessageHash(buffer.Buffer);
             //we need to sign the quantum here to prevent multiple signatures that can occur if we sign it when sending
-            quantumEnvelope.Sign(Global.Settings.KeyPair);
+            quantumEnvelope.Signatures.Add(messageHash.Sign(Global.Settings.KeyPair));
 
-            Global.AuditResultManager.Register(resultMessage, processor.GetNotificationMessages(context));
+            var resultMessageHash = resultMessageEnvelope.ComputeMessageHash(buffer.Buffer);
+            resultMessageEnvelope.Signatures.Add(resultMessageHash.Sign(Global.Settings.KeyPair));
 
-            Global.QuantumStorage.AddQuantum(quantumEnvelope);
+            Global.AuditResultManager.Register(resultMessageEnvelope, resultMessageHash, processor.GetNotificationMessages(context));
 
-            effectsContainer.Complete();
+            Global.QuantumStorage.AddQuantum(quantumEnvelope, messageHash);
+
+            effectsContainer.Complete(buffer.Buffer);
 
             logger.Trace($"Message of type {envelope.Message} with apex {quantum.Apex} is handled.");
 
-            return resultMessage;
+            return (ResultMessage)resultMessageEnvelope.Message;
         }
 
         async Task<ResultMessage> AuditorHandleQuantum(MessageEnvelope envelope)
@@ -187,15 +206,28 @@ namespace Centaurus.Domain
 
             var result = await processor.Process(context);
 
-            Global.QuantumStorage.AddQuantum(envelope);
+            var resultEffectsContainer = new EffectsContainer { Effects = effectsContainer.Effects };
+
+            var effects = resultEffectsContainer.ToByteArray(buffer.Buffer);
+
+            var effectsHash = effects.ComputeHash();
+
+            if (!ByteArrayComparer.Default.Equals(effectsHash, quantum.EffectsHash) && !EnvironmentHelper.IsTest)
+            {
+                throw new Exception("Effects hash is not equal to provided by Alpha.");
+            }
+
+            var messageHash = envelope.ComputeMessageHash(buffer.Buffer);
+
+            Global.QuantumStorage.AddQuantum(envelope, messageHash);
 
             ProcessTransaction(context, result);
 
-            effectsContainer.Complete();
+            effectsContainer.Complete(buffer.Buffer);
 
             logger.Trace($"Message of type {messageType} with apex {((Quantum)envelope.Message).Apex} is handled.");
 
-            OutgoingResultsStorage.EnqueueResult(result);
+            OutgoingResultsStorage.EnqueueResult(result, buffer.Buffer);
 
             return result;
         }

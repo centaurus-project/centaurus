@@ -8,8 +8,6 @@ namespace Centaurus.DAL.Models
     public class AssetModel
     {
         public int Id { get; set; }
-        
-        public long Apex { get; set; }
 
         public string Code { get; set; }
 

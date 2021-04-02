@@ -10,6 +10,7 @@ using System.Linq;
 using System.Net.WebSockets;
 using System.Threading;
 using System.Threading.Tasks;
+using Centaurus.Xdr;
 
 namespace Centaurus.Domain
 {
@@ -19,41 +20,8 @@ namespace Centaurus.Domain
         static Logger logger = LogManager.GetCurrentClassLogger();
 
         public AuditorWebSocketConnection(WebSocket webSocket, string ip)
-            : base(webSocket, ip)
+            : base(webSocket, ip, AlphaWebSocketConnection.AuditorBufferSize, AlphaWebSocketConnection.AuditorBufferSize)
         {
-            //we don't need to create and sign heartbeat message on every sending
-            hearbeatMessage = new Heartbeat().CreateEnvelope();
-            hearbeatMessage.Sign(Global.Settings.KeyPair);
-            MaxMessageSize = MaxMessageSize * Global.MaxMessageBatchSize;
-#if !DEBUG
-            InitTimer();
-#endif
-        }
-
-        private System.Timers.Timer heartbeatTimer = null;
-
-        //If we didn't receive message during specified interval, we should close connection
-        private void InitTimer()
-        {
-            heartbeatTimer = new System.Timers.Timer();
-            heartbeatTimer.Interval = 5000;
-            heartbeatTimer.AutoReset = false;
-            heartbeatTimer.Elapsed += HeartbeatTimer_Elapsed;
-        }
-
-        private MessageEnvelope hearbeatMessage;
-
-        private async void HeartbeatTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
-        {
-            try
-            {
-                await SendMessage(hearbeatMessage);
-            }
-            catch (Exception exc)
-            {
-                logger.Error(exc, "Unable to send heartbeat message.");
-                heartbeatTimer?.Reset();
-            }
         }
 
         protected ClientWebSocket clientWebSocket => webSocket as ClientWebSocket;
@@ -68,12 +36,11 @@ namespace Centaurus.Domain
         public override async Task SendMessage(MessageEnvelope envelope)
         {
             await base.SendMessage(envelope);
-            heartbeatTimer?.Reset();
         }
 
         protected override async Task<bool> HandleMessage(MessageEnvelope envelope)
         {
-            return await MessageHandlers<AuditorWebSocketConnection>.HandleMessage(this, envelope);
+            return await MessageHandlers<AuditorWebSocketConnection>.HandleMessage(this, envelope.ToIncomingMessage(incommingBuffer));
         }
 
         private async Task ProcessOutgoingMessageQueue()
@@ -117,10 +84,6 @@ namespace Centaurus.Domain
 
         public override void Dispose()
         {
-            heartbeatTimer?.Stop();
-            heartbeatTimer?.Dispose();
-            heartbeatTimer = null;
-
             base.Dispose();
             webSocket?.Dispose();
             webSocket = null;

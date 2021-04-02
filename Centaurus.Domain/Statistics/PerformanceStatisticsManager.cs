@@ -8,7 +8,7 @@ using System.Timers;
 
 namespace Centaurus.Domain
 {
-    public class PerformanceStatisticsManager: IDisposable
+    public class PerformanceStatisticsManager : IDisposable
     {
         const int updateInterval = 1000;
 
@@ -23,9 +23,17 @@ namespace Centaurus.Domain
             updateTimer.Start();
         }
 
-        public event Action<PerformanceStatisticsManagerUpdate> OnUpdates;
+        private Dictionary<string, AuditorPerformanceStatistics> auditorsStatistics { get; set; } = new Dictionary<string, AuditorPerformanceStatistics>();
 
-        public void OnBatchSaved(PendingUpdatesManager.BatchSavedInfo batchInfo)
+        public void AddAuditorStatistics(string accountId, AuditorPerfStatistics message)
+        {
+            lock (auditorsStatistics)
+                auditorsStatistics[accountId] = message.FromModel(accountId);
+        }
+
+        public event Action<PerformanceStatistics> OnUpdates;
+
+        public void OnBatchSaved(BatchSavedInfo batchInfo)
         {
             lock (syncRoot)
             {
@@ -35,8 +43,9 @@ namespace Centaurus.Domain
             }
         }
 
-        private List<Apex> LastApexes = new List<Apex>();
-        private List<PendingUpdatesManager.BatchSavedInfo> LastBatchInfos = new List<PendingUpdatesManager.BatchSavedInfo>();
+        private List<Apex> RecentApexes = new List<Apex>();
+        private List<BatchSavedInfo> LastBatchInfos = new List<BatchSavedInfo>();
+        private List<int> LastQuantaQueueLengths = new List<int>();
 
         private object syncRoot = new { };
         private Timer updateTimer;
@@ -48,8 +57,27 @@ namespace Centaurus.Domain
                 try
                 {
                     var quantaPerSecond = GetItemsPerSecond();
-                    var throttling = GetThrottling();
-                    OnUpdates?.Invoke(new PerformanceStatisticsManagerUpdate { BatchInfos = LastBatchInfos, QuantaPerSecond = quantaPerSecond, Trottling = throttling });
+                    var quantaAvgLength = GetQuantaAvgLength();
+                    var statistics = default(PerformanceStatistics);
+                    if (Global.IsAlpha)
+                    {
+                        var throttling = GetThrottling();
+                        var auditors = GetAuditorsStatistics();
+                        statistics = new AlphaPerformanceStatistics
+                        {
+                            Throttling = throttling,
+                            AuditorStatistics = auditors
+                        };
+                    }
+                    else
+                        statistics = new AuditorPerformanceStatistics();
+
+                    statistics.QuantaPerSecond = quantaPerSecond;
+                    statistics.QuantaQueueLength = quantaAvgLength;
+                    statistics.BatchInfos = LastBatchInfos;
+                    statistics.UpdateDate = DateTime.UtcNow;
+
+                    OnUpdates?.Invoke(statistics);
                     updateTimer?.Start();
                 }
                 catch (Exception exc)
@@ -59,6 +87,32 @@ namespace Centaurus.Domain
             }
         }
 
+        private List<AuditorPerformanceStatistics> GetAuditorsStatistics()
+        {
+            lock (auditorsStatistics)
+            {
+                var auditorConnections = ConnectionManager.GetAuditorConnections();
+                foreach (var auditorConnection in auditorConnections)
+                {
+                    var accountId = auditorConnection?.ClientKPAccountId;
+                    if (!auditorsStatistics.TryGetValue(accountId, out var statistics))
+                        continue;
+                    var auditorApex = auditorConnection?.QuantumWorker?.CurrentApexCursor ?? -1;
+                    if (auditorApex >= 0)
+                        statistics.Delay = (int)(Global.QuantumStorage.CurrentApex - auditorApex);
+                }
+                return auditorsStatistics.Values.ToList();
+            }
+        }
+
+        private int GetQuantaAvgLength()
+        {
+            LastQuantaQueueLengths.Add(Global.QuantumHandler.QuantaQueueLenght);
+            if (LastQuantaQueueLengths.Count > 20)
+                LastQuantaQueueLengths.RemoveAt(0);
+            return (int)Math.Floor(decimal.Divide(LastQuantaQueueLengths.Sum(), LastQuantaQueueLengths.Count));
+        }
+
         private int GetThrottling()
         {
             return QuantaThrottlingManager.Current.IsThrottlingEnabled ? QuantaThrottlingManager.Current.MaxItemsPerSecond : 0;
@@ -66,14 +120,14 @@ namespace Centaurus.Domain
 
         private int GetItemsPerSecond()
         {
-            LastApexes.Add(new Apex { UpdatedAt = DateTime.UtcNow, CurrentApex = Global.QuantumStorage.CurrentApex });
-            if (LastApexes.Count > 20)
-                LastApexes.RemoveAt(0);
+            RecentApexes.Add(new Apex { UpdatedAt = DateTime.UtcNow, CurrentApex = Global.QuantumStorage.CurrentApex });
+            if (RecentApexes.Count > 20)
+                RecentApexes.RemoveAt(0);
 
-            if (LastApexes.Count < 2) //intervals for 
+            if (RecentApexes.Count < 2)
                 return 0;
-            var lastItem = LastApexes.Last();
-            var firstItem = LastApexes.First();
+            var lastItem = RecentApexes.Last();
+            var firstItem = RecentApexes.First();
             var timeDiff = (decimal)(lastItem.UpdatedAt - firstItem.UpdatedAt).TotalMilliseconds;
             return (int)(decimal.Divide(lastItem.CurrentApex - firstItem.CurrentApex, timeDiff) * 1000);
         }
@@ -86,15 +140,6 @@ namespace Centaurus.Domain
                 updateTimer?.Dispose();
                 updateTimer = null;
             }
-        }
-
-        public class PerformanceStatisticsManagerUpdate
-        {
-            public int QuantaPerSecond { get; set; }
-
-            public int Trottling { get; set; }
-
-            public List<PendingUpdatesManager.BatchSavedInfo> BatchInfos { get; set; }
         }
 
         class Apex

@@ -36,13 +36,13 @@ namespace Centaurus.Domain
                 rawCursor = "0";
             if (!long.TryParse(rawCursor, out var apex))
                 throw new ArgumentException("Cursor is invalid.");
-            var accountEffectModels = (await storage.LoadEffects(apex, isDesc, limit, account));
-            var effectModels = accountEffectModels
+            var accountQuanta = (await storage.LoadEffects(apex, isDesc, limit, account));
+            var effectModels = accountQuanta
                 .OrderBy(e => e.Apex)
                 .Select(ae => new ApexEffects
                 {
                     Apex = ae.Apex,
-                    Items = ae.Effects.Select(e => e.ToEffect(null)).ToList() //we can ignore account here, because it's used only in domain
+                    Items = ae.ToQuantumContainer().Effects.Where(a => a.Account == account).ToList()
                 })
                 .ToList();
             if (isDesc)
@@ -83,7 +83,7 @@ namespace Centaurus.Domain
         public async Task<List<MessageEnvelope>> GetQuantaAboveApex(long apex, int count = 0)
         {
             var quantaModels = await storage.LoadQuantaAboveApex(apex, count);
-            return quantaModels.OrderBy(q => q.Apex).Select(q => XdrConverter.Deserialize<MessageEnvelope>(q.RawQuantum)).ToList();
+            return quantaModels.OrderBy(q => q.Apex).Select(q => XdrConverter.Deserialize<MessageEnvelope>(q.Bin)).ToList();
         }
 
         public async Task<long> GetLastApex()
@@ -94,7 +94,7 @@ namespace Centaurus.Domain
         public async Task<MessageEnvelope> GetQuantum(long apex)
         {
             var quantumModel = await storage.LoadQuantum(apex);
-            return XdrConverter.Deserialize<MessageEnvelope>(quantumModel.RawQuantum);
+            return XdrConverter.Deserialize<MessageEnvelope>(quantumModel.Bin);
         }
 
         /// <summary>
@@ -151,9 +151,7 @@ namespace Centaurus.Domain
             if (settingsModel == null)
                 return null;
 
-            var assets = await storage.LoadAssets(apex);
-
-            return settingsModel.ToSettings(assets);
+            return settingsModel.ToSettings();
         }
 
         /// <summary>
@@ -193,30 +191,19 @@ namespace Centaurus.Domain
 
             var withdrawalsStorage = new WithdrawalStorage(withdrawals, false);
 
-            var accountEffectModels = await storage.LoadEffectsAboveApex(apex);
-
-            var effectModels = new Effect[accountEffectModels.Sum(a => a.Effects.Count)];
-            var currentApexIndexOffset = 0;
-            foreach (var quantumEffect in accountEffectModels.GroupBy(a => a.Apex))
+            var batchSize = 1000;
+            var effects = new List<Effect>();
+            while (true)
             {
-                var effectsCount = 0;
-                foreach (var accountEffects in quantumEffect)
-                {
-                    var account = accountStorage.GetAccount(accountEffects.Account);
-                    if (account == null)
-                        throw new Exception($"Account {accountEffects.Account} is not found.");
-                    foreach (var rawEffect in accountEffects.Effects)
-                    {
-                        var effect = rawEffect.ToEffect(account);
-                        effectModels[currentApexIndexOffset + rawEffect.ApexIndex] = effect;
-                        effectsCount++;
-                    }
-                }
-                currentApexIndexOffset += effectsCount;
+                var quanta = await storage.LoadQuantaAboveApex(apex, batchSize);
+                effects.AddRange(quanta.SelectMany(q => q.ToQuantumContainer(accountStorage).Effects));
+                if (quanta.Count < batchSize)
+                    break;
             }
-            for (var i = effectModels.Length - 1; i >= 0; i--)
+
+            for (var i = effects.Count - 1; i >= 0; i--)
             {
-                var currentEffect = effectModels[i];
+                var currentEffect = effects[i];
                 var account = currentEffect.AccountWrapper;
                 IEffectProcessor<Effect> processor = null;
                 switch (currentEffect)
@@ -276,7 +263,7 @@ namespace Centaurus.Domain
                 processor.RevertEffect();
             }
 
-            var lastQuantum = (await storage.LoadQuantum(apex)).ToMessageEnvelope();
+            var lastQuantumData = (await storage.LoadQuantum(apex)).ToQuantumContainer();
 
             //TODO: refactor restore exchange
             //we need to clean all order links to be able to restore exchange
@@ -295,7 +282,7 @@ namespace Centaurus.Domain
                 Orders = allOrders.OrderBy(o => o.OrderId).ToList(),
                 Settings = settings,
                 Withdrawals = withdrawalsStorage.GetAll().OrderBy(w => w.Apex).ToList(),
-                LastHash = lastQuantum.Message.ComputeHash()
+                LastHash = lastQuantumData.Quantum.Message.ComputeHash()
             };
         }
 
@@ -306,7 +293,7 @@ namespace Centaurus.Domain
         public async Task<long> GetMinRevertApex()
         {
             //obtain min apex we can revert to
-            var minApex = await storage.GetFirstEffectApex();
+            var minApex = await storage.GetFirstApex();
             if (minApex == -1) //we can't revert at all
                 return -1;
 
@@ -315,8 +302,8 @@ namespace Centaurus.Domain
 
         private async Task<Exchange> GetRestoredExchange(List<Order> orders)
         {
-            var assets = await storage.LoadAssets(long.MaxValue);//we need to load all assets, otherwise errors could occur during exchange restore
-            return Exchange.RestoreExchange(assets.Select(a => a.ToAssetSettings()).OrderBy(a => a.Id).ToList(), orders, false);
+            var settings = await GetConstellationSettings(long.MaxValue); // load last settings
+            return Exchange.RestoreExchange(settings.Assets, orders, false);
         }
 
         private async Task<List<Account>> GetAccounts()
@@ -347,7 +334,7 @@ namespace Centaurus.Domain
             var withdrawals = withdrawalQuanta
                 .Select(w =>
                 {
-                    var withdrawalQuantum = XdrConverter.Deserialize<MessageEnvelope>(w.RawQuantum);
+                    var withdrawalQuantum = XdrConverter.Deserialize<MessageEnvelope>(w.Bin);
                     var withdrawalRequest = ((WithdrawalRequest)((RequestQuantum)withdrawalQuantum.Message).RequestMessage);
                     withdrawalQuantum.TryAssignAccountWrapper(accountStorage);
                     return WithdrawalWrapperExtensions.GetWithdrawal(withdrawalQuantum, constellationSettings);

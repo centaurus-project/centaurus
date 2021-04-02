@@ -13,18 +13,16 @@ namespace Centaurus.Domain
 
         public override ConnectionState[] ValidConnectionStates { get; } = new ConnectionState[] { ConnectionState.Connected };
 
-        public override async Task HandleMessage(AuditorWebSocketConnection connection, MessageEnvelope messageEnvelope)
+        public override async Task HandleMessage(AuditorWebSocketConnection connection, IncomingMessage message)
         {
-            var stateRequestMessage = (AuditorStateRequest)messageEnvelope.Message;
-            var allPendingQuanta = await Global.PersistenceManager.GetQuantaAboveApex(stateRequestMessage.TargetApex);
-            var skip = 0;
-            var maxQuantaPerMessage = 10;
+            var stateRequestMessage = (AuditorStateRequest)message.Envelope.Message;
             var hasQuanta = true;
+            var aboveApex = stateRequestMessage.TargetApex;
+            var quantaPerMessage = 50;
             while (hasQuanta)
             {
-                var currentBatch = allPendingQuanta.Skip(skip).Take(maxQuantaPerMessage).ToList();
-                hasQuanta = (skip + maxQuantaPerMessage) < allPendingQuanta.Count;
-                skip += maxQuantaPerMessage;
+                var currentBatch = await Global.PersistenceManager.GetQuantaAboveApex(aboveApex, 50);
+                hasQuanta = currentBatch.Count == quantaPerMessage;
                 var state = new AuditorState
                 {
                     State = Global.AppState.State,
@@ -32,6 +30,8 @@ namespace Centaurus.Domain
                     HasMorePendingQuanta = hasQuanta
                 };
                 await connection.SendMessage(state);
+                var lastQuantum = currentBatch.LastOrDefault();
+                aboveApex = lastQuantum?.Message.MessageId ?? 0;
             };
         }
     }

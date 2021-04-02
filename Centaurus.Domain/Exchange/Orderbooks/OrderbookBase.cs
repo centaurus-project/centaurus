@@ -4,16 +4,16 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 
 namespace Centaurus.Domain
 {
-    public class Orderbook : IEnumerable// : IXdrSerializableModel
+    public abstract class OrderbookBase : IEnumerable
     {
         private OrderMap orderMap;
-        private static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public Orderbook(OrderMap orderMap, int market, OrderSide side)
+        public OrderbookBase(OrderMap orderMap, int market, OrderSide side)
         {
             this.orderMap = orderMap;
             Side = side;
@@ -44,31 +44,7 @@ namespace Centaurus.Domain
             return GetEnumerator();
         }
 
-        /// <summary>
-        /// Add new order to the orderbook.
-        /// </summary>
-        /// <param name="order">An order to add</param>
-        public void InsertOrder(Order order)
-        {
-            var price = order.Price;
-            //just set Head reference if it's the first order
-            if (Head == null)
-            {
-                InsertOrderBefore(order, null);
-                return;
-            }
-            //find position to insert the order
-            var cursor = Head;
-            while ((Side == OrderSide.Sell && price >= cursor.Price)
-                || (Side == OrderSide.Buy && price <= cursor.Price))
-            {
-                cursor = cursor.Next;
-                if (cursor == null) break; //the last record
-            }
-
-            //insert order
-            InsertOrderBefore(order, cursor);
-        }
+        public abstract void InsertOrder(Order order);
 
         /// <summary>
         /// Insert order before the specific offer.
@@ -76,7 +52,7 @@ namespace Centaurus.Domain
         /// <param name="orderbook">Orderbook</param>
         /// <param name="order">An order to insert</param>
         /// <param name="before"></param>
-        private void InsertOrderBefore(Order order, Order before)
+        protected void InsertOrderBefore(Order order, Order before)
         {
             if (before == null)
             {
@@ -130,10 +106,9 @@ namespace Centaurus.Domain
         /// </summary>
         /// <param name="orderId"></param>
         /// <returns>Removal result.</returns>
-        public bool RemoveOrder(ulong orderId)
+        public virtual bool RemoveOrder(ulong orderId, out Order order)
         {
-            var order = GetOrder(orderId);
-            if (order == null)
+            if (!orderMap.RemoveOrder(orderId, out order))
                 return false;
             var next = order.Next;
             var prev = order.Prev;
@@ -146,7 +121,6 @@ namespace Centaurus.Domain
             if (next != null)
                 next.Prev = prev;
 
-            orderMap.RemoveOrder(orderId);
             Count--;
             return true;
         }

@@ -20,9 +20,7 @@ namespace Centaurus.Test
         private List<AccountModel> accountsCollection = new List<AccountModel>();
         private List<BalanceModel> balancesCollection = new List<BalanceModel>();
         private List<QuantumModel> quantaCollection = new List<QuantumModel>();
-        private List<EffectsModel> effectsCollection = new List<EffectsModel>();
         private List<SettingsModel> settingsCollection = new List<SettingsModel>();
-        private List<AssetModel> assetSettings = new List<AssetModel>();
         private List<PriceHistoryFrameModel> frames = new List<PriceHistoryFrameModel>();
         private ConstellationState constellationState;
 
@@ -39,6 +37,12 @@ namespace Centaurus.Test
         public Task<long> GetLastApex()
         {
             var res = quantaCollection.LastOrDefault()?.Apex ?? -1;
+            return Task.FromResult(res);
+        }
+
+        public Task<long> GetFirstApex()
+        {
+            var res = quantaCollection.FirstOrDefault()?.Apex ?? -1;
             return Task.FromResult(res);
         }
 
@@ -71,35 +75,6 @@ namespace Centaurus.Test
             return Task.FromResult(res);
         }
 
-        public Task<long> GetFirstEffectApex()
-        {
-            var firstEffect = effectsCollection
-                   .OrderBy(e => e.Apex)
-                   .FirstOrDefault();
-
-            if (firstEffect == null)
-                return Task.FromResult((long)-1);
-
-            return Task.FromResult(firstEffect.Apex);
-        }
-
-        public Task<List<EffectsModel>> LoadEffectsAboveApex(long apex)
-        {
-            var effects = effectsCollection
-                .OrderBy(e => e.Apex)
-                .Where(e => e.Apex > apex)
-                .ToList();
-            return Task.FromResult(effects);
-        }
-
-        public Task<List<EffectsModel>> LoadEffectsForApex(long apex)
-        {
-            var effects = effectsCollection
-                .Where(e => e.Apex == apex)
-                .ToList();
-            return Task.FromResult(effects);
-        }
-
         public Task<List<AccountModel>> LoadAccounts()
         {
             return Task.FromResult(accountsCollection.OrderBy(a => a.Id).ToList());
@@ -118,16 +93,6 @@ namespace Centaurus.Test
             return Task.FromResult(settings);
         }
 
-        public Task<List<AssetModel>> LoadAssets(long apex)
-        {
-            var assets = assetSettings
-                .Where(a => a.Apex <= apex)
-                .OrderBy(a => a.Id)
-                .ToList();
-
-            return Task.FromResult(assets);
-        }
-
         public Task<List<OrderModel>> LoadOrders()
         {
             return Task.FromResult(ordersCollection.OrderBy(o => o.Id).ToList());
@@ -140,7 +105,7 @@ namespace Centaurus.Test
 
         public Task<int> Update(DiffObject update)
         {
-            UpdateSettings(update.ConstellationSettings, update.Assets);
+            UpdateSettings(update.ConstellationSettings);
 
             UpdateStellarData(update.StellarInfoData);
 
@@ -150,16 +115,9 @@ namespace Centaurus.Test
 
             UpdateOrders(update.Orders.Values.ToList());
 
-            UpdateQuanta(update.Quanta.Select(q => q.Quantum).ToList());
-
-            UpdateEffects(update.Quanta.SelectMany(v => v.Effects.Values).ToList());
+            UpdateQuanta(update.Quanta);
 
             return Task.FromResult(1);
-        }
-
-        private void UpdateEffects(List<EffectsModel> effects)
-        {
-            effectsCollection.AddRange(effects);
         }
 
         private void UpdateQuanta(List<QuantumModel> quanta)
@@ -167,18 +125,10 @@ namespace Centaurus.Test
             quantaCollection.AddRange(quanta);
         }
 
-        private void UpdateSettings(SettingsModel settings, List<AssetModel> assets)
+        private void UpdateSettings(SettingsModel settings)
         {
             if (settings != null)
-            {
                 settingsCollection.Add(settings);
-
-                var currentAssets = assetSettings.Select(a => a.Id);
-                var newAssets = assets.Where(a => !currentAssets.Contains(a.Id));
-
-                if (newAssets.Count() > 0)
-                    assetSettings.AddRange(newAssets);
-            }
         }
 
         private void UpdateStellarData(DiffObject.ConstellationState _stellarData)
@@ -271,12 +221,12 @@ namespace Centaurus.Test
             }
         }
 
-        public Task<List<EffectsModel>> LoadEffects(long apex, bool isDesc, int limit, int account)
+        public Task<List<QuantumModel>> LoadEffects(long apex, bool isDesc, int limit, int account)
         {
             if (account == default)
                 throw new ArgumentNullException(nameof(account));
-            IEnumerable<EffectsModel> query = effectsCollection
-                    .Where(e => e.Account == account);
+            IEnumerable<QuantumModel> query = quantaCollection
+                    .Where(e => e.Accounts.Contains(account));
 
             if (isDesc)
                 query = query.OrderByDescending(e => e.Apex);
@@ -345,9 +295,7 @@ namespace Centaurus.Test
             accountsCollection.Clear();
             balancesCollection.Clear();
             quantaCollection.Clear();
-            effectsCollection.Clear();
             settingsCollection.Clear();
-            assetSettings.Clear();
             frames.Clear();
             constellationState = null;
             return Task.CompletedTask;

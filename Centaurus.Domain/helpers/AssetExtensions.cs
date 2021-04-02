@@ -8,9 +8,9 @@ namespace Centaurus.Domain
 {
     public static class AssetExtensions
     {
-        public static ExchangeMarket CreateMarket(this AssetSettings asset, OrderMap orderMap)
+        public static ExchangeMarket CreateMarket(this AssetSettings asset, OrderMap orderMap, bool useLegacyOrderbook = false)
         {
-            return new ExchangeMarket(asset.Id, orderMap);
+            return new ExchangeMarket(asset.Id, orderMap, useLegacyOrderbook);
         }
 
         public static Asset ToAsset(this AssetSettings assetSettings)

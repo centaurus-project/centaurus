@@ -49,7 +49,7 @@ namespace Centaurus.Xdr
         private Span<byte> Allocate(int requiredCapacity)
         {
             //allocate new chunk when the buffer size capacity is reached
-            if (bufferChunk.Position + requiredCapacity > DefaultBufferSize)
+            if (externalBuffer == null && bufferChunk.Position + requiredCapacity > DefaultBufferSize)
             {
                 AllocateBuffer();
             }
@@ -175,7 +175,7 @@ namespace Centaurus.Xdr
             do
             {
                 pointer -= chunk.Position;
-                Buffer.BlockCopy(chunk.Data, 0, result, pointer, chunk.Position);
+                Array.Copy(chunk.Data, 0, result, pointer, chunk.Position);
                 chunk = chunk.PrevChunk;
             }
             while (chunk != null);

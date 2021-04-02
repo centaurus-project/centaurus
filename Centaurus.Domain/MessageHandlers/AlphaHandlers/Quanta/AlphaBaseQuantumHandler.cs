@@ -15,9 +15,9 @@ namespace Centaurus.Domain
 
         public override bool IsAuditorOnly { get; } = false;
 
-        public override Task HandleMessage(AlphaWebSocketConnection connection, MessageEnvelope messageEnvelope)
+        public override Task HandleMessage(AlphaWebSocketConnection connection, IncomingMessage message)
         {
-            Global.QuantumHandler.HandleAsync(messageEnvelope);
+            Global.QuantumHandler.HandleAsync(message.Envelope);
             return Task.CompletedTask;
         }
     }

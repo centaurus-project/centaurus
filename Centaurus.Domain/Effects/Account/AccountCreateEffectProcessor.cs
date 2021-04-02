@@ -17,7 +17,7 @@ namespace Centaurus.Domain
         public override void CommitEffect()
         {
             MarkAsProcessed();
-            accountStorage.CreateAccount(Effect.AccountId, Effect.Pubkey);
+            accountStorage.CreateAccount(Effect.Account, Effect.Pubkey);
         }
 
         public override void RevertEffect()

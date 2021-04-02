@@ -7,10 +7,10 @@ namespace Centaurus.Domain
 {
     public class OrderPlacedEffectProcessor : EffectProcessor<OrderPlacedEffect>
     {
-        private Orderbook orderBook;
+        private OrderbookBase orderBook;
         private Order order;
 
-        public OrderPlacedEffectProcessor(OrderPlacedEffect effect, Orderbook orderBook, Order order)
+        public OrderPlacedEffectProcessor(OrderPlacedEffect effect, OrderbookBase orderBook, Order order)
             :base(effect)
         {
             this.orderBook = orderBook ?? throw new ArgumentNullException(nameof(orderBook));
@@ -36,7 +36,7 @@ namespace Centaurus.Domain
         {
             MarkAsProcessed();
 
-            orderBook.RemoveOrder(Effect.OrderId);
+            orderBook.RemoveOrder(Effect.OrderId, out _);
 
             var decodedId = OrderIdConverter.Decode(order.OrderId);
             if (decodedId.Side == OrderSide.Buy)

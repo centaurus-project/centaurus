@@ -20,11 +20,11 @@ namespace Centaurus.Domain
         /// </summary>
         public abstract bool IsAuditorOnly { get; }
 
-        public override async Task Validate(AlphaWebSocketConnection connection, MessageEnvelope envelope)
+        public override async Task Validate(AlphaWebSocketConnection connection, IncomingMessage message)
         {
             //if auth is required, then we should check that the current client public key is set, and that the envelope signatures contains it
             if (IsAuthRequired 
-                && (connection.ClientPubKey == null || !envelope.Signatures.Any(s => s.Signer != connection.ClientPubKey)))
+                && (connection.ClientPubKey == null || !message.Envelope.Signatures.Any(s => s.Signer != connection.ClientPubKey)))
                 throw new UnauthorizedException();
 
             if (IsAuditorOnly && !Global.Constellation.Auditors.Contains(connection.ClientPubKey))
@@ -33,7 +33,7 @@ namespace Centaurus.Domain
             if (connection.Account != null && !connection.Account.RequestCounter.IncRequestCount(DateTime.UtcNow.Ticks, out string error))
                 throw new TooManyRequestsException(error);
 
-            await base.Validate(connection, envelope);
+            await base.Validate(connection, message);
         }
     }
 }

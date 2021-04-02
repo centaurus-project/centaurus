@@ -29,9 +29,19 @@ namespace Centaurus.Domain
                 .ToList();
 
             resultMessage.Orders = Global.Exchange.OrderMap.GetAllAccountOrders(requestMessage.AccountWrapper)
-                .Select(order => new Order { AccountWrapper = order.AccountWrapper, Amount = order.Amount, QuoteAmount = order.QuoteAmount, Price = order.Price, OrderId = order.OrderId })
+                .Select(order =>
+                    new Order
+                    {
+                        AccountWrapper = order.AccountWrapper,
+                        Amount = order.Amount,
+                        QuoteAmount = order.QuoteAmount,
+                        Price = order.Price,
+                        OrderId = order.OrderId
+                    })
                 .OrderBy(order => order.OrderId)
                 .ToList();
+
+
 
             return Task.FromResult((ResultMessage)resultMessage);
         }

@@ -17,25 +17,25 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
 
         public override bool IsAuditorOnly { get; } = false;
 
-        public override async Task HandleMessage(AlphaWebSocketConnection connection, MessageEnvelope envelope)
+        public override async Task HandleMessage(AlphaWebSocketConnection connection, IncomingMessage message)
         {
-            var handshakeInit = envelope.Message as HandshakeInit;
+            var handshakeInit = message.Envelope.Message as HandshakeInit;
             if (!ByteArrayPrimitives.Equals(handshakeInit.HandshakeData.Data, connection.HandshakeData.Data))
                 throw new ConnectionCloseException(WebSocketCloseStatus.InvalidPayloadData, "Handshake failed");
 
-            connection.ClientPubKey = envelope.Signatures[0].Signer;
+            connection.ClientPubKey = message.Envelope.Signatures[0].Signer;
             connection.ConnectionState = ConnectionState.Validated;
 
             if (Global.Constellation.Auditors.Contains(connection.ClientPubKey))
                 await HandleAuditorHandshake(connection);
             else
-                await HandleClientHandshake(connection, envelope);
+                await HandleClientHandshake(connection, message.Envelope);
 
         }
 
         private async Task HandleAuditorHandshake(AlphaWebSocketConnection connection)
         {
-            connection.MaxMessageSize = connection.MaxMessageSize * Global.MaxMessageBatchSize;
+            connection.SetAuditor();
             Message message;
             if (Global.AppState.State == ApplicationState.Rising)
                 message = new AuditorStateRequest { TargetApex = await Global.PersistenceManager.GetLastApex() };

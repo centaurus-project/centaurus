@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Centaurus.Domain;
 using Centaurus.Models;
+using Centaurus.Xdr;
 
 namespace Centaurus.Test
 {
@@ -32,7 +33,9 @@ namespace Centaurus.Test
 
             var envelope = new HandshakeInit { HandshakeData = hd }.CreateEnvelope();
             envelope.Sign(TestEnvironment.AlphaKeyPair);
-            var isHandled = await MessageHandlers<AuditorWebSocketConnection>.HandleMessage(clientConnection, envelope);
+            using var writer = new XdrBufferWriter();
+            var inMessage = envelope.ToIncomingMessage(writer);
+            var isHandled = await MessageHandlers<AuditorWebSocketConnection>.HandleMessage(clientConnection, inMessage);
 
             Assert.IsTrue(isHandled);
         }
@@ -53,7 +56,9 @@ namespace Centaurus.Test
             }.CreateEnvelope();
             envelope.Sign(TestEnvironment.AlphaKeyPair);
 
-            var isHandled = await MessageHandlers<AuditorWebSocketConnection>.HandleMessage(clientConnection, envelope);
+            using var writer = new XdrBufferWriter();
+            var inMessage = envelope.ToIncomingMessage(writer);
+            var isHandled = await MessageHandlers<AuditorWebSocketConnection>.HandleMessage(clientConnection, inMessage);
 
             Assert.IsTrue(isHandled);
         }
@@ -84,8 +89,9 @@ namespace Centaurus.Test
                 Source = ledgerNotification.CreateEnvelope()
             }.CreateEnvelope();
             envelope.Sign(alphaKeyPair);
-
-            await AssertMessageHandling(clientConnection, envelope, excpectedException);
+            using var writer = new XdrBufferWriter();
+            var inMessage = envelope.ToIncomingMessage(writer);
+            await AssertMessageHandling(clientConnection, inMessage, excpectedException);
         }
 
         static object[] OrderQuantumTestCases =
@@ -115,9 +121,11 @@ namespace Centaurus.Test
                 RequestEnvelope = orderEnvelope
             }.CreateEnvelope();
             orderQuantumEnvelope.Sign(alphaKeyPair);
+            using var writer = new XdrBufferWriter();
+            var inMessage = orderQuantumEnvelope.ToIncomingMessage(writer);
 
 
-            await AssertMessageHandling(clientConnection, orderQuantumEnvelope, excpectedException);
+            await AssertMessageHandling(clientConnection, inMessage, excpectedException);
         }
 
         static object[] QuantaBatchTestCases =
@@ -140,8 +148,10 @@ namespace Centaurus.Test
                 Quanta = new List<MessageEnvelope>()
             }.CreateEnvelope();
             orderEnvelope.Sign(alphaKeyPair);
+            using var writer = new XdrBufferWriter();
+            var inMessage = orderEnvelope.ToIncomingMessage(writer);
 
-            await AssertMessageHandling(clientConnection, orderEnvelope, excpectedException);
+            await AssertMessageHandling(clientConnection, inMessage, excpectedException);
         }
     }
 }

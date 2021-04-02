@@ -73,5 +73,8 @@ namespace Centaurus
     {
         [Option("alpha_url", Required = true, HelpText = "The url the alpha will listen on.")]
         public string AlphaUrl { get; set; }
+
+        [Option("sync_batch_size", Default = 500, HelpText = "Max quanta sync batch size.")]
+        public int SyncBatchSize { get; set; }
     }
 }

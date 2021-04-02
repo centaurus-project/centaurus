@@ -17,13 +17,13 @@ namespace Centaurus.Domain
             InitCleanupTimer();
         }
 
-        public void Add(MessageEnvelope envelope)
+        public void Add(IncomingMessage message)
         {
-            var id = GetId(envelope);
+            var id = GetId(message.Envelope);
             ConsensusAggregate aggregate = GetConsensusAggregate(id);
 
             //add the signature to the aggregate
-            aggregate.Add(envelope);
+            aggregate.Add(message);
         }
 
         public virtual void Dispose()
@@ -55,7 +55,7 @@ namespace Centaurus.Domain
                     .ToArray();
 
                 foreach (var itemKey in itemsToRemove)
-                    pendingAggregates.Remove(itemKey);
+                    Remove(itemKey);
             }
             cleanupTimer?.Start();
         }
@@ -95,9 +95,7 @@ namespace Centaurus.Domain
             lock (syncRoot)
             {
                 if (pendingAggregates.Remove(id))
-                    logger.Error($"Unable to remove item by id '{id}'");
-                else
-                    logger.Trace($"Item with id '{id}' is removed");
+                    logger.Trace($"Unable to remove item by id '{id}'"); //it could be removed by timer
             }
         }
 
@@ -114,7 +112,7 @@ namespace Centaurus.Domain
 
         protected virtual byte[] GetHash(MessageEnvelope envelope)
         {
-            return envelope.Message.ComputeHash();
+            return envelope.ComputeMessageHash();
         }
 
         public class ConsensusAggregate
@@ -137,20 +135,19 @@ namespace Centaurus.Domain
 
             private Dictionary<byte[], MessageEnvelope> storage = new Dictionary<byte[], MessageEnvelope>(ByteArrayComparer.Default);
 
-            public void Add(MessageEnvelope envelope)
+            public void Add(IncomingMessage message)
             {
                 MessageEnvelope consensus = null;
                 MajorityResults majorityResult = MajorityResults.Unknown;
                 lock (syncRoot)
                 {
-                    var envelopeHash = majorityManager.GetHash(envelope);
-                    if (!storage.TryGetValue(envelopeHash, out var resultStorageEnvelope))//first result with such hash
+                    if (!storage.TryGetValue(message.MessageHash, out var resultStorageEnvelope))//first result with such hash
                     {
-                        resultStorageEnvelope = envelope;
-                        storage[envelopeHash] = envelope;
+                        resultStorageEnvelope = message.Envelope;
+                        storage[message.MessageHash] = resultStorageEnvelope;
                     }
                     else
-                        resultStorageEnvelope.AggregateEnvelopUnsafe(envelope);//we can use AggregateEnvelopUnsafe, we compute hash for every envelope above
+                        resultStorageEnvelope.AggregateEnvelopUnsafe(message.Envelope);//we can use AggregateEnvelopUnsafe, we compute hash for every envelope above
 
                     if (IsProcessed)
                     {

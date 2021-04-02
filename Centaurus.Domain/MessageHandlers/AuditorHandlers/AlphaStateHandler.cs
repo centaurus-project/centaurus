@@ -16,10 +16,10 @@ namespace Centaurus.Domain
 
         public override ConnectionState[] ValidConnectionStates { get; } = new ConnectionState[] { ConnectionState.Connected };
 
-        public override Task HandleMessage(AuditorWebSocketConnection connection, MessageEnvelope messageEnvelope)
+        public override Task HandleMessage(AuditorWebSocketConnection connection, IncomingMessage message)
         {
             //if we got this message than verification succeeded 
-            var alphaState = (AlphaState)messageEnvelope.Message;
+            var alphaState = (AlphaState)message.Envelope.Message;
 
             logger.Info($"Alpha state is {alphaState.State}");
 

@@ -20,7 +20,7 @@ namespace Centaurus.Domain
         /// <summary>
         /// Save interval in ms.
         /// </summary>
-        public const int SaveInterval = 5 * 1000;
+        public const int SaveInterval = 3 * 1000;
 
         public void Start()
         {
@@ -144,15 +144,6 @@ namespace Centaurus.Domain
             }
         }
 
-        public void TryRefreshContainer()
-        {
-            var effectsCount = Current.Quanta.Sum(ea => ea.EffectsCount);
-            if (effectsCount > 75_000)
-            {
-                RefreshUpdatesUnlocked();
-            }
-        }
-
         private void RefreshUpdatesUnlocked()
         {
             if (Current.Quanta.Count < 1)
@@ -182,7 +173,7 @@ namespace Centaurus.Domain
                 {
                     SavedAt = DateTime.UtcNow,
                     QuantaCount = updates.Quanta.Count,
-                    EffectsCount = updates.Quanta.Sum(ea => ea.EffectsCount),
+                    EffectsCount = updates.EffectsCount,
                     ElapsedMilliseconds = sw.ElapsedMilliseconds,
                     Retries = retries
                 };
@@ -211,19 +202,6 @@ namespace Centaurus.Domain
             cancellationTokenSource = null;
             UpdatesSyncRoot?.Dispose();
             UpdatesSyncRoot = null;
-        }
-
-        public class BatchSavedInfo
-        {
-            public int QuantaCount { get; set; }
-
-            public int EffectsCount { get; set; }
-
-            public int Retries { get; set; }
-
-            public long ElapsedMilliseconds { get; set; }
-
-            public DateTime SavedAt { get; set; }
         }
     }
 }

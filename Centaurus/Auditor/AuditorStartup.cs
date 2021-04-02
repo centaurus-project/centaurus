@@ -50,7 +50,7 @@ namespace Centaurus
         {
             try
             {
-                while (auditor == null && !isAborted)
+                while (!isAborted)
                 {
                     var _auditor = new AuditorWebSocketConnection(new ClientWebSocket(), null);
                     try
@@ -58,11 +58,13 @@ namespace Centaurus
                         Subscribe(_auditor);
                         await _auditor.EstablishConnection();
                         auditor = _auditor;
+                        break;
                     }
                     catch (Exception exc)
                     {
                         Unsubscribe(_auditor);
                         await CloseConnection(_auditor);
+                        _auditor.Dispose();
 
                         if (!(exc is OperationCanceledException))
                             logger.Info(exc, "Unable establish connection. Retry in 5000ms");
@@ -111,15 +113,15 @@ namespace Centaurus
             }
         }
 
-        private void OnConnectionStateChanged(object sender, ConnectionState e)
+        private void OnConnectionStateChanged((BaseWebSocketConnection connection, ConnectionState prev, ConnectionState current) args)
         {
-            switch (e)
+            switch (args.current)
             {
                 case ConnectionState.Ready:
-                    Ready((BaseWebSocketConnection)sender);
+                    Ready(args.connection);
                     break;
                 case ConnectionState.Closed:
-                    Close((BaseWebSocketConnection)sender);
+                    Close(args.connection);
                     break;
                 default:
                     break;
@@ -145,7 +147,7 @@ namespace Centaurus
             Global.AppState.State = ApplicationState.Running;
             Unsubscribe(auditor);
             await CloseConnection(auditor);
-            auditor = null;
+            auditor.Dispose();
             if (!isAborted)
                 _ = InternalRun();
         }

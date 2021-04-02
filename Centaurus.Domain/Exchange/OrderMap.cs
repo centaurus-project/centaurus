@@ -21,9 +21,9 @@ namespace Centaurus.Domain
             map.Add(order.OrderId, order);
         }
 
-        public void RemoveOrder(ulong orderId)
+        public bool RemoveOrder(ulong orderId, out Order order)
         {
-            map.Remove(orderId);
+            return map.Remove(orderId, out order);
         }
 
         public Order GetOrder(ulong orderId)

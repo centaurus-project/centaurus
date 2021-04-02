@@ -139,7 +139,7 @@ namespace Centaurus.Exchange.Analytics
             );
         }
 
-        private Dictionary<long, PriceHistoryPeriodManager> managers = new Dictionary<long, PriceHistoryPeriodManager>();
+        private readonly Dictionary<long, PriceHistoryPeriodManager> managers = new Dictionary<long, PriceHistoryPeriodManager>();
         private IEnumerable<PriceHistoryPeriod> periods;
         private SemaphoreSlim syncRoot = new SemaphoreSlim(1);
     }

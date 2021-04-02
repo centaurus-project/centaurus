@@ -3,22 +3,23 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
+using System.Linq;
 
 namespace Centaurus.Domain
 {
     public class AlphaStateManager : StateManager
     {
-        private HashSet<RawPubKey> ConnectedAuditors = new HashSet<RawPubKey>();
+        private Dictionary<RawPubKey, ConnectionState> ConnectedAuditors = new Dictionary<RawPubKey, ConnectionState>();
 
-        public bool HasMajority => ConnectedAuditors.Count >= MajorityHelper.GetMajorityCount();
+        public bool HasMajority => ConnectedAuditors.Count(a => a.Value == ConnectionState.Ready) >= MajorityHelper.GetMajorityCount();
 
         public int ConnectedAuditorsCount => ConnectedAuditors.Count;
 
-        public void AuditorConnected(RawPubKey rawPubKey)
+        public void RegisterAuditorState(RawPubKey rawPubKey, ConnectionState connectionState)
         {
             lock (this)
             {
-                ConnectedAuditors.Add(rawPubKey);
+                ConnectedAuditors[rawPubKey] = connectionState;
                 if (HasMajority && State == ApplicationState.Running)
                     State = ApplicationState.Ready;
             }
@@ -28,8 +29,6 @@ namespace Centaurus.Domain
         {
             lock (this)
             {
-                if (!ConnectedAuditors.Contains(rawPubKey))
-                    return;
                 ConnectedAuditors.Remove(rawPubKey);
                 if (!HasMajority && State == ApplicationState.Ready)
                     State = ApplicationState.Running;

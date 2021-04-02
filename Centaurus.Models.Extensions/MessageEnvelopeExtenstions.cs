@@ -1,5 +1,6 @@
 ﻿using Centaurus.Domain;
 using Centaurus.Models;
+using Centaurus.Xdr;
 using stellar_dotnet_sdk;
 using System;
 using System.Collections.Generic;
@@ -15,12 +16,13 @@ namespace Centaurus
         /// Compute SHA256 hash for the wrapped message.
         /// </summary>
         /// <param name="messageEnvelope">Envelope</param>
+        /// <param name="buffer">Buffer to use for serialization.</param>
         /// <returns>Message hash</returns>
-        public static byte[] ComputeMessageHash(this MessageEnvelope messageEnvelope)
+        public static byte[] ComputeMessageHash(this MessageEnvelope messageEnvelope, byte[] buffer = null)
         {
             if (messageEnvelope == null)
                 throw new ArgumentNullException(nameof(messageEnvelope));
-            return messageEnvelope.Message.ComputeHash();
+            return messageEnvelope.Message.ComputeHash(buffer);
         }
 
         /// <summary>
@@ -40,31 +42,24 @@ namespace Centaurus
         }
 
         /// <summary>
-        /// Verifies that both aggregated envelops contain the same message and merges signatures to the source envelope.
+        /// Signs an envelope with a given <see cref="KeyPair"/> and appends the signature to the <see cref="MessageEnvelope.Signatures"/>.
         /// </summary>
-        /// <param name="envelope">Source envelope</param>
-        /// <param name="anotherEnvelope">Envelope to aggregate</param>
-        public static void AggregateEnvelop(this MessageEnvelope envelope, MessageEnvelope anotherEnvelope)
+        /// <param name="messageEnvelope">Envelope to sign</param>
+        /// <param name="keyPair">Key pair to use for signing</param>
+        /// <param name="buffer">Buffer to use for computing hash code.</param>
+        public static MessageEnvelope Sign(this MessageEnvelope messageEnvelope, KeyPair keyPair, byte[] buffer)
         {
-            if (envelope == null)
-                throw new ArgumentNullException(nameof(envelope));
-            if (anotherEnvelope == null)
-                throw new ArgumentNullException(nameof(anotherEnvelope));
-            //TODO: cache hashes to improve performance
-            var hash = envelope.ComputeMessageHash();
-            var anotherHash = anotherEnvelope.ComputeMessageHash();
-            if (!ByteArrayPrimitives.Equals(anotherHash, hash))
-            {
-#if DEBUG
-                var envelopeJson = Newtonsoft.Json.JsonConvert.SerializeObject(envelope);
-                Debug.Print("envelope:\n" + envelopeJson);
-                envelopeJson = Newtonsoft.Json.JsonConvert.SerializeObject(anotherEnvelope);
-                Debug.Print("anotherEnvelope:\n" + envelopeJson);
-#endif
-
-                throw new InvalidOperationException($"Invalid message envelope hash. {hash} != {anotherHash}");
-            }
-            envelope.AggregateEnvelopUnsafe(anotherEnvelope);
+            if (messageEnvelope == null)
+                throw new ArgumentNullException(nameof(messageEnvelope));
+            if (keyPair == null)
+                throw new ArgumentNullException(nameof(keyPair));
+            if (buffer == null)
+                throw new ArgumentNullException(nameof(buffer));
+            using var writer = new XdrBufferWriter(buffer);
+            XdrConverter.Serialize(messageEnvelope.Message, writer);
+            var signature = writer.ToArray().ComputeHash().Sign(keyPair);
+            messageEnvelope.Signatures.Add(signature);
+            return messageEnvelope;
         }
 
         /// <summary>
@@ -105,10 +100,24 @@ namespace Centaurus
         {
             if (envelope == null)
                 throw new ArgumentNullException(nameof(envelope));
+            if (envelope.Signatures.Count < 1)
+                return true;
             var messageHash = envelope.Message.ComputeHash();
-            for (var i = 0; i < envelope.Signatures.Count; i++)
+            return envelope.Signatures.AreSignaturesValid(messageHash);
+        }
+
+        /// <summary>
+        /// Checks that all envelope signatures are valid
+        /// </summary>
+        /// <param name="envelope">Target envelope</param>
+        /// <returns>True if all signatures valid, otherwise false</returns>
+        public static bool AreSignaturesValid(this List<Ed25519Signature> signatures, byte[] hash)
+        {
+            if (signatures == null)
+                throw new ArgumentNullException(nameof(signatures));
+            for (var i = 0; i < signatures.Count; i++)
             {
-                if (!envelope.Signatures[i].IsValid(messageHash))
+                if (!signatures[i].IsValid(hash))
                     return false;
             }
             return true;

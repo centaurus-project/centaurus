@@ -16,7 +16,7 @@ namespace Centaurus.Domain
 
         public override ConnectionState[] ValidConnectionStates => new ConnectionState[] { ConnectionState.Ready };
 
-        public override Task HandleMessage(AlphaWebSocketConnection connection, MessageEnvelope messageEnvelope)
+        public override Task HandleMessage(AlphaWebSocketConnection connection, IncomingMessage message)
         {
             //run it in the separate thread to avoid blocking quanta handling
             Task.Factory.StartNew(async () =>
@@ -26,16 +26,16 @@ namespace Centaurus.Domain
                     ResultMessage result;
                     try
                     {
-                        var request = messageEnvelope.Message as EffectsRequest;
+                        var request = message.Envelope.Message as EffectsRequest;
                         var effectsResponse = await Global.PersistenceManager.LoadEffects(request.Cursor, request.IsDesc, request.Limit, request.Account);
-                        effectsResponse.OriginalMessage = messageEnvelope;
+                        effectsResponse.OriginalMessage = message.Envelope;
                         effectsResponse.Effects = new List<Effect>();
                         effectsResponse.Status = ResultStatusCodes.Success;
                         result = effectsResponse;
                     }
                     catch (Exception exc)
                     {
-                        result = messageEnvelope.CreateResult(exc.GetStatusCode());
+                        result = message.Envelope.CreateResult(exc.GetStatusCode());
                     }
                     await connection.SendMessage(result);
                 }

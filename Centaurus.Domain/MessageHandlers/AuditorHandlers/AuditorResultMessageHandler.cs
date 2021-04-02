@@ -15,10 +15,10 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
 
         public override ConnectionState[] ValidConnectionStates { get; } = null;
 
-        public override Task HandleMessage(AuditorWebSocketConnection connection, MessageEnvelope envelope)
+        public override Task HandleMessage(AuditorWebSocketConnection connection, IncomingMessage message)
         {
-            var resultMessage = (ResultMessage)envelope.Message;
-            logger.Trace($"Result message received. Status {resultMessage.Status}, original message type is {resultMessage.OriginalMessage.Message.MessageType}");
+            var resultMessage = (ResultMessage)message.Envelope.Message;
+            logger.Error($"Result message received. Status {resultMessage.Status}, original message type is {resultMessage.OriginalMessage.Message.MessageType}");
             return Task.CompletedTask;
         }
     }

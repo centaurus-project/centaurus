@@ -15,9 +15,9 @@ namespace Centaurus.Domain
             InitTimers();
         }
 
-        public void Register(ResultMessage resultMessage, Dictionary<int, Message> notifications)
+        public void Register(MessageEnvelope envelope, byte[] messageHash, Dictionary<int, Message> notifications)
         {
-            var resultMessageItem = new ResultMessageItem(resultMessage, notifications);
+            var resultMessageItem = new ResultMessageItem(envelope, messageHash, notifications);
             if (!pendingAggregates.TryAdd(resultMessageItem.Apex, new ResultConsensusAggregate(resultMessageItem, this)))
                 logger.Error("Unable to add result manager.");
         }
@@ -177,9 +177,7 @@ namespace Centaurus.Domain
             {
                 if (majorityResult == MajorityResults.Unreachable)
                 {
-                    var votesCount = resultMessageItem.ResultEnvelope.Signatures.Count;
-                    if (resultMessageItem.ResultEnvelope.IsSignedBy(Global.Settings.KeyPair))
-                        votesCount--;
+                    var votesCount = resultMessageItem.ResultEnvelope.Signatures.Count - 1;//one signature belongs to Alpha
 
                     var originalEnvelope = resultMessageItem.ResultMessage.OriginalMessage;
                     SequentialRequestMessage requestMessage = null;
@@ -223,13 +221,11 @@ namespace Centaurus.Domain
 
         class ResultMessageItem
         {
-            public ResultMessageItem(ResultMessage resultMessage, Dictionary<int, Message> notifications)
+            public ResultMessageItem(MessageEnvelope resultEnvelope, byte[] messageHash, Dictionary<int, Message> notifications)
             {
-                if (resultMessage == null)
-                    throw new ArgumentNullException(nameof(resultMessage));
-                ResultEnvelope = resultMessage.CreateEnvelope();
-                IsTxResultMessage = resultMessage is ITransactionResultMessage;
-                Hash = ResultEnvelope.ComputeMessageHash();
+                ResultEnvelope = resultEnvelope ?? throw new ArgumentNullException(nameof(resultEnvelope));
+                Hash = messageHash;
+                IsTxResultMessage = resultEnvelope.Message is ITransactionResultMessage;
                 AccountPubKey = GetMessageAccount();
                 Notifications = notifications ?? throw new ArgumentNullException(nameof(notifications));
             }

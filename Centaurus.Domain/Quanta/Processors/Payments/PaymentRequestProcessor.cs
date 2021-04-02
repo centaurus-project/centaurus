@@ -2,8 +2,11 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Centaurus.Models;
+using NLog;
 using stellar_dotnet_sdk;
 
 namespace Centaurus.Domain
@@ -36,8 +39,10 @@ namespace Centaurus.Domain
             context.EffectProcessors.AddBalanceUpdate(context.SourceAccount, payment.Asset, -payment.Amount);
             var effects = context.EffectProcessors.Effects;
 
-            var accountEffects = effects.Where(e => e.AccountWrapper.Id == payment.Account).ToList();
-            return Task.FromResult(context.Envelope.CreateResult(ResultStatusCodes.Success, accountEffects));
+            var accountEffects = effects.Where(e => e.Account == payment.Account).ToList();
+            var result = context.Envelope.CreateResult(ResultStatusCodes.Success, accountEffects);
+
+            return Task.FromResult(result);
         }
 
         public override Task Validate(PaymentProcessorContext context)
@@ -54,7 +59,7 @@ namespace Centaurus.Domain
                 if (payment.Asset != 0)
                     throw new BadRequestException("Account excepts only XLM asset.");
                 if (payment.Amount < Global.Constellation.MinAccountBalance)
-                throw new BadRequestException($"Min payment amount is {Amount.FromXdr(Global.Constellation.MinAccountBalance)} XLM for this account.");
+                    throw new BadRequestException($"Min payment amount is {Amount.FromXdr(Global.Constellation.MinAccountBalance)} XLM for this account.");
             }
 
             if (payment.Destination.Equals(payment.AccountWrapper.Account.Pubkey))

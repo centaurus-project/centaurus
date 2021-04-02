@@ -34,17 +34,49 @@ namespace Centaurus
             return new string(result);
         }
 
-        public static byte[] ComputeHash(this object objToSerialize)
+        public static byte[] ComputeHash(this byte[] buffer)
+        {
+            if (buffer == null)
+                throw new ArgumentNullException(nameof(buffer));
+            return SHA256.Create().ComputeHash(buffer);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="objToSerialize">Object to serialize</param>
+        /// <param name="buffer">Buffer to use for serialization</param>
+        /// <returns></returns>
+        public static byte[] ComputeHash(this object objToSerialize, byte[] buffer = null)
+        {
+            var bytes = objToSerialize.ToByteArray(buffer);
+            return ComputeHash(bytes);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="objToSerialize">Object to serialize</param>
+        /// <param name="buffer">Buffer to use for serialization</param>
+        /// <returns></returns>
+        public static byte[] ToByteArray(this object objToSerialize, byte[] buffer = null)
         {
             var bytes = objToSerialize as byte[];
-
             if (bytes != null)
-                return SHA256.Create().ComputeHash(bytes);
-            using var buffer = XdrBufferFactory.Rent();
-            using var writer = new XdrBufferWriter(buffer.Buffer);
+                return bytes;
+
+            using var writer = buffer == null ? new XdrBufferWriter() : new XdrBufferWriter(buffer);
+            return objToSerialize.ToByteArray(writer);
+        }
+
+        public static byte[] ToByteArray(this object objToSerialize, XdrBufferWriter writer)
+        {
+            var bytes = objToSerialize as byte[];
+            if (bytes != null)
+                return bytes;
+
             XdrConverter.Serialize(objToSerialize, writer);
-            var hash = SHA256.Create().ComputeHash(buffer.Buffer, 0, writer.Length);
-            return hash;
+            return writer.ToArray();
         }
 
         public static byte[] FromHexString(string hexString)

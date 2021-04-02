@@ -16,9 +16,9 @@ namespace Centaurus.Domain.MessageHandlers.AlphaHandlers
         public override bool IsAuditorOnly { get; } = true;
 
         //TODO: run result aggregation in separate thread
-        public override Task HandleMessage(AlphaWebSocketConnection connection, MessageEnvelope envelope)
+        public override Task HandleMessage(AlphaWebSocketConnection connection, IncomingMessage message)
         {
-            var resultsBatch = (AuditorResultsBatch)envelope.Message;
+            var resultsBatch = (AuditorResultsBatch)message.Envelope.Message;
             foreach (var result in resultsBatch.AuditorResultMessages)
                 Global.AuditResultManager.Add(result, connection.ClientPubKey);
             return Task.CompletedTask;

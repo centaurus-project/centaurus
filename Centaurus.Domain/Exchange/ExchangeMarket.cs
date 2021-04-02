@@ -4,19 +4,23 @@ namespace Centaurus.Domain
 {
     public class ExchangeMarket
     {
-        public ExchangeMarket(int market, OrderMap orderMap)
+        public ExchangeMarket(int market, OrderMap orderMap, bool useLegacyOrderbook = false)
         {
             Market = market;
-            Asks = new Orderbook(orderMap, market, OrderSide.Sell);
-            Bids = new Orderbook(orderMap, market, OrderSide.Buy);
+            Asks = useLegacyOrderbook 
+                ? (OrderbookBase)new Orderbook(orderMap, market, OrderSide.Sell)
+                : new OrderbookBinary(orderMap, market, OrderSide.Sell);
+            Bids = useLegacyOrderbook
+                ? (OrderbookBase)new Orderbook(orderMap, market, OrderSide.Buy)
+                : new OrderbookBinary(orderMap, market, OrderSide.Buy);
         }
 
         public int Market { get; }
 
         public double LastPrice { get; set; }
 
-        public Orderbook Asks { get; }
+        public OrderbookBase Asks { get; }
 
-        public Orderbook Bids { get; }
+        public OrderbookBase Bids { get; }
     }
 }

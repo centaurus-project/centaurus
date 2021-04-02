@@ -18,9 +18,9 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
                 ConnectionState.Ready
             };
 
-        public override Task HandleMessage(AlphaWebSocketConnection connection, MessageEnvelope messageEnvelope)
+        public override Task HandleMessage(AlphaWebSocketConnection connection, IncomingMessage message)
         {
-            connection.ResetApexCursor(messageEnvelope.Message as SetApexCursor);
+            connection.ResetApexCursor(message.Envelope.Message as SetApexCursor);
             return Task.CompletedTask;
         }
     }

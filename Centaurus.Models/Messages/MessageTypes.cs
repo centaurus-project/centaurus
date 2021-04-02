@@ -8,10 +8,6 @@ namespace Centaurus.Models
     public enum MessageTypes
     {
         /// <summary>
-        /// Heartbeat message
-        /// </summary>
-        Heartbeat = 0,
-        /// <summary>
         /// A client requested funds deposit.
         /// </summary>
         DepositRequest = 1,
@@ -79,6 +75,10 @@ namespace Centaurus.Models
         /// Auditor current state (the last snapshot, and all quanta after the last snapshot).
         /// </summary>
         AuditorState = 106,
+        /// <summary>
+        /// Auditor's performance statistics.
+        /// </summary>
+        AuditorPerfStatistics = 107,
         /// <summary>
         /// Set auditor apex cursor.
         /// </summary>

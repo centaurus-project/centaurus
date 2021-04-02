@@ -10,8 +10,7 @@ namespace Centaurus.Models
     {
         public override EffectTypes EffectType => EffectTypes.AccountCreate;
 
+        [XdrField(0)]
         public RawPubKey Pubkey { get; set; }
-
-        public int AccountId { get; set; }
     }
 }

@@ -18,7 +18,7 @@ namespace Centaurus.Domain
         {
             Global.ExtensionsManager.BeforeNotify(account, envelope);
             if (ConnectionManager.TryGetConnection(account, out Centaurus.AlphaWebSocketConnection connection))
-                _ = connection.SendMessage(envelope);
+                Task.Factory.StartNew(async () => await connection.SendMessage(envelope)).Unwrap();
         }
 
         /// <summary>
@@ -30,7 +30,10 @@ namespace Centaurus.Domain
             Global.ExtensionsManager.BeforeNotifyAuditors(envelope);
             var auditors = ConnectionManager.GetAuditorConnections();
             for (var i = 0; i < auditors.Count; i++)
-                _ = auditors[i].SendMessage(envelope);
+            {
+                var auditor = auditors[i];
+                Task.Factory.StartNew(async () => await auditor.SendMessage(envelope)).Unwrap();
+            }
         }
 
         /// <summary>

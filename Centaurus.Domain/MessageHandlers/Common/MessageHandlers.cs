@@ -41,18 +41,19 @@ namespace Centaurus.Domain
             handlers = processors.ToImmutableDictionary();
         }
 
-        public static async Task<bool> HandleMessage(T connetction, MessageEnvelope envelope)
+        public static async Task<bool> HandleMessage(T connetction, IncomingMessage message)
         {
-            if (!handlers.ContainsKey(envelope.Message.MessageType))
+            if (message == null)
+                throw new ArgumentNullException(nameof(message));
+            if (!handlers.TryGetValue(message.Envelope.Message.MessageType, out var handler))
                 return false;
 
-            var handler = handlers[envelope.Message.MessageType];
-            Global.ExtensionsManager.BeforeValidateMessage(connetction, envelope);
-            await handler.Validate(connetction, envelope);
-            Global.ExtensionsManager.AfterValidateMessage(connetction, envelope);
-            Global.ExtensionsManager.BeforeHandleMessage(connetction, envelope);
-            await handler.HandleMessage(connetction, envelope);
-            Global.ExtensionsManager.AfterHandleMessage(connetction, envelope);
+            Global.ExtensionsManager.BeforeValidateMessage(connetction, message.Envelope);
+            await handler.Validate(connetction, message);
+            Global.ExtensionsManager.AfterValidateMessage(connetction, message.Envelope);
+            Global.ExtensionsManager.BeforeHandleMessage(connetction, message.Envelope);
+            await handler.HandleMessage(connetction, message);
+            Global.ExtensionsManager.AfterHandleMessage(connetction, message.Envelope);
             return true;
         }
     }

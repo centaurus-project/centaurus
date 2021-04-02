@@ -11,9 +11,9 @@ namespace Centaurus.Domain
     {
         public override ConnectionState[] ValidConnectionStates { get; } = new ConnectionState[] { ConnectionState.Ready };
 
-        public override Task HandleMessage(AuditorWebSocketConnection connection, MessageEnvelope messageEnvelope)
+        public override Task HandleMessage(AuditorWebSocketConnection connection, IncomingMessage message)
         {
-            _ = Global.QuantumHandler.HandleAsync(messageEnvelope);
+            _ = Global.QuantumHandler.HandleAsync(message.Envelope);
             return Task.CompletedTask;
         }
     }
