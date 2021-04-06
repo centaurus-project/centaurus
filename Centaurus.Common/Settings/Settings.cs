@@ -56,7 +56,7 @@ namespace Centaurus
         [Option("alpha_pubkey", Required = true, HelpText = "Alpha server public key.")]
         public string AlphaPubKey { get; set; }
 
-        [Option("genesis_quorum", Separator = ',', HelpText = "Public keys of all auditors in genesis quorum, separated by comma.")]
+        [Option("genesis_quorum", Separator = ';', HelpText = "Public keys of all auditors in genesis quorum, delimited with semicolon.")]
         public IEnumerable<string> GenesisQuorum { get; set; }
 
         public KeyPair AlphaKeyPair { get; set; }
@@ -71,8 +71,14 @@ namespace Centaurus
     [Verb("alpha", HelpText = "Launch Centaurus in alpha mode.")]
     public class AlphaSettings : BaseSettings
     {
-        [Option("alpha_url", Required = true, HelpText = "The url the alpha will listen on.")]
-        public string AlphaUrl { get; set; }
+        [Option("alpha_endpoints", Separator = ';', Required = true, HelpText = "Endpoints the alpha will listen on. Example: \"http:5000;http:5001;https:443\"")]
+        public IEnumerable<string> AlphaEndpoints { get; set; }
+
+        [Option("alpha_allowed_hosts", Required = false, HelpText = "Allowed hosts delimited with semicolon. If value is null, all hosts are allowed. Example: \"www.example.com;localhost\"")]
+        public string AllowedHosts { get; set; }
+
+        [Option("alpha_cert", Required = false, HelpText = "Certificate and private key paths delimited with colon. Required if ssl is used. Example: \"C:\\\\certs\\cert.pem:C:\\\\certs\\privateKey.pem\"")]
+        public string Certificate { get; set; }
 
         [Option("sync_batch_size", Default = 500, HelpText = "Max quanta sync batch size.")]
         public int SyncBatchSize { get; set; }
