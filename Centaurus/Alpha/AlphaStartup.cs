@@ -21,44 +21,49 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Diagnostics;
 using System.Security.Cryptography.X509Certificates;
-using Microsoft.AspNetCore.Server.Kestrel.Https;
-using System.Net;
 using System.Text.RegularExpressions;
+using Microsoft.AspNetCore.Server.Kestrel.Https;
 
 namespace Centaurus
 {
-    public class AlphaStartup : IStartup<AlphaSettings>
+    public class AlphaStartup : StartupBase
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
         private IHost host;
         private ManualResetEvent resetEvent;
 
-        public async Task Run(AlphaSettings settings, ManualResetEvent resetEvent)
+        public AlphaStartup(AlphaContext context)
+            : base(context)
+        {
+        }
+
+        public override async Task Run(ManualResetEvent resetEvent)
         {
             try
             {
                 this.resetEvent = resetEvent;
 
-                host = CreateHostBuilder(settings).Build();
+                host = CreateHostBuilder((AlphaSettings)Context.Settings).Build();
                 _ = host.RunAsync();
-                await ConfigureConstellation(settings);
+                await ConfigureConstellation();
             }
             catch (Exception exc)
             {
                 logger.Error(exc);
-                if (Global.AppState != null)
-                    Global.AppState.State = ApplicationState.Failed;
+                if (Context.AppState != null)
+                    Context.AppState.State = ApplicationState.Failed;
                 resetEvent.Set();
             }
         }
 
-        public async Task Shutdown()
+        public override async Task Shutdown()
         {
             if (host != null)
             {
-                await ConnectionManager.CloseAllConnections();
-                await InfoConnectionManager.CloseAllConnections();
-                await Global.TearDown();
+                var alphaContext = (AlphaContext)Context;
+                await alphaContext.ConnectionManager.CloseAllConnections();
+                await alphaContext.InfoConnectionManager.CloseAllConnections();
+                await Context.TearDown();
                 await host.StopAsync(CancellationToken.None);
                 host = null;
             }
@@ -66,19 +71,20 @@ namespace Centaurus
 
         #region Private Members
 
-        private async Task ConfigureConstellation(AlphaSettings settings)
+        private async Task ConfigureConstellation()
         {
-            await Global.Setup(settings, new MongoStorage());
+            await Context.Init();
 
-            Global.AppState.StateChanged += Current_StateChanged;
+            Context.AppState.StateChanged += Current_StateChanged;
 
-            MessageHandlers<AlphaWebSocketConnection>.Init();
+            MessageHandlers<AlphaWebSocketConnection>.Init(Context);
         }
 
         private void Current_StateChanged(StateChangedEventArgs eventArgs)
         {
             if (eventArgs.State == ApplicationState.Failed)
             {
+                Console.WriteLine("Application failed. Saving pending updates...");
                 Thread.Sleep(PendingUpdatesManager.SaveInterval);
                 resetEvent.Set();
             }
@@ -176,7 +182,8 @@ namespace Centaurus
                 .UseNLog()
                 .ConfigureWebHostDefaults(webBuilder =>
                 {
-                    webBuilder.UseStartup<Startup>()
+                    webBuilder.ConfigureServices(s => s.AddSingleton(Context))
+                        .UseStartup<Startup>()
                         .UseKestrel(options =>
                         {
                             foreach (var endpoint in settings.AlphaEndpoints)
@@ -208,8 +215,6 @@ namespace Centaurus
             var regex = new Regex(@"(https?):?(\d*)\/?(.*)", RegexOptions.IgnoreCase);
 
             var match = regex.Match(rawData);
-            if (!match.Success)
-                throw new ArgumentException("Invalid endpoint settings.");
 
             var isHttps = match.Groups["1"].Value.Equals("https", StringComparison.OrdinalIgnoreCase);
             var portStr = match.Groups["2"].Value;
@@ -260,10 +265,11 @@ namespace Centaurus
 
         static async Task CentaurusWebSocketHandler(HttpContext context, Func<Task> next)
         {
-            if (Global.AppState == null || ValidApplicationStates.Contains(Global.AppState.State))
+            var centaurusContext = context.RequestServices.GetService<AlphaContext>();
+            if (centaurusContext.AppState == null || ValidApplicationStates.Contains(centaurusContext.AppState.State))
             {
                 using (var webSocket = await context.WebSockets.AcceptWebSocketAsync())
-                    await ConnectionManager.OnNewConnection(webSocket, context.Connection.RemoteIpAddress.ToString());
+                    await centaurusContext.ConnectionManager.OnNewConnection(webSocket, context.Connection.RemoteIpAddress.ToString());
             }
             else
             {
@@ -273,8 +279,9 @@ namespace Centaurus
 
         static async Task InfoWebSocketHandler(HttpContext context, Func<Task> next)
         {
+            var centaurusContext = context.RequestServices.GetService<AlphaContext>();
             var webSocket = await context.WebSockets.AcceptWebSocketAsync();
-            await InfoConnectionManager.OnNewConnection(webSocket, context.Connection.Id, context.Connection.RemoteIpAddress.ToString());
+            await centaurusContext.InfoConnectionManager.OnNewConnection(webSocket, context.Connection.Id, context.Connection.RemoteIpAddress.ToString());
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

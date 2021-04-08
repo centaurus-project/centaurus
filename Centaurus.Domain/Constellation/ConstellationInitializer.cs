@@ -27,10 +27,13 @@ namespace Centaurus.Domain
     {
         const int minAuditorsCount = 1;
 
-        ConstellationInitInfo constellationInitInfo { get; }
+        CentaurusContext context;
+        ConstellationInitInfo constellationInitInfo;
 
-        public ConstellationInitializer(ConstellationInitInfo constellationInitInfo)
+        public ConstellationInitializer(ConstellationInitInfo constellationInitInfo, CentaurusContext context)
         {
+            this.context = context ?? throw new ArgumentNullException(nameof(context));
+
             if (constellationInitInfo.Auditors == null || constellationInitInfo.Auditors.Count() < minAuditorsCount)
                 throw new ArgumentException($"Min auditors count is {minAuditorsCount}");
 
@@ -54,12 +57,12 @@ namespace Centaurus.Domain
 
         public async Task Init()
         {
-            if (Global.AppState.State != ApplicationState.WaitingForInit)
+            if (context.AppState.State != ApplicationState.WaitingForInit)
                 throw new InvalidOperationException("Alpha is not in the waiting for initialization state.");
 
             var alphaAccountData = await DoesAlphaAccountExist();
             if (alphaAccountData == null)
-                throw new InvalidOperationException($"The vault ({Global.Settings.KeyPair.AccountId}) is not yet funded");
+                throw new InvalidOperationException($"The vault ({context.Settings.KeyPair.AccountId}) is not yet funded");
 
             var txCursor = await BuildAndConfigureVault(alphaAccountData);
 
@@ -69,7 +72,7 @@ namespace Centaurus.Domain
             {
                 Assets = constellationInitInfo.Assets.ToList(),
                 Auditors = constellationInitInfo.Auditors.Select(key => (RawPubKey)key.PublicKey).ToList(),
-                Vault = Global.Settings.KeyPair.PublicKey,
+                Vault = context.Settings.KeyPair.PublicKey,
                 MinAccountBalance = constellationInitInfo.MinAccountBalance,
                 MinAllowedLotSize = constellationInitInfo.MinAllowedLotSize,
                 PrevHash = new byte[] { },
@@ -79,7 +82,7 @@ namespace Centaurus.Domain
 
             var envelope = initQuantum.CreateEnvelope();
 
-            await Global.QuantumHandler.HandleAsync(envelope);
+            await context.QuantumHandler.HandleAsync(envelope);
         }
 
         private void SetIdToAssets()
@@ -99,7 +102,7 @@ namespace Centaurus.Domain
         {
             var majority = MajorityHelper.GetMajorityCount(constellationInitInfo.Auditors.Count());
 
-            var sourceAccount = await StellarAccountHelper.GetStellarAccount(vaultAccount.KeyPair);
+            var sourceAccount = await StellarAccountHelper.GetStellarAccount(vaultAccount.KeyPair, context.StellarNetwork);
 
             var transactionBuilder = new TransactionBuilder(sourceAccount);
             transactionBuilder.SetFee(10_000);
@@ -136,16 +139,16 @@ namespace Centaurus.Domain
             }
 
             var transaction = transactionBuilder.Build();
-            transaction.Sign(Global.Settings.KeyPair);
+            transaction.Sign(context.Settings.KeyPair);
 
-            var result = await Global.StellarNetwork.Server.SubmitTransaction(transaction);
+            var result = await context.StellarNetwork.Server.SubmitTransaction(transaction);
 
             if (!result.IsSuccess())
             {
                 throw new Exception($"Transaction failed. Result Xdr: {result.ResultXdr}");
             }
 
-            var tx = await Global.StellarNetwork.Server.Transactions.Transaction(result.Hash);
+            var tx = await context.StellarNetwork.Server.Transactions.Transaction(result.Hash);
             return long.Parse(tx.PagingToken);
         }
 
@@ -153,7 +156,7 @@ namespace Centaurus.Domain
         {
             try
             {
-                return await StellarAccountHelper.GetStellarAccount(Global.Settings.KeyPair);
+                return await StellarAccountHelper.GetStellarAccount(context.Settings.KeyPair, context.StellarNetwork);
             }
             catch (HttpResponseException exc)
             {

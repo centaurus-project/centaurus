@@ -16,7 +16,7 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
 
         public override Task HandleMessage(AlphaWebSocketConnection connection, IncomingMessage message)
         {
-            Global.AuditLedgerManager.Add(message);
+            connection.AlphaContext.AuditLedgerManager.Add(message);
             return Task.CompletedTask;
         }
     }

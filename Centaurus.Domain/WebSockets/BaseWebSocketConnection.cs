@@ -36,12 +36,12 @@ namespace Centaurus
     public abstract class BaseWebSocketConnection : IDisposable
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
-
         protected WebSocket webSocket;
-        public BaseWebSocketConnection(WebSocket webSocket, string ip, int inBufferSize, int outBufferSize)
+        public BaseWebSocketConnection(CentaurusContext context, WebSocket webSocket, string ip, int inBufferSize, int outBufferSize)
         {
-            this.webSocket = webSocket;
-            this.Ip = ip;
+            Context = context ?? throw new ArgumentNullException(nameof(context));
+            this.webSocket = webSocket ?? throw new ArgumentNullException(nameof(webSocket));
+            Ip = ip;
 
             incommingBuffer = XdrBufferFactory.Rent(inBufferSize);
             outgoingBuffer = XdrBufferFactory.Rent(outBufferSize);
@@ -49,6 +49,8 @@ namespace Centaurus
             cancellationTokenSource = new CancellationTokenSource();
             cancellationToken = cancellationTokenSource.Token;
         }
+        public CentaurusContext Context { get; }
+
         public string Ip { get; }
 
         /// <summary>
@@ -107,7 +109,7 @@ namespace Centaurus
         {
             try
             {
-                Global.ExtensionsManager.BeforeConnectionClose(this);
+                Context.ExtensionsManager.BeforeConnectionClose(this);
                 if (webSocket.State == WebSocketState.Open)
                 {
                     desc = desc ?? status.ToString();
@@ -155,9 +157,9 @@ namespace Centaurus
             await sendMessageSemaphore.WaitAsync();
             try
             {
-                Global.ExtensionsManager.BeforeSendMessage(this, envelope);
-                if (!envelope.IsSignedBy(Global.Settings.KeyPair.PublicKey))
-                    envelope.Sign(Global.Settings.KeyPair, outgoingBuffer.Buffer);
+                Context.ExtensionsManager.BeforeSendMessage(this, envelope);
+                if (!envelope.IsSignedBy(Context.Settings.KeyPair.PublicKey))
+                    envelope.Sign(Context.Settings.KeyPair, outgoingBuffer.Buffer);
 
                 logger.Trace($"Connection {ClientKPAccountId}, about to send {envelope.Message.MessageType} message.");
 
@@ -168,7 +170,7 @@ namespace Centaurus
                         throw new ObjectDisposedException(nameof(webSocket));
                     if (webSocket.State == WebSocketState.Open)
                         await webSocket.SendAsync(outgoingBuffer.Buffer.AsMemory(0, writer.Length), WebSocketMessageType.Binary, true, cancellationToken);
-                    Global.ExtensionsManager.AfterSendMessage(this, envelope);
+                    Context.ExtensionsManager.AfterSendMessage(this, envelope);
 
                     logger.Trace($"Connection {ClientKPAccountId}, message {envelope.Message.MessageType} sent. Size: {writer.Length}");
                 }
@@ -178,7 +180,7 @@ namespace Centaurus
                 if (exc is OperationCanceledException
                     || exc is WebSocketException socketException && (socketException.WebSocketErrorCode == WebSocketError.InvalidState))
                     return;
-                Global.ExtensionsManager.SendMessageFailed(this, envelope, exc);
+                Context.ExtensionsManager.SendMessageFailed(this, envelope, exc);
                 throw;
             }
             finally
@@ -228,14 +230,14 @@ namespace Centaurus
                             }
                             catch (BaseClientException exc)
                             {
-                                Global.ExtensionsManager.HandleMessageFailed(this, envelope, exc);
+                                Context.ExtensionsManager.HandleMessageFailed(this, envelope, exc);
 
                                 var statusCode = exc.GetStatusCode();
 
                                 //prevent recursive error sending
                                 if (IsResultRequired && !(envelope == null || envelope.Message is ResultMessage))
                                     _ = Task.Factory.StartNew(async () => await SendMessage(envelope.CreateResult(statusCode))).Unwrap();
-                                if (statusCode == ResultStatusCodes.InternalError || !Global.IsAlpha)
+                                if (statusCode == ResultStatusCodes.InternalError || !Context.IsAlpha)
                                     logger.Error(exc);
                             }
                         }
@@ -245,7 +247,7 @@ namespace Centaurus
             catch (OperationCanceledException) { }
             catch (Exception e)
             {
-                Global.ExtensionsManager.HandleMessageFailed(this, null, e);
+                Context.ExtensionsManager.HandleMessageFailed(this, null, e);
                 var closureStatus = WebSocketCloseStatus.InternalServerError;
                 var desc = default(string);
                 if (e is WebSocketException webSocketException

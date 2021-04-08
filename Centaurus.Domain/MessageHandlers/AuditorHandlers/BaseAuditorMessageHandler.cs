@@ -11,7 +11,7 @@ namespace Centaurus.Domain
         public override async Task Validate(AuditorWebSocketConnection connection, IncomingMessage message)
         {
             //validate that alpha has signed the message
-            if (!message.Envelope.IsSignedBy(((AuditorSettings)Global.Settings).AlphaKeyPair))
+            if (!message.Envelope.IsSignedBy(((AuditorSettings)connection.Context.Settings).AlphaKeyPair))
                 throw new UnauthorizedException();
             await base.Validate(connection, message);
         }

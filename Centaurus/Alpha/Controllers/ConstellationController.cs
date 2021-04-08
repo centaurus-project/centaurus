@@ -11,11 +11,19 @@ namespace Centaurus.Controllers
     [Route("api/[controller]")]
     public class ConstellationController : Controller
     {
+        private CentaurusContext centaurusContext;
+
+        public ConstellationController(CentaurusContext centaurusContext)
+        {
+            this.centaurusContext = centaurusContext;
+        }
+
         [HttpGet("[action]")]
         public ConstellationInfo Info()
         {
             ConstellationInfo info;
-            var state = (int)(Global.AppState?.State ?? 0);
+
+            var state = (int)(centaurusContext.AppState?.State ?? 0);
             if (state < (int)ApplicationState.Running)
                 info = new ConstellationInfo
                 {
@@ -24,20 +32,20 @@ namespace Centaurus.Controllers
             else
             {
                 var network = new ConstellationInfo.Network(
-                    Global.StellarNetwork.Network.NetworkPassphrase,
-                    Global.StellarNetwork.Horizon
+                   centaurusContext.StellarNetwork.Network.NetworkPassphrase,
+                   centaurusContext.StellarNetwork.Horizon
                     );
-                var assets = Global.Constellation.Assets.Select(a => ConstellationInfo.Asset.FromAssetSettings(a)).ToArray();
+                var assets = centaurusContext.Constellation.Assets.Select(a => ConstellationInfo.Asset.FromAssetSettings(a)).ToArray();
                 info = new ConstellationInfo
                 {
-                    State = Global.AppState.State,
-                    Vault = ((KeyPair)Global.Constellation.Vault).AccountId,
-                    Auditors = Global.Constellation.Auditors.Select(a => ((KeyPair)a).AccountId).ToArray(),
-                    MinAccountBalance = Global.Constellation.MinAccountBalance,
-                    MinAllowedLotSize = Global.Constellation.MinAllowedLotSize,
+                    State = centaurusContext.AppState.State,
+                    Vault = ((KeyPair)centaurusContext.Constellation.Vault).AccountId,
+                    Auditors = centaurusContext.Constellation.Auditors.Select(a => ((KeyPair)a).AccountId).ToArray(),
+                    MinAccountBalance = centaurusContext.Constellation.MinAccountBalance,
+                    MinAllowedLotSize = centaurusContext.Constellation.MinAllowedLotSize,
                     StellarNetwork = network,
                     Assets = assets,
-                    RequestRateLimits = Global.Constellation.RequestRateLimits
+                    RequestRateLimits = centaurusContext.Constellation.RequestRateLimits
                 };
             }
 
@@ -68,7 +76,8 @@ namespace Centaurus.Controllers
                         MinAllowedLotSize = constellationInit.MinAllowedLotSize,
                         Assets = constellationInit.Assets.Select(a => AssetSettings.FromCode(a)).ToArray(),
                         RequestRateLimits = requestRateLimits
-                    }
+                    },
+                    centaurusContext
                 );
 
                 await constellationInitializer.Init();

@@ -13,7 +13,7 @@ namespace Centaurus.Domain
 
         public override Task HandleMessage(AuditorWebSocketConnection connection, IncomingMessage message)
         {
-            _ = Global.QuantumHandler.HandleAsync(message.Envelope);
+            _ = connection.Context.QuantumHandler.HandleAsync(message.Envelope);
             return Task.CompletedTask;
         }
     }

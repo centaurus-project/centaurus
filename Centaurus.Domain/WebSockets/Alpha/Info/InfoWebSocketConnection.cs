@@ -17,9 +17,10 @@ namespace Centaurus.Domain
 {
     public class InfoWebSocketConnection : IDisposable
     {
-        public InfoWebSocketConnection(WebSocket webSocket, string connectionId, string ip)
+        public InfoWebSocketConnection(AlphaContext context, WebSocket webSocket, string connectionId, string ip)
         {
-            this.webSocket = webSocket;
+            Context = context ?? throw new ArgumentNullException(nameof(context));
+            this.webSocket = webSocket ?? throw new ArgumentNullException(nameof(webSocket));
             Ip = ip;
             ConnectionId = connectionId;
             cancellationTokenSource = new CancellationTokenSource();
@@ -30,7 +31,6 @@ namespace Centaurus.Domain
         static InfoCommandsHandlers commandHandlers = new InfoCommandsHandlers();
 
         static Logger logger = LogManager.GetCurrentClassLogger();
-
         private readonly WebSocket webSocket;
 
         private CancellationTokenSource cancellationTokenSource;
@@ -38,6 +38,7 @@ namespace Centaurus.Domain
 
         private XdrBufferFactory.RentedBuffer incomingBuffer;
 
+        public AlphaContext Context { get; }
         public string Ip { get; }
         public string ConnectionId { get; }
 
@@ -162,7 +163,7 @@ namespace Centaurus.Domain
                                     Error = (int)statusCode < 500 ? exc.Message : statusCode.ToString()
                                 });
 
-                                if (statusCode == ResultStatusCodes.InternalError || !Global.IsAlpha)
+                                if (statusCode == ResultStatusCodes.InternalError)
                                     logger.Error(exc);
                             }
                         }

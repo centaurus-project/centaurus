@@ -17,6 +17,7 @@ namespace Centaurus.Domain
 
         public override async Task HandleMessage(AuditorWebSocketConnection connection, IncomingMessage message)
         {
+            var quantumHandler = (AuditorQuantumHandler)connection.Context.QuantumHandler;
             var quantaBatch = (QuantaBatch)message.Envelope.Message;
             var quanta = quantaBatch.Quanta;
             var quantaBatchCount = quanta.Count;
@@ -24,16 +25,16 @@ namespace Centaurus.Domain
             {
                 var quantumEnvelope = quanta[i];
                 var quantum = (Quantum)quantumEnvelope.Message;
-                if (quantum.Apex <= Global.QuantumHandler.LastAddedQuantumApex)
+                if (quantum.Apex <= quantumHandler.LastAddedQuantumApex)
                     continue;
 
-                if (quantum.Apex != Global.QuantumHandler.LastAddedQuantumApex + 1)
+                if (quantum.Apex != quantumHandler.LastAddedQuantumApex + 1)
                 {
-                    logger.Warn($"Batch has invalid quantum apexes (current: {Global.QuantumHandler.LastAddedQuantumApex}, received: {quantum.Apex}). New apex cursor request will be send.");
-                    await connection.SendMessage(new SetApexCursor { Apex = Global.QuantumHandler.LastAddedQuantumApex });
+                    logger.Warn($"Batch has invalid quantum apexes (current: {quantumHandler.LastAddedQuantumApex}, received: {quantum.Apex}). New apex cursor request will be send.");
+                    await connection.SendMessage(new SetApexCursor { Apex = quantumHandler.LastAddedQuantumApex });
                     return;
                 }
-                _ = Global.QuantumHandler.HandleAsync(quantumEnvelope);
+                _ = connection.Context.QuantumHandler.HandleAsync(quantumEnvelope);
             }
         }
     }

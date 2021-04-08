@@ -16,17 +16,17 @@ namespace Centaurus.Test
         public void Setup()
         {
             EnvironmentHelper.SetTestEnvironmentVariable();
-            GlobalInitHelper.DefaultAuditorSetup().Wait();
-            MessageHandlers<AuditorWebSocketConnection>.Init();
+            context = GlobalInitHelper.DefaultAuditorSetup().Result;
+            MessageHandlers<AuditorWebSocketConnection>.Init(context);
         }
 
 
         [Test]
         public async Task HandshakeTest()
         {
-            Global.AppState.State = ApplicationState.Running;
+            context.AppState.State = ApplicationState.Running;
 
-            var clientConnection = new AuditorWebSocketConnection(new FakeWebSocket(), null);
+            var clientConnection = new AuditorWebSocketConnection(context, new FakeWebSocket(), null);
 
             var hd = new HandshakeData();
             hd.Randomize();
@@ -46,9 +46,9 @@ namespace Centaurus.Test
         [TestCase(ApplicationState.Ready)]
         public async Task AlphaStateTest(ApplicationState alphaState)
         {
-            Global.AppState.State = ApplicationState.Running;
+            context.AppState.State = ApplicationState.Running;
 
-            var clientConnection = new AuditorWebSocketConnection(new FakeWebSocket(), null);
+            var clientConnection = new AuditorWebSocketConnection(context, new FakeWebSocket(), null);
 
             var envelope = new AlphaState
             {
@@ -74,9 +74,9 @@ namespace Centaurus.Test
         [TestCaseSource(nameof(LedgerQuantumTestCases))]
         public async Task TxCommitQuantumTest(KeyPair alphaKeyPair, ConnectionState state, Type excpectedException)
         {
-            Global.AppState.State = ApplicationState.Ready;
+            context.AppState.State = ApplicationState.Ready;
 
-            var clientConnection = new AuditorWebSocketConnection(new FakeWebSocket(), null) { ConnectionState = state };
+            var clientConnection = new AuditorWebSocketConnection(context, new FakeWebSocket(), null) { ConnectionState = state };
 
             var ledgerNotification = new TxNotification
             {
@@ -106,10 +106,10 @@ namespace Centaurus.Test
         [TestCaseSource(nameof(OrderQuantumTestCases))]
         public async Task OrderQuantumTest(KeyPair clientKeyPair, KeyPair alphaKeyPair, ConnectionState state, Type excpectedException)
         {
-            Global.AppState.State = ApplicationState.Ready;
+            context.AppState.State = ApplicationState.Ready;
 
-            var clientConnection = new AuditorWebSocketConnection(new FakeWebSocket(), null) { ConnectionState = state };
-            var account = Global.AccountStorage.GetAccount(clientKeyPair);
+            var clientConnection = new AuditorWebSocketConnection(context, new FakeWebSocket(), null) { ConnectionState = state };
+            var account = context.AccountStorage.GetAccount(clientKeyPair);
             var orderEnvelope = new OrderRequest
             {
                 Account = account?.Account.Id ?? 0
@@ -135,14 +135,15 @@ namespace Centaurus.Test
             new object[] { TestEnvironment.AlphaKeyPair, ConnectionState.Ready, null },
             new object[] { TestEnvironment.AlphaKeyPair, ConnectionState.Connected, null },
         };
+        private AuditorContext context;
 
         [Test]
         [TestCaseSource(nameof(QuantaBatchTestCases))]
         public async Task QuantaBatchTest(KeyPair alphaKeyPair, ConnectionState state, Type excpectedException)
         {
-            Global.AppState.State = ApplicationState.Ready;
+            context.AppState.State = ApplicationState.Ready;
 
-            var clientConnection = new AuditorWebSocketConnection(new FakeWebSocket(), null) { ConnectionState = state };
+            var clientConnection = new AuditorWebSocketConnection(context, new FakeWebSocket(), null) { ConnectionState = state };
             var orderEnvelope = new QuantaBatch
             {
                 Quanta = new List<MessageEnvelope>()

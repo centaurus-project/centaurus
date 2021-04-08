@@ -57,7 +57,7 @@ namespace Centaurus.Domain
         /// Generates context for the processor.
         /// </summary>
         /// <param name="context">Request context</param>
-        public object GetContext(EffectProcessorsContainer container);
+        public ProcessorContext GetContext(EffectProcessorsContainer container);
 
         /// <summary>
         /// Creates message notifications for accounts that were affected by quantum

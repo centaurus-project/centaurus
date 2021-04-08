@@ -28,8 +28,8 @@ namespace Centaurus.Domain
 
             if (context.DestinationAccount == null)
             {
-                var accId = Global.AccountStorage.GetNextAccountId();
-                context.EffectProcessors.AddAccountCreate(Global.AccountStorage, accId, payment.Destination);
+                var accId = context.CentaurusContext.AccountStorage.GetNextAccountId();
+                context.EffectProcessors.AddAccountCreate(context.CentaurusContext.AccountStorage, accId, payment.Destination);
             }
 
             if (!context.DestinationAccount.Account.HasBalance(payment.Asset))
@@ -58,8 +58,8 @@ namespace Centaurus.Domain
             {
                 if (payment.Asset != 0)
                     throw new BadRequestException("Account excepts only XLM asset.");
-                if (payment.Amount < Global.Constellation.MinAccountBalance)
-                    throw new BadRequestException($"Min payment amount is {Amount.FromXdr(Global.Constellation.MinAccountBalance)} XLM for this account.");
+                if (payment.Amount < context.CentaurusContext.Constellation.MinAccountBalance)
+                    throw new BadRequestException($"Min payment amount is {Amount.FromXdr(context.CentaurusContext.Constellation.MinAccountBalance)} XLM for this account.");
             }
 
             if (payment.Destination.Equals(payment.AccountWrapper.Account.Pubkey))
@@ -68,7 +68,7 @@ namespace Centaurus.Domain
             if (payment.Amount <= 0)
                 throw new BadRequestException("Amount should be greater than 0");
 
-            if (!Global.AssetIds.Contains(payment.Asset))
+            if (!context.CentaurusContext.AssetIds.Contains(payment.Asset))
                 throw new BadRequestException($"Asset {payment.Asset} is not supported");
 
             var balance = payment.AccountWrapper.Account.Balances.Find(b => b.Asset == payment.Asset);

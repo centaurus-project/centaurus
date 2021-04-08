@@ -12,8 +12,9 @@ namespace Centaurus.Domain
 {
     public abstract class MajorityManager : IDisposable
     {
-        public MajorityManager()
+        public MajorityManager(CentaurusContext context)
         {
+            Context = context ?? throw new ArgumentNullException(nameof(context));
             InitCleanupTimer();
         }
 
@@ -25,6 +26,7 @@ namespace Centaurus.Domain
             //add the signature to the aggregate
             aggregate.Add(message);
         }
+        public CentaurusContext Context { get; }
 
         public virtual void Dispose()
         {
@@ -105,7 +107,7 @@ namespace Centaurus.Domain
             {
                 var exc = new Exception("Majority is unreachable. The constellation collapsed.");
                 logger.Error(exc);
-                Global.AppState.State = ApplicationState.Failed;
+                Context.AppState.State = ApplicationState.Failed;
                 throw exc;
             }
         }
@@ -151,7 +153,7 @@ namespace Centaurus.Domain
 
                     if (IsProcessed)
                     {
-                        if (resultStorageEnvelope.Signatures.Count == ((AlphaStateManager)Global.AppState).ConnectedAuditorsCount) //remove if all auditors sent results
+                        if (resultStorageEnvelope.Signatures.Count == ((AlphaStateManager)majorityManager.Context.AppState).ConnectedAuditorsCount) //remove if all auditors sent results
                         {
                             majorityManager?.Remove(Id);
                         }
@@ -170,8 +172,8 @@ namespace Centaurus.Domain
             private MajorityResults CheckMajority(out MessageEnvelope consensus)
             {
                 //TODO: remove the item from storage once the majority succeeded of failed.
-                int requiredMajority = MajorityHelper.GetMajorityCount(),
-                    maxVotes = MajorityHelper.GetTotalAuditorsCount(),
+                int requiredMajority = majorityManager.Context.GetMajorityCount(),
+                    maxVotes = majorityManager.Context.GetTotalAuditorsCount(),
                     maxConsensus = 0,
                     totalOpposition = 0;
                 //try to find the majority

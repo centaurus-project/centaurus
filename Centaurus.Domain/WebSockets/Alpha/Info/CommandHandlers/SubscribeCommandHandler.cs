@@ -15,7 +15,7 @@ namespace Centaurus.Domain.WebSockets.Alpha.Info.CommandHandlers
             foreach (var subsName in command.Subscriptions)
             {
 
-                infoWebSocket.AddSubscription(SubscriptionsManager.GetOrAddSubscription(BaseSubscription.GetBySubscriptionName(subsName)));
+                infoWebSocket.AddSubscription(infoWebSocket.Context.SubscriptionsManager.GetOrAddSubscription(BaseSubscription.GetBySubscriptionName(subsName)));
             }
             return Task.FromResult((BaseResponse)new SuccesResponse());
         }

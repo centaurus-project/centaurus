@@ -10,12 +10,14 @@ namespace Centaurus.Domain
 {
     public class EffectProcessorsContainer
     {
-
-        public EffectProcessorsContainer(MessageEnvelope quantum, DiffObject pendingDiffObject)
+        public EffectProcessorsContainer(CentaurusContext context, MessageEnvelope quantum, DiffObject pendingDiffObject)
         {
+            Context = context ?? throw new ArgumentNullException(nameof(context));
             Envelope = quantum ?? throw new ArgumentNullException(nameof(quantum));
             PendingDiffObject = pendingDiffObject ?? throw new ArgumentNullException(nameof(pendingDiffObject));
         }
+
+        public CentaurusContext Context { get; }
 
         public MessageEnvelope Envelope { get; }
 

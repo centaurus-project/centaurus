@@ -14,7 +14,7 @@ using System.Threading.Tasks;
 
 namespace Centaurus
 {
-    public class AuditorStartup : IStartup<AuditorSettings>
+    public class AuditorStartup : StartupBase
     {
         private AuditorWebSocketConnection auditor;
 
@@ -23,25 +23,30 @@ namespace Centaurus
         private Logger logger = LogManager.GetCurrentClassLogger();
         private ManualResetEvent resetEvent;
 
-        public async Task Run(AuditorSettings settings, ManualResetEvent resetEvent)
+        public AuditorStartup(AuditorContext context)
+            :base(context)
+        {
+
+        }
+
+        public override async Task Run(ManualResetEvent resetEvent)
         {
             try
             {
                 this.resetEvent = resetEvent;
 
-                await Global.Setup(settings, new MongoStorage());
+                await Context.Init();
+                Context.AppState.StateChanged += StateChanged;
 
-                Global.AppState.StateChanged += StateChanged;
-
-                MessageHandlers<AuditorWebSocketConnection>.Init();
+                MessageHandlers<AuditorWebSocketConnection>.Init(Context);
 
                 _ = InternalRun();
             }
             catch (Exception exc)
             {
                 logger.Error(exc);
-                if (Global.AppState != null)
-                    Global.AppState.State = ApplicationState.Failed;
+                if (Context.AppState != null)
+                    Context.AppState.State = ApplicationState.Failed;
                 resetEvent.Set();
             }
         }
@@ -52,7 +57,7 @@ namespace Centaurus
             {
                 while (!isAborted)
                 {
-                    var _auditor = new AuditorWebSocketConnection(new ClientWebSocket(), null);
+                    var _auditor = new AuditorWebSocketConnection((AuditorContext)Context, new ClientWebSocket(), null);
                     try
                     {
                         Subscribe(_auditor);
@@ -75,7 +80,7 @@ namespace Centaurus
             catch (Exception exc)
             {
                 logger.Error(exc, "Auditor startup error.");
-                Global.AppState.State = ApplicationState.Failed;
+                Context.AppState.State = ApplicationState.Failed;
             }
         }
 
@@ -89,12 +94,12 @@ namespace Centaurus
             }
         }
 
-        public async Task Shutdown()
+        public override async Task Shutdown()
         {
             isAborted = true;
             Unsubscribe(auditor);
             await CloseConnection(auditor);
-            await Global.TearDown();
+            await Context.TearDown();
         }
 
         private void Subscribe(AuditorWebSocketConnection _auditor)
@@ -138,13 +143,13 @@ namespace Centaurus
 
         private void Ready(BaseWebSocketConnection e)
         {
-            if (Global.AppState.State != ApplicationState.WaitingForInit)
-                Global.AppState.State = ApplicationState.Ready;
+            if (Context.AppState.State != ApplicationState.WaitingForInit)
+                Context.AppState.State = ApplicationState.Ready;
         }
 
         private async void Close(BaseWebSocketConnection e)
         {
-            Global.AppState.State = ApplicationState.Running;
+            Context.AppState.State = ApplicationState.Running;
             Unsubscribe(auditor);
             await CloseConnection(auditor);
             auditor.Dispose();

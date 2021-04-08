@@ -16,11 +16,13 @@ namespace Centaurus.Domain
         where T : BaseWebSocketConnection
     {
         static ImmutableDictionary<MessageTypes, BaseMessageHandler<T>> handlers;
+        static CentaurusContext context;
 
-        public static void Init()
+        public static void Init(CentaurusContext context)
         {
+            MessageHandlers<T>.context = context ?? throw new ArgumentNullException(nameof(context));
             var currentServerHandlerType = typeof(IAuditorMessageHandler);
-            if (Global.IsAlpha)
+            if (context.IsAlpha)
                 currentServerHandlerType = typeof(IAlphaMessageHandler);
 
             var discoveredRequestProcessors = Assembly.GetExecutingAssembly()
@@ -48,12 +50,12 @@ namespace Centaurus.Domain
             if (!handlers.TryGetValue(message.Envelope.Message.MessageType, out var handler))
                 return false;
 
-            Global.ExtensionsManager.BeforeValidateMessage(connetction, message.Envelope);
+            context.ExtensionsManager.BeforeValidateMessage(connetction, message.Envelope);
             await handler.Validate(connetction, message);
-            Global.ExtensionsManager.AfterValidateMessage(connetction, message.Envelope);
-            Global.ExtensionsManager.BeforeHandleMessage(connetction, message.Envelope);
+            context.ExtensionsManager.AfterValidateMessage(connetction, message.Envelope);
+            context.ExtensionsManager.BeforeHandleMessage(connetction, message.Envelope);
             await handler.HandleMessage(connetction, message);
-            Global.ExtensionsManager.AfterHandleMessage(connetction, message.Envelope);
+            context.ExtensionsManager.AfterHandleMessage(connetction, message.Envelope);
             return true;
         }
     }

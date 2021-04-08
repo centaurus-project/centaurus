@@ -11,23 +11,23 @@ using System.Threading.Tasks;
 namespace Centaurus.Domain
 {
 
-    public static class OutgoingMessageStorage
+    public class OutgoingMessageStorage
     {
-        private readonly static Queue<MessageEnvelope> outgoingMessages = new Queue<MessageEnvelope>();
+        private readonly Queue<MessageEnvelope> outgoingMessages = new Queue<MessageEnvelope>();
 
-        public static void OnTransaction(TxNotification tx)
+        public void OnTransaction(TxNotification tx)
         {
             EnqueueMessage(tx);
         }
 
-        public static void EnqueueMessage(Message message)
+        public void EnqueueMessage(Message message)
         {
             if (message == null)
                 throw new ArgumentNullException(nameof(message));
             EnqueueMessage(message.CreateEnvelope());
         }
 
-        public static void EnqueueMessage(MessageEnvelope message)
+        public void EnqueueMessage(MessageEnvelope message)
         {
             if (message == null)
                 throw new ArgumentNullException(nameof(message));
@@ -35,33 +35,35 @@ namespace Centaurus.Domain
                 outgoingMessages.Enqueue(message);
         }
 
-        public static bool TryPeek(out MessageEnvelope message)
+        public bool TryPeek(out MessageEnvelope message)
         {
             lock (outgoingMessages)
                 return outgoingMessages.TryPeek(out message);
         }
 
-        public static bool TryDequeue(out MessageEnvelope message)
+        public bool TryDequeue(out MessageEnvelope message)
         {
             lock (outgoingMessages)
                 return outgoingMessages.TryDequeue(out message);
         }
     }
 
-    public static class OutgoingResultsStorage
+    public class OutgoingResultsStorage
     {
         const int MaxMessageBatchSize = 50;
 
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        private readonly static List<AuditorResultMessage> results = new List<AuditorResultMessage>();
+        readonly static List<AuditorResultMessage> results = new List<AuditorResultMessage>();
+        private readonly AuditorContext context;
 
-        static OutgoingResultsStorage()
+        public OutgoingResultsStorage(AuditorContext context)
         {
+            this.context = context;
             _ = Task.Factory.StartNew(RunWorker);
         }
 
-        private static void RunWorker()
+        private void RunWorker()
         {
             while (true)
             {
@@ -79,7 +81,7 @@ namespace Centaurus.Domain
                     }
                     if (resultsBatch != default)
                     {
-                        OutgoingMessageStorage.EnqueueMessage(new AuditorResultsBatch { AuditorResultMessages = resultsBatch });
+                        context.OutgoingMessageStorage.EnqueueMessage(new AuditorResultsBatch { AuditorResultMessages = resultsBatch });
                         continue;
                     }
                     Thread.Sleep(50);
@@ -96,7 +98,7 @@ namespace Centaurus.Domain
         /// </summary>
         /// <param name="result"></param>
         /// <param name="buffer">Buffer to use for serialization</param>
-        public static void EnqueueResult(ResultMessage result, byte[] buffer)
+        public void EnqueueResult(ResultMessage result, byte[] buffer)
         {
             if (result == null)
                 throw new ArgumentNullException(nameof(result));
@@ -114,7 +116,7 @@ namespace Centaurus.Domain
             }
 
             var resultEnvelope = result.CreateEnvelope();
-            resultEnvelope.Sign(Global.Settings.KeyPair, buffer);
+            resultEnvelope.Sign(context.Settings.KeyPair, buffer);
             signature = resultEnvelope.Signatures[0].Signature;
 
             lock (results)

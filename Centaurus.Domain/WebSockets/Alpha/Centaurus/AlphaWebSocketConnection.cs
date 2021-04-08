@@ -16,8 +16,8 @@ namespace Centaurus
 
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public AlphaWebSocketConnection(WebSocket webSocket, string ip)
-            : base(webSocket, ip, 1024, 64 * 1024)
+        public AlphaWebSocketConnection(AlphaContext context, WebSocket webSocket, string ip)
+            : base(context, webSocket, ip, 1024, 64 * 1024)
         {
 
             var hd = new HandshakeData();
@@ -25,6 +25,8 @@ namespace Centaurus
             HandshakeData = hd;
             _ = SendMessage(new HandshakeInit { HandshakeData = hd });
         }
+
+        public AlphaContext AlphaContext => (AlphaContext)Context;
 
         public HandshakeData HandshakeData { get; }
 
@@ -52,7 +54,7 @@ namespace Centaurus
                 QuantumWorker?.Dispose();
 
                 //set new apex cursor, and start quantum worker
-                QuantumWorker = new QuantumSyncWorker(newApexCursor, this);
+                QuantumWorker = new QuantumSyncWorker((AlphaContext)Context, newApexCursor, this);
                 logger.Trace($"Connection {ClientKPAccountId}, apex cursor reseted. New apex cursor {newApexCursor}");
             }
         }

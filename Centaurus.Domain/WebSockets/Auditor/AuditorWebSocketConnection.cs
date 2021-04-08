@@ -19,16 +19,18 @@ namespace Centaurus.Domain
 
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public AuditorWebSocketConnection(WebSocket webSocket, string ip)
-            : base(webSocket, ip, AlphaWebSocketConnection.AuditorBufferSize, AlphaWebSocketConnection.AuditorBufferSize)
+        public AuditorWebSocketConnection(AuditorContext context, WebSocket webSocket, string ip)
+            : base(context, webSocket, ip, AlphaWebSocketConnection.AuditorBufferSize, AlphaWebSocketConnection.AuditorBufferSize)
         {
         }
 
         protected ClientWebSocket clientWebSocket => webSocket as ClientWebSocket;
 
+        private AuditorContext AuditorContext => (AuditorContext)Context;
+
         public async Task EstablishConnection()
         {
-            await clientWebSocket.ConnectAsync(new Uri(((AuditorSettings)Global.Settings).AlphaAddress), cancellationToken);
+            await clientWebSocket.ConnectAsync(new Uri(((AuditorSettings)Context.Settings).AlphaAddress), cancellationToken);
             _ = Listen();
             _ = ProcessOutgoingMessageQueue();
         }
@@ -53,13 +55,13 @@ namespace Centaurus.Domain
                     {
                         if (ConnectionState == ConnectionState.Ready
                             && !cancellationToken.IsCancellationRequested
-                            && OutgoingMessageStorage.TryPeek(out MessageEnvelope message)
+                            && AuditorContext.OutgoingMessageStorage.TryPeek(out MessageEnvelope message)
                             )
                         {
                             try
                             {
                                 await base.SendMessage(message);
-                                if (!OutgoingMessageStorage.TryDequeue(out message))
+                                if (!AuditorContext.OutgoingMessageStorage.TryDequeue(out message))
                                 {
                                     logger.Error("Unable to dequeue");
                                 }

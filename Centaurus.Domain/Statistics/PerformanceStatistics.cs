@@ -12,12 +12,13 @@ namespace Centaurus.Domain
 
         public List<BatchSavedInfo> BatchInfos { get; set; }
 
+        public int Throttling { get; set; }
+
         public DateTime UpdateDate { get; set; }
     }
 
     public class AlphaPerformanceStatistics : PerformanceStatistics
     {
-        public int Throttling { get; set; }
 
         public List<AuditorPerformanceStatistics> AuditorStatistics { get; set; }
 

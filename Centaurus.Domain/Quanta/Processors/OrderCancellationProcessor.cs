@@ -23,7 +23,7 @@ namespace Centaurus.Domain
 
             context.UpdateNonce();
 
-            Global.Exchange.RemoveOrder(context.EffectProcessors, context.Orderbook, context.Order);
+            context.CentaurusContext.Exchange.RemoveOrder(context.EffectProcessors, context.Orderbook, context.Order);
 
             var resultMessage = context.Envelope.CreateResult(ResultStatusCodes.Success, context.EffectProcessors.Effects);
             return Task.FromResult(resultMessage);
@@ -38,10 +38,10 @@ namespace Centaurus.Domain
             var orderRequest = (OrderCancellationRequest)quantum.RequestMessage;
 
             var orderData = OrderIdConverter.Decode(orderRequest.OrderId);
-            if (!Global.Exchange.HasMarket(orderData.Asset))
+            if (!context.CentaurusContext.Exchange.HasMarket(orderData.Asset))
                 throw new BadRequestException("Asset is not supported.");
 
-            context.Orderbook = Global.Exchange.GetOrderbook(orderData.Asset, orderData.Side);
+            context.Orderbook = context.CentaurusContext.Exchange.GetOrderbook(orderData.Asset, orderData.Side);
 
             context.Order = context.Orderbook.GetOrder(orderRequest.OrderId);
 

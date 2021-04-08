@@ -25,7 +25,7 @@ namespace Centaurus.Domain
 
             connection.ConnectionState = ConnectionState.Ready;
             //send apex cursor message to start receive quanta
-            _ = connection.SendMessage(new SetApexCursor() { Apex = Global.QuantumStorage.CurrentApex });
+            _ = connection.SendMessage(new SetApexCursor() { Apex = connection.Context.QuantumStorage.CurrentApex });
 
             return Task.CompletedTask;
         }

@@ -7,12 +7,14 @@ namespace Centaurus.Domain
 {
     public static class AlphaStateHelper
     {
-        public static AlphaState GetCurrentState()
+        public static AlphaState GetCurrentState(this CentaurusContext context)
         {
+            if (context == null)
+                throw new ArgumentNullException(nameof(context));
             return new AlphaState
             {
-                State = Global.AppState.State,
-                TxCursor = Global.TxCursorManager.TxCursor
+                State = context.AppState.State,
+                TxCursor = context.TxCursorManager.TxCursor
             };
         }
     }

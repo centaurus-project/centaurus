@@ -18,7 +18,8 @@ namespace Centaurus.Domain
         {
             var auditor = connection.ClientKPAccountId;
             var statistics = (AuditorPerfStatistics)message.Envelope.Message;
-            _ = Task.Factory.StartNew(() => Global.PerformanceStatisticsManager.AddAuditorStatistics(auditor, statistics));
+            var alphaPerfManager = (AlphaPerformanceStatisticsManager)connection.Context.PerformanceStatisticsManager;
+            _ = Task.Factory.StartNew(() => alphaPerfManager.AddAuditorStatistics(auditor, statistics));
             return Task.CompletedTask;
         }
     }

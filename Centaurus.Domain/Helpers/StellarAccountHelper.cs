@@ -9,11 +9,11 @@ namespace Centaurus.Domain
 {
     public static class StellarAccountHelper
     {
-        public static async Task<AccountResponse> GetStellarAccount(this KeyPair keyPair)
+        public static async Task<AccountResponse> GetStellarAccount(this KeyPair keyPair, StellarNetwork stellarNetwork)
         {
             if (keyPair == null)
                 throw new ArgumentNullException(nameof(keyPair));
-            return await Global.StellarNetwork.Server.Accounts.Account(keyPair.AccountId);
+            return await stellarNetwork.Server.Accounts.Account(keyPair.AccountId);
         }
     }
 }

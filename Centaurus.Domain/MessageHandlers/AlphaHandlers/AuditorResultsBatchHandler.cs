@@ -20,7 +20,7 @@ namespace Centaurus.Domain.MessageHandlers.AlphaHandlers
         {
             var resultsBatch = (AuditorResultsBatch)message.Envelope.Message;
             foreach (var result in resultsBatch.AuditorResultMessages)
-                Global.AuditResultManager.Add(result, connection.ClientPubKey);
+                connection.AlphaContext.AuditResultManager.Add(result, connection.ClientPubKey);
             return Task.CompletedTask;
         }
     }

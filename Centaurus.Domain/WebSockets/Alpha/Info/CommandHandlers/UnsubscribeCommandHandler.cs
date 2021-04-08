@@ -16,7 +16,7 @@ namespace Centaurus.Domain
 
             foreach (var subs in command.Subscriptions)
             {
-                var subscription = SubscriptionsManager.GetOrAddSubscription(BaseSubscription.GetBySubscriptionName(subs));
+                var subscription = infoWebSocket.Context.SubscriptionsManager.GetOrAddSubscription(BaseSubscription.GetBySubscriptionName(subs));
                 infoWebSocket.RemoveSubsctioption(subscription);
             }
             return Task.FromResult((BaseResponse)new SuccesResponse { RequestId = command.RequestId });

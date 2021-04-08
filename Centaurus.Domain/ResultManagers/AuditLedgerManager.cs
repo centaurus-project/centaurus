@@ -10,9 +10,10 @@ namespace Centaurus.Domain
 {
     public class AuditLedgerManager : MajorityManager
     {
-        public AuditLedgerManager()
+        public AuditLedgerManager(AlphaContext context)
+            :base(context)
         {
-            alphaListener = (AlphaTxListener)Global.TxListener;
+            alphaListener = (AlphaTxListener)context.TxListener;
             alphaListener.OnNewCursor += AlphaListener_OnNewCursor;
         }
 
@@ -31,7 +32,7 @@ namespace Centaurus.Domain
             if (majorityResult != MajorityResults.Success)
             {
                 logger.Error($"Tx result received ({majorityResult}).");
-                Global.AppState.State = ApplicationState.Failed;
+                Context.AppState.State = ApplicationState.Failed;
             }
 
             var nextCursor = alphaListener.PeekCursor();
@@ -66,7 +67,7 @@ namespace Centaurus.Domain
                     {
                         alphaListener.DequeueCursor();
                         var ledgerCommitEnvelope = txCommit.CreateEnvelope();
-                        await Global.QuantumHandler.HandleAsync(ledgerCommitEnvelope);
+                        await Context.QuantumHandler.HandleAsync(ledgerCommitEnvelope);
                     }
                     else
                         break;
@@ -75,7 +76,7 @@ namespace Centaurus.Domain
             catch (Exception exc)
             {
                 logger.Error(exc, "Error on tx commit processing.");
-                Global.AppState.State = ApplicationState.Failed;
+                Context.AppState.State = ApplicationState.Failed;
             }
             finally
             {

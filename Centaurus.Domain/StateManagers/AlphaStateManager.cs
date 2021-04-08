@@ -9,9 +9,14 @@ namespace Centaurus.Domain
 {
     public class AlphaStateManager : StateManager
     {
+        public AlphaStateManager(CentaurusContext context)
+            : base(context)
+        {
+        }
+
         private Dictionary<RawPubKey, ConnectionState> ConnectedAuditors = new Dictionary<RawPubKey, ConnectionState>();
 
-        public bool HasMajority => ConnectedAuditors.Count(a => a.Value == ConnectionState.Ready) >= MajorityHelper.GetMajorityCount();
+        public bool HasMajority => ConnectedAuditors.Count(a => a.Value == ConnectionState.Ready) >= context.GetMajorityCount();
 
         public int ConnectedAuditorsCount => ConnectedAuditors.Count;
 

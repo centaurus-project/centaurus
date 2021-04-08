@@ -21,8 +21,14 @@ namespace Centaurus.Domain
 
     public abstract class StateManager
     {
+        public StateManager(CentaurusContext context)
+        {
+            this.context = context;
+        }
 
         private ApplicationState state;
+        protected readonly CentaurusContext context;
+
         public virtual ApplicationState State
         {
             get

@@ -22,7 +22,7 @@ namespace Centaurus.Test.Client
         {
             //we don't need to create and sign heartbeat message on every sending
             hearbeatMessage = new Heartbeat().CreateEnvelope();
-            hearbeatMessage.Sign(Global.Settings.KeyPair);
+            hearbeatMessage.Sign(CentaurusContext.Current.Settings.KeyPair);
 #if !DEBUG
             InitTimer();
 #endif
@@ -50,7 +50,7 @@ namespace Centaurus.Test.Client
 
         public virtual async Task EstablishConnection()
         {
-            await (webSocket as ClientWebSocket).ConnectAsync(new Uri(((AuditorSettings)Global.Settings).AlphaAddress), CancellationToken.None);
+            await (webSocket as ClientWebSocket).ConnectAsync(new Uri(((AuditorSettings)CentaurusContext.Current.Settings).AlphaAddress), CancellationToken.None);
             _ = Listen();
         }
 
@@ -105,7 +105,7 @@ namespace Centaurus.Test.Client
                     Asset = 1,
                     Amount = amount,
                     Nonce = DateTime.Now.Ticks,
-                    Account = new RawPubKey() { Data = Global.Settings.KeyPair.PublicKey },
+                    Account = new RawPubKey() { Data = CentaurusContext.Current.Settings.KeyPair.PublicKey },
                     Price = price,
                     Side = (OrderSide)side
                 };

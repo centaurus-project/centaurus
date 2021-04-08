@@ -23,5 +23,7 @@ namespace Centaurus.Domain
         public MessageEnvelope Envelope => EffectProcessors.Envelope;
 
         public EffectProcessorsContainer EffectProcessors { get; }
+
+        public CentaurusContext CentaurusContext => EffectProcessors.Context;
     }
 }

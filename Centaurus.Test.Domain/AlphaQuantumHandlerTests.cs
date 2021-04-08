@@ -9,13 +9,13 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Test
 {
-    public class AlphaQuantumHandlerTests: BaseQuantumHandlerTests
+    public class AlphaQuantumHandlerTests : BaseQuantumHandlerTests
     {
         [SetUp]
         public void Setup()
         {
             EnvironmentHelper.SetTestEnvironmentVariable();
-            GlobalInitHelper.DefaultAlphaSetup().Wait();
+            context = GlobalInitHelper.DefaultAlphaSetup().Result;
         }
 
         static object[] AccountRequestRateLimitsCases =

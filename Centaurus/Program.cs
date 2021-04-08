@@ -36,10 +36,10 @@ namespace Centaurus
                 LogConfigureHelper.Configure(logsDirectory, settings.Silent, settings.Verbose);
                 isLoggerInited = true;
 
-                var startup = isAlpha ? (IStartup<T>)new AlphaStartup() : (IStartup<T>)new AuditorStartup();
+                var startup = StartupBase.GetStartup(settings);
 
                 var resetEvent = new ManualResetEvent(false);
-                startup.Run(settings, resetEvent);
+                startup.Run(resetEvent);
 
                 if (!isAlpha)
                     logger.Info("Auditor is started");

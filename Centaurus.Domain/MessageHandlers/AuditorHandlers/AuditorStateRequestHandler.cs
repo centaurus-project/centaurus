@@ -21,11 +21,11 @@ namespace Centaurus.Domain
             var quantaPerMessage = 50;
             while (hasQuanta)
             {
-                var currentBatch = await Global.PersistenceManager.GetQuantaAboveApex(aboveApex, 50);
+                var currentBatch = await connection.Context.PersistenceManager.GetQuantaAboveApex(aboveApex, 50);
                 hasQuanta = currentBatch.Count == quantaPerMessage;
                 var state = new AuditorState
                 {
-                    State = Global.AppState.State,
+                    State = connection.Context.AppState.State,
                     PendingQuanta = currentBatch,
                     HasMorePendingQuanta = hasQuanta
                 };

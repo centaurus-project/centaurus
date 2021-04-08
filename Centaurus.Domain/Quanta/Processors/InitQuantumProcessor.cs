@@ -21,14 +21,14 @@ namespace Centaurus.Domain
                 (ConstellationInitEffect)context.EffectProcessors.Effects[0],
                 context.Envelope.ComputeMessageHash()
             );
-            await Global.Setup(initSnapshot);
+            await context.CentaurusContext.Setup(initSnapshot);
 
-            Global.AppState.State = ApplicationState.Running;
-            if (!Global.IsAlpha) //set auditor to Ready state after init
+            context.CentaurusContext.AppState.State = ApplicationState.Running;
+            if (!context.CentaurusContext.IsAlpha) //set auditor to Ready state after init
             {
                 //send new apex cursor message to notify Alpha that the auditor was initialized
-                OutgoingMessageStorage.EnqueueMessage(new SetApexCursor { Apex = 1 });
-                Global.AppState.State = ApplicationState.Ready;
+                ((AuditorContext)context.CentaurusContext).OutgoingMessageStorage.EnqueueMessage(new SetApexCursor { Apex = 1 });
+                context.CentaurusContext.AppState.State = ApplicationState.Ready;
             }
 
             return context.Envelope.CreateResult(ResultStatusCodes.Success, context.EffectProcessors.Effects);
@@ -36,10 +36,10 @@ namespace Centaurus.Domain
 
         public override Task Validate(ProcessorContext context)
         {
-            if (Global.AppState.State != ApplicationState.WaitingForInit)
+            if (context.CentaurusContext.AppState.State != ApplicationState.WaitingForInit)
                 throw new InvalidOperationException("Init quantum can be handled only when application is in WaitingForInit state.");
 
-            if (!Global.IsAlpha && !context.Envelope.IsSignedBy(((AuditorSettings)Global.Settings).AlphaKeyPair.PublicKey))
+            if (!context.CentaurusContext.IsAlpha && !context.Envelope.IsSignedBy(((AuditorSettings)context.CentaurusContext.Settings).AlphaKeyPair.PublicKey))
                 throw new InvalidOperationException("The quantum isn't signed by Alpha.");
 
             if (!context.Envelope.AreSignaturesValid())

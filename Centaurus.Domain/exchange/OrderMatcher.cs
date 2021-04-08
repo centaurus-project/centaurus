@@ -23,7 +23,7 @@ namespace Centaurus.Domain
             asset = orderData.Asset;
             side = orderData.Side;
             //get asset orderbook
-            market = Global.Exchange.GetMarket(asset);
+            market = effectsContainer.Context.Exchange.GetMarket(asset);
             orderbook = market.GetOrderbook(side.Inverse());
             //fetch balances
             if (!takerOrder.AccountWrapper.Account.HasBalance(asset))

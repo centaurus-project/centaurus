@@ -28,7 +28,7 @@ namespace Centaurus.Domain
 
         public abstract T GetContext(EffectProcessorsContainer container);
 
-        object IQuantumRequestProcessor.GetContext(EffectProcessorsContainer container) => GetContext(container);
+        ProcessorContext IQuantumRequestProcessor.GetContext(EffectProcessorsContainer container) => GetContext(container);
 
         public Dictionary<int, Message> GetNotificationMessages(T context)
         {

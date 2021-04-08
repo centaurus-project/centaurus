@@ -27,7 +27,7 @@ namespace Centaurus.Domain
                 && (connection.ClientPubKey == null || !message.Envelope.Signatures.Any(s => s.Signer != connection.ClientPubKey)))
                 throw new UnauthorizedException();
 
-            if (IsAuditorOnly && !Global.Constellation.Auditors.Contains(connection.ClientPubKey))
+            if (IsAuditorOnly && !connection.Context.Constellation.Auditors.Contains(connection.ClientPubKey))
                 throw new UnauthorizedException();
 
             if (connection.Account != null && !connection.Account.RequestCounter.IncRequestCount(DateTime.UtcNow.Ticks, out string error))

@@ -16,8 +16,9 @@ namespace Centaurus.Domain
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public TxListenerBase(long txCursor)
+        public TxListenerBase(CentaurusContext context, long txCursor)
         {
+            this.context = context;
             _ = ListenTransactions(txCursor);
             _ = Task.Factory.StartNew(() =>
             {
@@ -35,7 +36,7 @@ namespace Centaurus.Domain
             {
                 try
                 {
-                    listener = Global.StellarNetwork.Server.GetTransactionsRequestBuilder(Global.Constellation.Vault.ToString(), cursor)
+                    listener = context.StellarNetwork.Server.GetTransactionsRequestBuilder(context.Constellation.Vault.ToString(), cursor)
                         .Stream((_, tx) =>
                         {
                             awaitedTransactions.Add(tx);
@@ -58,13 +59,13 @@ namespace Centaurus.Domain
                             e = exc.GetBaseException();
                         logger.Error(e, "Failed to start transaction listener.");
 
-                        Global.AppState.State = ApplicationState.Failed;
+                        context.AppState.State = ApplicationState.Failed;
                         throw;
                     }
                     //TODO: discuss if we should wait
                     await Task.Delay(new TimeSpan(0, 1, 0));
                     //continue from last known cursor
-                    cursor = Global.TxCursorManager.TxCursor;
+                    cursor = context.TxCursorManager.TxCursor;
                 }
             }
         }
@@ -72,6 +73,7 @@ namespace Centaurus.Domain
         protected IEventSource listener;
 
         protected BlockingCollection<TransactionResponse> awaitedTransactions = new BlockingCollection<TransactionResponse>();
+        protected readonly CentaurusContext context;
 
         public void Dispose()
         {
@@ -87,10 +89,12 @@ namespace Centaurus.Domain
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public AuditorTxListener(long cursor)
-            : base(cursor)
+        public AuditorTxListener(CentaurusContext context, long cursor)
+            : base(context, cursor)
         {
         }
+
+        private AuditorContext AuditorContext => (AuditorContext)context;
 
         private List<PaymentBase> AddVaultPayments(Transaction transaction, bool isSuccess)
         {
@@ -100,7 +104,7 @@ namespace Centaurus.Domain
             for (var i = 0; i < transaction.Operations.Length; i++)
             {
                 var source = transaction.Operations[i].SourceAccount?.SigningKey ?? transaction.SourceAccount.SigningKey;
-                if (PaymentsHelper.FromOperationResponse(transaction.Operations[i].ToOperationBody(), source, res, txHash, out PaymentBase payment))
+                if (context.TryGetPayment(transaction.Operations[i].ToOperationBody(), source, res, txHash, out PaymentBase payment))
                 {
                     //withdrawals are grouped by tx hash. If one withdrawal item already in list, then we can skip this one
                     if (ledgerPayments.Any(p => p is Withdrawal))
@@ -115,7 +119,7 @@ namespace Centaurus.Domain
         {
             try
             {
-                if (Global.AppState.State == ApplicationState.Failed)
+                if (context.AppState.State == ApplicationState.Failed)
                 {
                     listener.Shutdown();
                     return;
@@ -129,9 +133,9 @@ namespace Centaurus.Domain
                     Payments = payments
                 };
 
-                logger.Trace($"Tx with hash {tx.Hash} is handled. Number of payments for account {Global.Constellation.Vault} is {payment.Payments.Count}.");
+                logger.Trace($"Tx with hash {tx.Hash} is handled. Number of payments for account {context.Constellation.Vault} is {payment.Payments.Count}.");
 
-                OutgoingMessageStorage.OnTransaction(payment);
+                AuditorContext.OutgoingMessageStorage.OnTransaction(payment);
             }
             catch (Exception exc)
             {
@@ -141,7 +145,7 @@ namespace Centaurus.Domain
                 logger.Error(e, "Transaction listener failed.");
 
                 //if worker is broken, the auditor should quit consensus
-                Global.AppState.State = ApplicationState.Failed;
+                context.AppState.State = ApplicationState.Failed;
 
                 listener?.Shutdown();
 
@@ -155,8 +159,8 @@ namespace Centaurus.Domain
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public AlphaTxListener(long cursor)
-            : base(cursor)
+        public AlphaTxListener(CentaurusContext context, long cursor)
+            : base(context, cursor)
         {
         }
 
@@ -193,7 +197,7 @@ namespace Centaurus.Domain
         {
             try
             {
-                if (Global.AppState.State == ApplicationState.Failed)
+                if (context.AppState.State == ApplicationState.Failed)
                 {
                     listener.Shutdown();
                     return;
@@ -211,7 +215,7 @@ namespace Centaurus.Domain
                 logger.Error(e, "Transaction listener failed.");
 
                 //if worker is broken, the auditor should quit consensus
-                Global.AppState.State = ApplicationState.Failed;
+                context.AppState.State = ApplicationState.Failed;
 
                 listener?.Shutdown();
 

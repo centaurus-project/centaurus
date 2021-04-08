@@ -25,9 +25,9 @@ namespace Centaurus.Domain
 
         public Dictionary<string, string> Config { get; }
 
-        public static ExtensionItem Load(ExtensionConfigItem extensionConfigItem)
+        public static ExtensionItem Load(ExtensionConfigItem extensionConfigItem, string extensionsDirectory)
         {
-            var extensionPath = Path.Combine(Path.GetDirectoryName(Global.Settings.ExtensionsConfigFilePath), extensionConfigItem.Name + ".dll");
+            var extensionPath = Path.Combine(extensionsDirectory, extensionConfigItem.Name + ".dll");
             if (!File.Exists(extensionPath))
                 throw new Exception($"Extension {extensionConfigItem.Name} is not found.");
             var extensionAssenmbly = Assembly.LoadFile(extensionPath);
