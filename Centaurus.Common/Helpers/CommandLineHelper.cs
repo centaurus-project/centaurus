@@ -110,50 +110,14 @@ namespace Centaurus
             return arg.IndexOf('-') == 0;
         }
 
-        static Dictionary<OptionAlias, string> GetConfigValues(string configFilePath, List<OptionAlias> optionAlias)
-        {
-            if (!File.Exists(configFilePath))
-                throw new Exception("Config file is not found");
-
-            using (StreamReader r = new StreamReader(configFilePath))
-            {
-                string json = r.ReadToEnd();
-                var rawConfig = JsonConvert.DeserializeObject<Dictionary<string, string>>(json);
-
-                var argsValues = new Dictionary<OptionAlias, string>();
-
-                foreach (var configField in rawConfig.Keys)
-                {
-                    var val = rawConfig[configField];
-                    if (string.IsNullOrEmpty(val))
-                        continue;
-
-                    var currentOptionAlias = optionAlias.FirstOrDefault(o => o.LongName == configField);
-                    if (!currentOptionAlias.Equals(default(OptionAlias)))
-                        argsValues.Add(currentOptionAlias, val);
-                }
-
-                return argsValues;
-            }
-        }
-
         static string[] MergeArgs<T>(string[] passedArgs)
         {
             var optionAlias = GetOptions<T>();
             var envArgsDict = GetEnvironmentValues(optionAlias);
             var passedArgsDict = GetArguments(passedArgs, optionAlias);
 
-            var configFileOptionAlias = new OptionAlias(BaseSettings.ConfigFileArgName, "");
-            var configFilePath = "";
-            var configFileArgsDict = new Dictionary<OptionAlias, string>();
-
-            if (passedArgsDict.TryGetValue(configFileOptionAlias, out configFilePath) || envArgsDict.TryGetValue(configFileOptionAlias, out configFilePath))
-                configFileArgsDict = GetConfigValues(configFilePath, optionAlias);
-
-            //override config by env variables
-            var merged = OverrideValues(configFileArgsDict, envArgsDict);
             //override config and env variables by passed arguments
-            merged = OverrideValues(passedArgsDict, merged);
+            var merged = OverrideValues(passedArgsDict, envArgsDict);
 
             return merged
                 .SelectMany(a => new string[] { a.Key.FullArgumentName, a.Value })
