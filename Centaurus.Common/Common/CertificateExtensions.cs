@@ -4,6 +4,7 @@ using System.IO;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace Centaurus
 {
@@ -24,8 +25,11 @@ namespace Centaurus
                     throw new FileNotFoundException("Private key file is not found", privateKeyFile);
                 var rawPk = File.ReadAllText(privateKeyFile).Trim();
 
-                rawPk = rawPk.Substring(rawPk.IndexOf('\n') + 1); //remove BEGIN header
-                rawPk = rawPk.Substring(0, rawPk.LastIndexOf('\n')); //remove END footer
+                var r = new Regex(@"-----BEGIN [\w ]+-----(.+?)-----END [\w ]+-----", RegexOptions.Singleline);
+                var m = r.Match(rawPk);
+                if (!m.Success)
+                    throw new Exception("Invalid certificate file. PEM-encoded format expected.");
+                rawPk = m.Groups[1].Value.Replace("\n", "");
 
                 rsa = RSA.Create();
                 rsa.ImportPkcs8PrivateKey(Convert.FromBase64String(rawPk), out _);
