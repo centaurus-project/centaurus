@@ -10,8 +10,6 @@ namespace Centaurus
 {
     public abstract class BaseSettings
     {
-        public const string ConfigFileArgName = "configFile";
-
         public KeyPair KeyPair { get; set; }
 
         [Option("verbose", Default = false, HelpText = "Logs all messages. The verbose option overrides the silent one.")]
@@ -19,9 +17,6 @@ namespace Centaurus
 
         [Option("silent", Default = false, HelpText = "Logs only errors.")]
         public bool Silent { get; set; }
-
-        [Option(ConfigFileArgName, Required = false, HelpText = "Config file path.")]
-        public string ConfigFile { get; set; }
 
         [Option('s', "secret", Required = true, HelpText = "Current application secret key.")]
         public string Secret { get; set; }
@@ -56,7 +51,7 @@ namespace Centaurus
         [Option("alpha_pubkey", Required = true, HelpText = "Alpha server public key.")]
         public string AlphaPubKey { get; set; }
 
-        [Option("genesis_quorum", Separator = ';', HelpText = "Public keys of all auditors in genesis quorum, delimited with semicolon.")]
+        [Option("genesis_quorum", Separator = ',', HelpText = "Public keys of all auditors in genesis quorum, delimited with coma.")]
         public IEnumerable<string> GenesisQuorum { get; set; }
 
         public KeyPair AlphaKeyPair { get; set; }
@@ -71,14 +66,14 @@ namespace Centaurus
     [Verb("alpha", HelpText = "Launch Centaurus in alpha mode.")]
     public class AlphaSettings : BaseSettings
     {
-        [Option("alpha_endpoints", Separator = ';', Required = true, HelpText = "Endpoints the alpha will listen on. Example: \"http:5000;http:5001;https:443\"")]
-        public IEnumerable<string> AlphaEndpoints { get; set; }
+        [Option("alpha_port", Required = true, HelpText = "Port the alpha will listen on.")]
+        public int AlphaPort { get; set; }
 
-        [Option("alpha_allowed_hosts", Required = false, HelpText = "Allowed hosts delimited with semicolon. If value is null, all hosts are allowed. Example: \"www.example.com;localhost\"")]
-        public string AllowedHosts { get; set; }
+        [Option("alpha_cert", Required = false, HelpText = "Certificate path.")]
+        public string TlsCertificatePath { get; set; }
 
-        [Option("alpha_cert", Required = false, HelpText = "Certificate and private key paths delimited with colon. Required if ssl is used. Example: \"C:\\\\certs\\cert.pem:C:\\\\certs\\privateKey.pem\"")]
-        public string Certificate { get; set; }
+        [Option("alpha_cert_pk", Required = false, HelpText = "Certificate private key file path.")]
+        public string TlsCertificatePrivateKeyPath { get; set; }
 
         [Option("sync_batch_size", Default = 500, HelpText = "Max quanta sync batch size.")]
         public int SyncBatchSize { get; set; }

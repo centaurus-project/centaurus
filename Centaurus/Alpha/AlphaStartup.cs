@@ -21,8 +21,9 @@ using System.Collections.Generic;
 using System.Threading;
 using System.Diagnostics;
 using System.Security.Cryptography.X509Certificates;
-using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Server.Kestrel.Https;
+using System.Net;
+using System.Text.RegularExpressions;
 
 namespace Centaurus
 {
@@ -84,7 +85,6 @@ namespace Centaurus
         {
             if (eventArgs.State == ApplicationState.Failed)
             {
-                Console.WriteLine("Application failed. Saving pending updates...");
                 Thread.Sleep(PendingUpdatesManager.SaveInterval);
                 resetEvent.Set();
             }
@@ -92,21 +92,15 @@ namespace Centaurus
 
         private void SetupCertificate(AlphaSettings alphaSettings)
         {
-            if (alphaSettings.Certificate == null)
+            if (alphaSettings.TlsCertificatePath == null)
                 return;
 
-            var certData = alphaSettings.Certificate.Split(':', StringSplitOptions.RemoveEmptyEntries);
-            if (certData.Length < 1 || certData.Length > 2)
-                throw new Exception("Invalid certificate settings data.");
+            if (!File.Exists(alphaSettings.TlsCertificatePath))
+                throw new FileNotFoundException($"Failed to find a certificate \"{alphaSettings.TlsCertificatePath}\"");
 
-            var certPath = certData[0];
-            var pkPath = certData.Length == 1 ? null : certData[1];
-            if (!File.Exists(certPath))
-                throw new FileNotFoundException($"Failed to find a certificate \"{certPath}\"");
+            UpdateCertificate(alphaSettings.TlsCertificatePath, alphaSettings.TlsCertificatePrivateKeyPath);
 
-            UpdateCertificate(certPath, pkPath);
-
-            ObserveCertificateChange(certPath, pkPath);
+            ObserveCertificateChange(alphaSettings.TlsCertificatePath, alphaSettings.TlsCertificatePrivateKeyPath);
         }
 
         private void ObserveCertificateChange(string certPath, string pkPath)
@@ -156,15 +150,6 @@ namespace Centaurus
         {
             SetupCertificate(settings);
             return Host.CreateDefaultBuilder()
-                .ConfigureAppConfiguration((ctx, configBuilder) =>
-                {
-                    if (string.IsNullOrEmpty(settings.AllowedHosts))
-                        return;
-                    configBuilder.AddInMemoryCollection(new Dictionary<string, string>
-                    {
-                        ["AllowedHosts"] = settings.AllowedHosts
-                    });
-                })
                 .ConfigureLogging(logging =>
                 {
 
@@ -186,41 +171,20 @@ namespace Centaurus
                         .UseStartup<Startup>()
                         .UseKestrel(options =>
                         {
-                            foreach (var endpoint in settings.AlphaEndpoints)
+                            if (Certificate != null)
                             {
-                                var endpointData = GetEndointData(endpoint);
-                                if (endpointData.isHttps)
+                                options.ListenAnyIP(settings.AlphaPort,
+                                listenOptions =>
                                 {
-                                    if (certificate == null)
-                                        throw new Exception("Unable to load certificate.");
-                                    options.ListenAnyIP(endpointData.port,
-                                    listenOptions =>
-                                    {
-                                        var httpsOptions = new HttpsConnectionAdapterOptions();
-                                        httpsOptions.ServerCertificateSelector = (context, path) => Certificate;
-                                        listenOptions.UseHttps(httpsOptions);
-                                    });
-                                }
-                                else
-                                    options.ListenAnyIP(endpointData.port);
-
-                                logger.Trace($"Added listening. Raw endpoint: {endpoint}. Is https: {endpointData.isHttps}; port: {endpointData.port}.");
+                                    var httpsOptions = new HttpsConnectionAdapterOptions();
+                                    httpsOptions.ServerCertificateSelector = (context, path) => Certificate;
+                                    listenOptions.UseHttps(httpsOptions);
+                                });
                             }
+                            else
+                                options.ListenAnyIP(settings.AlphaPort);
                         });
                 });
-        }
-
-        private static (bool isHttps, int port) GetEndointData(string rawData)
-        {
-            var regex = new Regex(@"(https?):?(\d*)\/?(.*)", RegexOptions.IgnoreCase);
-
-            var match = regex.Match(rawData);
-
-            var isHttps = match.Groups["1"].Value.Equals("https", StringComparison.OrdinalIgnoreCase);
-            var portStr = match.Groups["2"].Value;
-            if (!int.TryParse(portStr, out var port))
-                port = isHttps ? 443 : 80;
-            return (isHttps, port);
         }
     }
 
@@ -251,6 +215,11 @@ namespace Centaurus
             );
             services.AddOptions<HostOptions>().Configure(opts => opts.ShutdownTimeout = TimeSpan.FromDays(365));
         }
+
+        public IConfiguration Configuration { get; }
+
+            const string centaurusWebSocketEndPoint = "/centaurus";
+            const string infoWebSocketEndPoint = "/info";
 
         static ApplicationState[] ValidApplicationStates = new ApplicationState[] { ApplicationState.Rising, ApplicationState.Running, ApplicationState.Ready };
 
