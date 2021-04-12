@@ -186,109 +186,104 @@ namespace Centaurus
                         });
                 });
         }
-    }
 
-    class Startup
-    {
-        public Startup(IConfiguration configuration)
+        class Startup
         {
-            Configuration = configuration;
-        }
+            public Startup(IConfiguration configuration)
+            {
+                Configuration = configuration;
+            }
 
-        public IConfiguration Configuration { get; }
+            public IConfiguration Configuration { get; }
 
-        // This method gets called by the runtime. Use this method to add services to the container.
-        // For more information on how to configure your application, visit https://go.microsoft.com/fwlink/?LinkID=398940
-        public void ConfigureServices(IServiceCollection services)
-        {
-            services
-                .AddMvc(options => options.EnableEndpointRouting = false);
-            //.AddJsonOptions(options =>
-            //{
-            //    options.JsonSerializerOptions.Converters.Add(new AssetSettingsConverter());
-            //});
-            services.Add(
-                new ServiceDescriptor(
-                    typeof(IActionResultExecutor<JsonResult>),
-                    Type.GetType("Microsoft.AspNetCore.Mvc.Infrastructure.SystemTextJsonResultExecutor, Microsoft.AspNetCore.Mvc.Core"),
-                    ServiceLifetime.Singleton)
-            );
-            services.AddOptions<HostOptions>().Configure(opts => opts.ShutdownTimeout = TimeSpan.FromDays(365));
-        }
+            // This method gets called by the runtime. Use this method to add services to the container.
+            // For more information on how to configure your application, visit https://go.microsoft.com/fwlink/?LinkID=398940
+            public void ConfigureServices(IServiceCollection services)
+            {
+                services
+                    .AddMvc(options => options.EnableEndpointRouting = false);
+                //.AddJsonOptions(options =>
+                //{
+                //    options.JsonSerializerOptions.Converters.Add(new AssetSettingsConverter());
+                //});
+                services.Add(
+                    new ServiceDescriptor(
+                        typeof(IActionResultExecutor<JsonResult>),
+                        Type.GetType("Microsoft.AspNetCore.Mvc.Infrastructure.SystemTextJsonResultExecutor, Microsoft.AspNetCore.Mvc.Core"),
+                        ServiceLifetime.Singleton)
+                );
+                services.AddOptions<HostOptions>().Configure(opts => opts.ShutdownTimeout = TimeSpan.FromDays(365));
+            }
 
-        public IConfiguration Configuration { get; }
+            static ApplicationState[] ValidApplicationStates = new ApplicationState[] { ApplicationState.Rising, ApplicationState.Running, ApplicationState.Ready };
 
             const string centaurusWebSocketEndPoint = "/centaurus";
             const string infoWebSocketEndPoint = "/info";
 
-        static ApplicationState[] ValidApplicationStates = new ApplicationState[] { ApplicationState.Rising, ApplicationState.Running, ApplicationState.Ready };
-
-        const string centaurusWebSocketEndPoint = "/centaurus";
-        const string infoWebSocketEndPoint = "/info";
-
-        static Dictionary<string, Func<HttpContext, Func<Task>, Task>> webSocketHandlers = new Dictionary<string, Func<HttpContext, Func<Task>, Task>>
+            static Dictionary<string, Func<HttpContext, Func<Task>, Task>> webSocketHandlers = new Dictionary<string, Func<HttpContext, Func<Task>, Task>>
             {
                 { centaurusWebSocketEndPoint, CentaurusWebSocketHandler },
                 { infoWebSocketEndPoint, InfoWebSocketHandler }
             };
 
-        static async Task CentaurusWebSocketHandler(HttpContext context, Func<Task> next)
-        {
-            var centaurusContext = context.RequestServices.GetService<AlphaContext>();
-            if (centaurusContext.AppState == null || ValidApplicationStates.Contains(centaurusContext.AppState.State))
+            static async Task CentaurusWebSocketHandler(HttpContext context, Func<Task> next)
             {
-                using (var webSocket = await context.WebSockets.AcceptWebSocketAsync())
-                    await centaurusContext.ConnectionManager.OnNewConnection(webSocket, context.Connection.RemoteIpAddress.ToString());
-            }
-            else
-            {
-                context.Abort();
-            }
-        }
-
-        static async Task InfoWebSocketHandler(HttpContext context, Func<Task> next)
-        {
-            var centaurusContext = context.RequestServices.GetService<AlphaContext>();
-            var webSocket = await context.WebSockets.AcceptWebSocketAsync();
-            await centaurusContext.InfoConnectionManager.OnNewConnection(webSocket, context.Connection.Id, context.Connection.RemoteIpAddress.ToString());
-        }
-
-        // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-        public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
-        {
-            app.UseHostFiltering();
-
-            if (env.IsDevelopment())
-            {
-                app.UseDeveloperExceptionPage();
-            }
-            else
-            {
-                app.UseExceptionHandler("/Error");
-                // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-                //app.UseHsts();
-            }
-            //app.UseHttpsRedirection();
-
-            app.UseWebSockets();
-
-            app.Use(async (context, next) =>
-            {
-                var path = context.Request.Path.ToString();
-                if (context.WebSockets.IsWebSocketRequest && webSocketHandlers.Keys.Contains(path))
-                    await webSocketHandlers[path].Invoke(context, next);
+                var centaurusContext = context.RequestServices.GetService<AlphaContext>();
+                if (centaurusContext.AppState == null || ValidApplicationStates.Contains(centaurusContext.AppState.State))
+                {
+                    using (var webSocket = await context.WebSockets.AcceptWebSocketAsync())
+                        await centaurusContext.ConnectionManager.OnNewConnection(webSocket, context.Connection.RemoteIpAddress.ToString());
+                }
                 else
-                    await next();
-            });
+                {
+                    context.Abort();
+                }
+            }
 
-            app.UseMvc(routes =>
+            static async Task InfoWebSocketHandler(HttpContext context, Func<Task> next)
             {
-                routes.MapRoute(
-                    name: "default",
-                    template: "{controller}/{action=Index}/{id?}");
-            });
-        }
-    }
+                var centaurusContext = context.RequestServices.GetService<AlphaContext>();
+                var webSocket = await context.WebSockets.AcceptWebSocketAsync();
+                await centaurusContext.InfoConnectionManager.OnNewConnection(webSocket, context.Connection.Id, context.Connection.RemoteIpAddress.ToString());
+            }
 
-    #endregion
+            // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
+            public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
+            {
+                app.UseHostFiltering();
+
+                if (env.IsDevelopment())
+                {
+                    app.UseDeveloperExceptionPage();
+                }
+                else
+                {
+                    app.UseExceptionHandler("/Error");
+                    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
+                    //app.UseHsts();
+                }
+                //app.UseHttpsRedirection();
+
+                app.UseWebSockets();
+
+                app.Use(async (context, next) =>
+                {
+                    var path = context.Request.Path.ToString();
+                    if (context.WebSockets.IsWebSocketRequest && webSocketHandlers.Keys.Contains(path))
+                        await webSocketHandlers[path].Invoke(context, next);
+                    else
+                        await next();
+                });
+
+                app.UseMvc(routes =>
+                {
+                    routes.MapRoute(
+                        name: "default",
+                        template: "{controller}/{action=Index}/{id?}");
+                });
+            }
+        }
+
+        #endregion
+    }
 }
