@@ -9,6 +9,11 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
 {
     public class AlphaHandshakeHandler : BaseAlphaMessageHandler
     {
+        public AlphaHandshakeHandler(AlphaContext context) 
+            : base(context)
+        {
+        }
+
         public override MessageTypes SupportedMessageType { get; } = MessageTypes.HandshakeInit;
 
         public override ConnectionState[] ValidConnectionStates { get; } = new ConnectionState[] { ConnectionState.Connected };
@@ -26,7 +31,7 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
             connection.ClientPubKey = message.Envelope.Signatures[0].Signer;
             connection.ConnectionState = ConnectionState.Validated;
 
-            if (connection.Context.Constellation.Auditors.Contains(connection.ClientPubKey))
+            if (Context.Constellation.Auditors.Contains(connection.ClientPubKey))
                 await HandleAuditorHandshake(connection);
             else
                 await HandleClientHandshake(connection, message.Envelope);

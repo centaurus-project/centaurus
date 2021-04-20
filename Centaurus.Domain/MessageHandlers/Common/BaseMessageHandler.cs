@@ -7,9 +7,13 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public abstract class BaseMessageHandler<TConnection>
-        where TConnection: BaseWebSocketConnection
+    public abstract class BaseMessageHandler : ContextualBase
     {
+        protected BaseMessageHandler(ExecutionContext context) 
+            : base(context)
+        {
+        }
+
         /// <summary>
         /// Handler supported message types
         /// </summary>
@@ -24,19 +28,51 @@ namespace Centaurus.Domain
         /// Validates authentication, connection state and message.
         /// </summary>
         /// <param name="envelope">The current message envelope</param>
+        public abstract Task Validate(BaseWebSocketConnection connection, IncomingMessage message);
+
+        /// <summary>
+        /// Handles message
+        /// </summary>
+        /// <param name="messageEnvelope">The current message envelope</param>
+        /// <returns>Handle result</returns>
+        public abstract Task HandleMessage(BaseWebSocketConnection connection, IncomingMessage message);
+    }
+
+    public abstract class BaseMessageHandler<TConnection, TContext> : BaseMessageHandler, IContextual<TContext>
+        where TConnection: BaseWebSocketConnection
+        where TContext: ExecutionContext
+    {
+        public BaseMessageHandler(TContext context)
+            :base(context)
+        {
+
+        }
+
+        public new TContext Context => (TContext)base.Context;
+
+        /// <summary>
+        /// Validates authentication, connection state and message.
+        /// </summary>
+        /// <param name="envelope">The current message envelope</param>
         public virtual Task Validate(TConnection connection, IncomingMessage message)
         {
             if (ValidConnectionStates != null
                 && ValidConnectionStates.Length > 0
                 && Array.IndexOf(ValidConnectionStates, connection.ConnectionState) < 0)
                 throw new InvalidStateException(
-                    SupportedMessageType.ToString(), 
+                    SupportedMessageType.ToString(),
                     connection.ConnectionState.ToString(),
                     ValidConnectionStates.Select(s => s.ToString()).ToArray());
 
-            if(!message.Envelope.Signatures.AreSignaturesValid(message.MessageHash))
+            if (!message.Envelope.Signatures.AreSignaturesValid(message.MessageHash))
                 throw new UnauthorizedException();
 
+            return Task.CompletedTask;
+        }
+
+        public override Task Validate(BaseWebSocketConnection connection, IncomingMessage message)
+        {
+            Validate((TConnection)connection, message);
             return Task.CompletedTask;
         }
 
@@ -46,6 +82,12 @@ namespace Centaurus.Domain
         /// <param name="messageEnvelope">The current message envelope</param>
         /// <returns>Handle result</returns>
         public abstract Task HandleMessage(TConnection connection, IncomingMessage message);
+
+        public override Task HandleMessage(BaseWebSocketConnection connection, IncomingMessage message)
+        {
+            HandleMessage((TConnection)connection, message);
+            return Task.CompletedTask;
+        }
     }
 
     public class IncomingMessage

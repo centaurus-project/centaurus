@@ -8,15 +8,13 @@ using System.Timers;
 
 namespace Centaurus.Domain
 {
-    public abstract class PerformanceStatisticsManager : IDisposable
+    public abstract class PerformanceStatisticsManager : IContextual, IDisposable
     {
         const int updateInterval = 1000;
 
-        static Logger logger = LogManager.GetCurrentClassLogger();
-
-        public PerformanceStatisticsManager(CentaurusContext context)
+        public PerformanceStatisticsManager(ExecutionContext context)
         {
-            this.context = context;
+            Context = context ?? throw new ArgumentNullException(nameof(context));
             updateTimer = new System.Timers.Timer();
             updateTimer.Interval = updateInterval;
             updateTimer.AutoReset = false;
@@ -43,7 +41,7 @@ namespace Centaurus.Domain
         private object syncRoot = new { };
         private Timer updateTimer;
 
-        protected readonly CentaurusContext context;
+        public ExecutionContext Context { get; }
 
         private void UpdateTimer_Elapsed(object sender, ElapsedEventArgs e)
         {
@@ -56,7 +54,7 @@ namespace Centaurus.Domain
 
         protected int GetQuantaAvgLength()
         {
-            LastQuantaQueueLengths.Add(context.QuantumHandler.QuantaQueueLenght);
+            LastQuantaQueueLengths.Add(Context.QuantumHandler.QuantaQueueLenght);
             if (LastQuantaQueueLengths.Count > 20)
                 LastQuantaQueueLengths.RemoveAt(0);
             return (int)Math.Floor(decimal.Divide(LastQuantaQueueLengths.Sum(), LastQuantaQueueLengths.Count));
@@ -69,7 +67,7 @@ namespace Centaurus.Domain
 
         protected int GetItemsPerSecond()
         {
-            RecentApexes.Add(new Apex { UpdatedAt = DateTime.UtcNow, CurrentApex = context.QuantumStorage.CurrentApex });
+            RecentApexes.Add(new Apex { UpdatedAt = DateTime.UtcNow, CurrentApex = Context.QuantumStorage.CurrentApex });
             if (RecentApexes.Count > 20)
                 RecentApexes.RemoveAt(0);
 
@@ -105,7 +103,7 @@ namespace Centaurus.Domain
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public AlphaPerformanceStatisticsManager(CentaurusContext context)
+        public AlphaPerformanceStatisticsManager(ExecutionContext context)
             : base(context)
         {
         }
@@ -123,7 +121,7 @@ namespace Centaurus.Domain
         {
             lock (auditorsStatistics)
             {
-                var auditorConnections = ((AlphaContext)context).ConnectionManager.GetAuditorConnections();
+                var auditorConnections = ((AlphaContext)Context).ConnectionManager.GetAuditorConnections();
                 foreach (var auditorConnection in auditorConnections)
                 {
                     var accountId = auditorConnection?.ClientKPAccountId;
@@ -131,7 +129,7 @@ namespace Centaurus.Domain
                         continue;
                     var auditorApex = auditorConnection?.QuantumWorker?.CurrentApexCursor ?? -1;
                     if (auditorApex >= 0)
-                        statistics.Delay = (int)(context.QuantumStorage.CurrentApex - auditorApex);
+                        statistics.Delay = (int)(Context.QuantumStorage.CurrentApex - auditorApex);
                 }
                 return auditorsStatistics.Values.ToList();
             }
@@ -164,7 +162,7 @@ namespace Centaurus.Domain
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public AuditorPerformanceStatisticsManager(CentaurusContext context)
+        public AuditorPerformanceStatisticsManager(ExecutionContext context)
             : base(context)
         {
         }

@@ -1,4 +1,6 @@
 ﻿using Centaurus.SDK.Models;
+using Centaurus.Stellar;
+using Centaurus.Stellar.Models;
 using stellar_dotnet_sdk;
 using stellar_dotnet_sdk.responses;
 using stellar_dotnet_sdk.xdr;
@@ -17,19 +19,6 @@ namespace Centaurus.SDK
             var outputStream = new XdrDataOutputStream();
             stellar_dotnet_sdk.xdr.Transaction.Encode(outputStream, tx.ToXdrV1());
             return outputStream.ToArray();
-        }
-
-        public static async Task<SubmitTransactionResponse> Submit(this stellar_dotnet_sdk.Transaction tx, ConstellationInfo constellation)
-        {
-            using (var server = constellation.StellarNetwork.GetServer())
-            {
-                var res = await server.SubmitTransaction(tx);
-                if (!res.IsSuccess())
-                {
-                    throw new Exception($"Tx submit error. Result xdr: {res.ResultXdr}");
-                }
-                return res;
-            }
         }
     }
 }

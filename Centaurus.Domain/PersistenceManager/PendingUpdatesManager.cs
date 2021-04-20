@@ -12,13 +12,13 @@ using System.Timers;
 
 namespace Centaurus.Domain
 {
-    public class PendingUpdatesManager : IDisposable
+    public class PendingUpdatesManager : ContextualBase, IDisposable
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public PendingUpdatesManager(CentaurusContext context)
+        public PendingUpdatesManager(ExecutionContext context)
+            :base(context)
         {
-            this.context = context;
         }
 
         //TODO: move interval to config
@@ -26,7 +26,6 @@ namespace Centaurus.Domain
         /// Save interval in ms.
         /// </summary>
         public const int SaveInterval = 3 * 1000;
-        private readonly CentaurusContext context;
 
         public void Start()
         {
@@ -97,7 +96,7 @@ namespace Centaurus.Domain
                     logger.Error(exc, errorMessage);
                 else
                     logger.Error(errorMessage);
-                context.AppState.State = ApplicationState.Failed;
+                Context.AppState.State = ApplicationState.Failed;
             }
         }
 
@@ -131,7 +130,7 @@ namespace Centaurus.Domain
             {
                 RefreshUpdatesContainer();
 
-                if (context.AppState.State == ApplicationState.Failed) //no need to start timer if application failed
+                if (Context.AppState.State == ApplicationState.Failed) //no need to start timer if application failed
                     return;
                 refreshUpdatesTimer.Start();
             }
@@ -160,9 +159,9 @@ namespace Centaurus.Domain
                 return;
 
             awaitedUpdates.Add(pendingUpdates);
-            if (context.IsAlpha)
+            if (Context.IsAlpha)
                 QuantaThrottlingManager.Current.SetBatchQueueLength(awaitedUpdates.Count);
-            else if (awaitedUpdates.Count >= 20 && context.AppState.State != ApplicationState.Failed)
+            else if (awaitedUpdates.Count >= 20 && Context.AppState.State != ApplicationState.Failed)
                 OnSaveFailed($"Delayed updates queue ({awaitedUpdates.Count}) is too long.");
         }
 
@@ -172,7 +171,7 @@ namespace Centaurus.Domain
             {
                 var sw = new Stopwatch();
                 sw.Start();
-                var retries = await context.PersistenceManager.ApplyUpdates(updates);
+                var retries = await Context.PersistenceManager.ApplyUpdates(updates);
                 sw.Stop();
 
                 var batchInfo = new BatchSavedInfo
@@ -189,7 +188,7 @@ namespace Centaurus.Domain
             {
                 //we need to cancel all pending updates
                 cancellationTokenSource.Cancel();
-                if (context.AppState.State != ApplicationState.Failed)
+                if (Context.AppState.State != ApplicationState.Failed)
                     OnSaveFailed("Error on saving updates.", exc);
             }
         }

@@ -14,7 +14,7 @@ using System.Threading.Tasks;
 
 namespace Centaurus
 {
-    public class AuditorStartup : StartupBase
+    public class AuditorStartup : StartupBase<AuditorContext>
     {
         private AuditorWebSocketConnection auditor;
 
@@ -23,10 +23,12 @@ namespace Centaurus
         private Logger logger = LogManager.GetCurrentClassLogger();
         private ManualResetEvent resetEvent;
 
-        public AuditorStartup(AuditorContext context)
-            :base(context)
-        {
+        private Func<ClientConnectionWrapperBase> connectionFactory;
 
+        public AuditorStartup(AuditorContext context, Func<ClientConnectionWrapperBase> connectionFactory)
+            : base(context)
+        {
+            this.connectionFactory = connectionFactory;
         }
 
         public override async Task Run(ManualResetEvent resetEvent)
@@ -38,50 +40,52 @@ namespace Centaurus
                 await Context.Init();
                 Context.AppState.StateChanged += StateChanged;
 
-                MessageHandlers<AuditorWebSocketConnection>.Init(Context);
-
-                _ = InternalRun();
+                InternalRun();
             }
             catch (Exception exc)
             {
                 logger.Error(exc);
                 if (Context.AppState != null)
                     Context.AppState.State = ApplicationState.Failed;
-                resetEvent.Set();
+                var isSet = resetEvent.WaitOne(0);
+                if (!isSet)
+                    resetEvent.Set();
             }
         }
 
-        private async Task InternalRun()
+        private void InternalRun()
         {
-            try
+            var runTask = Task.Factory.StartNew(async () =>
             {
-                while (!isAborted)
+                try
                 {
-                    var _auditor = new AuditorWebSocketConnection((AuditorContext)Context, new ClientWebSocket(), null);
-                    try
+                    while (!isAborted)
                     {
-                        Subscribe(_auditor);
-                        await _auditor.EstablishConnection();
-                        auditor = _auditor;
-                        break;
-                    }
-                    catch (Exception exc)
-                    {
-                        Unsubscribe(_auditor);
-                        await CloseConnection(_auditor);
-                        _auditor.Dispose();
+                        var _auditor = new AuditorWebSocketConnection(Context, connectionFactory());
+                        try
+                        {
+                            Subscribe(_auditor);
+                            await _auditor.EstablishConnection();
+                            auditor = _auditor;
+                            break;
+                        }
+                        catch (Exception exc)
+                        {
+                            Unsubscribe(_auditor);
+                            await CloseConnection(_auditor);
 
-                        if (!(exc is OperationCanceledException))
-                            logger.Info(exc, "Unable establish connection. Retry in 5000ms");
-                        Thread.Sleep(5000);
+                            if (!(exc is OperationCanceledException))
+                                logger.Info(exc, "Unable establish connection. Retry in 5000ms");
+                            Thread.Sleep(5000);
+                        }
                     }
                 }
-            }
-            catch (Exception exc)
-            {
-                logger.Error(exc, "Auditor startup error.");
-                Context.AppState.State = ApplicationState.Failed;
-            }
+                catch (Exception exc)
+                {
+                    logger.Error(exc, "Auditor startup error.");
+                    Context.AppState.State = ApplicationState.Failed;
+                }
+            }).Unwrap();
         }
 
         private void StateChanged(StateChangedEventArgs eventArgs)
@@ -99,7 +103,7 @@ namespace Centaurus
             isAborted = true;
             Unsubscribe(auditor);
             await CloseConnection(auditor);
-            await Context.TearDown();
+            Context.Dispose();
         }
 
         private void Subscribe(AuditorWebSocketConnection _auditor)
@@ -138,6 +142,7 @@ namespace Centaurus
             if (_auditor != null)
             {
                 await _auditor.CloseConnection();
+                _auditor.Dispose();
             }
         }
 
@@ -152,9 +157,8 @@ namespace Centaurus
             Context.AppState.State = ApplicationState.Running;
             Unsubscribe(auditor);
             await CloseConnection(auditor);
-            auditor.Dispose();
             if (!isAborted)
-                _ = InternalRun();
+                InternalRun();
         }
     }
 }

@@ -7,6 +7,11 @@ namespace Centaurus.Domain.WebSockets.Alpha.Info.CommandHandlers
 {
     public class SubscribeCommandHandler : BaseCommandHandler<SubscribeCommand>
     {
+        public SubscribeCommandHandler(AlphaContext context)
+            : base(context)
+        {
+
+        }
         public override Task<BaseResponse> Handle(InfoWebSocketConnection infoWebSocket, SubscribeCommand command)
         {
             if (command.Subscriptions == null || command.Subscriptions.Count < 1)
@@ -15,7 +20,7 @@ namespace Centaurus.Domain.WebSockets.Alpha.Info.CommandHandlers
             foreach (var subsName in command.Subscriptions)
             {
 
-                infoWebSocket.AddSubscription(infoWebSocket.Context.SubscriptionsManager.GetOrAddSubscription(BaseSubscription.GetBySubscriptionName(subsName)));
+                infoWebSocket.AddSubscription(Context.SubscriptionsManager.GetOrAddSubscription(BaseSubscription.GetBySubscriptionName(subsName)));
             }
             return Task.FromResult((BaseResponse)new SuccesResponse());
         }

@@ -8,13 +8,11 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public class ResultManager : IDisposable
+    public class ResultManager : ContextualBase<AlphaContext>, IDisposable
     {
-        public AlphaContext Context { get; }
-
         public ResultManager(AlphaContext context)
+            :base(context)
         {
-            Context = context ?? throw new ArgumentNullException(nameof(context));
             InitTimers();
         }
 
@@ -189,7 +187,10 @@ namespace Centaurus.Domain
                     else if (originalEnvelope.Message is RequestQuantum)
                         requestMessage = ((RequestQuantum)originalEnvelope.Message).RequestEnvelope.Message as SequentialRequestMessage;
 
-                    var exc = new Exception($"Majority for quantum {resultMessageItem.Apex} ({requestMessage.MessageType}) is unreachable. Results received count is {processedAuditors.Count}, valid results count is {votesCount}. The constellation collapsed.");
+                    var exc = new Exception("Majority for quantum" +
+                        $" {resultMessageItem.Apex} ({requestMessage?.MessageType ?? originalEnvelope.Message.MessageType})" +
+                        $" is unreachable. Results received count is {processedAuditors.Count}," +
+                        $" valid results count is {votesCount}. The constellation collapsed.");
                     logger.Error(exc);
                     resultManager.Context.AppState.State = ApplicationState.Failed;
                     throw exc;

@@ -39,7 +39,8 @@ namespace Centaurus.Domain
             if (context.CentaurusContext.AppState.State != ApplicationState.WaitingForInit)
                 throw new InvalidOperationException("Init quantum can be handled only when application is in WaitingForInit state.");
 
-            if (!context.CentaurusContext.IsAlpha && !context.Envelope.IsSignedBy(((AuditorSettings)context.CentaurusContext.Settings).AlphaKeyPair.PublicKey))
+            if (!context.CentaurusContext.IsAlpha 
+                && !context.Envelope.IsSignedBy(((AuditorSettings)context.CentaurusContext.Settings).AlphaKeyPair.PublicKey))
                 throw new InvalidOperationException("The quantum isn't signed by Alpha.");
 
             if (!context.Envelope.AreSignaturesValid())

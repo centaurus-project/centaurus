@@ -10,9 +10,9 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public abstract class MajorityManager : IDisposable
+    public abstract class MajorityManager : IContextual, IDisposable
     {
-        public MajorityManager(CentaurusContext context)
+        public MajorityManager(ExecutionContext context)
         {
             Context = context ?? throw new ArgumentNullException(nameof(context));
             InitCleanupTimer();
@@ -26,7 +26,7 @@ namespace Centaurus.Domain
             //add the signature to the aggregate
             aggregate.Add(message);
         }
-        public CentaurusContext Context { get; }
+        public ExecutionContext Context { get; }
 
         public virtual void Dispose()
         {

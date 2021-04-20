@@ -26,7 +26,7 @@ namespace Centaurus.Domain
 
         public override void Start()
         {
-            LastAddedQuantumApex = context.QuantumStorage.CurrentApex;
+            LastAddedQuantumApex = Context.QuantumStorage.CurrentApex;
             base.Start();
         }
 
@@ -37,7 +37,7 @@ namespace Centaurus.Domain
             return task;
         }
 
-        AuditorContext auditorContext => (AuditorContext)context;
+        AuditorContext auditorContext => (AuditorContext)Context;
 
         protected override void OnProcessException(HandleItem handleItem, ResultMessage result, Exception exc)
         {
@@ -48,8 +48,8 @@ namespace Centaurus.Domain
         {
             var quantum = (Quantum)envelope.Message;
 
-            if (quantum.Apex != context.QuantumStorage.CurrentApex + 1)
-                throw new Exception($"Current quantum apex is {quantum.Apex} but {context.QuantumStorage.CurrentApex + 1} was expected.");
+            if (quantum.Apex != Context.QuantumStorage.CurrentApex + 1)
+                throw new Exception($"Current quantum apex is {quantum.Apex} but {Context.QuantumStorage.CurrentApex + 1} was expected.");
 
             var messageType = GetMessageType(envelope);
 
@@ -78,7 +78,7 @@ namespace Centaurus.Domain
 
             var messageHash = envelope.ComputeMessageHash(buffer.Buffer);
 
-            context.QuantumStorage.AddQuantum(envelope, messageHash);
+            Context.QuantumStorage.AddQuantum(envelope, messageHash);
 
             ProcessTransaction(processorContext, result);
 
@@ -112,8 +112,8 @@ namespace Centaurus.Domain
                 throw new Exception("Result is not ITransactionResultMessage");
             txResult.TxSignatures.Add(new Ed25519Signature
             {
-                Signature = context.Settings.KeyPair.Sign(transactionContext.TransactionHash),
-                Signer = context.Settings.KeyPair.PublicKey
+                Signature = Context.Settings.KeyPair.Sign(transactionContext.TransactionHash),
+                Signer = Context.Settings.KeyPair.PublicKey
             });
         }
 

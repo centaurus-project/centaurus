@@ -33,13 +33,13 @@ namespace Centaurus
         Closed = 3
     }
 
-    public abstract class BaseWebSocketConnection : IDisposable
+    public abstract class BaseWebSocketConnection : ContextualBase, IDisposable
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
         protected WebSocket webSocket;
-        public BaseWebSocketConnection(CentaurusContext context, WebSocket webSocket, string ip, int inBufferSize, int outBufferSize)
+        public BaseWebSocketConnection(Domain.ExecutionContext context, WebSocket webSocket, string ip, int inBufferSize, int outBufferSize)
+            :base(context)
         {
-            Context = context ?? throw new ArgumentNullException(nameof(context));
             this.webSocket = webSocket ?? throw new ArgumentNullException(nameof(webSocket));
             Ip = ip;
 
@@ -49,7 +49,6 @@ namespace Centaurus
             cancellationTokenSource = new CancellationTokenSource();
             cancellationToken = cancellationTokenSource.Token;
         }
-        public CentaurusContext Context { get; }
 
         public string Ip { get; }
 
@@ -292,5 +291,15 @@ namespace Centaurus
             outgoingBuffer?.Dispose();
             outgoingBuffer = null;
         }
+    }
+
+    public abstract class BaseWebSocketConnection<TContext> : BaseWebSocketConnection, IContextual<TContext>
+        where TContext : Domain.ExecutionContext
+    {
+        public BaseWebSocketConnection(Domain.ExecutionContext context, WebSocket webSocket, string ip, int inBufferSize, int outBufferSize)
+            :base(context, webSocket, ip, inBufferSize, outBufferSize)
+        { }
+
+        public new TContext Context => (TContext)base.Context;
     }
 }

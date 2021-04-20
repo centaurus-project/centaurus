@@ -28,7 +28,7 @@ namespace Centaurus.Domain
 
             if (context.DestinationAccount == null)
             {
-                var accId = context.CentaurusContext.AccountStorage.GetNextAccountId();
+                var accId = context.CentaurusContext.AccountStorage.NextAccountId;
                 context.EffectProcessors.AddAccountCreate(context.CentaurusContext.AccountStorage, accId, payment.Destination);
             }
 

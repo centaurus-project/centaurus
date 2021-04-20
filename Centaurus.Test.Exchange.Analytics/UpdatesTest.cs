@@ -29,7 +29,10 @@ namespace Centaurus.Test.Exchange.Analytics
                 NetworkPassphrase = "Test SDF Network ; September 2015",
                 CWD = "AppData"
             };
-            context = new AlphaContext(settings, new MockStorage());
+
+            var stellarProvider = new MockStellarDataProvider(settings.NetworkPassphrase, settings.HorizonUrl);
+
+            context = new AlphaContext(settings, new MockStorage(), stellarProvider);
             context.Init().Wait();
             var requestsLimit = new RequestRateLimits();
 

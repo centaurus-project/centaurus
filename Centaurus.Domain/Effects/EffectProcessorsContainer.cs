@@ -8,16 +8,14 @@ using System.Text;
 
 namespace Centaurus.Domain
 {
-    public class EffectProcessorsContainer
+    public class EffectProcessorsContainer: ContextualBase
     {
-        public EffectProcessorsContainer(CentaurusContext context, MessageEnvelope quantum, DiffObject pendingDiffObject)
+        public EffectProcessorsContainer(ExecutionContext context, MessageEnvelope quantum, DiffObject pendingDiffObject)
+            :base(context)
         {
-            Context = context ?? throw new ArgumentNullException(nameof(context));
             Envelope = quantum ?? throw new ArgumentNullException(nameof(quantum));
             PendingDiffObject = pendingDiffObject ?? throw new ArgumentNullException(nameof(pendingDiffObject));
         }
-
-        public CentaurusContext Context { get; }
 
         public MessageEnvelope Envelope { get; }
 
@@ -42,7 +40,7 @@ namespace Centaurus.Domain
         {
             Effects.Add(effectProcessor.Effect);
             effectProcessor.CommitEffect();
-            this.Aggregate(Envelope, effectProcessor.Effect, Effects.Count - 1);
+            this.Aggregate(Envelope, effectProcessor.Effect);
             if (effectProcessor.Effect.Account != 0)
                 AffectedAccounts.Add(effectProcessor.Effect.Account);
         }

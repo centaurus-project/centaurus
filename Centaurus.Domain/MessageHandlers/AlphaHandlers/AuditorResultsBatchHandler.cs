@@ -5,13 +5,18 @@ using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Centaurus.Domain.MessageHandlers.AlphaHandlers
+namespace Centaurus.Domain
 {
     public class AuditorResultsBatchHandler : BaseAlphaMessageHandler
     {
+        public AuditorResultsBatchHandler(AlphaContext context) 
+            : base(context)
+        {
+        }
+
         public override MessageTypes SupportedMessageType { get; } = MessageTypes.AuditorResultsBatch;
 
-        public override ConnectionState[] ValidConnectionStates { get; } = new ConnectionState[] { ConnectionState.Ready };
+        public override ConnectionState[] ValidConnectionStates { get; } = new ConnectionState[] { ConnectionState.Ready, ConnectionState.Validated };
 
         public override bool IsAuditorOnly { get; } = true;
 
@@ -20,7 +25,7 @@ namespace Centaurus.Domain.MessageHandlers.AlphaHandlers
         {
             var resultsBatch = (AuditorResultsBatch)message.Envelope.Message;
             foreach (var result in resultsBatch.AuditorResultMessages)
-                connection.AlphaContext.AuditResultManager.Add(result, connection.ClientPubKey);
+                Context.AuditResultManager.Add(result, connection.ClientPubKey);
             return Task.CompletedTask;
         }
     }

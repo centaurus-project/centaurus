@@ -25,7 +25,7 @@ namespace Centaurus.Test
         AccountWrapper account1;
         AccountWrapper account2;
         private bool useLegacyOrderbook;
-        private CentaurusContext context;
+        private ExecutionContext context;
 
         [SetUp]
         public void Setup()
@@ -37,7 +37,10 @@ namespace Centaurus.Test
                 NetworkPassphrase = "Test SDF Network ; September 2015",
                 CWD = "AppData"
             };
-            context = new AlphaContext(settings, new MockStorage(), useLegacyOrderbook);
+
+            var stellarProvider = new MockStellarDataProvider(settings.NetworkPassphrase, settings.HorizonUrl);
+
+            context = new AlphaContext(settings, new MockStorage(), stellarProvider, useLegacyOrderbook);
             context.Init().Wait();
 
             var requestRateLimits = new RequestRateLimits { HourLimit = 1000, MinuteLimit = 100 };

@@ -48,18 +48,17 @@ namespace Centaurus.Domain
         }
     }
 
-    public class OutgoingResultsStorage
+    public class OutgoingResultsStorage: ContextualBase<AuditorContext>
     {
         const int MaxMessageBatchSize = 50;
 
         static Logger logger = LogManager.GetCurrentClassLogger();
 
         readonly static List<AuditorResultMessage> results = new List<AuditorResultMessage>();
-        private readonly AuditorContext context;
 
         public OutgoingResultsStorage(AuditorContext context)
+            :base(context)
         {
-            this.context = context;
             _ = Task.Factory.StartNew(RunWorker);
         }
 
@@ -81,7 +80,7 @@ namespace Centaurus.Domain
                     }
                     if (resultsBatch != default)
                     {
-                        context.OutgoingMessageStorage.EnqueueMessage(new AuditorResultsBatch { AuditorResultMessages = resultsBatch });
+                        Context.OutgoingMessageStorage.EnqueueMessage(new AuditorResultsBatch { AuditorResultMessages = resultsBatch });
                         continue;
                     }
                     Thread.Sleep(50);
@@ -116,7 +115,7 @@ namespace Centaurus.Domain
             }
 
             var resultEnvelope = result.CreateEnvelope();
-            resultEnvelope.Sign(context.Settings.KeyPair, buffer);
+            resultEnvelope.Sign(Context.Settings.KeyPair, buffer);
             signature = resultEnvelope.Signatures[0].Signature;
 
             lock (results)

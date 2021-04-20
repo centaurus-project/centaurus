@@ -7,7 +7,7 @@ namespace Centaurus.Domain
 {
     public static class AlphaStateHelper
     {
-        public static AlphaState GetCurrentState(this CentaurusContext context)
+        public static AlphaState GetCurrentState(this ExecutionContext context)
         {
             if (context == null)
                 throw new ArgumentNullException(nameof(context));

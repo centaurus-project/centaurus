@@ -24,10 +24,11 @@ using System.Security.Cryptography.X509Certificates;
 using Microsoft.AspNetCore.Server.Kestrel.Https;
 using System.Net;
 using System.Text.RegularExpressions;
+using Centaurus.Alpha;
 
 namespace Centaurus
 {
-    public class AlphaStartup : StartupBase
+    public class AlphaStartup : StartupBase<AlphaContext>
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
         private IHost host;
@@ -44,8 +45,13 @@ namespace Centaurus
             {
                 this.resetEvent = resetEvent;
 
-                host = CreateHostBuilder((AlphaSettings)Context.Settings).Build();
-                _ = host.RunAsync();
+                //TODO: mock host
+                if (!EnvironmentHelper.IsTest)
+                {
+                    host = new AlphaHostBuilder(Context).CreateHost(Context.Settings);
+                    _ = host.RunAsync();
+                }
+
                 await ConfigureConstellation();
             }
             catch (Exception exc)
@@ -53,7 +59,7 @@ namespace Centaurus
                 logger.Error(exc);
                 if (Context.AppState != null)
                     Context.AppState.State = ApplicationState.Failed;
-                resetEvent.Set();
+                throw;
             }
         }
 
@@ -61,12 +67,14 @@ namespace Centaurus
         {
             if (host != null)
             {
-                var alphaContext = (AlphaContext)Context;
-                await alphaContext.ConnectionManager.CloseAllConnections();
-                await alphaContext.InfoConnectionManager.CloseAllConnections();
-                await Context.TearDown();
-                await host.StopAsync(CancellationToken.None);
-                host = null;
+                await Context.ConnectionManager.CloseAllConnections();
+                await Context.InfoConnectionManager.CloseAllConnections();
+                Context.Dispose();
+                if (host != null)
+                {
+                    await host.StopAsync(CancellationToken.None);
+                    host = null;
+                }
             }
         }
 
@@ -77,8 +85,6 @@ namespace Centaurus
             await Context.Init();
 
             Context.AppState.StateChanged += Current_StateChanged;
-
-            MessageHandlers<AlphaWebSocketConnection>.Init(Context);
         }
 
         private void Current_StateChanged(StateChangedEventArgs eventArgs)
@@ -86,201 +92,9 @@ namespace Centaurus
             if (eventArgs.State == ApplicationState.Failed)
             {
                 Thread.Sleep(PendingUpdatesManager.SaveInterval);
-                resetEvent.Set();
-            }
-        }
-
-        private void SetupCertificate(AlphaSettings alphaSettings)
-        {
-            if (alphaSettings.TlsCertificatePath == null)
-                return;
-
-            if (!File.Exists(alphaSettings.TlsCertificatePath))
-                throw new FileNotFoundException($"Failed to find a certificate \"{alphaSettings.TlsCertificatePath}\"");
-
-            UpdateCertificate(alphaSettings.TlsCertificatePath, alphaSettings.TlsCertificatePrivateKeyPath);
-
-            ObserveCertificateChange(alphaSettings.TlsCertificatePath, alphaSettings.TlsCertificatePrivateKeyPath);
-        }
-
-        private void ObserveCertificateChange(string certPath, string pkPath)
-        {
-            if (string.IsNullOrWhiteSpace(certPath))
-                throw new ArgumentNullException(nameof(certPath));
-
-            var certFolder = Path.GetDirectoryName(certPath);
-            var certFileName = Path.GetFileName(certPath);
-
-            var watcher = new FileSystemWatcher(certFolder, certFileName);
-
-            watcher.NotifyFilter = NotifyFilters.LastWrite;
-            watcher.Changed += (s, e) =>
-            {
-                try
-                {
-                    lock (syncRoot)
-                        UpdateCertificate(certPath, pkPath);
-                }
-                catch (Exception exc)
-                {
-                    logger.Error(exc, "Error on certificate update");
-                }
-            };
-            watcher.Error += (s, eArgs) => logger.Error(eArgs.GetException());
-            watcher.EnableRaisingEvents = true;
-        }
-
-        private void UpdateCertificate(string certFile, string privateKeyFile)
-        {
-            certificate = CertificateExtensions.GetSertificate(certFile, privateKeyFile);
-        }
-
-        private object syncRoot = new { };
-        private X509Certificate2 certificate;
-        private X509Certificate2 Certificate
-        {
-            get
-            {
-                lock (syncRoot)
-                    return certificate;
-            }
-        }
-
-        private IHostBuilder CreateHostBuilder(AlphaSettings settings)
-        {
-            SetupCertificate(settings);
-            return Host.CreateDefaultBuilder()
-                .ConfigureLogging(logging =>
-                {
-
-                    logging.ClearProviders();
-                    logging.AddConsole();
-
-                    if (settings.Verbose)
-                        logging.SetMinimumLevel(Microsoft.Extensions.Logging.LogLevel.Trace);
-                    else if (settings.Silent)
-                        logging.SetMinimumLevel(Microsoft.Extensions.Logging.LogLevel.Error);
-                    else
-                        logging.SetMinimumLevel(Microsoft.Extensions.Logging.LogLevel.Information);
-
-                })
-                .UseNLog()
-                .ConfigureWebHostDefaults(webBuilder =>
-                {
-                    webBuilder.ConfigureServices(s => s.AddSingleton(Context))
-                        .UseStartup<Startup>()
-                        .UseKestrel(options =>
-                        {
-                            if (Certificate != null)
-                            {
-                                options.ListenAnyIP(settings.AlphaPort,
-                                listenOptions =>
-                                {
-                                    var httpsOptions = new HttpsConnectionAdapterOptions();
-                                    httpsOptions.ServerCertificateSelector = (context, path) => Certificate;
-                                    listenOptions.UseHttps(httpsOptions);
-                                });
-                            }
-                            else
-                                options.ListenAnyIP(settings.AlphaPort);
-                        });
-                });
-        }
-
-        class Startup
-        {
-            public Startup(IConfiguration configuration)
-            {
-                Configuration = configuration;
-            }
-
-            public IConfiguration Configuration { get; }
-
-            // This method gets called by the runtime. Use this method to add services to the container.
-            // For more information on how to configure your application, visit https://go.microsoft.com/fwlink/?LinkID=398940
-            public void ConfigureServices(IServiceCollection services)
-            {
-                services
-                    .AddMvc(options => options.EnableEndpointRouting = false);
-                //.AddJsonOptions(options =>
-                //{
-                //    options.JsonSerializerOptions.Converters.Add(new AssetSettingsConverter());
-                //});
-                services.Add(
-                    new ServiceDescriptor(
-                        typeof(IActionResultExecutor<JsonResult>),
-                        Type.GetType("Microsoft.AspNetCore.Mvc.Infrastructure.SystemTextJsonResultExecutor, Microsoft.AspNetCore.Mvc.Core"),
-                        ServiceLifetime.Singleton)
-                );
-                services.AddOptions<HostOptions>().Configure(opts => opts.ShutdownTimeout = TimeSpan.FromDays(365));
-            }
-
-            static ApplicationState[] ValidApplicationStates = new ApplicationState[] { ApplicationState.Rising, ApplicationState.Running, ApplicationState.Ready };
-
-            const string centaurusWebSocketEndPoint = "/centaurus";
-            const string infoWebSocketEndPoint = "/info";
-
-            static Dictionary<string, Func<HttpContext, Func<Task>, Task>> webSocketHandlers = new Dictionary<string, Func<HttpContext, Func<Task>, Task>>
-            {
-                { centaurusWebSocketEndPoint, CentaurusWebSocketHandler },
-                { infoWebSocketEndPoint, InfoWebSocketHandler }
-            };
-
-            static async Task CentaurusWebSocketHandler(HttpContext context, Func<Task> next)
-            {
-                var centaurusContext = context.RequestServices.GetService<AlphaContext>();
-                if (centaurusContext.AppState == null || ValidApplicationStates.Contains(centaurusContext.AppState.State))
-                {
-                    using (var webSocket = await context.WebSockets.AcceptWebSocketAsync())
-                        await centaurusContext.ConnectionManager.OnNewConnection(webSocket, context.Connection.RemoteIpAddress.ToString());
-                }
-                else
-                {
-                    context.Abort();
-                }
-            }
-
-            static async Task InfoWebSocketHandler(HttpContext context, Func<Task> next)
-            {
-                var centaurusContext = context.RequestServices.GetService<AlphaContext>();
-                var webSocket = await context.WebSockets.AcceptWebSocketAsync();
-                await centaurusContext.InfoConnectionManager.OnNewConnection(webSocket, context.Connection.Id, context.Connection.RemoteIpAddress.ToString());
-            }
-
-            // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-            public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
-            {
-                app.UseHostFiltering();
-
-                if (env.IsDevelopment())
-                {
-                    app.UseDeveloperExceptionPage();
-                }
-                else
-                {
-                    app.UseExceptionHandler("/Error");
-                    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-                    //app.UseHsts();
-                }
-                //app.UseHttpsRedirection();
-
-                app.UseWebSockets();
-
-                app.Use(async (context, next) =>
-                {
-                    var path = context.Request.Path.ToString();
-                    if (context.WebSockets.IsWebSocketRequest && webSocketHandlers.Keys.Contains(path))
-                        await webSocketHandlers[path].Invoke(context, next);
-                    else
-                        await next();
-                });
-
-                app.UseMvc(routes =>
-                {
-                    routes.MapRoute(
-                        name: "default",
-                        template: "{controller}/{action=Index}/{id?}");
-                });
+                var isSet = resetEvent.WaitOne(0);
+                if (!isSet)
+                    resetEvent.Set();
             }
         }
 

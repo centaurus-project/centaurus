@@ -15,7 +15,7 @@ namespace Centaurus.Domain
 {
     public static class UpdatesAggregator
     {
-        public static void Aggregate(this EffectProcessorsContainer processorsContainer, MessageEnvelope quantumEnvelope, Effect quatumEffect, int effectIndex)
+        public static void Aggregate(this EffectProcessorsContainer processorsContainer, MessageEnvelope quantumEnvelope, Effect quatumEffect)
         {
             if (processorsContainer == null)
                 throw new ArgumentNullException(nameof(processorsContainer));

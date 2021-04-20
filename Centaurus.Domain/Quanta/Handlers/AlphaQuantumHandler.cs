@@ -13,7 +13,7 @@ using System.Threading.Tasks;
 namespace Centaurus.Domain
 {
     //TODO: add Stop method
-    public class AlphaQuantumHandler : QuantumHandler
+    public class AlphaQuantumHandler : QuantumHandler<AlphaContext>
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
@@ -22,19 +22,17 @@ namespace Centaurus.Domain
         {
         }
 
-        AlphaContext AlphaContext => (AlphaContext)context;
-
         protected override void OnProcessException(HandleItem handleItem, ResultMessage result, Exception exc)
         {
             if (result == null)
                 result = handleItem.Quantum.CreateResult(exc);
-            AlphaContext.OnMessageProcessResult(result);
+            Context.OnMessageProcessResult(result);
         }
 
         MessageEnvelope GetQuantumEnvelope(MessageEnvelope envelope)
         {
             var quantumEnvelope = envelope;
-            if (context.IsAlpha && !(envelope.Message is Quantum))//we need to wrap client request
+            if (Context.IsAlpha && !(envelope.Message is Quantum))//we need to wrap client request
                 quantumEnvelope = new RequestQuantum { RequestEnvelope = envelope }.CreateEnvelope();
             return quantumEnvelope;
         }
@@ -47,8 +45,8 @@ namespace Centaurus.Domain
 
             var quantum = (Quantum)quantumEnvelope.Message;
 
-            quantum.Apex = context.QuantumStorage.CurrentApex + 1;
-            quantum.PrevHash = context.QuantumStorage.LastQuantumHash;
+            quantum.Apex = Context.QuantumStorage.CurrentApex + 1;
+            quantum.PrevHash = Context.QuantumStorage.LastQuantumHash;
             quantum.Timestamp = timestamp == default ? DateTime.UtcNow.Ticks : timestamp;//it could be assigned, if this quantum was handled already and we handle it during the server rising
 
             var effectsContainer = GetEffectProcessorsContainer(quantumEnvelope);
@@ -67,14 +65,14 @@ namespace Centaurus.Domain
 
             var messageHash = quantumEnvelope.ComputeMessageHash(buffer.Buffer);
             //we need to sign the quantum here to prevent multiple signatures that can occur if we sign it when sending
-            quantumEnvelope.Signatures.Add(messageHash.Sign(context.Settings.KeyPair));
+            quantumEnvelope.Signatures.Add(messageHash.Sign(Context.Settings.KeyPair));
 
             var resultMessageHash = resultMessageEnvelope.ComputeMessageHash(buffer.Buffer);
-            resultMessageEnvelope.Signatures.Add(resultMessageHash.Sign(context.Settings.KeyPair));
+            resultMessageEnvelope.Signatures.Add(resultMessageHash.Sign(Context.Settings.KeyPair));
 
-            ((AlphaContext)context).AuditResultManager.Register(resultMessageEnvelope, resultMessageHash, processor.GetNotificationMessages(processorContext));
+            ((AlphaContext)Context).AuditResultManager.Register(resultMessageEnvelope, resultMessageHash, processor.GetNotificationMessages(processorContext));
 
-            context.QuantumStorage.AddQuantum(quantumEnvelope, messageHash);
+            Context.QuantumStorage.AddQuantum(quantumEnvelope, messageHash);
 
             effectsContainer.Complete(buffer.Buffer);
 

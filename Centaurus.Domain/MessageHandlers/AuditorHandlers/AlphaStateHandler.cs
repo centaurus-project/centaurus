@@ -12,6 +12,11 @@ namespace Centaurus.Domain
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
+        public AlphaStateHandler(AuditorContext context) 
+            : base(context)
+        {
+        }
+
         public override MessageTypes SupportedMessageType { get; } = MessageTypes.AlphaState;
 
         public override ConnectionState[] ValidConnectionStates { get; } = new ConnectionState[] { ConnectionState.Connected };
@@ -25,7 +30,7 @@ namespace Centaurus.Domain
 
             connection.ConnectionState = ConnectionState.Ready;
             //send apex cursor message to start receive quanta
-            _ = connection.SendMessage(new SetApexCursor() { Apex = connection.Context.QuantumStorage.CurrentApex });
+            _ = connection.SendMessage(new SetApexCursor() { Apex = Context.QuantumStorage.CurrentApex });
 
             return Task.CompletedTask;
         }

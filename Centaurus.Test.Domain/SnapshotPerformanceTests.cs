@@ -15,7 +15,7 @@ namespace Centaurus.Test
     [TestFixture]
     public class SnapshotPerformanceTests
     {
-        private CentaurusContext context;
+        private ExecutionContext context;
 
         [SetUp]
         public void Setup()
@@ -25,7 +25,8 @@ namespace Centaurus.Test
             { 
                 CWD = "AppData"
             };
-            context = new AlphaContext(settings, new MongoStorage());
+            var stellarProvider = new MockStellarDataProvider(settings.NetworkPassphrase, settings.HorizonUrl);
+            context = new AlphaContext(settings, new MongoStorage(), stellarProvider);
 
             context.Init().Wait();
         }
@@ -34,8 +35,7 @@ namespace Centaurus.Test
         public void TearDown()
         {
             context.Exchange.Clear();
-            context.TearDown().Wait();
-            //AccountStorage.Clear();
+            context.Dispose();
         }
     }
 }

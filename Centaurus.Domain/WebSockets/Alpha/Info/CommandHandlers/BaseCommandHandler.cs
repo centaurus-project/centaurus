@@ -16,9 +16,15 @@ namespace Centaurus.Domain
         public abstract Task<BaseResponse> Handle(InfoWebSocketConnection infoWebSocket, T command);
     }
 
-    public abstract class BaseCommandHandler<T>: IBaseCommandHandler<T>, IBaseCommandHandler
+    public abstract class BaseCommandHandler<T>: ContextualBase<AlphaContext>, IBaseCommandHandler<T>, IBaseCommandHandler
         where T : BaseCommand
     {
+        public BaseCommandHandler(AlphaContext context)
+            :base(context)
+        {
+
+        }
+
         public abstract Task<BaseResponse> Handle(InfoWebSocketConnection infoWebSocket, T command);
 
         Task<BaseResponse> IBaseCommandHandler.Handle(InfoWebSocketConnection infoWebSocket, object command)

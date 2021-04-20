@@ -35,6 +35,7 @@ namespace Centaurus.Test
         {
             var settings = new AuditorSettings();
             SetCommonSettings(settings, TestEnvironment.Auditor1KeyPair.SecretSeed);
+            settings.AlphaAddress = "http://localhost";
             settings.ConnectionString = "mongodb://localhost:27001/auditorDBTest?replicaSet=centaurus";
             settings.AlphaPubKey = TestEnvironment.AlphaKeyPair.AccountId;
             settings.GenesisQuorum = new string[] { TestEnvironment.Auditor1KeyPair.AccountId };
@@ -95,9 +96,13 @@ namespace Centaurus.Test
         /// <param name="clients">Clients to add to constellation</param>
         /// <param name="auditors">Auditors to add to constellation</param>
         /// <param name="settings">Settings that will be used to init Global</param>
-        public static async Task<CentaurusContext> Setup(List<KeyPair> clients, List<KeyPair> auditors, BaseSettings settings, IStorage storage)
+        public static async Task<ExecutionContext> Setup(List<KeyPair> clients, List<KeyPair> auditors, BaseSettings settings, IStorage storage)
         {
-            var context = settings is AlphaSettings ? (CentaurusContext)new AlphaContext(settings, storage) : new AuditorContext(settings, storage);
+            var stellarProvider = new MockStellarDataProvider(settings.NetworkPassphrase, settings.HorizonUrl);
+
+            var context = settings is AlphaSettings 
+                ? (ExecutionContext)new AlphaContext((AlphaSettings)settings, storage, stellarProvider) 
+                : new AuditorContext((AuditorSettings)settings, storage, stellarProvider);
 
             await context.Init();
 

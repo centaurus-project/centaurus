@@ -18,7 +18,6 @@ namespace Centaurus.Test
         {
             EnvironmentHelper.SetTestEnvironmentVariable();
             context = GlobalInitHelper.DefaultAlphaSetup().Result;
-            MessageHandlers<AlphaWebSocketConnection>.Init(context);
         }
 
         private AlphaContext context;
@@ -48,7 +47,7 @@ namespace Centaurus.Test
             var inMessage = envelope.ToIncomingMessage(writer);
             if (expectedException == null)
             {
-                var isHandled = await MessageHandlers<AlphaWebSocketConnection>.HandleMessage(clientConnection, inMessage);
+                var isHandled = await context.MessageHandlers.HandleMessage(clientConnection, inMessage);
 
                 Assert.IsTrue(isHandled);
                 Assert.AreEqual(clientConnection.ClientPubKey, new RawPubKey(clientKeyPair.AccountId));
@@ -58,7 +57,7 @@ namespace Centaurus.Test
                     Assert.AreEqual(clientConnection.ConnectionState, ConnectionState.Ready);
             }
             else
-                Assert.ThrowsAsync(expectedException, async () => await MessageHandlers<AlphaWebSocketConnection>.HandleMessage(clientConnection, inMessage));
+                Assert.ThrowsAsync(expectedException, async () => await context.MessageHandlers.HandleMessage(clientConnection, inMessage));
         }
 
         [Test]
@@ -77,7 +76,7 @@ namespace Centaurus.Test
             using var writer = new XdrBufferWriter();
             var inMessage = envelope.ToIncomingMessage(writer);
 
-            Assert.ThrowsAsync<ConnectionCloseException>(async () => await MessageHandlers<AlphaWebSocketConnection>.HandleMessage(clientConnection, inMessage));
+            Assert.ThrowsAsync<ConnectionCloseException>(async () => await context.MessageHandlers.HandleMessage(clientConnection, inMessage));
         }
 
         [Test]
@@ -137,7 +136,7 @@ namespace Centaurus.Test
         static object[] TxNotificationTestCases =
         {
             new object[] { TestEnvironment.Client1KeyPair, ConnectionState.Validated, typeof(UnauthorizedException) },
-            new object[] { TestEnvironment.Auditor1KeyPair, ConnectionState.Validated, typeof(InvalidStateException) },
+            new object[] { TestEnvironment.Auditor1KeyPair, ConnectionState.Connected, typeof(InvalidStateException) },
             new object[] { TestEnvironment.Auditor1KeyPair, ConnectionState.Ready, null }
         };
 

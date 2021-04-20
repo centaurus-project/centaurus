@@ -32,8 +32,9 @@ namespace Centaurus.Models
 
         public override string ToString()
         {
-            if (IsXlm) return "XLM";
-            return $"{Code}-{Issuer}";
+            if (IsXlm) 
+                return AssetsHelper.XLMCode;
+            return AssetsHelper.GetCode(Code, Issuer.ToString());
         }
 
         /// <summary>

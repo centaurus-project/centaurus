@@ -11,7 +11,7 @@ namespace Centaurus.Domain
 {
     public static class PaymentsHelper
     {
-        private static bool TryGetAsset(this CentaurusContext context, Asset xdrAsset, out int asset)
+        private static bool TryGetAsset(this ExecutionContext context, Asset xdrAsset, out int asset)
         {
             if (context == null)
                 throw new ArgumentNullException(nameof(context));
@@ -32,7 +32,7 @@ namespace Centaurus.Domain
 
         public static OperationTypeEnum[] SupportedDepositOperations = new OperationTypeEnum[] { OperationTypeEnum.PAYMENT };
 
-        public static bool TryGetPayment(this CentaurusContext context, Operation.OperationBody operation, stellar_dotnet_sdk.KeyPair source, PaymentResults pResult, byte[] transactionHash, out PaymentBase payment)
+        public static bool TryGetPayment(this ExecutionContext context, Operation.OperationBody operation, stellar_dotnet_sdk.KeyPair source, PaymentResults pResult, byte[] transactionHash, out PaymentBase payment)
         {
             if (context == null)
                 throw new ArgumentNullException(nameof(context));

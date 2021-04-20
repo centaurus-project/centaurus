@@ -18,7 +18,6 @@ namespace Centaurus.Test
         {
             EnvironmentHelper.SetTestEnvironmentVariable();
             context = GlobalInitHelper.DefaultAlphaSetup().Result;
-            MessageHandlers<AlphaWebSocketConnection>.Init(context);
         }
 
         static object[] EffectsLoadTestCases = new object[]

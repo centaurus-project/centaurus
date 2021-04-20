@@ -46,7 +46,7 @@ namespace Centaurus.SDK
         {
             var resultMessage = (ResultMessage)envelope.Message;
             if (resultMessage.Status == ResultStatusCodes.Success)
-                completionSource.TrySetResult(envelope);
+                completionSource.TrySetResultAsync(envelope);
             else
                 SetException(new RequestException(envelope, resultMessage.Status.ToString()));
         }
@@ -67,7 +67,7 @@ namespace Centaurus.SDK
         {
             if (IsCompleted)
                 return;
-            acknowledgmentSource.TrySetException(exc);
+            acknowledgmentSource.TrySetExceptionAsync(exc);
         }
     }
 
@@ -117,8 +117,8 @@ namespace Centaurus.SDK
             }
             catch (Exception exc)
             {
-                acknowledgmentSource.TrySetException(exc);
-                finalizeSource.TrySetException(exc);
+                acknowledgmentSource.TrySetExceptionAsync(exc);
+                finalizeSource.TrySetExceptionAsync(exc);
             }
         }
 
@@ -126,8 +126,8 @@ namespace Centaurus.SDK
         {
             if (IsCompleted)
                 return;
-            acknowledgmentSource.TrySetException(exc);
-            finalizeSource.TrySetException(exc);
+            acknowledgmentSource.TrySetExceptionAsync(exc);
+            finalizeSource.TrySetExceptionAsync(exc);
         }
     }
 }

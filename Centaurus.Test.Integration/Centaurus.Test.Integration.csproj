@@ -25,6 +25,8 @@
     <ProjectReference Include="..\Centaurus.Domain\Centaurus.Domain.csproj" />
     <ProjectReference Include="..\Centaurus.Models\Centaurus.Models.csproj" />
     <ProjectReference Include="..\Centaurus.Test.Utils\Centaurus.Test.Utils.csproj" />
+    <ProjectReference Include="..\Centaurus\Centaurus.csproj" />
+    <ProjectReference Include="..\SDK\Centaurus.SDK\Centaurus.SDK.csproj" />
   </ItemGroup>
 
 </Project>

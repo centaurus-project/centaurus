@@ -1,4 +1,6 @@
 ﻿using Centaurus.Models;
+using Centaurus.Stellar;
+using Centaurus.Stellar.Models;
 using stellar_dotnet_sdk;
 using stellar_dotnet_sdk.requests;
 using System;
@@ -23,17 +25,15 @@ namespace Centaurus.Domain
     /// Initializes the application. 
     /// It can only be called from the Alpha, and only when it is in the waiting for initialization state.
     /// </summary>
-    public class ConstellationInitializer
+    public class ConstellationInitializer: ContextualBase<AlphaContext>
     {
         const int minAuditorsCount = 1;
 
-        CentaurusContext context;
         ConstellationInitInfo constellationInitInfo;
 
-        public ConstellationInitializer(ConstellationInitInfo constellationInitInfo, CentaurusContext context)
+        public ConstellationInitializer(ConstellationInitInfo constellationInitInfo, AlphaContext context)
+            :base(context)
         {
-            this.context = context ?? throw new ArgumentNullException(nameof(context));
-
             if (constellationInitInfo.Auditors == null || constellationInitInfo.Auditors.Count() < minAuditorsCount)
                 throw new ArgumentException($"Min auditors count is {minAuditorsCount}");
 
@@ -57,12 +57,12 @@ namespace Centaurus.Domain
 
         public async Task Init()
         {
-            if (context.AppState.State != ApplicationState.WaitingForInit)
+            if (Context.AppState.State != ApplicationState.WaitingForInit)
                 throw new InvalidOperationException("Alpha is not in the waiting for initialization state.");
 
             var alphaAccountData = await DoesAlphaAccountExist();
             if (alphaAccountData == null)
-                throw new InvalidOperationException($"The vault ({context.Settings.KeyPair.AccountId}) is not yet funded");
+                throw new InvalidOperationException($"The vault ({Context.Settings.KeyPair.AccountId}) is not yet funded");
 
             var txCursor = await BuildAndConfigureVault(alphaAccountData);
 
@@ -72,7 +72,7 @@ namespace Centaurus.Domain
             {
                 Assets = constellationInitInfo.Assets.ToList(),
                 Auditors = constellationInitInfo.Auditors.Select(key => (RawPubKey)key.PublicKey).ToList(),
-                Vault = context.Settings.KeyPair.PublicKey,
+                Vault = Context.Settings.KeyPair.PublicKey,
                 MinAccountBalance = constellationInitInfo.MinAccountBalance,
                 MinAllowedLotSize = constellationInitInfo.MinAllowedLotSize,
                 PrevHash = new byte[] { },
@@ -82,7 +82,7 @@ namespace Centaurus.Domain
 
             var envelope = initQuantum.CreateEnvelope();
 
-            await context.QuantumHandler.HandleAsync(envelope);
+            var res = await Context.QuantumHandler.HandleAsync(envelope);
         }
 
         private void SetIdToAssets()
@@ -98,30 +98,24 @@ namespace Centaurus.Domain
         /// Builds and configures Centaurus vault
         /// </summary>
         /// <returns>Transaction cursor</returns>
-        private async Task<long> BuildAndConfigureVault(stellar_dotnet_sdk.responses.AccountResponse vaultAccount)
+        private async Task<long> BuildAndConfigureVault(AccountModel vaultAccount)
         {
             var majority = MajorityHelper.GetMajorityCount(constellationInitInfo.Auditors.Count());
 
-            var sourceAccount = await StellarAccountHelper.GetStellarAccount(vaultAccount.KeyPair, context.StellarNetwork);
+            var sourceAccount = await Context.StellarDataProvider.GetAccountData(vaultAccount.KeyPair.AccountId);
 
-            var transactionBuilder = new TransactionBuilder(sourceAccount);
+            var transactionBuilder = new TransactionBuilder(sourceAccount.ToITransactionBuilderAccount());
             transactionBuilder.SetFee(10_000);
 
-            var existingTrustlines = vaultAccount.Balances
-                .Where(b => b.Asset is stellar_dotnet_sdk.AssetTypeCreditAlphaNum)
-                .Select(b => b.Asset)
-                .Cast<stellar_dotnet_sdk.AssetTypeCreditAlphaNum>();
             foreach (var a in constellationInitInfo.Assets)
             {
-                var asset = a.ToAsset() as stellar_dotnet_sdk.AssetTypeCreditAlphaNum;
-
-                if (asset == null)//if null than asset is stellar_dotnet_sdk.AssetTypeNative
+                if (a.IsXlm)
                     throw new InvalidOperationException("Native assets are supported by default."); //better to throw exception to avoid confusions with id
 
-                if (existingTrustlines.Any(t => t.Code == asset.Code && t.Issuer == asset.Issuer))
+                if (vaultAccount.ExistingTrustLines.Any(ta => ta == a.ToString()))
                     continue;
 
-                var trustOperation = new ChangeTrustOperation.Builder(asset, "922337203685.4775807");
+                var trustOperation = new ChangeTrustOperation.Builder(a.ToAsset(), "922337203685.4775807");
                 transactionBuilder.AddOperation(trustOperation.Build());
             }
 
@@ -139,24 +133,24 @@ namespace Centaurus.Domain
             }
 
             var transaction = transactionBuilder.Build();
-            transaction.Sign(context.Settings.KeyPair);
+            transaction.Sign(Context.Settings.KeyPair);
 
-            var result = await context.StellarNetwork.Server.SubmitTransaction(transaction);
+            var result = await Context.StellarDataProvider.SubmitTransaction(transaction);
 
-            if (!result.IsSuccess())
+            if (!result.IsSuccess)
             {
                 throw new Exception($"Transaction failed. Result Xdr: {result.ResultXdr}");
             }
 
-            var tx = await context.StellarNetwork.Server.Transactions.Transaction(result.Hash);
-            return long.Parse(tx.PagingToken);
+            var tx = await Context.StellarDataProvider.GetTransaction(result.Hash);
+            return tx.PagingToken;
         }
 
-        private async Task<stellar_dotnet_sdk.responses.AccountResponse> DoesAlphaAccountExist()
+        private async Task<AccountModel> DoesAlphaAccountExist()
         {
             try
             {
-                return await StellarAccountHelper.GetStellarAccount(context.Settings.KeyPair, context.StellarNetwork);
+                return await Context.StellarDataProvider.GetAccountData(Context.Settings.KeyPair.AccountId);
             }
             catch (HttpResponseException exc)
             {

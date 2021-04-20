@@ -11,6 +11,11 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
+        public AuditorResultMessageHandler(AuditorContext context) 
+            : base(context)
+        {
+        }
+
         public override MessageTypes SupportedMessageType { get; } = MessageTypes.ResultMessage;
 
         public override ConnectionState[] ValidConnectionStates { get; } = null;

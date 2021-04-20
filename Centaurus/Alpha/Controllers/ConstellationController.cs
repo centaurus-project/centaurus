@@ -9,21 +9,21 @@ using stellar_dotnet_sdk;
 namespace Centaurus.Controllers
 {
     [Route("api/[controller]")]
-    public class ConstellationController : Controller
+    public class ConstellationController : Controller, IContextual<AlphaContext>
     {
-        private CentaurusContext centaurusContext;
-
-        public ConstellationController(CentaurusContext centaurusContext)
+        public ConstellationController(AlphaContext centaurusContext)
         {
-            this.centaurusContext = centaurusContext;
+            Context = centaurusContext;
         }
+
+        public AlphaContext Context { get; }
 
         [HttpGet("[action]")]
         public ConstellationInfo Info()
         {
             ConstellationInfo info;
 
-            var state = (int)(centaurusContext.AppState?.State ?? 0);
+            var state = (int)(Context.AppState?.State ?? 0);
             if (state < (int)ApplicationState.Running)
                 info = new ConstellationInfo
                 {
@@ -32,20 +32,20 @@ namespace Centaurus.Controllers
             else
             {
                 var network = new ConstellationInfo.Network(
-                   centaurusContext.StellarNetwork.Network.NetworkPassphrase,
-                   centaurusContext.StellarNetwork.Horizon
+                   Context.StellarDataProvider.NetworkPassphrase,
+                   Context.StellarDataProvider.Horizon
                     );
-                var assets = centaurusContext.Constellation.Assets.Select(a => ConstellationInfo.Asset.FromAssetSettings(a)).ToArray();
+                var assets = Context.Constellation.Assets.Select(a => ConstellationInfo.Asset.FromAssetSettings(a)).ToArray();
                 info = new ConstellationInfo
                 {
-                    State = centaurusContext.AppState.State,
-                    Vault = ((KeyPair)centaurusContext.Constellation.Vault).AccountId,
-                    Auditors = centaurusContext.Constellation.Auditors.Select(a => ((KeyPair)a).AccountId).ToArray(),
-                    MinAccountBalance = centaurusContext.Constellation.MinAccountBalance,
-                    MinAllowedLotSize = centaurusContext.Constellation.MinAllowedLotSize,
+                    State = Context.AppState.State,
+                    Vault = ((KeyPair)Context.Constellation.Vault).AccountId,
+                    Auditors = Context.Constellation.Auditors.Select(a => ((KeyPair)a).AccountId).ToArray(),
+                    MinAccountBalance = Context.Constellation.MinAccountBalance,
+                    MinAllowedLotSize = Context.Constellation.MinAllowedLotSize,
                     StellarNetwork = network,
                     Assets = assets,
-                    RequestRateLimits = centaurusContext.Constellation.RequestRateLimits
+                    RequestRateLimits = Context.Constellation.RequestRateLimits
                 };
             }
 
@@ -77,17 +77,24 @@ namespace Centaurus.Controllers
                         Assets = constellationInit.Assets.Select(a => AssetSettings.FromCode(a)).ToArray(),
                         RequestRateLimits = requestRateLimits
                     },
-                    centaurusContext
+                    Context
                 );
 
                 await constellationInitializer.Init();
 
-                return new JsonResult(new { IsSuccess = true });
+                return new JsonResult(new InitResult { IsSuccess = true });
             }
             catch (Exception exc)
             {
-                return new JsonResult(new { IsSuccess = false, Error = exc.Message });
+                return new JsonResult(new InitResult { IsSuccess = false, Error = exc.Message });
             }
+        }
+
+        public class InitResult
+        {
+            public bool IsSuccess { get; set; }
+
+            public string Error { get; set; }
         }
     }
 }

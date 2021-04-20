@@ -18,6 +18,12 @@ namespace Centaurus.Test
             context = GlobalInitHelper.DefaultAlphaSetup().Result;
         }
 
+        [TearDown]
+        public void TearDown()
+        {
+            context?.Dispose();
+        }
+
         static object[] AccountRequestRateLimitsCases =
         {
             new object[] { TestEnvironment.Client1KeyPair, null },

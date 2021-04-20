@@ -12,8 +12,7 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    //TODO: add Stop method
-    public abstract class QuantumHandler : IDisposable
+    public abstract class QuantumHandler: ContextualBase, IDisposable
     {
         protected class HandleItem
         {
@@ -28,13 +27,13 @@ namespace Centaurus.Domain
             public long Timestamp { get; }
         }
 
-        static Logger logger = LogManager.GetCurrentClassLogger();
-
-        public QuantumHandler(CentaurusContext context)
+        public QuantumHandler(ExecutionContext context)
+            : base(context)
         {
             buffer = XdrBufferFactory.Rent(256 * 1024);
-            this.context = context;
         }
+
+        static Logger logger = LogManager.GetCurrentClassLogger();
 
         public virtual void Start()
         {
@@ -43,7 +42,6 @@ namespace Centaurus.Domain
 
         BlockingCollection<HandleItem> awaitedQuanta = new BlockingCollection<HandleItem>();
         protected XdrBufferFactory.RentedBuffer buffer;
-        protected readonly CentaurusContext context;
 
         /// <summary>
         /// Handles the quantum and returns Task.
@@ -68,14 +66,14 @@ namespace Centaurus.Domain
                 foreach (var handlingItem in awaitedQuanta.GetConsumingEnumerable())
                 {
                     await ProcessQuantum(handlingItem);
-                    if (context.IsAlpha && QuantaThrottlingManager.Current.IsThrottlingEnabled)
+                    if (Context.IsAlpha && QuantaThrottlingManager.Current.IsThrottlingEnabled)
                         Thread.Sleep(QuantaThrottlingManager.Current.SleepTime);
                 }
             }
             catch (Exception exc)
             {
                 logger.Error(exc, "Quantum worker failed");
-                context.AppState.State = ApplicationState.Failed;
+                Context.AppState.State = ApplicationState.Failed;
                 throw;
             }
         }
@@ -87,34 +85,34 @@ namespace Centaurus.Domain
             ResultMessage result = null;
             try
             {
-                context.ExtensionsManager.BeforeQuantumHandle(envelope);
+                Context.ExtensionsManager.BeforeQuantumHandle(envelope);
 
                 result = await HandleQuantumInternal(envelope, handleItem.Timestamp);
                 if (result.Status != ResultStatusCodes.Success)
                     throw new Exception("Failed to handle quantum.");
-                tcs.SetResult(result);
+                tcs.SetResultAsync(result);
             }
             catch (Exception exc)
             {
-                tcs.SetException(exc);
+                tcs.SetExceptionAsync(exc);
                 OnProcessException(handleItem, result, exc);
             }
-            context.ExtensionsManager.AfterQuantumHandle(result);
+            Context.ExtensionsManager.AfterQuantumHandle(result);
         }
 
         protected abstract void OnProcessException(HandleItem handleItem, ResultMessage result, Exception exc);
 
         async Task<ResultMessage> HandleQuantumInternal(MessageEnvelope quantumEnvelope, long timestamp)
         {
-            quantumEnvelope.TryAssignAccountWrapper(context.AccountStorage);
-            await context.PendingUpdatesManager.UpdatesSyncRoot.WaitAsync();
+            quantumEnvelope.TryAssignAccountWrapper(Context.AccountStorage);
+            await Context.PendingUpdatesManager.UpdatesSyncRoot.WaitAsync();
             try
             {
                 return await HandleQuantum(quantumEnvelope, timestamp);
             }
             finally
             {
-                context.PendingUpdatesManager.UpdatesSyncRoot.Release();
+                Context.PendingUpdatesManager.UpdatesSyncRoot.Release();
             }
         }
 
@@ -122,7 +120,7 @@ namespace Centaurus.Domain
 
         protected EffectProcessorsContainer GetEffectProcessorsContainer(MessageEnvelope envelope)
         {
-            return new EffectProcessorsContainer(context, envelope, context.PendingUpdatesManager.Current);
+            return new EffectProcessorsContainer(Context, envelope, Context.PendingUpdatesManager.Current);
         }
 
         /// <summary>
@@ -130,7 +128,7 @@ namespace Centaurus.Domain
         /// </summary>
         protected IQuantumRequestProcessor GetProcessorItem(MessageTypes messageType)
         {
-            if (!context.QuantumProcessor.TryGetValue(messageType, out var processor))
+            if (!Context.QuantumProcessor.TryGetValue(messageType, out var processor))
                 //TODO: do not fail here - return unsupported error message;
                 throw new InvalidOperationException($"Quantum {messageType} is not supported.");
             return processor;
@@ -141,5 +139,16 @@ namespace Centaurus.Domain
             awaitedQuanta?.Dispose();
             awaitedQuanta = null;
         }
+    }
+
+    public abstract class QuantumHandler<TContext> : QuantumHandler, IContextual<TContext>
+        where TContext: ExecutionContext
+    {
+        public QuantumHandler(TContext context)
+            :base(context)
+        {
+        }
+
+        public new TContext Context => (TContext)base.Context;
     }
 }

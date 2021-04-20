@@ -7,8 +7,13 @@ using Centaurus.Models;
 
 namespace Centaurus.Domain
 {
-    public abstract class BaseAlphaMessageHandler: BaseMessageHandler<AlphaWebSocketConnection>, IAlphaMessageHandler
+    public abstract class BaseAlphaMessageHandler: BaseMessageHandler<AlphaWebSocketConnection, AlphaContext>, IAlphaMessageHandler
     {
+        public BaseAlphaMessageHandler(AlphaContext context) 
+            : base(context)
+        {
+        }
+
         /// <summary>
         /// Indicates whether authorization is required for the handler.
         /// </summary>

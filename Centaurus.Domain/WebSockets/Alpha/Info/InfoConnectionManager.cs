@@ -11,16 +11,14 @@ namespace Centaurus.Domain
     /// <summary>
     /// Manages all client websocket connections
     /// </summary>
-    public class InfoConnectionManager
+    public class InfoConnectionManager: ContextualBase<AlphaContext>
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        private readonly AlphaContext context;
-
         public InfoConnectionManager(AlphaContext context)
+            :base(context)
         {
-            this.context = context;
-        } 
+        }
 
         /// <summary>
         /// Registers new client websocket connection
@@ -28,7 +26,7 @@ namespace Centaurus.Domain
         /// <param name="webSocket">New websocket connection</param>
         public async Task OnNewConnection(WebSocket webSocket, string connectionId, string ip)
         {
-            var connection = new InfoWebSocketConnection(context, webSocket, connectionId, ip);
+            var connection = new InfoWebSocketConnection(Context, webSocket, connectionId, ip);
             Subscribe(connection);
             if (!connections.TryAdd(connectionId, connection))
                 throw new Exception($"Connection with id {connectionId} already exists.");

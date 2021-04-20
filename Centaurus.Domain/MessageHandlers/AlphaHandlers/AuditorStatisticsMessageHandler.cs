@@ -8,6 +8,11 @@ namespace Centaurus.Domain
 {
     public class AuditorPerfStatisticsMessageHandler : BaseAlphaMessageHandler
     {
+        public AuditorPerfStatisticsMessageHandler(AlphaContext context) 
+            : base(context)
+        {
+        }
+
         public override MessageTypes SupportedMessageType { get; } = MessageTypes.AuditorPerfStatistics;
 
         public override ConnectionState[] ValidConnectionStates { get; } = null;
@@ -18,7 +23,7 @@ namespace Centaurus.Domain
         {
             var auditor = connection.ClientKPAccountId;
             var statistics = (AuditorPerfStatistics)message.Envelope.Message;
-            var alphaPerfManager = (AlphaPerformanceStatisticsManager)connection.Context.PerformanceStatisticsManager;
+            var alphaPerfManager = (AlphaPerformanceStatisticsManager)Context.PerformanceStatisticsManager;
             _ = Task.Factory.StartNew(() => alphaPerfManager.AddAuditorStatistics(auditor, statistics));
             return Task.CompletedTask;
         }

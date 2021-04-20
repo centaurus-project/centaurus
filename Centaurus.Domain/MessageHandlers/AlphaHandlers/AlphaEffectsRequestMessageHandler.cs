@@ -10,6 +10,11 @@ namespace Centaurus.Domain
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
+        public AlphaEffectsRequestMessageHandler(AlphaContext context) 
+            : base(context)
+        {
+        }
+
         public override bool IsAuditorOnly => false;
 
         public override MessageTypes SupportedMessageType => MessageTypes.EffectsRequest;

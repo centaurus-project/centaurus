@@ -19,7 +19,7 @@ namespace Centaurus.Test
             refreshUpdatesContainerMethod = updatesManagerType.GetMethod("RefreshUpdatesContainer", BindingFlags.NonPublic | BindingFlags.Instance);
         }
 
-        public static async Task ApplyUpdates(CentaurusContext context)
+        public static async Task ApplyUpdates(ExecutionContext context)
         {
             await (Task)applyUpdatesMethod.Invoke(context.PendingUpdatesManager, new object[] { context.PendingUpdatesManager.Current });
             refreshUpdatesContainerMethod.Invoke(context.PendingUpdatesManager, null);

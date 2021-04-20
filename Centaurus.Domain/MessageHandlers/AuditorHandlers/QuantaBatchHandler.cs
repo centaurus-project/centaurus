@@ -11,6 +11,11 @@ namespace Centaurus.Domain
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
+        public QuantaBatchHandler(AuditorContext context) 
+            : base(context)
+        {
+        }
+
         public override MessageTypes SupportedMessageType => MessageTypes.QuantaBatch;
 
         public override ConnectionState[] ValidConnectionStates => new ConnectionState[] { ConnectionState.Connected, ConnectionState.Ready };
@@ -34,7 +39,7 @@ namespace Centaurus.Domain
                     await connection.SendMessage(new SetApexCursor { Apex = quantumHandler.LastAddedQuantumApex });
                     return;
                 }
-                _ = connection.Context.QuantumHandler.HandleAsync(quantumEnvelope);
+                _ = Context.QuantumHandler.HandleAsync(quantumEnvelope);
             }
         }
     }

@@ -24,6 +24,6 @@ namespace Centaurus.Domain
 
         public EffectProcessorsContainer EffectProcessors { get; }
 
-        public CentaurusContext CentaurusContext => EffectProcessors.Context;
+        public ExecutionContext CentaurusContext => EffectProcessors.Context;
     }
 }

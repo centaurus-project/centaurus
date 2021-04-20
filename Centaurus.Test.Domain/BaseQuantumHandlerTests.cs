@@ -16,7 +16,7 @@ namespace Centaurus.Test
 {
     public abstract class BaseQuantumHandlerTests
     {
-        protected CentaurusContext context;
+        protected Domain.ExecutionContext context;
 
         [Test]
         [TestCase(0, 0, 0, typeof(InvalidOperationException))]

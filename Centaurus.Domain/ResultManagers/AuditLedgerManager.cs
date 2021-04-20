@@ -1,6 +1,7 @@
 ﻿using Centaurus.Models;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -11,20 +12,15 @@ namespace Centaurus.Domain
     public class AuditLedgerManager : MajorityManager
     {
         public AuditLedgerManager(AlphaContext context)
-            :base(context)
+            : base(context)
         {
             alphaListener = (AlphaTxListener)context.TxListener;
-            alphaListener.OnNewCursor += AlphaListener_OnNewCursor;
+            Task.Factory.StartNew(TryHandleTxCommit);
         }
 
         private Dictionary<long, TxCommitQuantum> pendingTxCommits = new Dictionary<long, TxCommitQuantum>();
         private AlphaTxListener alphaListener;
-        private SemaphoreSlim semaphore = new SemaphoreSlim(1);
-
-        private void AlphaListener_OnNewCursor()
-        {
-            _ = TryHandleTxCommit();
-        }
+        private object syncRoot = new { };
 
         protected override void OnResult(MajorityResults majorityResult, MessageEnvelope result)
         {
@@ -43,34 +39,39 @@ namespace Centaurus.Domain
                 return;
             }
             AddNewTxCommit(result);
-            _ = TryHandleTxCommit();
         }
 
         private void AddNewTxCommit(MessageEnvelope result)
         {
-            semaphore.Wait();
-            var txCursor = ((TxNotification)result.Message).TxCursor;
-            if (!pendingTxCommits.ContainsKey(((TxNotification)result.Message).TxCursor))
-                pendingTxCommits.Add(txCursor, new TxCommitQuantum { Source = result });
-            semaphore.Release();
+            lock (syncRoot)
+            {
+                var txCursor = ((TxNotification)result.Message).TxCursor;
+                if (!pendingTxCommits.ContainsKey(txCursor))
+                    pendingTxCommits.Add(txCursor, new TxCommitQuantum { Source = result });
+            }
         }
 
-        private async Task TryHandleTxCommit()
+        private bool TryGetTxCommit(long cursor, out TxCommitQuantum txCommit)
         {
-            await semaphore.WaitAsync();
+            lock (syncRoot)
+                return pendingTxCommits.Remove(cursor, out txCommit);
+        }
+
+        private void TryHandleTxCommit()
+        {
             try
             {
-                while (true)
+                while (!isStoped)
                 {
                     var nextCursor = alphaListener.PeekCursor();
-                    if (pendingTxCommits.Remove(nextCursor, out var txCommit))
+                    if (TryGetTxCommit(nextCursor, out var txCommit))
                     {
                         alphaListener.DequeueCursor();
                         var ledgerCommitEnvelope = txCommit.CreateEnvelope();
-                        await Context.QuantumHandler.HandleAsync(ledgerCommitEnvelope);
+                        Context.QuantumHandler.HandleAsync(ledgerCommitEnvelope);
                     }
                     else
-                        break;
+                        Thread.Sleep(100);
                 }
             }
             catch (Exception exc)
@@ -78,18 +79,14 @@ namespace Centaurus.Domain
                 logger.Error(exc, "Error on tx commit processing.");
                 Context.AppState.State = ApplicationState.Failed;
             }
-            finally
-            {
-                semaphore.Release();
-            }
         }
+
+        private bool isStoped = false;
 
         public override void Dispose()
         {
+            isStoped = true;
             base.Dispose();
-            alphaListener.OnNewCursor -= AlphaListener_OnNewCursor;
-            semaphore?.Dispose();
-            semaphore = null;
         }
     }
 }

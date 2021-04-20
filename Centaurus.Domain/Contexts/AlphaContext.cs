@@ -1,6 +1,7 @@
 ﻿using Centaurus.DAL;
 using Centaurus.Exchange.Analytics;
 using Centaurus.Models;
+using Centaurus.Stellar;
 using NLog;
 using System;
 using System.Collections.Generic;
@@ -10,12 +11,12 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public class AlphaContext : CentaurusContext
+    public class AlphaContext : ExecutionContext<AlphaContext, AlphaSettings>
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public AlphaContext(BaseSettings settings, IStorage storage, bool useLegacyOrderbook = false)
-            : base(settings, storage, useLegacyOrderbook)
+        public AlphaContext(AlphaSettings settings, IStorage storage, StellarDataProviderBase stellarDataProvider, bool useLegacyOrderbook = false)
+            : base(settings, storage, stellarDataProvider, useLegacyOrderbook)
         {
             AppState = new AlphaStateManager(this);
             AppState.StateChanged += AppState_StateChanged;
@@ -25,9 +26,15 @@ namespace Centaurus.Domain
             QuantumHandler = new AlphaQuantumHandler(this);
 
             ConnectionManager = new ConnectionManager(this);
+
             SubscriptionsManager = new SubscriptionsManager();
             InfoConnectionManager = new InfoConnectionManager(this);
+
             Catchup = new AlphaCatchup(this);
+
+            MessageHandlers = new MessageHandlers<AlphaWebSocketConnection, AlphaContext>(this);
+
+            InfoCommandsHandlers = new InfoCommandsHandlers(this);
         }
 
         public override bool IsAlpha => true;
@@ -38,10 +45,12 @@ namespace Centaurus.Domain
 
         public override QuantumHandler QuantumHandler { get; }
 
+        public override MessageHandlers MessageHandlers { get; }
+        public InfoCommandsHandlers InfoCommandsHandlers { get; }
         public AlphaCatchup Catchup { get; }
         public ConnectionManager ConnectionManager { get; }
-        public SubscriptionsManager SubscriptionsManager { get; }
         public InfoConnectionManager InfoConnectionManager { get; }
+        public SubscriptionsManager SubscriptionsManager { get; }
         public AuditLedgerManager AuditLedgerManager { get; private set; }
         public ResultManager AuditResultManager { get; private set; }
         public AnalyticsManager AnalyticsManager { get; private set; }
@@ -84,12 +93,14 @@ namespace Centaurus.Domain
             PerformanceStatisticsManager.OnUpdates += PerformanceStatisticsManager_OnUpdates;
         }
 
-        public override async Task TearDown()
+        public override void Dispose()
         {
-            await base.TearDown();
+            base.Dispose();
+            QuantumHandler.Dispose();
             AuditLedgerManager?.Dispose();
             AuditResultManager?.Dispose();
-            await DisposeAnalyticsManager();
+            DisposeAnalyticsManager().Wait();
+            DisposePerformanceStatisticsManager();
         }
 
         protected override void AppState_StateChanged(StateChangedEventArgs stateChangedEventArgs)
@@ -156,13 +167,13 @@ namespace Centaurus.Domain
                 {
                     var limit = 200;
                     var unhandledTxs = new List<byte[]>();
-                    var pageResult = await StellarNetwork.Server.GetTransactionsRequestBuilder(Constellation.Vault.ToString(), TxCursorManager.TxCursor, limit).Execute();
-                    while (pageResult.Records.Count > 0)
+                    var result = await StellarDataProvider.GetTransactions(Constellation.Vault.ToString(), TxCursorManager.TxCursor, limit);
+                    while (result.Count > 0)
                     {
-                        unhandledTxs.AddRange(pageResult.Records.Select(r => ByteArrayExtensions.FromHexString(r.Hash)));
-                        if (pageResult.Records.Count != limit)
+                        unhandledTxs.AddRange(result.Select(r => ByteArrayExtensions.FromHexString(r.Hash)));
+                        if (result.Count != limit)
                             break;
-                        pageResult = await pageResult.NextPage();
+                        result = await StellarDataProvider.GetTransactions(Constellation.Vault.ToString(), result.Last().PagingToken, limit);
                     }
                     return unhandledTxs;
                 }

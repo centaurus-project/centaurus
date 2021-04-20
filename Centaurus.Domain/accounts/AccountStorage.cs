@@ -70,10 +70,11 @@ namespace Centaurus.Domain
             return acc;
         }
 
-        public int GetNextAccountId()
-        {
-            return accountIds.Values.LastOrDefault() + 1;
-        }
+        public int NextAccountId => LastAccountId + 1;
+
+        public int LastAccountId => accountIds.Values.LastOrDefault();
+
+        public int Count => accountIds.Count;
 
         public void RemoveAccount(RawPubKey pubkey)
         {

@@ -8,6 +8,11 @@ namespace Centaurus.Domain
 {
     public class AuditorHandeshakeHandler : BaseAuditorMessageHandler
     {
+        public AuditorHandeshakeHandler(AuditorContext context) 
+            : base(context)
+        {
+        }
+
         public override MessageTypes SupportedMessageType { get; } = MessageTypes.HandshakeInit;
 
         public override ConnectionState[] ValidConnectionStates { get; } = new ConnectionState[] { ConnectionState.Connected };

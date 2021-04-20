@@ -8,29 +8,28 @@ using Centaurus.DAL;
 using Centaurus.DAL.Mongo;
 using Centaurus.Exchange.Analytics;
 using Centaurus.Models;
+using Centaurus.Stellar;
 using Centaurus.Xdr;
 using NLog;
 
 namespace Centaurus.Domain
 {
-
-    public abstract class CentaurusContext
+    public abstract class ExecutionContext: IDisposable
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
         /// <param name="settings">Application config</param>
         /// <param name="storage">Permanent storage object</param>
         /// <param name="useLegacyOrderbook"></param>
-        public CentaurusContext(BaseSettings settings, IStorage storage, bool useLegacyOrderbook = false)
+        public ExecutionContext(BaseSettings settings, IStorage storage, StellarDataProviderBase stellarDataProvider, bool useLegacyOrderbook = false)
         {
             PermanentStorage = storage ?? throw new ArgumentNullException(nameof(storage));
             Settings = settings ?? throw new ArgumentNullException(nameof(settings));
+            StellarDataProvider = stellarDataProvider ?? throw new ArgumentNullException(nameof(settings));
 
             ExtensionsManager = new ExtensionsManager(settings.ExtensionsConfigFilePath);
 
             PersistenceManager = new PersistenceManager(PermanentStorage);
-
-            StellarNetwork = new StellarNetwork(Settings.NetworkPassphrase, Settings.HorizonUrl);
             QuantumProcessor = new QuantumProcessorsStorage();
 
             PendingUpdatesManager = new PendingUpdatesManager(this);
@@ -91,13 +90,13 @@ namespace Centaurus.Domain
             return Task.CompletedTask;
         }
 
-        public virtual Task TearDown()
+        public virtual void Dispose()
         {
             PendingUpdatesManager?.Stop(); PendingUpdatesManager?.Dispose();
 
             ExtensionsManager?.Dispose();
             WithdrawalStorage?.Dispose();
-            return Task.CompletedTask;
+            TxListener?.Dispose();
         }
 
         protected virtual void AppState_StateChanged(StateChangedEventArgs stateChangedEventArgs)
@@ -163,7 +162,7 @@ namespace Centaurus.Domain
 
         public BaseSettings Settings { get; }
 
-        public StellarNetwork StellarNetwork { get; }
+        public StellarDataProviderBase StellarDataProvider { get; }
 
         public virtual bool IsAlpha { get; } = false;
 
@@ -171,6 +170,20 @@ namespace Centaurus.Domain
 
         public abstract QuantumStorageBase QuantumStorage { get; }
 
-        public abstract QuantumHandler QuantumHandler { get; }
+        public virtual QuantumHandler QuantumHandler { get; }
+
+        public virtual MessageHandlers MessageHandlers { get; }
+    }
+
+    public abstract class ExecutionContext<TContext, TSettings> : ExecutionContext
+        where TContext: ExecutionContext
+        where TSettings: BaseSettings
+    {
+        public ExecutionContext(TSettings settings, IStorage storage, StellarDataProviderBase stellarDataProvider, bool useLegacyOrderbook = false)
+            :base(settings, storage, stellarDataProvider, useLegacyOrderbook)
+        {
+        }
+
+        public new TSettings Settings => (TSettings)base.Settings;
     }
 }

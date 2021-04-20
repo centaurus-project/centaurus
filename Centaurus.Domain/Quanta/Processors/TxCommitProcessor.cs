@@ -45,7 +45,6 @@ namespace Centaurus.Domain
             //TODO: validate type automatically based on the SupportedMessageType
             var ledgerQuantum = context.Envelope.Message as TxCommitQuantum
                 ?? throw new ArgumentException($"Unexpected message type. Only messages of type {typeof(TxCommitQuantum).FullName} are supported.");
-
             var ledgerSourceEnvelope = ledgerQuantum.Source;
             var ledgerInfo = ledgerSourceEnvelope.Message as TxNotification
                 ?? throw new ArgumentException($"Unexpected LedgerCommitQuantum source. Only messages of {typeof(TxNotification).FullName} type can be the source.");
@@ -75,7 +74,7 @@ namespace Centaurus.Domain
             return Task.CompletedTask;
         }
 
-        private void CheckSignatures(CentaurusContext context, MessageEnvelope envelope)
+        private void CheckSignatures(ExecutionContext context, MessageEnvelope envelope)
         {
             if (!context.HasMajority(envelope))
                 throw new InvalidOperationException("No majority");
@@ -110,7 +109,7 @@ namespace Centaurus.Domain
                 //ignore registration with non-native asset or with amount that is less than MinAccountBalance
                 if (deposit.Asset != 0 || deposit.Amount < context.CentaurusContext.Constellation.MinAccountBalance)
                     return;
-                var accId = context.CentaurusContext.AccountStorage.GetNextAccountId();
+                var accId = context.CentaurusContext.AccountStorage.NextAccountId;
                 context.EffectProcessors.AddAccountCreate(context.CentaurusContext.AccountStorage, accId, deposit.Destination);
                 account = context.CentaurusContext.AccountStorage.GetAccount(accId);
             }

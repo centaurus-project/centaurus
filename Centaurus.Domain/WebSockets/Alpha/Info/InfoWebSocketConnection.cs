@@ -15,11 +15,12 @@ using Centaurus.Xdr;
 
 namespace Centaurus.Domain
 {
-    public class InfoWebSocketConnection : IDisposable
+    //TODO: TESTS!
+    public class InfoWebSocketConnection : ContextualBase<AlphaContext>, IDisposable
     {
         public InfoWebSocketConnection(AlphaContext context, WebSocket webSocket, string connectionId, string ip)
+            :base(context)
         {
-            Context = context ?? throw new ArgumentNullException(nameof(context));
             this.webSocket = webSocket ?? throw new ArgumentNullException(nameof(webSocket));
             Ip = ip;
             ConnectionId = connectionId;
@@ -27,8 +28,6 @@ namespace Centaurus.Domain
             cancellationToken = cancellationTokenSource.Token;
             incomingBuffer = XdrBufferFactory.Rent(WebSocketExtension.ChunkSize);
         }
-
-        static InfoCommandsHandlers commandHandlers = new InfoCommandsHandlers();
 
         static Logger logger = LogManager.GetCurrentClassLogger();
         private readonly WebSocket webSocket;
@@ -38,7 +37,6 @@ namespace Centaurus.Domain
 
         private XdrBufferFactory.RentedBuffer incomingBuffer;
 
-        public AlphaContext Context { get; }
         public string Ip { get; }
         public string ConnectionId { get; }
 
@@ -148,7 +146,7 @@ namespace Centaurus.Domain
                             try
                             {
                                 command = BaseCommand.Deserialize(incomingBuffer.AsSpan());
-                                var handlerResult = await commandHandlers.HandleCommand(this, command);
+                                var handlerResult = await Context.InfoCommandsHandlers.HandleCommand(this, command);
                                 await SendMessage(handlerResult);
                             }
                             catch (Exception exc)
