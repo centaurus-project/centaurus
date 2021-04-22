@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Net.WebSockets;
 using System.Text;
 using System.Threading;
@@ -21,13 +22,17 @@ namespace Centaurus.Test
         WebSocketState state;
         public override WebSocketState State => state;
 
-        string subProtocol;
-
-        public override string SubProtocol => subProtocol;
+        public override string SubProtocol => null;
 
         public override void Abort()
         {
             state = WebSocketState.Aborted;
+            secondPartyWebsocket?.SetClosed();
+        }
+
+        private void SetClosed()
+        {
+            CloseAsync(WebSocketCloseStatus.Empty, "", CancellationToken.None);
         }
 
         public override Task CloseAsync(WebSocketCloseStatus _closeStatus, string statusDescription, CancellationToken cancellationToken)
@@ -37,6 +42,8 @@ namespace Centaurus.Test
                 closeStatus = _closeStatus;
                 closeStatusDescription = statusDescription;
                 state = WebSocketState.Closed;
+                listenToken?.Cancel();
+                secondPartyWebsocket.SetClosed();
             }
             return Task.CompletedTask;
         }
@@ -48,14 +55,14 @@ namespace Centaurus.Test
 
         private BlockingCollection<TestMessage> pendingMessages = new BlockingCollection<TestMessage>();
         TestMessage currentMessage;
-        SemaphoreSlim receivingSemaphore = new SemaphoreSlim(1);
-        public override async Task<WebSocketReceiveResult> ReceiveAsync(ArraySegment<byte> buffer, CancellationToken cancellationToken)
+        object receivingSemaphore = new { };
+        CancellationTokenSource listenToken = new CancellationTokenSource();
+        public override Task<WebSocketReceiveResult> ReceiveAsync(ArraySegment<byte> buffer, CancellationToken cancellationToken)
         {
-            await receivingSemaphore.WaitAsync();
-            try
+            lock (receivingSemaphore)
             {
                 if (currentMessage == null)
-                    currentMessage = pendingMessages.Take();
+                    currentMessage = pendingMessages.Take(listenToken.Token);
 
                 var startAt = currentMessage.ReadenDataLength;
                 var length = Math.Min(currentMessage.Data.Length - currentMessage.ReadenDataLength, buffer.Count);
@@ -70,26 +77,19 @@ namespace Centaurus.Test
                     currentMessage.Dispose();
                     currentMessage = null;
                 }
-                else
-                { }
 
-                return new WebSocketReceiveResult(length, messageType, isEnd);
-
-            }
-            finally
-            {
-                receivingSemaphore.Release();
+                return Task.FromResult(new WebSocketReceiveResult(length, messageType, isEnd));
             }
         }
 
-        SemaphoreSlim sendingSemaphore = new SemaphoreSlim(1);
+        object sendingSemaphore = new { };
 
         private BlockingCollection<TestMessage> secondPartyPendingMessages;
+        private MockWebSocket secondPartyWebsocket;
 
-        public override async Task SendAsync(ArraySegment<byte> buffer, WebSocketMessageType messageType, bool endOfMessage, CancellationToken cancellationToken)
+        public override Task SendAsync(ArraySegment<byte> buffer, WebSocketMessageType messageType, bool endOfMessage, CancellationToken cancellationToken)
         {
-            await sendingSemaphore.WaitAsync();
-            try
+            lock (sendingSemaphore)
             {
                 if (!endOfMessage)
                     throw new InvalidOperationException("Only completed messages are supported.");
@@ -99,10 +99,7 @@ namespace Centaurus.Test
                 message.Resize(buffer.Count);
                 secondPartyPendingMessages.Add(new TestMessage(message, messageType, endOfMessage));
             }
-            finally
-            {
-                sendingSemaphore.Release();
-            }
+            return Task.CompletedTask;
         }
 
         private void AssignMessagePool(BlockingCollection<TestMessage> pendingMessages)
@@ -112,8 +109,8 @@ namespace Centaurus.Test
 
         public void Connect(MockWebSocket webSocket)
         {
+            secondPartyWebsocket = webSocket;
             webSocket.AssignMessagePool(pendingMessages);
-            
             state = WebSocketState.Open;
         }
 
@@ -121,16 +118,10 @@ namespace Centaurus.Test
         {
             pendingMessages?.Dispose();
             pendingMessages = null;
-
-            receivingSemaphore?.Dispose();
-            receivingSemaphore = null;
-
-            sendingSemaphore?.Dispose();
-            sendingSemaphore = null;
         }
     }
 
-    public class TestMessage: IDisposable
+    public class TestMessage : IDisposable
     {
         public TestMessage(RentedBuffer data, WebSocketMessageType type, bool isEnd)
         {

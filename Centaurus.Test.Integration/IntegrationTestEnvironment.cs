@@ -7,6 +7,7 @@ using stellar_dotnet_sdk;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.WebSockets;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -25,7 +26,10 @@ namespace Centaurus.Test
 
         public const string HorizonUrl = "https://horizon-testnet.stellar.org";
         public const string NetworkPassphrase = "Test SDF Network ; September 2015";
-        public const string AlphaAddress = "wss://localhost";
+        public const int AlphaPort = 5000;
+
+        public static string AlphaAddress { get; } = $"ws://localhost:{AlphaPort}/centaurus";
+
         public KeyPair Issuer { get; } = KeyPair.Random();
 
         public MockStellarDataProvider StellarProvider { get; }
@@ -35,14 +39,31 @@ namespace Centaurus.Test
         public List<AuditorStartup> AuditorStartups { get; } = new List<AuditorStartup>();
         public List<KeyPair> Clients { get; } = new List<KeyPair>();
 
-        public async Task Init(int auditorsCount)
+        public void Init(int auditorsCount)
         {
-            await RunAlpha();
-            await RunAuditors(auditorsCount);
+            if (isInited)
+                throw new InvalidOperationException("Already inited");
+            GenerateAlpha();
+            GenerateAuditors(auditorsCount);
+            isInited = true;
+        }
+
+        private void GenerateAlpha()
+        {
+            alphaSettings = GetAlphaSettings();
+            RegisterStellarAccount(alphaSettings.KeyPair);
+        }
+
+        private void GenerateAuditors(int auditorsCount)
+        {
+            var keyPairs = Enumerable.Range(0, auditorsCount).Select(_ => KeyPair.Random()).ToArray();
+            GenesisQuorum = keyPairs.Select(k => k.AccountId);
+            auditorSettings = keyPairs.Select(kp => GetAuditorSettings(kp)).ToList();
         }
 
         public void GenerateCliens(int clientsCount)
         {
+            EnsureInited();
             var clients = Enumerable.Range(0, clientsCount).Select(_ => KeyPair.Random()).ToList();
             var info = ConstellationController.Info();
             var assets = info.Assets;
@@ -63,19 +84,28 @@ namespace Centaurus.Test
             Clients.AddRange(clients);
         }
 
-        public MockClientConnectionWrapper GetClientConnectionWrapper()
+        public ClientConnectionWrapperBase GetClientConnectionWrapper()
         {
-            var serverSocket = new MockWebSocket();
-            var auditorSocket = new MockWebSocket();
+            var clientConnection = new MockWebSocket();
+            var serverConnection = new MockWebSocket();
+            return new MockClientConnectionWrapper(AlphaStartup.Context, clientConnection, serverConnection);
 
-            return new MockClientConnectionWrapper(AlphaStartup.Context, auditorSocket, serverSocket);
+            //return new ClientConnectionWrapper(new ClientWebSocket());
         }
 
         SDK.Models.ConstellationInfo sdkConstellationInfo;
+        private AlphaSettings alphaSettings;
+
+        public IEnumerable<string> GenesisQuorum { get; private set; }
+
+        private List<AuditorSettings> auditorSettings;
+        private bool isInited;
+
         public SDK.Models.ConstellationInfo SDKConstellationInfo
         {
             get
             {
+                EnsureInited();
                 if (sdkConstellationInfo == null)
                     sdkConstellationInfo = ConstellationController.Info().ToSdkModel();
                 return sdkConstellationInfo;
@@ -86,6 +116,7 @@ namespace Centaurus.Test
         {
             var alphaSettings = new AlphaSettings
             {
+                AlphaPort = 5000,
                 HorizonUrl = HorizonUrl,
                 NetworkPassphrase = NetworkPassphrase,
                 Secret = KeyPair.Random().SecretSeed,
@@ -95,13 +126,10 @@ namespace Centaurus.Test
             return alphaSettings;
         }
 
-        private async Task RunAlpha()
+        public async Task RunAlpha()
         {
-            var settings = GetAlphaSettings();
-
-            RegisterStellarAccount(settings.KeyPair);
-
-            var alphaContext = new AlphaContext(settings, new MockStorage(), StellarProvider);
+            EnsureInited();
+            var alphaContext = new AlphaContext(alphaSettings, new MockStorage(), StellarProvider);
             AlphaStartup = new AlphaStartup(alphaContext);
             ConstellationController = new ConstellationController(alphaContext);
             await AlphaStartup.Run(Reset);
@@ -119,25 +147,23 @@ namespace Centaurus.Test
             return accountModel;
         }
 
-        private AuditorSettings GetAuditorSettings(KeyPair keyPair, IEnumerable<string> genesisQuorum)
+        private AuditorSettings GetAuditorSettings(KeyPair keyPair)
         {
             var settings = new AuditorSettings
             {
-                AlphaPubKey = AlphaStartup.Context.Settings.KeyPair.AccountId,
-                Secret = KeyPair.Random().SecretSeed,
+                AlphaPubKey = alphaSettings.KeyPair.AccountId,
+                Secret = keyPair.SecretSeed,
                 NetworkPassphrase = NetworkPassphrase,
                 HorizonUrl = HorizonUrl,
-                GenesisQuorum = genesisQuorum,
+                GenesisQuorum = GenesisQuorum,
                 AlphaAddress = AlphaAddress
             };
             settings.Build();
             return settings;
         }
 
-        private async Task<AuditorStartup> RunAuditor(KeyPair keyPair, IEnumerable<string> genesisQuorum)
+        private async Task<AuditorStartup> RunAuditor(AuditorSettings settings)
         {
-            var settings = GetAuditorSettings(keyPair, genesisQuorum);
-
             var auditorContext = new AuditorContext(settings, new MockStorage(), StellarProvider);
 
             var auditorStartup = new AuditorStartup(auditorContext, GetClientConnectionWrapper);
@@ -147,12 +173,17 @@ namespace Centaurus.Test
             return auditorStartup;
         }
 
-        private async Task RunAuditors(int count)
+        public async Task RunAuditors()
         {
-            var keyPairs = Enumerable.Range(0, count).Select(_ => KeyPair.Random());
-            var genesisQuorum = keyPairs.Select(k => k.AccountId);
-            foreach (var keyPair in keyPairs)
-                AuditorStartups.Add(await RunAuditor(keyPair, genesisQuorum));
+            EnsureInited();
+            foreach (var settings in auditorSettings)
+                AuditorStartups.Add(await RunAuditor(settings));
+        }
+
+        private void EnsureInited()
+        {
+            if (!isInited)
+                throw new InvalidOperationException("Call init first.");
         }
     }
 }

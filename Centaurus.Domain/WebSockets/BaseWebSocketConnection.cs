@@ -278,6 +278,7 @@ namespace Centaurus
             sendMessageSemaphore?.Dispose();
             sendMessageSemaphore = null;
 
+            cancellationTokenSource?.Cancel();
             cancellationTokenSource?.Dispose();
             cancellationTokenSource = null;
 

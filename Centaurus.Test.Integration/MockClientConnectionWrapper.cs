@@ -29,7 +29,7 @@ namespace Centaurus.Test
 
             ((MockWebSocket)WebSocket).Connect(webSocketServer);
             (webSocketServer).Connect((MockWebSocket)WebSocket);
-            _ = Task.Factory.StartNew(() => alphaContext.ConnectionManager.OnNewConnection(webSocketServer, null));
+            Task.Factory.StartNew(() => alphaContext.ConnectionManager.OnNewConnection(webSocketServer, null));
             return Task.CompletedTask;
         }
     }

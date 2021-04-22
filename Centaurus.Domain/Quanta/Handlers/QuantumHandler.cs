@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public abstract class QuantumHandler: ContextualBase, IDisposable
+    public abstract class QuantumHandler : ContextualBase, IDisposable
     {
         protected class HandleItem
         {
@@ -126,12 +126,64 @@ namespace Centaurus.Domain
         /// <summary>
         /// Looks for a processor for the specified message type
         /// </summary>
-        protected IQuantumRequestProcessor GetProcessorItem(MessageTypes messageType)
+        private IQuantumRequestProcessor GetProcessorItem(MessageEnvelope envelope)
         {
+            var messageType = GetMessageType(envelope);
+
             if (!Context.QuantumProcessor.TryGetValue(messageType, out var processor))
                 //TODO: do not fail here - return unsupported error message;
                 throw new InvalidOperationException($"Quantum {messageType} is not supported.");
             return processor;
+        }
+
+        protected async Task<QuantumProcessingResult> ProcessQuantum(MessageEnvelope envelope)
+        {
+            var processor = GetProcessorItem(envelope);
+
+            var effectsContainer = GetEffectProcessorsContainer(envelope);
+
+            var processorContext = processor.GetContext(effectsContainer);
+
+            await processor.Validate(processorContext);
+
+            var resultMessage = await processor.Process(processorContext);
+
+            var effectsData = GetEffectsData(effectsContainer);
+
+            var result = new QuantumProcessingResult
+            {
+                ResultMessage = resultMessage,
+                Effects = new QuantumProcessingEffects
+                {
+                    Data = effectsData,
+                    Hash = effectsData.ComputeHash()
+                },
+                TxHash = GetTxHash(processorContext),
+                EffectProcessorsContainer = effectsContainer
+            };
+
+            return result;
+        }
+
+        byte[] GetTxHash(ProcessorContext processorContext)
+        {
+            if (processorContext is ITransactionProcessorContext transaction)
+                return transaction.TransactionHash;
+            return null;
+        }
+
+        byte[] GetEffectsData(EffectProcessorsContainer effectsContainer)
+        {
+            var resultEffectsContainer = new EffectsContainer { Effects = effectsContainer.Effects };
+
+            return resultEffectsContainer.ToByteArray(buffer.Buffer);
+        }
+
+        MessageTypes GetMessageType(MessageEnvelope envelope)
+        {
+            if (envelope.Message is RequestQuantum)
+                return ((RequestQuantum)envelope.Message).RequestMessage.MessageType;
+            return envelope.Message.MessageType;
         }
 
         public void Dispose()
@@ -139,13 +191,31 @@ namespace Centaurus.Domain
             awaitedQuanta?.Dispose();
             awaitedQuanta = null;
         }
+
+        protected class QuantumProcessingResult
+        {
+            public EffectProcessorsContainer EffectProcessorsContainer { get; set; }
+
+            public ResultMessage ResultMessage { get; set; }
+
+            public QuantumProcessingEffects Effects { get; set; }
+
+            public byte[] TxHash { get; set; }
+        }
+
+        protected class QuantumProcessingEffects
+        {
+            public byte[] Data { get; set; }
+
+            public byte[] Hash { get; set; }
+        }
     }
 
     public abstract class QuantumHandler<TContext> : QuantumHandler, IContextual<TContext>
-        where TContext: ExecutionContext
+        where TContext : ExecutionContext
     {
         public QuantumHandler(TContext context)
-            :base(context)
+            : base(context)
         {
         }
 

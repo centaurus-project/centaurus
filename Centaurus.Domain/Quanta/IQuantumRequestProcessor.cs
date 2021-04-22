@@ -28,13 +28,6 @@ namespace Centaurus.Domain
         /// </summary>
         /// <param name="context">Request context</param>
         public T GetContext(EffectProcessorsContainer container);
-
-        /// <summary>
-        /// Creates message notifications for accounts that were affected by quantum
-        /// </summary>
-        /// <param name="context"></param>
-        /// <returns></returns>
-        public Dictionary<int, Message> GetNotificationMessages(T context);
     }
 
     public interface IQuantumRequestProcessor
@@ -58,12 +51,5 @@ namespace Centaurus.Domain
         /// </summary>
         /// <param name="context">Request context</param>
         public ProcessorContext GetContext(EffectProcessorsContainer container);
-
-        /// <summary>
-        /// Creates message notifications for accounts that were affected by quantum
-        /// </summary>
-        /// <param name="context"></param>
-        /// <returns></returns>
-        public Dictionary<int, Message> GetNotificationMessages(object context);
     }
 }

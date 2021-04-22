@@ -51,27 +51,11 @@ namespace Centaurus.Domain
             if (quantum.Apex != Context.QuantumStorage.CurrentApex + 1)
                 throw new Exception($"Current quantum apex is {quantum.Apex} but {Context.QuantumStorage.CurrentApex + 1} was expected.");
 
-            var messageType = GetMessageType(envelope);
-
-            var processor = GetProcessorItem(messageType);
-
             ValidateAccountRequestRate(envelope);
 
-            var effectsContainer = GetEffectProcessorsContainer(envelope);
+            var result = await ProcessQuantum(envelope);
 
-            var processorContext = processor.GetContext(effectsContainer);
-
-            await processor.Validate(processorContext);
-
-            var result = await processor.Process(processorContext);
-
-            var resultEffectsContainer = new EffectsContainer { Effects = effectsContainer.Effects };
-
-            var effects = resultEffectsContainer.ToByteArray(buffer.Buffer);
-
-            var effectsHash = effects.ComputeHash();
-
-            if (!ByteArrayComparer.Default.Equals(effectsHash, quantum.EffectsHash) && !EnvironmentHelper.IsTest)
+            if (!ByteArrayComparer.Default.Equals(result.Effects.Hash, quantum.EffectsHash) && !EnvironmentHelper.IsTest)
             {
                 throw new Exception("Effects hash is not equal to provided by Alpha.");
             }
@@ -80,15 +64,15 @@ namespace Centaurus.Domain
 
             Context.QuantumStorage.AddQuantum(envelope, messageHash);
 
-            ProcessTransaction(processorContext, result);
+            ProcessTransaction(result.ResultMessage, result.TxHash);
 
-            effectsContainer.Complete(buffer.Buffer);
+            result.EffectProcessorsContainer.Complete(buffer.Buffer);
 
-            logger.Trace($"Message of type {messageType} with apex {((Quantum)envelope.Message).Apex} is handled.");
+            auditorContext.OutgoingResultsStorage.EnqueueResult(result.ResultMessage, buffer.Buffer);
 
-            auditorContext.OutgoingResultsStorage.EnqueueResult(result, buffer.Buffer);
+            logger.Trace($"Message of type {quantum.MessageType} with apex {quantum.Apex} is handled.");
 
-            return result;
+            return result.ResultMessage;
         }
 
         void ValidateAccountRequestRate(MessageEnvelope envelope)
@@ -102,26 +86,19 @@ namespace Centaurus.Domain
         }
 
 
-        void ProcessTransaction(ProcessorContext processorContext, ResultMessage resultMessage)
+        void ProcessTransaction(ResultMessage resultMessage, byte[] txHash)
         {
-            var transactionContext = processorContext as ITransactionProcessorContext;
-            if (transactionContext == null)
+            if (txHash == null)
                 return;
+
             var txResult = resultMessage as ITransactionResultMessage;
             if (txResult == null)
                 throw new Exception("Result is not ITransactionResultMessage");
             txResult.TxSignatures.Add(new Ed25519Signature
             {
-                Signature = Context.Settings.KeyPair.Sign(transactionContext.TransactionHash),
+                Signature = Context.Settings.KeyPair.Sign(txHash),
                 Signer = Context.Settings.KeyPair.PublicKey
             });
-        }
-
-        MessageTypes GetMessageType(MessageEnvelope envelope)
-        {
-            if (envelope.Message is RequestQuantum)
-                return ((RequestQuantum)envelope.Message).RequestMessage.MessageType;
-            return envelope.Message.MessageType;
         }
     }
 }

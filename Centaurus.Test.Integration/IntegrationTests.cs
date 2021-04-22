@@ -36,7 +36,7 @@ namespace Centaurus.Test
             var initResult = await environment.ConstellationController.Init(new ConstellationInitModel
             {
                 Assets = assetCodes.Select(a => $"{a}-{environment.Issuer.AccountId}-{(a.Length > 4 ? 2 : 1)}").ToArray(),
-                Auditors = environment.AuditorStartups.Select(a => a.Context.Settings.KeyPair.AccountId).ToArray(),
+                Auditors = environment.GenesisQuorum.ToArray(),
                 MinAccountBalance = 1000,
                 MinAllowedLotSize = 100,
                 RequestRateLimits = new RequestRateLimitsModel { HourLimit = int.MaxValue, MinuteLimit = int.MaxValue }
@@ -46,7 +46,7 @@ namespace Centaurus.Test
             Assert.IsTrue(result.IsSuccess, "Init result.");
         }
 
-        private async Task AssertConstellationState(ApplicationState targetState)
+        private async Task AssertConstellationState(ApplicationState targetState, TimeSpan timeOut)
         {
             Func<Task<bool>> func = () =>
             {
@@ -55,7 +55,7 @@ namespace Centaurus.Test
 
             await AssertDuringPeriod(
                 func,
-                TimeSpan.FromSeconds(10000),
+                timeOut,
                 $"Unable to rich {targetState} state."
             );
         }
@@ -110,7 +110,8 @@ namespace Centaurus.Test
 
         private void AsserFinalize(MessageEnvelope resultMessage)
         {
-            Assert.IsTrue(resultMessage.AreSignaturesValid(), "Signatures validation.");
+            if (resultMessage.Message.MessageType != MessageTypes.ITransactionResultMessage)
+                Assert.IsTrue(resultMessage.AreSignaturesValid(), "Signatures validation.");
             Assert.IsTrue(resultMessage.Signatures.Count >= environment.AlphaStartup.Context.GetMajorityCount(), "Majority validation.");
         }
 
@@ -141,6 +142,23 @@ namespace Centaurus.Test
             }
         }
 
+        private async Task AssertWithdrawal(SDK.CentaurusClient client, KeyPair keyPair, int assetId, string amount)
+        {
+            var balance = client.AccountData.GetBalances().First(a => a.AssetId == assetId);
+            var balanceAmount = balance.Amount;
+            try
+            {
+                var result = await client.Withdrawal(keyPair, amount, environment.SDKConstellationInfo.Assets.First(a => a.Id == assetId));
+                AsserFinalize(result);
+                AsserResult(result, ResultStatusCodes.Success);
+                await AssertBalance(client, assetId, balanceAmount - Amount.ToXdr(amount), 0);
+            }
+            catch (Exception exc)
+            {
+                Assert.Fail(exc.Message, "Error on withdrawal.");
+            }
+        }
+
         private async Task AssertBalance(SDK.CentaurusClient client, int assetId, long amount, long liabilities)
         {
             Func<Task<bool>> func = async () =>
@@ -158,29 +176,37 @@ namespace Centaurus.Test
         }
 
         [Test]
-        [TestCase(1)]
-        //[TestCase(2)]
-        //[TestCase(10)]
+        //[TestCase(1)]
+        [TestCase(2)]
+        [TestCase(10)]
         public async Task BaseTest(int auditorsCount)
         {
-            await environment.Init(auditorsCount);
+            environment.Init(auditorsCount);
+
+            await environment.RunAlpha();
 
             await InitConstellation();
 
-            await AssertConstellationState(ApplicationState.Ready);
+            await AssertConstellationState(ApplicationState.Running, TimeSpan.FromSeconds(5));
+
+            await environment.RunAuditors();
+
+            await AssertConstellationState(ApplicationState.Ready, TimeSpan.FromSeconds(100 * auditorsCount));
 
             var clientsCount = 1;
 
             environment.GenerateCliens(clientsCount);
 
-            await AssertClientsCount(clientsCount, TimeSpan.FromSeconds(5));
+            await AssertClientsCount(clientsCount, TimeSpan.FromSeconds(15));
 
             var connectedClients = await ConnectClients(environment.Clients, environment.SDKConstellationInfo);
 
             var client = connectedClients.First();
             await AssertPayment(client, KeyPair.Random(), 0, environment.SDKConstellationInfo.MinAccountBalance);
 
-            await AssertClientsCount(clientsCount + 1, TimeSpan.FromSeconds(5)); //client should be created on payment
+            await AssertClientsCount(clientsCount + 1, TimeSpan.FromSeconds(15)); //client should be created on payment
+
+            await AssertWithdrawal(client, client.KeyPair, 0, 1.ToString());
         }
     }
 }

@@ -42,7 +42,7 @@ namespace Centaurus.SDK
         public CentaurusClient(Uri alphaWebSocketAddress, KeyPair keyPair, ConstellationInfo constellation, StellarDataProviderBase stellarDataProvider, Func<ClientConnectionWrapperBase> connectionFactory)
         {
             this.alphaWebSocketAddress = alphaWebSocketAddress ?? throw new ArgumentNullException(nameof(alphaWebSocketAddress));
-            this.keyPair = keyPair ?? throw new ArgumentNullException(nameof(keyPair));
+            this.KeyPair = keyPair ?? throw new ArgumentNullException(nameof(keyPair));
             this.constellation = constellation ?? throw new ArgumentNullException(nameof(constellation));
 
             this.stellarDataProvider = stellarDataProvider ?? throw new ArgumentNullException(nameof(stellarDataProvider));
@@ -51,6 +51,7 @@ namespace Centaurus.SDK
 
             Network.Use(new Network(this.constellation.StellarNetwork.Passphrase));
         }
+        public KeyPair KeyPair { get; }
 
         public async Task Connect()
         {
@@ -63,7 +64,7 @@ namespace Centaurus.SDK
 
                 handshakeResult = new TaskCompletionSource<int>();
 
-                connection = new CentaurusConnection(alphaWebSocketAddress, keyPair, connectionFactory(), constellation);
+                connection = new CentaurusConnection(alphaWebSocketAddress, KeyPair, connectionFactory(), constellation);
                 SubscribeToEvents(connection);
                 await connection.EstablishConnection();
 
@@ -136,7 +137,7 @@ namespace Centaurus.SDK
         public async Task<MessageEnvelope> Withdrawal(KeyPair destination, string amount, ConstellationInfo.Asset asset, bool waitForFinalize = true)
         {
             var paymentMessage = new WithdrawalRequest();
-            var tx = await stellarDataProvider.GetWithdrawalTx(keyPair, constellation.VaultPubKey, destination, amount, asset);
+            var tx = await stellarDataProvider.GetWithdrawalTx(KeyPair, constellation.VaultPubKey, destination, amount, asset);
 
             paymentMessage.TransactionXdr = tx.ToArray();
 
@@ -146,7 +147,7 @@ namespace Centaurus.SDK
             if (txResultMessage is null)
                 throw new Exception($"Unexpected result type '{result.Message.MessageType}'");
 
-            tx.Sign(keyPair);
+            tx.Sign(KeyPair);
             foreach (var signature in txResultMessage.TxSignatures)
             {
                 tx.Signatures.Add(signature.ToDecoratedSignature());
@@ -215,8 +216,8 @@ namespace Centaurus.SDK
 
         public async Task Deposit(long amount, ConstellationInfo.Asset asset, params KeyPair[] extraSigners)
         {
-            var tx = await stellarDataProvider.GetDepositTx(keyPair, constellation.VaultPubKey, Amount.FromXdr(amount), asset);
-            tx.Sign(keyPair);
+            var tx = await stellarDataProvider.GetDepositTx(KeyPair, constellation.VaultPubKey, Amount.FromXdr(amount), asset);
+            tx.Sign(KeyPair);
             foreach (var signer in extraSigners)
                 tx.Sign(signer);
             var submitResult = await stellarDataProvider.SubmitTransaction(tx);
@@ -241,7 +242,6 @@ namespace Centaurus.SDK
 
         private CentaurusConnection connection;
         private Uri alphaWebSocketAddress;
-        private KeyPair keyPair;
         private ConstellationInfo constellation;
         private StellarDataProviderBase stellarDataProvider;
         private Func<ClientConnectionWrapperBase> connectionFactory;

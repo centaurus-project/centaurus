@@ -1,6 +1,7 @@
 ﻿using Centaurus.Models;
 using Centaurus.Xdr;
 using NLog;
+using stellar_dotnet_sdk;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -54,7 +55,7 @@ namespace Centaurus.Domain
 
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        readonly static List<AuditorResultMessage> results = new List<AuditorResultMessage>();
+        readonly List<AuditorResultMessage> results = new List<AuditorResultMessage>();
 
         public OutgoingResultsStorage(AuditorContext context)
             :base(context)
@@ -102,7 +103,6 @@ namespace Centaurus.Domain
             if (result == null)
                 throw new ArgumentNullException(nameof(result));
 
-            var signature = default(byte[]);
             var txSignature = default(byte[]);
             if (result is ITransactionResultMessage txResult)
             {
@@ -114,9 +114,8 @@ namespace Centaurus.Domain
                 txResult.TxSignatures.Clear();
             }
 
-            var resultEnvelope = result.CreateEnvelope();
-            resultEnvelope.Sign(Context.Settings.KeyPair, buffer);
-            signature = resultEnvelope.Signatures[0].Signature;
+            var resultHash = result.ComputeHash(buffer);
+            var signature = Context.Settings.KeyPair.Sign(resultHash);
 
             lock (results)
                 results.Add(new AuditorResultMessage

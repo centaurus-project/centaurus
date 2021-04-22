@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -18,7 +19,7 @@ namespace Centaurus.Domain
         static Logger logger = LogManager.GetCurrentClassLogger();
 
         public AlphaQuantumHandler(AlphaContext context)
-            :base(context)
+            : base(context)
         {
         }
 
@@ -39,8 +40,6 @@ namespace Centaurus.Domain
 
         protected override async Task<ResultMessage> HandleQuantum(MessageEnvelope envelope, long timestamp)
         {
-            var processor = GetProcessorItem(envelope.Message.MessageType);
-
             var quantumEnvelope = GetQuantumEnvelope(envelope);
 
             var quantum = (Quantum)quantumEnvelope.Message;
@@ -49,36 +48,33 @@ namespace Centaurus.Domain
             quantum.PrevHash = Context.QuantumStorage.LastQuantumHash;
             quantum.Timestamp = timestamp == default ? DateTime.UtcNow.Ticks : timestamp;//it could be assigned, if this quantum was handled already and we handle it during the server rising
 
-            var effectsContainer = GetEffectProcessorsContainer(quantumEnvelope);
 
-            var processorContext = processor.GetContext(effectsContainer);
+            var result = await ProcessQuantum(quantumEnvelope);
 
-            await processor.Validate(processorContext);
-
-            var resultMessageEnvelope = (await processor.Process(processorContext)).CreateEnvelope();
-
-            var resultEffectsContainer = new EffectsContainer { Effects = effectsContainer.Effects };
-
-            var effects = resultEffectsContainer.ToByteArray(buffer.Buffer);
-
-            quantum.EffectsHash = effects.ComputeHash();
+            quantum.EffectsHash = result.Effects.Hash;
 
             var messageHash = quantumEnvelope.ComputeMessageHash(buffer.Buffer);
             //we need to sign the quantum here to prevent multiple signatures that can occur if we sign it when sending
             quantumEnvelope.Signatures.Add(messageHash.Sign(Context.Settings.KeyPair));
 
-            var resultMessageHash = resultMessageEnvelope.ComputeMessageHash(buffer.Buffer);
-            resultMessageEnvelope.Signatures.Add(resultMessageHash.Sign(Context.Settings.KeyPair));
-
-            ((AlphaContext)Context).AuditResultManager.Register(resultMessageEnvelope, resultMessageHash, processor.GetNotificationMessages(processorContext));
+            RegisterResult(result);
 
             Context.QuantumStorage.AddQuantum(quantumEnvelope, messageHash);
 
-            effectsContainer.Complete(buffer.Buffer);
+            result.EffectProcessorsContainer.Complete(buffer.Buffer);
 
-            logger.Trace($"Message of type {envelope.Message} with apex {quantum.Apex} is handled.");
+            logger.Trace($"Message of type {quantum.MessageType} with apex {quantum.Apex} is handled.");
 
-            return (ResultMessage)resultMessageEnvelope.Message;
+            return result.ResultMessage;
+        }
+
+        private void RegisterResult(QuantumProcessingResult result)
+        {
+            var resultEnvelope = result.ResultMessage.CreateEnvelope();
+            var resultMessageHash = result.ResultMessage.CreateEnvelope().ComputeMessageHash(buffer.Buffer);
+            resultEnvelope.Signatures.Add(resultMessageHash.Sign(Context.Settings.KeyPair));
+
+            Context.AuditResultManager.Register(resultEnvelope, resultMessageHash, result.EffectProcessorsContainer.GetNotificationMessages());
         }
     }
 }

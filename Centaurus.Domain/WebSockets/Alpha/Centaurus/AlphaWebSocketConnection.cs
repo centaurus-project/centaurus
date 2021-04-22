@@ -51,7 +51,7 @@ namespace Centaurus
                 QuantumWorker?.Dispose();
 
                 //set new apex cursor, and start quantum worker
-                QuantumWorker = new QuantumSyncWorker((AlphaContext)Context, newApexCursor, this);
+                QuantumWorker = new QuantumSyncWorker(Context, newApexCursor, this);
                 logger.Trace($"Connection {ClientKPAccountId}, apex cursor reseted. New apex cursor {newApexCursor}");
             }
         }

@@ -29,34 +29,6 @@ namespace Centaurus.Domain
         public abstract T GetContext(EffectProcessorsContainer container);
 
         ProcessorContext IQuantumRequestProcessor.GetContext(EffectProcessorsContainer container) => GetContext(container);
-
-        public Dictionary<int, Message> GetNotificationMessages(T context)
-        {
-            var requestAccount = 0;
-            if (context.Envelope.Message is RequestQuantum request)
-                requestAccount = request.RequestMessage.Account;
-
-            var result = new Dictionary<int, EffectsNotification>();
-            var effects = context.EffectProcessors.Effects;
-            foreach (var effect in effects)
-            {
-                if (effect.Account == 0
-                    || effect.Account == requestAccount)
-                    continue;
-                if (!result.TryGetValue(effect.Account, out var effectsNotification))
-                {
-                    effectsNotification = new EffectsNotification { Effects = new List<Effect>() };
-                    result.Add(effect.Account, effectsNotification);
-                }
-                effectsNotification.Effects.Add(effect);
-            }
-            return result.ToDictionary(k => k.Key, v => (Message)v.Value);
-        }
-
-        public Dictionary<int, Message> GetNotificationMessages(object context)
-        {
-            return GetNotificationMessages((T)context);
-        }
     }
 
     public abstract class QuantumRequestProcessor : QuantumRequestProcessor<ProcessorContext>

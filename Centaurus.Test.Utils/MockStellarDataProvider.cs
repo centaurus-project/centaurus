@@ -141,7 +141,8 @@ namespace Centaurus.Test
 
             public override Task Connect()
             {
-                return Task.Factory.StartNew(StartSendTxs);
+                Task.Factory.StartNew(StartSendTxs);
+                return Task.CompletedTask;
             }
 
             private void StartSendTxs()

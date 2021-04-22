@@ -21,8 +21,7 @@ namespace Centaurus.Domain
 
         public List<Effect> Effects { get; } = new List<Effect>();
 
-
-        public HashSet<int> AffectedAccounts = new HashSet<int>();
+        public HashSet<int> AffectedAccounts { get; } = new HashSet<int>();
 
         public DiffObject PendingDiffObject { get; }
 
@@ -68,6 +67,32 @@ namespace Centaurus.Domain
                 buffer);
             PendingDiffObject.Quanta.Add(quantumModel);
             PendingDiffObject.EffectsCount += Effects.Count;
+        }
+
+        /// <summary>
+        /// Creates message notifications for accounts that were affected by quantum
+        /// </summary>
+        /// <returns></returns>
+        public Dictionary<int, Message> GetNotificationMessages()
+        {
+            var requestAccount = 0;
+            if (Envelope.Message is RequestQuantum request)
+                requestAccount = request.RequestMessage.Account;
+
+            var result = new Dictionary<int, EffectsNotification>();
+            foreach (var effect in Effects)
+            {
+                if (effect.Account == 0
+                    || effect.Account == requestAccount)
+                    continue;
+                if (!result.TryGetValue(effect.Account, out var effectsNotification))
+                {
+                    effectsNotification = new EffectsNotification { Effects = new List<Effect>() };
+                    result.Add(effect.Account, effectsNotification);
+                }
+                effectsNotification.Effects.Add(effect);
+            }
+            return result.ToDictionary(k => k.Key, v => (Message)v.Value);
         }
     }
 }
