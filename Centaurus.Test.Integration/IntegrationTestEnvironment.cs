@@ -14,7 +14,7 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Test
 {
-    public class IntegrationTestEnvironment
+    public class IntegrationTestEnvironment: IDisposable
     {
         public IntegrationTestEnvironment()
         {
@@ -184,6 +184,15 @@ namespace Centaurus.Test
         {
             if (!isInited)
                 throw new InvalidOperationException("Call init first.");
+        }
+
+        public void Dispose()
+        {
+            AlphaStartup.Shutdown().Wait();
+            foreach (var auditor in AuditorStartups)
+            {
+                auditor.Shutdown().Wait();
+            }
         }
     }
 }

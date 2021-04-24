@@ -33,7 +33,7 @@ namespace Centaurus.Domain
             {
                 StartRefreshTimer();
                 awaitedUpdates = new BlockingCollection<DiffObject>();
-                savingOperation = Task.Factory.StartNew(async () => await StartUpdatesWorker(cancellationTokenSource.Token)).Unwrap();
+                savingOperation = Task.Factory.StartNew(async () => await StartUpdatesWorker(cancellationTokenSource.Token), TaskCreationOptions.LongRunning).Unwrap();
             }
         }
 

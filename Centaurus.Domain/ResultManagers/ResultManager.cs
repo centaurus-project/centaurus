@@ -75,7 +75,7 @@ namespace Centaurus.Domain
                 .Where(a => !a.IsAcknowledgmentSent && DateTime.UtcNow - a.CreatedAt > acknowledgmentTimeout)
                 .ToArray();
             foreach (var resultItem in resultsToSend)
-                Task.Factory.StartNew(() => resultItem.SendResult(true));
+                resultItem.SendResult(true);
             acknowledgmentTimer.Start();
         }
 

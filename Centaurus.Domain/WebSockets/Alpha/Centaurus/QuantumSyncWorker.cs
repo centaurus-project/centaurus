@@ -21,7 +21,7 @@ namespace Centaurus
             CurrentApexCursor = apexCursor;
             cancellationTokenSource = new CancellationTokenSource();
             cancellationToken = cancellationTokenSource.Token;
-            Task.Factory.StartNew(SendQuantums);
+            Task.Factory.StartNew(SendQuantums, TaskCreationOptions.LongRunning);
         }
 
         private readonly AlphaWebSocketConnection auditor;

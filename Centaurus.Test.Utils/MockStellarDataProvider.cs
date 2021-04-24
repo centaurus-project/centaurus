@@ -141,14 +141,9 @@ namespace Centaurus.Test
 
             public override Task Connect()
             {
-                Task.Factory.StartNew(StartSendTxs);
-                return Task.CompletedTask;
-            }
-
-            private void StartSendTxs()
-            {
                 foreach (var tx in txs.GetConsumingEnumerable(cts.Token))
                     onTxCallback.Invoke(tx);
+                return Task.CompletedTask;
             }
 
             private void DataProvider_TxAdded(TxModel obj)

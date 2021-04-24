@@ -486,7 +486,8 @@ namespace Centaurus.SDK
             public async Task EstablishConnection()
             {
                 await connection.Connect(websocketAddress, cancellationToken);
-                _ = Task.Factory.StartNew(Listen);
+                _ = Task.Factory.StartNew(Listen, TaskCreationOptions.LongRunning).Unwrap();
+                _ = Task.Factory.StartNew(ObserveMessages, TaskCreationOptions.LongRunning);
             }
 
             public async Task CloseConnection(WebSocketCloseStatus status = WebSocketCloseStatus.NormalClosure, string desc = null)
@@ -560,7 +561,8 @@ namespace Centaurus.SDK
                     if (connection.WebSocket.State == WebSocketState.Open)
                         await connection.WebSocket.SendAsync(sendBuffer.Buffer.AsMemory(0, writer.Length), WebSocketMessageType.Binary, true, cancellationToken);
 
-                    _ = Task.Factory.StartNew(() => OnSend?.Invoke(envelope));
+                    if (OnSend != null)
+                        _ = Task.Factory.StartNew(() => OnSend?.Invoke(envelope));
                 }
                 catch (WebSocketException e)
                 {
@@ -765,7 +767,24 @@ namespace Centaurus.SDK
             private void HandleMessage(MessageEnvelope envelope)
             {
                 TryResolveRequest(envelope);
-                _ = Task.Factory.StartNew(() => OnMessage?.Invoke(envelope));
+                messages.Add(envelope);
+            }
+
+            private BlockingCollection<MessageEnvelope> messages = new BlockingCollection<MessageEnvelope>();
+
+            private void ObserveMessages()
+            {
+                foreach (var message in messages.GetConsumingEnumerable(cancellationToken))
+                {
+                    try
+                    {
+                        OnMessage?.Invoke(message);
+                    }
+                    catch (Exception exc)
+                    {
+                        logger.Error(exc);
+                    }
+                }
             }
 
             #endregion

@@ -53,7 +53,7 @@ namespace Centaurus.Domain
 
             ValidateAccountRequestRate(envelope);
 
-            var result = await ProcessQuantum(envelope);
+            var result = await ProcessQuantumEnvelope(envelope);
 
             if (!ByteArrayComparer.Default.Equals(result.Effects.Hash, quantum.EffectsHash) && !EnvironmentHelper.IsTest)
             {

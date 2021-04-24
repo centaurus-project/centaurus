@@ -235,7 +235,7 @@ namespace Centaurus
 
                                 //prevent recursive error sending
                                 if (IsResultRequired && !(envelope == null || envelope.Message is ResultMessage))
-                                    _ = Task.Factory.StartNew(async () => await SendMessage(envelope.CreateResult(statusCode))).Unwrap();
+                                    _ = SendMessage(envelope.CreateResult(statusCode));
                                 if (statusCode == ResultStatusCodes.InternalError || !Context.IsAlpha)
                                     logger.Error(exc);
                             }

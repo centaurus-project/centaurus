@@ -60,7 +60,7 @@ namespace Centaurus.Domain
         public OutgoingResultsStorage(AuditorContext context)
             :base(context)
         {
-            _ = Task.Factory.StartNew(RunWorker);
+            _ = Task.Factory.StartNew(RunWorker, TaskCreationOptions.LongRunning);
         }
 
         private void RunWorker()

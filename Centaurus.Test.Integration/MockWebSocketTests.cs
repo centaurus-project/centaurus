@@ -1,4 +1,5 @@
-﻿using NUnit.Framework;
+﻿using Centaurus.Xdr;
+using NUnit.Framework;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -21,13 +22,16 @@ namespace Centaurus.Test
             leftWebsocket.Connect(rightWebsocket);
             rightWebsocket.Connect(leftWebsocket);
 
-            var data = GetTestData();
-            await rightWebsocket.SendAsync(data, WebSocketMessageType.Binary, true, CancellationToken.None);
-            var buffer = new byte[1024];
-            var segment = buffer.AsMemory();
-            var res = await leftWebsocket.ReceiveAsync(segment, CancellationToken.None);
-            Assert.AreEqual(data.Length, res.Count);
-            Assert.IsTrue(data.SequenceEqual(segment.Slice(0, res.Count).ToArray()));
+            var receiveData = XdrBufferFactory.Rent(1024);
+            for (var i = 0; i < 100000; i++)
+            {
+                var data = GetTestData();
+                await rightWebsocket.SendAsync(data, WebSocketMessageType.Binary, true, CancellationToken.None);
+                var segment = receiveData.AsSegment(0, 1024);
+                var res = await leftWebsocket.ReceiveAsync(segment, CancellationToken.None);
+                Assert.AreEqual(data.Length, res.Count);
+                Assert.IsTrue(data.SequenceEqual(segment.Slice(0, res.Count).ToArray()));
+            }
         }
 
         private byte[] GetTestData()

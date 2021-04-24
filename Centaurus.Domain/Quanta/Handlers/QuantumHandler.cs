@@ -90,11 +90,11 @@ namespace Centaurus.Domain
                 result = await HandleQuantumInternal(envelope, handleItem.Timestamp);
                 if (result.Status != ResultStatusCodes.Success)
                     throw new Exception("Failed to handle quantum.");
-                tcs.SetResultAsync(result);
+                tcs.SetResult(result);
             }
             catch (Exception exc)
             {
-                tcs.SetExceptionAsync(exc);
+                tcs.SetException(exc);
                 OnProcessException(handleItem, result, exc);
             }
             Context.ExtensionsManager.AfterQuantumHandle(result);
@@ -136,7 +136,7 @@ namespace Centaurus.Domain
             return processor;
         }
 
-        protected async Task<QuantumProcessingResult> ProcessQuantum(MessageEnvelope envelope)
+        protected async Task<QuantumProcessingResult> ProcessQuantumEnvelope(MessageEnvelope envelope)
         {
             var processor = GetProcessorItem(envelope);
 

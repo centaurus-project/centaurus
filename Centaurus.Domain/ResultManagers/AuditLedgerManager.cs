@@ -15,7 +15,7 @@ namespace Centaurus.Domain
             : base(context)
         {
             alphaListener = (AlphaTxListener)context.TxListener;
-            Task.Factory.StartNew(TryHandleTxCommit);
+            Task.Factory.StartNew(TryHandleTxCommit, TaskCreationOptions.LongRunning);
         }
 
         private Dictionary<long, TxCommitQuantum> pendingTxCommits = new Dictionary<long, TxCommitQuantum>();

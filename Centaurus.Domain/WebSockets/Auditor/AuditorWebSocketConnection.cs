@@ -28,7 +28,7 @@ namespace Centaurus.Domain
         public async Task EstablishConnection()
         {
             await connection.Connect(new Uri(Context.Settings.AlphaAddress), cancellationToken);
-            _ = Task.Factory.StartNew(Listen);
+            _ = Task.Factory.StartNew(Listen, TaskCreationOptions.LongRunning);
             ProcessOutgoingMessageQueue();
         }
 
@@ -78,7 +78,7 @@ namespace Centaurus.Domain
                         logger.Error(e);
                     }
                 }
-            }, cancellationToken);
+            }, cancellationToken, TaskCreationOptions.LongRunning, TaskScheduler.Default);
         }
 
         public override void Dispose()

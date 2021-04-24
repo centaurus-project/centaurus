@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Centaurus.Domain
@@ -21,12 +22,12 @@ namespace Centaurus.Domain
         public TxListenerBase(ExecutionContext context, long txCursor)
         {
             Context = context ?? throw new ArgumentNullException(nameof(context));
-            Task.Factory.StartNew(() => ListenTransactions(txCursor));
+            Task.Factory.StartNew(() => ListenTransactions(txCursor), TaskCreationOptions.LongRunning);
             Task.Factory.StartNew(() =>
             {
-                foreach (var tx in awaitedTransactions.GetConsumingEnumerable())
+                foreach (var tx in awaitedTransactions.GetConsumingEnumerable(cancellationTokenSource.Token))
                     ProcessTransactionTx(tx);
-            });
+            }, TaskCreationOptions.LongRunning);
         }
 
         public ExecutionContext Context { get; }
@@ -36,7 +37,7 @@ namespace Centaurus.Domain
         protected async Task ListenTransactions(long cursor)
         {
             var failedDates = new List<DateTime>();
-            while (true)
+            while (!cancellationTokenSource.IsCancellationRequested)
             {
                 try
                 {
@@ -72,8 +73,15 @@ namespace Centaurus.Domain
 
         protected BlockingCollection<TxModel> awaitedTransactions = new BlockingCollection<TxModel>();
 
+        protected CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
+
         public void Dispose()
         {
+            if (!cancellationTokenSource.IsCancellationRequested)
+            {
+                cancellationTokenSource.Cancel();
+                cancellationTokenSource.Dispose();
+            }
             DisposeListener();
             awaitedTransactions?.Dispose();
             awaitedTransactions = null;

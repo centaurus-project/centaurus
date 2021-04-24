@@ -49,7 +49,7 @@ namespace Centaurus.Domain
             quantum.Timestamp = timestamp == default ? DateTime.UtcNow.Ticks : timestamp;//it could be assigned, if this quantum was handled already and we handle it during the server rising
 
 
-            var result = await ProcessQuantum(quantumEnvelope);
+            var result = await ProcessQuantumEnvelope(quantumEnvelope);
 
             quantum.EffectsHash = result.Effects.Hash;
 

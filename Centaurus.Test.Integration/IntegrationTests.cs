@@ -19,9 +19,9 @@ namespace Centaurus.Test
 {
     public class IntegrationTests
     {
-        IntegrationTestEnvironment environment = new IntegrationTestEnvironment();
+        IntegrationTestEnvironment environment;
 
-        private async Task InitConstellation()
+        private void InitConstellation()
         {
             var assetCodes = new string[] {
                 "USD",
@@ -33,7 +33,7 @@ namespace Centaurus.Test
                 "CORN",
                 "SUGAR"
             };
-            var initResult = await environment.ConstellationController.Init(new ConstellationInitModel
+            var initTask = environment.ConstellationController.Init(new ConstellationInitModel
             {
                 Assets = assetCodes.Select(a => $"{a}-{environment.Issuer.AccountId}-{(a.Length > 4 ? 2 : 1)}").ToArray(),
                 Auditors = environment.GenesisQuorum.ToArray(),
@@ -41,7 +41,11 @@ namespace Centaurus.Test
                 MinAllowedLotSize = 100,
                 RequestRateLimits = new RequestRateLimitsModel { HourLimit = int.MaxValue, MinuteLimit = int.MaxValue }
             });
-            var result = (ConstellationController.InitResult)((JsonResult)initResult).Value;
+
+            while (!initTask.IsCompleted)
+                Thread.Sleep(50);
+
+            var result = (ConstellationController.InitResult)((JsonResult)initTask.Result).Value;
 
             Assert.IsTrue(result.IsSuccess, "Init result.");
         }
@@ -176,24 +180,24 @@ namespace Centaurus.Test
         }
 
         [Test]
-        //[TestCase(1)]
-        [TestCase(2)]
-        [TestCase(10)]
-        public async Task BaseTest(int auditorsCount)
+        [TestCase(1, 100)]
+        [TestCase(2, 100)]
+        [TestCase(10, 10)]
+        public async Task BaseTest(int auditorsCount, int clientsCount)
         {
+            environment = new IntegrationTestEnvironment();
+
             environment.Init(auditorsCount);
 
             await environment.RunAlpha();
 
-            await InitConstellation();
+            InitConstellation();
 
             await AssertConstellationState(ApplicationState.Running, TimeSpan.FromSeconds(5));
 
             await environment.RunAuditors();
 
-            await AssertConstellationState(ApplicationState.Ready, TimeSpan.FromSeconds(100 * auditorsCount));
-
-            var clientsCount = 1;
+            await AssertConstellationState(ApplicationState.Ready, TimeSpan.FromSeconds(50 * auditorsCount));
 
             environment.GenerateCliens(clientsCount);
 
@@ -207,6 +211,8 @@ namespace Centaurus.Test
             await AssertClientsCount(clientsCount + 1, TimeSpan.FromSeconds(15)); //client should be created on payment
 
             await AssertWithdrawal(client, client.KeyPair, 0, 1.ToString());
+
+            environment.Dispose();
         }
     }
 }
