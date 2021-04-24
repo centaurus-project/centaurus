@@ -15,6 +15,7 @@
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
     <Exec Command="dotnet run -c $(ConfigurationName) -p ../Centaurus.Xdr.ContractGenerator -- -c -l cs -d ../Centaurus.Test.DynamicSerializers/Serializers -a $(OutDir)Centaurus.Test.Contracts.dll" />
+    <Exec Condition="'$(ConfigurationName)'=='Release'" Command="dotnet run -c $(ConfigurationName) -p ../Centaurus.Xdr.ContractGenerator -- -c -l js -d ../centaurus-js-test-contracts -a $(OutDir)Centaurus.Test.Contracts.dll" />
   </Target>
 
 </Project>

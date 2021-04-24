@@ -7,11 +7,12 @@ using System.Text;
 namespace Centaurus.Xdr
 {
 
-   public class XdrPropertySerializationDescriptor
+    public class XdrPropertySerializationDescriptor
     {
-        public XdrPropertySerializationDescriptor(PropertyInfo prop)
+        public XdrPropertySerializationDescriptor(PropertyInfo prop, bool inherited)
         {
             Property = prop;
+            Inherited = inherited;
             PrimitiveType = prop.PropertyType;
             if (prop.GetMethod == null) throw new InvalidOperationException($"Property {FullPropertyName} does not have getter and cannot be serialized.");
             if (prop.SetMethod == null) throw new InvalidOperationException($"Property {FullPropertyName} does not have setter and cannot be serialized.");
@@ -70,19 +71,21 @@ namespace Centaurus.Xdr
             throw new InvalidOperationException($"{PrimitiveType.FullName} XDR serialization is not supported. Check {FullPropertyName}.");
         }
 
-        public PropertyInfo Property { get; private set; }
+        public readonly PropertyInfo Property;
+
+        public readonly bool Inherited;
+
+        public readonly Type PrimitiveType;
+
+        public readonly Type GenericArgument;
+
+        public readonly bool IsOptional;
+
+        public readonly bool IsNullable;
 
         public string PropertyName => Property.Name;
 
-        public Type PropertyType { get => Property.PropertyType; }
-
-        public Type PrimitiveType { get; private set; }
-
-        public Type GenericArgument { get; private set; }
-
-        public bool IsOptional { get; private set; }
-
-        public bool IsNullable { get; private set; }
+        public Type PropertyType => Property.PropertyType;
 
         private string FullPropertyName => $"{Property.DeclaringType.FullName}.{Property.Name}";
 
@@ -130,6 +133,16 @@ namespace Centaurus.Xdr
         public override string ToString()
         {
             return FullPropertyName;
+        }
+
+        public override int GetHashCode()
+        {
+            return Property.GetHashCode();
+        }
+
+        public override bool Equals(object obj)
+        {
+            return Property.Equals((obj as XdrPropertySerializationDescriptor)?.Property);
         }
     }
 }

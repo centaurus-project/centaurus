@@ -54,6 +54,8 @@ namespace Centaurus.ContractGenerator
             }
             if (prop.PropertyType.IsArray)
             {
+                var elementType = prop.PropertyType.GetElementType();
+                if (elementType == typeof(byte)) return PrimitiveTypesMap[typeof(byte[])];
                 var subtype = ResolveRegistiredTypeDescriptor(prop.PropertyType.GetElementType());
                 return PrimitiveTypesMap[typeof(Array)].CreateSubtypeContainer(subtype);
             }
