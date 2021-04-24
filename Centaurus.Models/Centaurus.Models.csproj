@@ -13,6 +13,7 @@
 
   <Target Name="PostBuild" AfterTargets="PostBuildEvent">
     <Exec Command="dotnet run -c $(ConfigurationName) -p ../Centaurus.Xdr.ContractGenerator -- -c -l cs -d ../Centaurus.DynamicSerializers/Serializers -a $(OutDir)Centaurus.Models.dll" />
+    <Exec Condition="'$(ConfigurationName)'=='Release'" Command="dotnet run -c $(ConfigurationName) -p ../Centaurus.Xdr.ContractGenerator -- -c -l js -d ../centaurus-js-contracts -a $(OutDir)Centaurus.Models.dll" />
   </Target>
 
 </Project>
