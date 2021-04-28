@@ -9,6 +9,7 @@ using NUnit.Framework;
 using stellar_dotnet_sdk;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
@@ -21,7 +22,7 @@ namespace Centaurus.Test
     {
         IntegrationTestEnvironment environment;
 
-        private void InitConstellation()
+        private async Task InitConstellation()
         {
             var assetCodes = new string[] {
                 "USD",
@@ -33,7 +34,7 @@ namespace Centaurus.Test
                 "CORN",
                 "SUGAR"
             };
-            var initTask = environment.ConstellationController.Init(new ConstellationInitModel
+            var res = await environment.ConstellationController.Init(new ConstellationInitModel
             {
                 Assets = assetCodes.Select(a => $"{a}-{environment.Issuer.AccountId}-{(a.Length > 4 ? 2 : 1)}").ToArray(),
                 Auditors = environment.GenesisQuorum.ToArray(),
@@ -42,10 +43,7 @@ namespace Centaurus.Test
                 RequestRateLimits = new RequestRateLimitsModel { HourLimit = int.MaxValue, MinuteLimit = int.MaxValue }
             });
 
-            while (!initTask.IsCompleted)
-                Thread.Sleep(50);
-
-            var result = (ConstellationController.InitResult)((JsonResult)initTask.Result).Value;
+            var result = (ConstellationController.InitResult)((JsonResult)res).Value;
 
             Assert.IsTrue(result.IsSuccess, "Init result.");
         }
@@ -191,7 +189,7 @@ namespace Centaurus.Test
 
             await environment.RunAlpha();
 
-            InitConstellation();
+            await InitConstellation();
 
             await AssertConstellationState(ApplicationState.Running, TimeSpan.FromSeconds(5));
 
@@ -211,6 +209,60 @@ namespace Centaurus.Test
             await AssertClientsCount(clientsCount + 1, TimeSpan.FromSeconds(15)); //client should be created on payment
 
             await AssertWithdrawal(client, client.KeyPair, 0, 1.ToString());
+
+            environment.Dispose();
+        }
+
+        [Test]
+        public async Task TradeTest()
+        {
+            environment = new IntegrationTestEnvironment();
+
+            environment.Init(2);
+
+            await environment.RunAlpha();
+
+            await InitConstellation();
+
+            await AssertConstellationState(ApplicationState.Running, TimeSpan.FromSeconds(5));
+
+            await environment.RunAuditors();
+
+            await AssertConstellationState(ApplicationState.Ready, TimeSpan.FromSeconds(10));
+
+            var clientsCount = 101;
+            environment.GenerateCliens(clientsCount);
+
+            await AssertClientsCount(clientsCount, TimeSpan.FromSeconds(15));
+
+            var connectedClients = await ConnectClients(environment.Clients, environment.SDKConstellationInfo);
+
+            var asset = environment.SDKConstellationInfo.Assets[1];
+
+            var totalAmount = 0;
+            var price = 1d;
+            var orderAmount = 101;
+            var tasks = new List<Task>();
+            var orders = 0;
+
+            while (orders < 10_000)
+            {
+                for (var i = 0; i < clientsCount - 1; i++)
+                {
+                    var client = connectedClients[i];
+                    var p = price;
+                    tasks.Add(Task.Factory.StartNew(async () => await client.CreateOrder(orderAmount, p, OrderSide.Sell, asset, false)).Unwrap());
+                    totalAmount += orderAmount;
+                    price += 0.0001;
+                }
+                await Task.WhenAll(tasks);
+                orders += tasks.Count;
+                tasks.Clear();
+            }
+
+            var solver = connectedClients.Last();
+
+            var result = await solver.CreateOrder(totalAmount, price, OrderSide.Buy, asset);
 
             environment.Dispose();
         }

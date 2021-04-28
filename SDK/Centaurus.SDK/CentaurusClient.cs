@@ -774,17 +774,21 @@ namespace Centaurus.SDK
 
             private void ObserveMessages()
             {
-                foreach (var message in messages.GetConsumingEnumerable(cancellationToken))
+                try
                 {
-                    try
+                    foreach (var message in messages.GetConsumingEnumerable(cancellationToken))
                     {
-                        OnMessage?.Invoke(message);
-                    }
-                    catch (Exception exc)
-                    {
-                        logger.Error(exc);
+                        try
+                        {
+                            OnMessage?.Invoke(message);
+                        }
+                        catch (Exception exc)
+                        {
+                            logger.Error(exc);
+                        }
                     }
                 }
+                catch (OperationCanceledException) { }
             }
 
             #endregion

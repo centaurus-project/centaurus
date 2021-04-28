@@ -10,11 +10,11 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public abstract class MajorityManager : IContextual, IDisposable
+    public abstract class MajorityManager : ContextualBase<AlphaContext>, IDisposable
     {
-        public MajorityManager(ExecutionContext context)
+        public MajorityManager(AlphaContext context)
+            : base(context)
         {
-            Context = context ?? throw new ArgumentNullException(nameof(context));
             InitCleanupTimer();
         }
 
@@ -26,7 +26,6 @@ namespace Centaurus.Domain
             //add the signature to the aggregate
             aggregate.Add(message);
         }
-        public ExecutionContext Context { get; }
 
         public virtual void Dispose()
         {
@@ -135,7 +134,7 @@ namespace Centaurus.Domain
 
             private MajorityManager majorityManager;
 
-            private Dictionary<byte[], MessageEnvelope> storage = new Dictionary<byte[], MessageEnvelope>(ByteArrayComparer.Default);
+            private Dictionary<byte[], MessageEnvelopeVote> storage = new Dictionary<byte[], MessageEnvelopeVote>(ByteArrayComparer.Default);
 
             public void Add(IncomingMessage message)
             {
@@ -143,17 +142,20 @@ namespace Centaurus.Domain
                 MajorityResults majorityResult = MajorityResults.Unknown;
                 lock (syncRoot)
                 {
-                    if (!storage.TryGetValue(message.MessageHash, out var resultStorageEnvelope))//first result with such hash
+                    if (!storage.TryGetValue(message.MessageHash, out var envelopeVote))//first result with such hash
                     {
-                        resultStorageEnvelope = message.Envelope;
-                        storage[message.MessageHash] = resultStorageEnvelope;
+                        envelopeVote = new MessageEnvelopeVote(message.Envelope, message.MessageHash);
+                        storage.Add(message.MessageHash, envelopeVote);
                     }
                     else
-                        resultStorageEnvelope.AggregateEnvelopUnsafe(message.Envelope);//we can use AggregateEnvelopUnsafe, we compute hash for every envelope above
+                        envelopeVote.AddSignature(message.Envelope.Signatures[0]);
+
+                    if (storage.Count > 1)
+                    { }
 
                     if (IsProcessed)
                     {
-                        if (resultStorageEnvelope.Signatures.Count == ((AlphaStateManager)majorityManager.Context.AppState).ConnectedAuditorsCount) //remove if all auditors sent results
+                        if (storage.Select(e => e.Value.Signatures.Count).Sum() == ((AlphaStateManager)majorityManager.Context.AppState).ConnectedAuditorsCount) //remove if all auditors sent results
                         {
                             majorityManager?.Remove(Id);
                         }
@@ -183,8 +185,11 @@ namespace Centaurus.Domain
                     //check if we have the majority
                     if (votes >= requiredMajority)
                     {
+                        //add signatures to envelope
+                        pair.Value.AggregateSignatures();
+
                         //return the messages for the consensus
-                        consensus = pair.Value;
+                        consensus = pair.Value.Envelope;
                         return MajorityResults.Success;
                     }
                     //check whether a current message is a potential consensus candidate
@@ -206,6 +211,39 @@ namespace Centaurus.Domain
                 }
                 //not enough votes to decided whether the consensus can be reached or not
                 return MajorityResults.Unknown;
+            }
+
+            class MessageEnvelopeVote
+            {
+                public MessageEnvelopeVote(MessageEnvelope envelope, byte[] messageHash)
+                {
+                    Envelope = envelope ?? throw new ArgumentNullException(nameof(envelope));
+                    Hash = messageHash ?? throw new ArgumentNullException(nameof(messageHash));
+                    var signature = envelope.Signatures[0];
+                    Signatures = new Dictionary<RawPubKey, Ed25519Signature> { { signature.Signer, signature } };
+
+                    //all signatures must be stored in Signatures prop
+                    Envelope.Signatures.Clear();
+                }
+
+                public byte[] Hash { get; }
+
+                public MessageEnvelope Envelope { get; }
+
+                public Dictionary<RawPubKey, Ed25519Signature> Signatures { get; }
+
+                public void AddSignature(Ed25519Signature signature)
+                {
+                    if (Signatures.ContainsKey(signature.Signer))
+                        throw new InvalidOperationException($"Already contains signature from {signature.Signer}");
+
+                    Signatures.Add(signature.Signer, signature);
+                }
+
+                public void AggregateSignatures()
+                {
+                    Envelope.Signatures.AddRange(Signatures.Values);
+                }
             }
         }
     }

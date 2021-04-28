@@ -40,7 +40,7 @@ namespace Centaurus.Domain
             var quoteAmount = OrderMatcher.EstimateQuoteAmount(orderRequest.Amount, orderRequest.Price, orderRequest.Side);
 
             //check that lot size is greater than minimum allowed lot
-            if (quoteAmount <= context.CentaurusContext.Constellation.MinAllowedLotSize)
+            if (quoteAmount < context.CentaurusContext.Constellation.MinAllowedLotSize)
                 throw new BadRequestException("Lot size is smaller than the minimum allowed lot.");
 
             //fetch user's account record

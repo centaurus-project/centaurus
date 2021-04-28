@@ -20,7 +20,7 @@ namespace Centaurus
 
         public static bool IsValid(this Ed25519Signature signature, byte[] data)
         {
-            var keypair = KeyPair.FromPublicKey(signature.Signer.ToArray());
+            var keypair = (KeyPair)signature.Signer;
             return keypair.Verify(data, signature.Signature);
         }
     }

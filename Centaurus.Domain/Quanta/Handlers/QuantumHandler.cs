@@ -19,7 +19,7 @@ namespace Centaurus.Domain
             public HandleItem(MessageEnvelope quantum, long timestamp = 0)
             {
                 Quantum = quantum;
-                HandlingTaskSource = new TaskCompletionSource<ResultMessage>();
+                HandlingTaskSource = new TaskCompletionSource<ResultMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
                 Timestamp = timestamp;
             }
             public MessageEnvelope Quantum { get; }
