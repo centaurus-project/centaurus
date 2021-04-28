@@ -178,6 +178,7 @@ namespace Centaurus.Test
         }
 
         [Test]
+        [Explicit]
         [TestCase(1, 100)]
         [TestCase(2, 100)]
         [TestCase(10, 10)]
@@ -209,60 +210,6 @@ namespace Centaurus.Test
             await AssertClientsCount(clientsCount + 1, TimeSpan.FromSeconds(15)); //client should be created on payment
 
             await AssertWithdrawal(client, client.KeyPair, 0, 1.ToString());
-
-            environment.Dispose();
-        }
-
-        [Test]
-        public async Task TradeTest()
-        {
-            environment = new IntegrationTestEnvironment();
-
-            environment.Init(2);
-
-            await environment.RunAlpha();
-
-            await InitConstellation();
-
-            await AssertConstellationState(ApplicationState.Running, TimeSpan.FromSeconds(5));
-
-            await environment.RunAuditors();
-
-            await AssertConstellationState(ApplicationState.Ready, TimeSpan.FromSeconds(10));
-
-            var clientsCount = 101;
-            environment.GenerateCliens(clientsCount);
-
-            await AssertClientsCount(clientsCount, TimeSpan.FromSeconds(15));
-
-            var connectedClients = await ConnectClients(environment.Clients, environment.SDKConstellationInfo);
-
-            var asset = environment.SDKConstellationInfo.Assets[1];
-
-            var totalAmount = 0;
-            var price = 1d;
-            var orderAmount = 101;
-            var tasks = new List<Task>();
-            var orders = 0;
-
-            while (orders < 10_000)
-            {
-                for (var i = 0; i < clientsCount - 1; i++)
-                {
-                    var client = connectedClients[i];
-                    var p = price;
-                    tasks.Add(Task.Factory.StartNew(async () => await client.CreateOrder(orderAmount, p, OrderSide.Sell, asset, false)).Unwrap());
-                    totalAmount += orderAmount;
-                    price += 0.0001;
-                }
-                await Task.WhenAll(tasks);
-                orders += tasks.Count;
-                tasks.Clear();
-            }
-
-            var solver = connectedClients.Last();
-
-            var result = await solver.CreateOrder(totalAmount, price, OrderSide.Buy, asset);
 
             environment.Dispose();
         }

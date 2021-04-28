@@ -25,8 +25,16 @@ namespace Centaurus.Domain
             Task.Factory.StartNew(() => ListenTransactions(txCursor), TaskCreationOptions.LongRunning);
             Task.Factory.StartNew(() =>
             {
-                foreach (var tx in awaitedTransactions.GetConsumingEnumerable(cancellationTokenSource.Token))
-                    ProcessTransactionTx(tx);
+                try
+                {
+                    foreach (var tx in awaitedTransactions.GetConsumingEnumerable(cancellationTokenSource.Token))
+                        ProcessTransactionTx(tx);
+                }
+                catch (OperationCanceledException) { }
+                catch (Exception exc)
+                {
+                    logger.Error(exc);
+                }
             }, TaskCreationOptions.LongRunning);
         }
 
