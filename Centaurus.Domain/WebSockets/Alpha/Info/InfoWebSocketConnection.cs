@@ -15,11 +15,13 @@ using Centaurus.Xdr;
 
 namespace Centaurus.Domain
 {
-    public class InfoWebSocketConnection : IDisposable
+    //TODO: TESTS!
+    public class InfoWebSocketConnection : ContextualBase<AlphaContext>, IDisposable
     {
-        public InfoWebSocketConnection(WebSocket webSocket, string connectionId, string ip)
+        public InfoWebSocketConnection(AlphaContext context, WebSocket webSocket, string connectionId, string ip)
+            :base(context)
         {
-            this.webSocket = webSocket;
+            this.webSocket = webSocket ?? throw new ArgumentNullException(nameof(webSocket));
             Ip = ip;
             ConnectionId = connectionId;
             cancellationTokenSource = new CancellationTokenSource();
@@ -27,10 +29,7 @@ namespace Centaurus.Domain
             incomingBuffer = XdrBufferFactory.Rent(WebSocketExtension.ChunkSize);
         }
 
-        static InfoCommandsHandlers commandHandlers = new InfoCommandsHandlers();
-
         static Logger logger = LogManager.GetCurrentClassLogger();
-
         private readonly WebSocket webSocket;
 
         private CancellationTokenSource cancellationTokenSource;
@@ -147,7 +146,7 @@ namespace Centaurus.Domain
                             try
                             {
                                 command = BaseCommand.Deserialize(incomingBuffer.AsSpan());
-                                var handlerResult = await commandHandlers.HandleCommand(this, command);
+                                var handlerResult = await Context.InfoCommandsHandlers.HandleCommand(this, command);
                                 await SendMessage(handlerResult);
                             }
                             catch (Exception exc)
@@ -162,7 +161,7 @@ namespace Centaurus.Domain
                                     Error = (int)statusCode < 500 ? exc.Message : statusCode.ToString()
                                 });
 
-                                if (statusCode == ResultStatusCodes.InternalError || !Global.IsAlpha)
+                                if (statusCode == ResultStatusCodes.InternalError)
                                     logger.Error(exc);
                             }
                         }

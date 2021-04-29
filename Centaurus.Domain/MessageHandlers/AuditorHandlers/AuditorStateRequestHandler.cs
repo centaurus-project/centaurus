@@ -9,6 +9,11 @@ namespace Centaurus.Domain
 {
     public class AuditorStateRequestHandler : BaseAuditorMessageHandler
     {
+        public AuditorStateRequestHandler(AuditorContext context) 
+            : base(context)
+        {
+        }
+
         public override MessageTypes SupportedMessageType { get; } = MessageTypes.AuditorStateRequest;
 
         public override ConnectionState[] ValidConnectionStates { get; } = new ConnectionState[] { ConnectionState.Connected };
@@ -21,11 +26,11 @@ namespace Centaurus.Domain
             var quantaPerMessage = 50;
             while (hasQuanta)
             {
-                var currentBatch = await Global.PersistenceManager.GetQuantaAboveApex(aboveApex, 50);
+                var currentBatch = await Context.PersistenceManager.GetQuantaAboveApex(aboveApex, 50);
                 hasQuanta = currentBatch.Count == quantaPerMessage;
                 var state = new AuditorState
                 {
-                    State = Global.AppState.State,
+                    State = Context.AppState.State,
                     PendingQuanta = currentBatch,
                     HasMorePendingQuanta = hasQuanta
                 };

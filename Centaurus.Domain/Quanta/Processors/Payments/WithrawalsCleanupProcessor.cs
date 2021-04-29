@@ -18,7 +18,7 @@ namespace Centaurus.Domain
 
         public override Task<ResultMessage> Process(WithdrawalCleanupProcessorContext context)
         {
-            context.EffectProcessors.AddWithdrawalRemove(context.Withdrawal, false, Global.WithdrawalStorage);
+            context.EffectProcessors.AddWithdrawalRemove(context.Withdrawal, false, context.CentaurusContext.WithdrawalStorage);
             return Task.FromResult(context.Envelope.CreateResult(ResultStatusCodes.Success, context.EffectProcessors.Effects));
         }
 
@@ -28,7 +28,7 @@ namespace Centaurus.Domain
             if (cleanup.ExpiredWithdrawal == null)
                 throw new InvalidOperationException("No withdrawal was specified.");
 
-            var withdrawal = Global.WithdrawalStorage.GetWithdrawal(cleanup.ExpiredWithdrawal);
+            var withdrawal = context.CentaurusContext.WithdrawalStorage.GetWithdrawal(cleanup.ExpiredWithdrawal);
             if (withdrawal == null)
                 throw new InvalidOperationException("Withdrawal is missing.");
             context.Withdrawal = withdrawal;

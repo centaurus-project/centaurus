@@ -15,11 +15,11 @@ namespace Centaurus.Test
         {
             if (excpectedException == null)
             {
-                var isHandled = await MessageHandlers<T>.HandleMessage(connection, message);
+                var isHandled = await connection.Context.MessageHandlers.HandleMessage(connection, message);
                 Assert.IsTrue(isHandled);
             }
             else
-                Assert.ThrowsAsync(excpectedException, async () => await MessageHandlers<T>.HandleMessage(connection, message));
+                Assert.ThrowsAsync(excpectedException, async () => await connection.Context.MessageHandlers.HandleMessage(connection, message));
         }
     }
 }

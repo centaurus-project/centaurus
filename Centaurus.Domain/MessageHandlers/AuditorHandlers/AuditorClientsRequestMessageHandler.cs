@@ -8,6 +8,11 @@ namespace Centaurus.Domain
 {
     public abstract class AuditorClientsRequestMessageHandler : BaseAuditorMessageHandler
     {
+        protected AuditorClientsRequestMessageHandler(AuditorContext context) 
+            : base(context)
+        {
+        }
+
         public override async Task Validate(AuditorWebSocketConnection connection, IncomingMessage message)
         {
             var request = message.Envelope.Message as RequestMessage;

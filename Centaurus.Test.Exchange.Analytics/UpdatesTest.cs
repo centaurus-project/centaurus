@@ -17,6 +17,7 @@ namespace Centaurus.Test.Exchange.Analytics
     {
         AccountWrapper account1;
         AccountWrapper account2;
+        private AlphaContext context;
 
         [SetUp]
         public void Setup()
@@ -28,7 +29,11 @@ namespace Centaurus.Test.Exchange.Analytics
                 NetworkPassphrase = "Test SDF Network ; September 2015",
                 CWD = "AppData"
             };
-            Global.Setup(settings, new MockStorage()).Wait();
+
+            var stellarProvider = new MockStellarDataProvider(settings.NetworkPassphrase, settings.HorizonUrl);
+
+            context = new AlphaContext(settings, new MockStorage(), stellarProvider);
+            context.Init().Wait();
             var requestsLimit = new RequestRateLimits();
 
             account1 = new AccountWrapper(new Models.Account
@@ -56,7 +61,7 @@ namespace Centaurus.Test.Exchange.Analytics
 
             account2.Account.CreateBalance(1);
             account2.Account.GetBalance(1).UpdateBalance(10000000000);
-            Global.Setup(new Snapshot
+            context.Setup(new Snapshot
             {
                 Accounts = new List<AccountWrapper> { account1, account2 },
                 Apex = 0,
@@ -79,7 +84,7 @@ namespace Centaurus.Test.Exchange.Analytics
             for (var i = 1; i < iterations; i++)
             {
                 var price = useNormalDistribution ? rnd.NextNormallyDistributed() + 50 : rnd.NextDouble() * 100;
-                var accountWrapper = Global.AccountStorage.GetAccount(account1.Account.Pubkey);
+                var accountWrapper = context.AccountStorage.GetAccount(account1.Account.Pubkey);
                 var trade = new RequestQuantum
                 {
                     Apex = i,
@@ -93,24 +98,24 @@ namespace Centaurus.Test.Exchange.Analytics
                             Asset = 1,
                             Price = Math.Round(price * 10) / 10,
                             Side = rnd.NextDouble() >= 0.5 ? OrderSide.Buy : OrderSide.Sell,
-                            AccountWrapper = Global.AccountStorage.GetAccount(account1.Account.Pubkey)
+                            AccountWrapper = context.AccountStorage.GetAccount(account1.Account.Pubkey)
                         },
                         Signatures = new List<Ed25519Signature>()
                     },
                     Timestamp = DateTime.UtcNow.Ticks
                 };
                 var diffObject = new DiffObject();
-                var conterOrderEffectsContainer = new EffectProcessorsContainer(trade.CreateEnvelope(), diffObject);
+                var conterOrderEffectsContainer = new EffectProcessorsContainer(context, trade.CreateEnvelope(), diffObject);
                 testTradeResults.Add(trade, conterOrderEffectsContainer);
             }
 
             PerfCounter.MeasureTime(() =>
             {
                 foreach (var trade in testTradeResults)
-                    Global.Exchange.ExecuteOrder(trade.Value);
+                    context.Exchange.ExecuteOrder(trade.Value);
             }, () =>
             {
-                var market = Global.Exchange.GetMarket(1);
+                var market = context.Exchange.GetMarket(1);
                 return $"{iterations} iterations, orderbook size: {market.Bids.Count} bids,  {market.Asks.Count} asks, {market.Bids.GetBestPrice().ToString("G3")}/{market.Asks.GetBestPrice().ToString("G3")} spread.";
             });
         }
@@ -118,7 +123,7 @@ namespace Centaurus.Test.Exchange.Analytics
         [Test]
         public void OnUpdates()
         {
-            Global.AnalyticsManager.OnUpdate += AnalyticsManager_OnUpdate;
+            context.AnalyticsManager.OnUpdate += AnalyticsManager_OnUpdate;
             OrderbookPerformanceTest(10_000);
         }
 
@@ -126,26 +131,26 @@ namespace Centaurus.Test.Exchange.Analytics
         {
             try
             {
-                foreach (var asset in Global.Constellation.Assets)
+                foreach (var asset in context.Constellation.Assets)
                 {
                     if (asset.IsXlm)
                         continue;
                     foreach (var precision in DepthsSubscription.Precisions)
                     {
-                        Global.AnalyticsManager.MarketDepthsManager.GetDepth(asset.Id, precision);
+                        context.AnalyticsManager.MarketDepthsManager.GetDepth(asset.Id, precision);
                     }
 
                     var periods = Enum.GetValues(typeof(PriceHistoryPeriod)).Cast<PriceHistoryPeriod>();
                     foreach (var period in periods)
                     {
-                        await Global.AnalyticsManager.PriceHistoryManager.GetPriceHistory(0, asset.Id, period);
+                        await context.AnalyticsManager.PriceHistoryManager.GetPriceHistory(0, asset.Id, period);
                     }
 
-                    Global.AnalyticsManager.TradesHistoryManager.GetTrades(asset.Id);
+                    context.AnalyticsManager.TradesHistoryManager.GetTrades(asset.Id);
 
-                    Global.AnalyticsManager.MarketTickersManager.GetAllTickers();
+                    context.AnalyticsManager.MarketTickersManager.GetAllTickers();
 
-                    Global.AnalyticsManager.MarketTickersManager.GetMarketTicker(asset.Id);
+                    context.AnalyticsManager.MarketTickersManager.GetMarketTicker(asset.Id);
                 }
             }
             catch (Exception exc)

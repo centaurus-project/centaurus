@@ -8,11 +8,12 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public class InfoCommandsHandlers
+    public class InfoCommandsHandlers: ContextualBase<AlphaContext>
     {
-        static ImmutableDictionary<string, IBaseCommandHandler> handlers;
+        ImmutableDictionary<string, IBaseCommandHandler> handlers;
 
-        static InfoCommandsHandlers()
+        public InfoCommandsHandlers(AlphaContext context)
+            :base(context)
         {
                 var discoveredRequestProcessors = Assembly.GetExecutingAssembly()
                     .GetTypes()
@@ -46,7 +47,7 @@ namespace Centaurus.Domain
 
                     if (processors.ContainsKey(commandAttribute.Command))
                         throw new Exception($"Handler for command type {commandAttribute.Command} is already registered");
-                    var instance = Activator.CreateInstance(processorType) as IBaseCommandHandler;
+                    var instance = Activator.CreateInstance(processorType, new object[] { Context }) as IBaseCommandHandler;
                     processors.Add(commandAttribute.Command, instance);
                 }
                 handlers = processors.ToImmutableDictionary(StringComparer.OrdinalIgnoreCase);

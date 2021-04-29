@@ -24,7 +24,7 @@ namespace Centaurus.Domain
                 Withdrawals = context.WithdrawalItems,
                 MaxTime = context.Transaction.TimeBounds.MaxTime
             };
-            context.EffectProcessors.AddWithdrawalCreate(withdrawal, Global.WithdrawalStorage);
+            context.EffectProcessors.AddWithdrawalCreate(withdrawal, context.CentaurusContext.WithdrawalStorage);
 
             var effects = context.EffectProcessors.Effects;
 
@@ -46,17 +46,18 @@ namespace Centaurus.Domain
                 throw new BadRequestException("Withdrawal already exists.");
 
             context.Transaction = context.WithdrawalRequest.DeserializeTransaction();
-            ValidateTransaction(context.Transaction);
+            ValidateTransaction(context);
 
-            context.WithdrawalItems = context.Transaction.GetWithdrawals(context.WithdrawalRequest.AccountWrapper.Account, Global.Constellation);
+            context.WithdrawalItems = context.Transaction.GetWithdrawals(context.WithdrawalRequest.AccountWrapper.Account, context.CentaurusContext.Constellation);
             if (context.WithdrawalItems.Count() < 1)
                 throw new BadRequestException("No payment operations.");
         }
 
-        private void ValidateTransaction(Transaction transaction)
+        private void ValidateTransaction(WithdrawalProcessorContext context)
         {
+            var transaction = context.Transaction;
             var txSourceAccount = transaction.SourceAccount;
-            if (ByteArrayPrimitives.Equals(Global.Constellation.Vault.Data, txSourceAccount.PublicKey))
+            if (ByteArrayPrimitives.Equals(context.CentaurusContext.Constellation.Vault.Data, txSourceAccount.PublicKey))
                 throw new BadRequestException("Vault account cannot be used as transaction source.");
 
             if (transaction.TimeBounds == null || transaction.TimeBounds.MaxTime <= 0)

@@ -18,7 +18,7 @@ namespace Centaurus.Domain
 
             context.UpdateNonce();
 
-            Global.Exchange.ExecuteOrder(context.EffectProcessors);
+            context.CentaurusContext.Exchange.ExecuteOrder(context.EffectProcessors);
 
             var accountEffects = context.EffectProcessors.GetEffects(requestMessage.Account).ToList();
 
@@ -33,14 +33,14 @@ namespace Centaurus.Domain
             var quantum = context.Envelope.Message as RequestQuantum;
             var orderRequest = quantum.RequestEnvelope.Message as OrderRequest;
 
-            if (orderRequest.Asset <= 0 || !Global.AssetIds.Contains(orderRequest.Asset))
+            if (orderRequest.Asset <= 0 || !context.CentaurusContext.AssetIds.Contains(orderRequest.Asset))
                 throw new InvalidOperationException("Invalid asset identifier: " + orderRequest.Asset);
 
             //estimate XLM amount
             var quoteAmount = OrderMatcher.EstimateQuoteAmount(orderRequest.Amount, orderRequest.Price, orderRequest.Side);
 
             //check that lot size is greater than minimum allowed lot
-            if (quoteAmount <= Global.Constellation.MinAllowedLotSize)
+            if (quoteAmount < context.CentaurusContext.Constellation.MinAllowedLotSize)
                 throw new BadRequestException("Lot size is smaller than the minimum allowed lot.");
 
             //fetch user's account record

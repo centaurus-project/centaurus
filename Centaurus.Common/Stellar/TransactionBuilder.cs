@@ -65,7 +65,7 @@ namespace Centaurus
         /// </summary>
         /// <param name="transactionHash"></param>
         /// <returns></returns>
-        public static async Task<TransactionResponse> GetTransaction(this Server server, byte[] transactionHash)
+        public static async Task<TransactionResponse> GetTransaction(this Server server, string transactionHash)
         {
             if (server == null)
                 throw new ArgumentNullException(nameof(server));
@@ -73,8 +73,7 @@ namespace Centaurus
                 throw new ArgumentNullException(nameof(transactionHash));
             try
             {
-                var transactionResponse = await server.Transactions.IncludeFailed(true).Transaction(transactionHash.ToHex().ToLower());
-                return transactionResponse;
+                return await server.Transactions.IncludeFailed(true).Transaction(transactionHash);
             }
             catch (HttpResponseException exc)
             {

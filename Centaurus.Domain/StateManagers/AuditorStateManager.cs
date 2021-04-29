@@ -6,6 +6,9 @@ namespace Centaurus.Domain
 {
     public class AuditorStateManager : StateManager
     {
-
+        public AuditorStateManager(ExecutionContext context) 
+            : base(context)
+        {
+        }
     }
 }

@@ -20,7 +20,7 @@ namespace Centaurus.Domain
                 cancellationTokenSource = new CancellationTokenSource();
                 cancellationToken = cancellationTokenSource.Token;
                 awaitedUpdates = new BlockingCollection<ExchangeUpdate>();
-                Task.Factory.StartNew(ObserveUpdates, cancellationToken, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+                Task.Factory.StartNew(ObserveUpdates, TaskCreationOptions.LongRunning);
             }
         }
 

@@ -14,23 +14,22 @@ using Centaurus.Xdr;
 
 namespace Centaurus.Domain
 {
-    public class AuditorWebSocketConnection : BaseWebSocketConnection
+    public class AuditorWebSocketConnection : BaseWebSocketConnection<AuditorContext>
     {
-
         static Logger logger = LogManager.GetCurrentClassLogger();
+        private ClientConnectionWrapperBase connection;
 
-        public AuditorWebSocketConnection(WebSocket webSocket, string ip)
-            : base(webSocket, ip, AlphaWebSocketConnection.AuditorBufferSize, AlphaWebSocketConnection.AuditorBufferSize)
+        public AuditorWebSocketConnection(AuditorContext context, ClientConnectionWrapperBase connection)
+            : base(context, connection.WebSocket, null, AlphaWebSocketConnection.AuditorBufferSize, AlphaWebSocketConnection.AuditorBufferSize)
         {
+            this.connection = connection;
         }
-
-        protected ClientWebSocket clientWebSocket => webSocket as ClientWebSocket;
 
         public async Task EstablishConnection()
         {
-            await clientWebSocket.ConnectAsync(new Uri(((AuditorSettings)Global.Settings).AlphaAddress), cancellationToken);
-            _ = Listen();
-            _ = ProcessOutgoingMessageQueue();
+            await connection.Connect(new Uri(Context.Settings.AlphaAddress), cancellationToken);
+            _ = Task.Factory.StartNew(Listen, TaskCreationOptions.LongRunning);
+            ProcessOutgoingMessageQueue();
         }
 
         public override async Task SendMessage(MessageEnvelope envelope)
@@ -40,12 +39,12 @@ namespace Centaurus.Domain
 
         protected override async Task<bool> HandleMessage(MessageEnvelope envelope)
         {
-            return await MessageHandlers<AuditorWebSocketConnection>.HandleMessage(this, envelope.ToIncomingMessage(incommingBuffer));
+            return await Context.MessageHandlers.HandleMessage(this, envelope.ToIncomingMessage(incommingBuffer));
         }
 
-        private async Task ProcessOutgoingMessageQueue()
+        private void ProcessOutgoingMessageQueue()
         {
-            await Task.Factory.StartNew(async () =>
+            Task.Factory.StartNew(async () =>
             {
                 while (!cancellationToken.IsCancellationRequested)
                 {
@@ -53,13 +52,13 @@ namespace Centaurus.Domain
                     {
                         if (ConnectionState == ConnectionState.Ready
                             && !cancellationToken.IsCancellationRequested
-                            && OutgoingMessageStorage.TryPeek(out MessageEnvelope message)
+                            && Context.OutgoingMessageStorage.TryPeek(out MessageEnvelope message)
                             )
                         {
                             try
                             {
                                 await base.SendMessage(message);
-                                if (!OutgoingMessageStorage.TryDequeue(out message))
+                                if (!Context.OutgoingMessageStorage.TryDequeue(out message))
                                 {
                                     logger.Error("Unable to dequeue");
                                 }
@@ -79,7 +78,7 @@ namespace Centaurus.Domain
                         logger.Error(e);
                     }
                 }
-            }, cancellationToken);
+            }, cancellationToken, TaskCreationOptions.LongRunning, TaskScheduler.Default);
         }
 
         public override void Dispose()

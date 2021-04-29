@@ -35,6 +35,7 @@ namespace Centaurus.Test
         {
             var settings = new AuditorSettings();
             SetCommonSettings(settings, TestEnvironment.Auditor1KeyPair.SecretSeed);
+            settings.AlphaAddress = "http://localhost";
             settings.ConnectionString = "mongodb://localhost:27001/auditorDBTest?replicaSet=centaurus";
             settings.AlphaPubKey = TestEnvironment.AlphaKeyPair.AccountId;
             settings.GenesisQuorum = new string[] { TestEnvironment.Auditor1KeyPair.AccountId };
@@ -72,21 +73,21 @@ namespace Centaurus.Test
         /// <summary>
         /// Setups Global with predefined settings
         /// </summary>
-        public static async Task DefaultAlphaSetup()
+        public static async Task<AlphaContext> DefaultAlphaSetup()
         {
             var settings = GetAlphaSettings();
             var storage = await GetStorage(settings.ConnectionString);
-            await Setup(GetPredefinedClients(), GetPredefinedAuditors(), settings, storage);
+            return (AlphaContext)await Setup(GetPredefinedClients(), GetPredefinedAuditors(), settings, storage);
         }
 
         /// <summary>
         /// Setups Global with predefined settings
         /// </summary>
-        public static async Task DefaultAuditorSetup()
+        public static async Task<AuditorContext> DefaultAuditorSetup()
         {
             var settings = GetAuditorSettings();
             var storage = await GetStorage(settings.ConnectionString);
-            await Setup(GetPredefinedClients(), GetPredefinedAuditors(), settings, storage);
+            return (AuditorContext)await Setup(GetPredefinedClients(), GetPredefinedAuditors(), settings, storage);
         }
 
         /// <summary>
@@ -95,9 +96,15 @@ namespace Centaurus.Test
         /// <param name="clients">Clients to add to constellation</param>
         /// <param name="auditors">Auditors to add to constellation</param>
         /// <param name="settings">Settings that will be used to init Global</param>
-        public static async Task Setup(List<KeyPair> clients, List<KeyPair> auditors, BaseSettings settings, IStorage storage)
+        public static async Task<ExecutionContext> Setup(List<KeyPair> clients, List<KeyPair> auditors, BaseSettings settings, IStorage storage)
         {
-            await Global.Setup(settings, storage);
+            var stellarProvider = new MockStellarDataProvider(settings.NetworkPassphrase, settings.HorizonUrl);
+
+            var context = settings is AlphaSettings 
+                ? (ExecutionContext)new AlphaContext((AlphaSettings)settings, storage, stellarProvider) 
+                : new AuditorContext((AuditorSettings)settings, storage, stellarProvider);
+
+            await context.Init();
 
             var assets = new List<AssetSettings> { new AssetSettings { Id = 1, Code = "X", Issuer = KeyPair.Random() } };
 
@@ -113,17 +120,17 @@ namespace Centaurus.Test
                 RequestRateLimits = new RequestRateLimits { HourLimit = 1000, MinuteLimit = 100 }
             };
 
-            if (!Global.IsAlpha)
+            if (!context.IsAlpha)
                 initQuantum.Timestamp = DateTime.UtcNow.Ticks;
 
             var envelope = initQuantum.CreateEnvelope();
-            if (!Global.IsAlpha)
+            if (!context.IsAlpha)
             {
                 var alphaKeyPair = KeyPair.FromSecretSeed(TestEnvironment.AlphaKeyPair.SecretSeed);
                 envelope.Sign(alphaKeyPair);
             }
 
-            await Global.QuantumHandler.HandleAsync(envelope);
+            await context.QuantumHandler.HandleAsync(envelope);
 
             var deposits = new List<PaymentBase>();
             Action<byte[], int> addAssetsFn = (acc, asset) =>
@@ -148,7 +155,7 @@ namespace Centaurus.Test
             var depositQuantum = new TxCommitQuantum
             {
                 Apex = 2,
-                PrevHash = Global.QuantumStorage.LastQuantumHash,
+                PrevHash = context.QuantumStorage.LastQuantumHash,
                 Source = new TxNotification
                 {
                     TxCursor = 2,
@@ -158,10 +165,11 @@ namespace Centaurus.Test
 
             depositQuantum.Source.Sign(TestEnvironment.Auditor1KeyPair);
 
-            await Global.QuantumHandler.HandleAsync(depositQuantum.CreateEnvelope());
+            await context.QuantumHandler.HandleAsync(depositQuantum.CreateEnvelope());
 
             //save all effects
-            await SnapshotHelper.ApplyUpdates();
+            await SnapshotHelper.ApplyUpdates(context);
+            return context;
         }
     }
 }

@@ -24,7 +24,7 @@ namespace Centaurus.Domain
             get
             {
                 if (destinationAccount == null)
-                    destinationAccount = Global.AccountStorage.GetAccount(Payment.Destination);
+                    destinationAccount = EffectProcessors.Context.AccountStorage.GetAccount(Payment.Destination);
 
                 return destinationAccount;
             }

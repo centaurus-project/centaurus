@@ -7,11 +7,16 @@ using System.Linq;
 
 namespace Centaurus.Domain
 {
-    public class AlphaStateManager : StateManager
+    public class AlphaStateManager : StateManager<AlphaContext>
     {
+        public AlphaStateManager(AlphaContext context)
+            : base(context)
+        {
+        }
+
         private Dictionary<RawPubKey, ConnectionState> ConnectedAuditors = new Dictionary<RawPubKey, ConnectionState>();
 
-        public bool HasMajority => ConnectedAuditors.Count(a => a.Value == ConnectionState.Ready) >= MajorityHelper.GetMajorityCount();
+        public bool HasMajority => ConnectedAuditors.Count(a => a.Value == ConnectionState.Ready) >= Context.GetMajorityCount();
 
         public int ConnectedAuditorsCount => ConnectedAuditors.Count;
 

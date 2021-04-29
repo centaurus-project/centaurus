@@ -10,16 +10,15 @@ using stellar_dotnet_sdk;
 
 namespace Centaurus
 {
-    public class AlphaWebSocketConnection : BaseWebSocketConnection
+    public class AlphaWebSocketConnection : BaseWebSocketConnection<AlphaContext>
     {
         public const int AuditorBufferSize = 50 * 1024 * 1024;
 
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public AlphaWebSocketConnection(WebSocket webSocket, string ip)
-            : base(webSocket, ip, 1024, 64 * 1024)
+        public AlphaWebSocketConnection(AlphaContext context, WebSocket webSocket, string ip)
+            : base(context, webSocket, ip, 1024, 64 * 1024)
         {
-
             var hd = new HandshakeData();
             hd.Randomize();
             HandshakeData = hd;
@@ -52,7 +51,7 @@ namespace Centaurus
                 QuantumWorker?.Dispose();
 
                 //set new apex cursor, and start quantum worker
-                QuantumWorker = new QuantumSyncWorker(newApexCursor, this);
+                QuantumWorker = new QuantumSyncWorker(Context, newApexCursor, this);
                 logger.Trace($"Connection {ClientKPAccountId}, apex cursor reseted. New apex cursor {newApexCursor}");
             }
         }
@@ -64,7 +63,7 @@ namespace Centaurus
 
         protected override async Task<bool> HandleMessage(MessageEnvelope envelope)
         {
-            var isHandled = await MessageHandlers<AlphaWebSocketConnection>.HandleMessage(this, envelope.ToIncomingMessage(incommingBuffer));
+            var isHandled = await Context.MessageHandlers.HandleMessage(this, envelope.ToIncomingMessage(incommingBuffer));
 
             return isHandled;
         }

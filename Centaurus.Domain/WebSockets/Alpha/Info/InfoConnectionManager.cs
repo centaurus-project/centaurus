@@ -11,17 +11,22 @@ namespace Centaurus.Domain
     /// <summary>
     /// Manages all client websocket connections
     /// </summary>
-    public static class InfoConnectionManager
+    public class InfoConnectionManager: ContextualBase<AlphaContext>
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
+
+        public InfoConnectionManager(AlphaContext context)
+            :base(context)
+        {
+        }
 
         /// <summary>
         /// Registers new client websocket connection
         /// </summary>
         /// <param name="webSocket">New websocket connection</param>
-        public static async Task OnNewConnection(WebSocket webSocket, string connectionId, string ip)
+        public async Task OnNewConnection(WebSocket webSocket, string connectionId, string ip)
         {
-            var connection = new InfoWebSocketConnection(webSocket, connectionId, ip);
+            var connection = new InfoWebSocketConnection(Context, webSocket, connectionId, ip);
             Subscribe(connection);
             if (!connections.TryAdd(connectionId, connection))
                 throw new Exception($"Connection with id {connectionId} already exists.");
@@ -31,7 +36,7 @@ namespace Centaurus.Domain
         /// <summary>
         /// Closes all connection
         /// </summary>
-        public static async Task CloseAllConnections()
+        public async Task CloseAllConnections()
         {
             foreach (var connection in connections)
             {
@@ -47,26 +52,12 @@ namespace Centaurus.Domain
             connections.Clear();
         }
 
-        #region Private members
-
-        static ConcurrentDictionary<string, InfoWebSocketConnection> connections = new ConcurrentDictionary<string, InfoWebSocketConnection>();
-
-        static void Subscribe(InfoWebSocketConnection connection)
-        {
-            connection.OnClosed += OnClosed;
-        }
-
-        static void Unsubscribe(InfoWebSocketConnection connection)
-        {
-            connection.OnClosed -= OnClosed;
-        }
-
-        public static List<BaseSubscription> GetActiveSubscriptions()
+        public List<BaseSubscription> GetActiveSubscriptions()
         {
             return connections.Values.SelectMany(c => c.GetSubscriptions()).Distinct().ToList();
         }
 
-        public static void SendSubscriptionUpdates(Dictionary<BaseSubscription, SubscriptionUpdateBase> subsUpdates)
+        public void SendSubscriptionUpdates(Dictionary<BaseSubscription, SubscriptionUpdateBase> subsUpdates)
         {
             foreach (var update in subsUpdates)
             {
@@ -79,7 +70,7 @@ namespace Centaurus.Domain
             }
         }
 
-        public static void SendSubscriptionUpdate(BaseSubscription subscription, SubscriptionUpdateBase subsUpdates)
+        public void SendSubscriptionUpdate(BaseSubscription subscription, SubscriptionUpdateBase subsUpdates)
         {
             foreach (var connection in connections)
             {
@@ -87,24 +78,38 @@ namespace Centaurus.Domain
             }
         }
 
-        static async Task SendSubscriptionUpdate(BaseSubscription subscription, SubscriptionUpdateBase update, InfoWebSocketConnection connection)
+        #region Private members
+
+        ConcurrentDictionary<string, InfoWebSocketConnection> connections = new ConcurrentDictionary<string, InfoWebSocketConnection>();
+
+        void Subscribe(InfoWebSocketConnection connection)
+        {
+            connection.OnClosed += OnClosed;
+        }
+
+        void Unsubscribe(InfoWebSocketConnection connection)
+        {
+            connection.OnClosed -= OnClosed;
+        }
+
+        async Task SendSubscriptionUpdate(BaseSubscription subscription, SubscriptionUpdateBase update, InfoWebSocketConnection connection)
         {
             await connection.SendSubscriptionUpdate(subscription, update);
         }
 
-        static void OnClosed(object sender, EventArgs args)
+        void OnClosed(object sender, EventArgs args)
         {
             RemoveConnection((InfoWebSocketConnection)sender);
         }
 
-        static async Task UnsubscribeAndClose(InfoWebSocketConnection connection)
+        async Task UnsubscribeAndClose(InfoWebSocketConnection connection)
         {
             Unsubscribe(connection);
             await connection.CloseConnection();
             connection.Dispose();
         }
 
-        static void RemoveConnection(InfoWebSocketConnection connection)
+        void RemoveConnection(InfoWebSocketConnection connection)
         {
             _ = UnsubscribeAndClose(connection);
             connections.TryRemove(connection.ConnectionId, out _);

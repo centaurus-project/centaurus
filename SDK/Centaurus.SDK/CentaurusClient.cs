@@ -1,5 +1,6 @@
 ﻿using Centaurus.Models;
 using Centaurus.SDK.Models;
+using Centaurus.Stellar;
 using Centaurus.Xdr;
 using NLog;
 using NSec.Cryptography;
@@ -26,14 +27,31 @@ namespace Centaurus.SDK
         static Logger logger = LogManager.GetCurrentClassLogger();
 
         const int timeout = 15000;
-        public CentaurusClient(Uri alphaWebSocketAddress, KeyPair keyPair, ConstellationInfo constellationInfo)
+
+        public CentaurusClient(Uri alphaWebSocketAddress, KeyPair keyPair, ConstellationInfo constellation)
+            : this(
+                  alphaWebSocketAddress,
+                  keyPair,
+                  constellation,
+                  new StellarDataProvider(constellation.StellarNetwork.Passphrase, constellation.StellarNetwork.Horizon),
+                  () => new ClientConnectionWrapper(new ClientWebSocket())
+            )
+        {
+        }
+
+        public CentaurusClient(Uri alphaWebSocketAddress, KeyPair keyPair, ConstellationInfo constellation, StellarDataProviderBase stellarDataProvider, Func<ClientConnectionWrapperBase> connectionFactory)
         {
             this.alphaWebSocketAddress = alphaWebSocketAddress ?? throw new ArgumentNullException(nameof(alphaWebSocketAddress));
-            this.keyPair = keyPair ?? throw new ArgumentNullException(nameof(keyPair));
-            this.constellation = constellationInfo ?? throw new ArgumentNullException(nameof(constellationInfo));
+            this.KeyPair = keyPair ?? throw new ArgumentNullException(nameof(keyPair));
+            this.constellation = constellation ?? throw new ArgumentNullException(nameof(constellation));
 
-            Network.Use(new Network(constellation.StellarNetwork.Passphrase));
+            this.stellarDataProvider = stellarDataProvider ?? throw new ArgumentNullException(nameof(stellarDataProvider));
+
+            this.connectionFactory = connectionFactory ?? throw new ArgumentNullException(nameof(connectionFactory));
+
+            Network.Use(new Network(this.constellation.StellarNetwork.Passphrase));
         }
+        public KeyPair KeyPair { get; }
 
         public async Task Connect()
         {
@@ -46,7 +64,7 @@ namespace Centaurus.SDK
 
                 handshakeResult = new TaskCompletionSource<int>();
 
-                connection = new CentaurusConnection(alphaWebSocketAddress, keyPair, constellation);
+                connection = new CentaurusConnection(alphaWebSocketAddress, KeyPair, connectionFactory(), constellation);
                 SubscribeToEvents(connection);
                 await connection.EstablishConnection();
 
@@ -119,7 +137,7 @@ namespace Centaurus.SDK
         public async Task<MessageEnvelope> Withdrawal(KeyPair destination, string amount, ConstellationInfo.Asset asset, bool waitForFinalize = true)
         {
             var paymentMessage = new WithdrawalRequest();
-            var tx = await TransactionHelper.GetWithdrawalTx(keyPair, constellation, destination, amount, asset);
+            var tx = await stellarDataProvider.GetWithdrawalTx(KeyPair, constellation.VaultPubKey, destination, amount, asset);
 
             paymentMessage.TransactionXdr = tx.ToArray();
 
@@ -129,17 +147,15 @@ namespace Centaurus.SDK
             if (txResultMessage is null)
                 throw new Exception($"Unexpected result type '{result.Message.MessageType}'");
 
-            tx.Sign(keyPair);
+            tx.Sign(KeyPair);
             foreach (var signature in txResultMessage.TxSignatures)
             {
                 tx.Signatures.Add(signature.ToDecoratedSignature());
             }
 
-            var submitResult = await tx.Submit(constellation);
-            if (!submitResult.IsSuccess())
-            {
+            var submitResult = await stellarDataProvider.SubmitTransaction(tx);
+            if (!submitResult.IsSuccess)
                 logger.Error($"Submit withdrawal failed. Result xdr: {submitResult.ResultXdr}");
-            }
             return result;
         }
 
@@ -200,11 +216,13 @@ namespace Centaurus.SDK
 
         public async Task Deposit(long amount, ConstellationInfo.Asset asset, params KeyPair[] extraSigners)
         {
-            var tx = await TransactionHelper.GetDepositTx(keyPair, constellation, Amount.FromXdr(amount), asset);
-            tx.Sign(keyPair);
+            var tx = await stellarDataProvider.GetDepositTx(KeyPair, constellation.VaultPubKey, Amount.FromXdr(amount), asset);
+            tx.Sign(KeyPair);
             foreach (var signer in extraSigners)
                 tx.Sign(signer);
-            await tx.Submit(constellation);
+            var submitResult = await stellarDataProvider.SubmitTransaction(tx);
+            if (!submitResult.IsSuccess)
+                logger.Error($"Deposit failed. Result xdr: {submitResult.ResultXdr}");
         }
 
         public void Dispose()
@@ -224,8 +242,9 @@ namespace Centaurus.SDK
 
         private CentaurusConnection connection;
         private Uri alphaWebSocketAddress;
-        private KeyPair keyPair;
         private ConstellationInfo constellation;
+        private StellarDataProviderBase stellarDataProvider;
+        private Func<ClientConnectionWrapperBase> connectionFactory;
         private TaskCompletionSource<int> handshakeResult;
 
         private List<long> processedEffectsMessages = new List<long>();
@@ -441,23 +460,20 @@ namespace Centaurus.SDK
 
         private class CentaurusConnection : IDisposable
         {
-            public CentaurusConnection(Uri _websocketAddress, KeyPair _clientKeyPair, ConstellationInfo _constellationInfo)
+            public CentaurusConnection(Uri _websocketAddress, KeyPair _clientKeyPair, ClientConnectionWrapperBase connection, ConstellationInfo constellationInfo)
             {
                 clientKeyPair = _clientKeyPair ?? throw new ArgumentNullException(nameof(_clientKeyPair));
                 websocketAddress = new Uri(_websocketAddress ?? throw new ArgumentNullException(nameof(_websocketAddress)), "centaurus");
-                constellationInfo = _constellationInfo ?? throw new ArgumentNullException(nameof(_constellationInfo));
+                this.constellationInfo = constellationInfo ?? throw new ArgumentNullException(nameof(constellationInfo));
 
-                readBuffer = XdrBufferFactory.Rent();
-                sendBuffer = XdrBufferFactory.Rent(1024);
+                this.connection = connection ?? throw new ArgumentNullException(nameof(constellationInfo));
+
+                readBuffer = Rent();
+                sendBuffer = Rent(1024);
 
                 cancellationTokenSource = new CancellationTokenSource();
                 cancellationToken = cancellationTokenSource.Token;
             }
-
-            private CancellationTokenSource cancellationTokenSource;
-            private CancellationToken cancellationToken;
-            private RentedBuffer readBuffer;
-            private RentedBuffer sendBuffer;
 
             public event Action<MessageEnvelope> OnMessage;
 
@@ -469,21 +485,22 @@ namespace Centaurus.SDK
 
             public async Task EstablishConnection()
             {
-                await webSocket.ConnectAsync(websocketAddress, cancellationToken);
-                _ = Listen();
+                await connection.Connect(websocketAddress, cancellationToken);
+                _ = Task.Factory.StartNew(Listen, TaskCreationOptions.LongRunning).Unwrap();
+                _ = Task.Factory.StartNew(ObserveMessages, TaskCreationOptions.LongRunning);
             }
 
             public async Task CloseConnection(WebSocketCloseStatus status = WebSocketCloseStatus.NormalClosure, string desc = null)
             {
                 try
                 {
-                    if (webSocket.State == WebSocketState.Open)
+                    if (connection.WebSocket.State == WebSocketState.Open)
                     {
                         await sendMessageSemaphore.WaitAsync();
                         try
                         {
                             var timeoutTokenSource = new CancellationTokenSource(1000);
-                            await webSocket.CloseAsync(status, desc, timeoutTokenSource.Token);
+                            await connection.WebSocket.CloseAsync(status, desc, timeoutTokenSource.Token);
                             cancellationTokenSource.Cancel();
                         }
                         catch (WebSocketException exc)
@@ -541,10 +558,11 @@ namespace Centaurus.SDK
                     var writer = new XdrBufferWriter(sendBuffer.Buffer);
                     XdrConverter.Serialize(envelope, writer);
 
-                    if (webSocket.State == WebSocketState.Open)
-                        await webSocket.SendAsync(sendBuffer.Buffer.AsMemory(0, writer.Length), WebSocketMessageType.Binary, true, cancellationToken);
+                    if (connection.WebSocket.State == WebSocketState.Open)
+                        await connection.WebSocket.SendAsync(sendBuffer.Buffer.AsMemory(0, writer.Length), WebSocketMessageType.Binary, true, cancellationToken);
 
-                    _ = Task.Factory.StartNew(() => OnSend?.Invoke(envelope));
+                    if (OnSend != null)
+                        _ = Task.Factory.StartNew(() => OnSend?.Invoke(envelope));
                 }
                 catch (WebSocketException e)
                 {
@@ -579,10 +597,10 @@ namespace Centaurus.SDK
                 cancellationTokenSource = null;
 
                 //make sure the socket is closed
-                if (webSocket?.State != WebSocketState.Closed)
-                    webSocket?.Abort();
-                webSocket?.Dispose();
-                webSocket = null;
+                if (connection?.WebSocket.State != WebSocketState.Closed)
+                    connection?.WebSocket.Abort();
+                connection?.WebSocket.Dispose();
+                connection = null;
 
                 readBuffer?.Dispose();
                 readBuffer = null;
@@ -597,8 +615,12 @@ namespace Centaurus.SDK
             private int accountId;
             private Uri websocketAddress;
             private ConstellationInfo constellationInfo;
+            private ClientConnectionWrapperBase connection;
 
-            private ClientWebSocket webSocket = new ClientWebSocket();
+            private CancellationTokenSource cancellationTokenSource;
+            private CancellationToken cancellationToken;
+            private RentedBuffer readBuffer;
+            private RentedBuffer sendBuffer;
 
             private void AssignRequestId(MessageEnvelope envelope)
             {
@@ -678,21 +700,21 @@ namespace Centaurus.SDK
             {
                 try
                 {
-                    while (webSocket.State != WebSocketState.Closed && webSocket.State != WebSocketState.Aborted && !cancellationToken.IsCancellationRequested)
+                    while (connection.WebSocket.State != WebSocketState.Closed && connection.WebSocket.State != WebSocketState.Aborted && !cancellationToken.IsCancellationRequested)
                     {
-                        var messageType = await webSocket.GetWebsocketBuffer(readBuffer, cancellationToken);
+                        var messageType = await connection.WebSocket.GetWebsocketBuffer(readBuffer, cancellationToken);
                         if (!cancellationToken.IsCancellationRequested)
                         {
                             //the client send close message
                             if (messageType == WebSocketMessageType.Close)
                             {
-                                if (webSocket.State != WebSocketState.CloseReceived)
+                                if (connection.WebSocket.State != WebSocketState.CloseReceived)
                                     continue;
                                 await sendMessageSemaphore.WaitAsync();
                                 try
                                 {
                                     var timeoutTokenSource = new CancellationTokenSource(1000);
-                                    await webSocket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "Close", CancellationToken.None);
+                                    await connection.WebSocket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "Close", CancellationToken.None);
                                 }
                                 finally
                                 {
@@ -745,7 +767,28 @@ namespace Centaurus.SDK
             private void HandleMessage(MessageEnvelope envelope)
             {
                 TryResolveRequest(envelope);
-                _ = Task.Factory.StartNew(() => OnMessage?.Invoke(envelope));
+                messages.Add(envelope);
+            }
+
+            private BlockingCollection<MessageEnvelope> messages = new BlockingCollection<MessageEnvelope>();
+
+            private void ObserveMessages()
+            {
+                try
+                {
+                    foreach (var message in messages.GetConsumingEnumerable(cancellationToken))
+                    {
+                        try
+                        {
+                            OnMessage?.Invoke(message);
+                        }
+                        catch (Exception exc)
+                        {
+                            logger.Error(exc);
+                        }
+                    }
+                }
+                catch (OperationCanceledException) { }
             }
 
             #endregion

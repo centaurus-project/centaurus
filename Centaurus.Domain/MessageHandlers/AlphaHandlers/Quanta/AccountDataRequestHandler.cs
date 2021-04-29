@@ -8,6 +8,11 @@ namespace Centaurus.Domain
 {
     public class AccountDataRequestHandler : AlphaBaseQuantumHandler
     {
+        public AccountDataRequestHandler(AlphaContext context) 
+            : base(context)
+        {
+        }
+
         public override MessageTypes SupportedMessageType => MessageTypes.AccountDataRequest;
     }
 }

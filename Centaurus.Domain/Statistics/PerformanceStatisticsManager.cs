@@ -8,14 +8,13 @@ using System.Timers;
 
 namespace Centaurus.Domain
 {
-    public class PerformanceStatisticsManager : IDisposable
+    public abstract class PerformanceStatisticsManager : IContextual, IDisposable
     {
         const int updateInterval = 1000;
 
-        static Logger logger = LogManager.GetCurrentClassLogger();
-
-        public PerformanceStatisticsManager()
+        public PerformanceStatisticsManager(ExecutionContext context)
         {
+            Context = context ?? throw new ArgumentNullException(nameof(context));
             updateTimer = new System.Timers.Timer();
             updateTimer.Interval = updateInterval;
             updateTimer.AutoReset = false;
@@ -23,15 +22,7 @@ namespace Centaurus.Domain
             updateTimer.Start();
         }
 
-        private Dictionary<string, AuditorPerformanceStatistics> auditorsStatistics { get; set; } = new Dictionary<string, AuditorPerformanceStatistics>();
-
-        public void AddAuditorStatistics(string accountId, AuditorPerfStatistics message)
-        {
-            lock (auditorsStatistics)
-                auditorsStatistics[accountId] = message.FromModel(accountId);
-        }
-
-        public event Action<PerformanceStatistics> OnUpdates;
+        public abstract event Action<PerformanceStatistics> OnUpdates;
 
         public void OnBatchSaved(BatchSavedInfo batchInfo)
         {
@@ -50,77 +41,33 @@ namespace Centaurus.Domain
         private object syncRoot = new { };
         private Timer updateTimer;
 
+        public ExecutionContext Context { get; }
+
         private void UpdateTimer_Elapsed(object sender, ElapsedEventArgs e)
         {
             lock (syncRoot)
-            {
-                try
-                {
-                    var quantaPerSecond = GetItemsPerSecond();
-                    var quantaAvgLength = GetQuantaAvgLength();
-                    var statistics = default(PerformanceStatistics);
-                    if (Global.IsAlpha)
-                    {
-                        var throttling = GetThrottling();
-                        var auditors = GetAuditorsStatistics();
-                        statistics = new AlphaPerformanceStatistics
-                        {
-                            Throttling = throttling,
-                            AuditorStatistics = auditors
-                        };
-                    }
-                    else
-                        statistics = new AuditorPerformanceStatistics();
-
-                    statistics.QuantaPerSecond = quantaPerSecond;
-                    statistics.QuantaQueueLength = quantaAvgLength;
-                    statistics.BatchInfos = LastBatchInfos;
-                    statistics.UpdateDate = DateTime.UtcNow;
-
-                    OnUpdates?.Invoke(statistics);
-                    updateTimer?.Start();
-                }
-                catch (Exception exc)
-                {
-                    logger.Error(exc);
-                }
-            }
+                CollectStatistics();
+            updateTimer?.Start();
         }
 
-        private List<AuditorPerformanceStatistics> GetAuditorsStatistics()
-        {
-            lock (auditorsStatistics)
-            {
-                var auditorConnections = ConnectionManager.GetAuditorConnections();
-                foreach (var auditorConnection in auditorConnections)
-                {
-                    var accountId = auditorConnection?.ClientKPAccountId;
-                    if (!auditorsStatistics.TryGetValue(accountId, out var statistics))
-                        continue;
-                    var auditorApex = auditorConnection?.QuantumWorker?.CurrentApexCursor ?? -1;
-                    if (auditorApex >= 0)
-                        statistics.Delay = (int)(Global.QuantumStorage.CurrentApex - auditorApex);
-                }
-                return auditorsStatistics.Values.ToList();
-            }
-        }
+        protected abstract void CollectStatistics();
 
-        private int GetQuantaAvgLength()
+        protected int GetQuantaAvgLength()
         {
-            LastQuantaQueueLengths.Add(Global.QuantumHandler.QuantaQueueLenght);
+            LastQuantaQueueLengths.Add(Context.QuantumHandler.QuantaQueueLenght);
             if (LastQuantaQueueLengths.Count > 20)
                 LastQuantaQueueLengths.RemoveAt(0);
             return (int)Math.Floor(decimal.Divide(LastQuantaQueueLengths.Sum(), LastQuantaQueueLengths.Count));
         }
 
-        private int GetThrottling()
+        protected int GetThrottling()
         {
             return QuantaThrottlingManager.Current.IsThrottlingEnabled ? QuantaThrottlingManager.Current.MaxItemsPerSecond : 0;
         }
 
-        private int GetItemsPerSecond()
+        protected int GetItemsPerSecond()
         {
-            RecentApexes.Add(new Apex { UpdatedAt = DateTime.UtcNow, CurrentApex = Global.QuantumStorage.CurrentApex });
+            RecentApexes.Add(new Apex { UpdatedAt = DateTime.UtcNow, CurrentApex = Context.QuantumStorage.CurrentApex });
             if (RecentApexes.Count > 20)
                 RecentApexes.RemoveAt(0);
 
@@ -132,6 +79,8 @@ namespace Centaurus.Domain
             return (int)(decimal.Divide(lastItem.CurrentApex - firstItem.CurrentApex, timeDiff) * 1000);
         }
 
+        protected List<BatchSavedInfo> GetBatchInfos() => LastBatchInfos;
+
         public void Dispose()
         {
             lock (syncRoot)
@@ -142,11 +91,101 @@ namespace Centaurus.Domain
             }
         }
 
-        class Apex
+        protected class Apex
         {
             public long CurrentApex { get; set; }
 
             public DateTime UpdatedAt { get; set; }
+        }
+    }
+
+    public class AlphaPerformanceStatisticsManager : PerformanceStatisticsManager
+    {
+        static Logger logger = LogManager.GetCurrentClassLogger();
+
+        public AlphaPerformanceStatisticsManager(ExecutionContext context)
+            : base(context)
+        {
+        }
+
+        public override event Action<PerformanceStatistics> OnUpdates;
+
+        private Dictionary<string, AuditorPerformanceStatistics> auditorsStatistics { get; set; } = new Dictionary<string, AuditorPerformanceStatistics>();
+
+        public void AddAuditorStatistics(string accountId, AuditorPerfStatistics message)
+        {
+            lock (auditorsStatistics)
+                auditorsStatistics[accountId] = message.FromModel(accountId);
+        }
+        private List<AuditorPerformanceStatistics> GetAuditorsStatistics()
+        {
+            lock (auditorsStatistics)
+            {
+                var auditorConnections = ((AlphaContext)Context).ConnectionManager.GetAuditorConnections();
+                foreach (var auditorConnection in auditorConnections)
+                {
+                    var accountId = auditorConnection?.ClientKPAccountId;
+                    if (!auditorsStatistics.TryGetValue(accountId, out var statistics))
+                        continue;
+                    var auditorApex = auditorConnection?.QuantumWorker?.CurrentApexCursor ?? -1;
+                    if (auditorApex >= 0)
+                        statistics.Delay = (int)(Context.QuantumStorage.CurrentApex - auditorApex);
+                }
+                return auditorsStatistics.Values.ToList();
+            }
+        }
+
+
+        protected override void CollectStatistics()
+        {
+            try
+            {
+                var statistics = new AlphaPerformanceStatistics
+                {
+                    QuantaPerSecond = GetItemsPerSecond(),
+                    QuantaQueueLength = GetQuantaAvgLength(),
+                    Throttling = GetThrottling(),
+                    AuditorStatistics = GetAuditorsStatistics(),
+                    BatchInfos = GetBatchInfos(),
+                    UpdateDate = DateTime.UtcNow
+                };
+                OnUpdates?.Invoke(statistics);
+            }
+            catch (Exception exc)
+            {
+                logger.Error(exc);
+            }
+        }
+    }
+
+    public class AuditorPerformanceStatisticsManager : PerformanceStatisticsManager
+    {
+        static Logger logger = LogManager.GetCurrentClassLogger();
+
+        public AuditorPerformanceStatisticsManager(ExecutionContext context)
+            : base(context)
+        {
+        }
+
+        public override event Action<PerformanceStatistics> OnUpdates;
+
+        protected override void CollectStatistics()
+        {
+            try
+            {
+                var statistics = new AuditorPerformanceStatistics
+                {
+                    QuantaPerSecond = GetItemsPerSecond(),
+                    QuantaQueueLength = GetQuantaAvgLength(),
+                    BatchInfos = GetBatchInfos(),
+                    UpdateDate = DateTime.UtcNow
+                };
+                OnUpdates?.Invoke(statistics);
+            }
+            catch (Exception exc)
+            {
+                logger.Error(exc);
+            }
         }
     }
 }

@@ -54,7 +54,7 @@ namespace Centaurus.Test
         [Test]
         public void AssetsNullValueSerializationTest()
         {
-            var asset = new AssetSettings { Code = "XLM" };
+            var asset = new AssetSettings { Code = AssetsHelper.XLMCode };
             var rawData = XdrConverter.Serialize(asset);
             asset = XdrConverter.Deserialize<AssetSettings>(rawData);
             Assert.AreEqual(null, asset.Issuer);

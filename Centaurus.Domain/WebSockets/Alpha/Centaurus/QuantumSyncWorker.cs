@@ -10,20 +10,21 @@ using System.Threading.Tasks;
 
 namespace Centaurus
 {
-    public class QuantumSyncWorker : IDisposable
+    public class QuantumSyncWorker : ContextualBase<AlphaContext>, IDisposable
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public QuantumSyncWorker(long apexCursor, AlphaWebSocketConnection auditor)
+        public QuantumSyncWorker(AlphaContext context, long apexCursor, AlphaWebSocketConnection auditor)
+            :base(context)
         {
-            this.auditor = auditor;
+            this.auditor = auditor ?? throw new ArgumentNullException(nameof(auditor));
             CurrentApexCursor = apexCursor;
             cancellationTokenSource = new CancellationTokenSource();
             cancellationToken = cancellationTokenSource.Token;
-            Task.Factory.StartNew(SendQuantums);
+            Task.Factory.StartNew(SendQuantums, TaskCreationOptions.LongRunning);
         }
 
-        private AlphaWebSocketConnection auditor;
+        private readonly AlphaWebSocketConnection auditor;
 
         private CancellationTokenSource cancellationTokenSource;
         private CancellationToken cancellationToken;
@@ -32,8 +33,8 @@ namespace Centaurus
 
         private async Task SendQuantums()
         {
-            var batchSize = ((AlphaSettings)Global.Settings).SyncBatchSize;
-            var quantumStorage = (AlphaQuantumStorage)Global.QuantumStorage;
+            var batchSize = Context.Settings.SyncBatchSize;
+            var quantumStorage = (AlphaQuantumStorage)Context.QuantumStorage;
             while (!cancellationToken.IsCancellationRequested)
             {
                 var apexDiff = quantumStorage.CurrentApex - CurrentApexCursor;
@@ -53,7 +54,7 @@ namespace Centaurus
                     return;
                 }
 
-                if (CurrentApexCursor == Global.QuantumStorage.CurrentApex)
+                if (CurrentApexCursor == Context.QuantumStorage.CurrentApex)
                 {
                     Thread.Sleep(50);
                     continue;
@@ -63,7 +64,7 @@ namespace Centaurus
                     List<MessageEnvelope> quanta = null;
                     if (!quantumStorage.GetQuantaBacth(CurrentApexCursor + 1, batchSize, out quanta))
                     {
-                        quanta = await Global.PersistenceManager.GetQuantaAboveApex(CurrentApexCursor, batchSize); //quanta are not found in the in-memory storage
+                        quanta = await Context.PersistenceManager.GetQuantaAboveApex(CurrentApexCursor, batchSize); //quanta are not found in the in-memory storage
                         if (quanta.Count < 1)
                             throw new Exception("No quanta from database.");
                     }
@@ -86,7 +87,7 @@ namespace Centaurus
                     if (exc is ObjectDisposedException
                     || exc.GetBaseException() is ObjectDisposedException)
                         throw;
-                    logger.Error(exc, $"Unable to get quanta. Cursor: {CurrentApexCursor}; CurrentApex: {Global.QuantumStorage.CurrentApex}");
+                    logger.Error(exc, $"Unable to get quanta. Cursor: {CurrentApexCursor}; CurrentApex: {Context.QuantumStorage.CurrentApex}");
                 }
             }
         }

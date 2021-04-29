@@ -58,6 +58,8 @@ namespace Centaurus
 
         public override void Build()
         {
+            if (!Uri.TryCreate(AlphaAddress, UriKind.Absolute, out _))
+                throw new ArgumentException("Invalid Alpha address url.", nameof(AlphaAddress));
             base.Build();
             AlphaKeyPair = KeyPair.FromAccountId(AlphaPubKey);
         }

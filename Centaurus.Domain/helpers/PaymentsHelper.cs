@@ -11,8 +11,11 @@ namespace Centaurus.Domain
 {
     public static class PaymentsHelper
     {
-        private static bool TryGetAsset(Asset xdrAsset, out int asset)
+        private static bool TryGetAsset(this ExecutionContext context, Asset xdrAsset, out int asset)
         {
+            if (context == null)
+                throw new ArgumentNullException(nameof(context));
+
             var assetAlphaNum = stellar_dotnet_sdk.Asset.FromXdr(xdrAsset) as stellar_dotnet_sdk.AssetTypeCreditAlphaNum;
 
             asset = 0;
@@ -21,7 +24,7 @@ namespace Centaurus.Domain
 
             string assetSymbol = $"{assetAlphaNum.Code}-{assetAlphaNum.Issuer}";
 
-            var assetSettings = Global.Constellation.Assets.Find(a => a.ToString() == assetSymbol);
+            var assetSettings = context.Constellation.Assets.Find(a => a.ToString() == assetSymbol);
             if (assetSettings == null) return false;
             asset = assetSettings.Id;
             return true;
@@ -29,8 +32,11 @@ namespace Centaurus.Domain
 
         public static OperationTypeEnum[] SupportedDepositOperations = new OperationTypeEnum[] { OperationTypeEnum.PAYMENT };
 
-        public static bool FromOperationResponse(Operation.OperationBody operation, stellar_dotnet_sdk.KeyPair source, PaymentResults pResult, byte[] transactionHash, out PaymentBase payment)
+        public static bool TryGetPayment(this ExecutionContext context, Operation.OperationBody operation, stellar_dotnet_sdk.KeyPair source, PaymentResults pResult, byte[] transactionHash, out PaymentBase payment)
         {
+            if (context == null)
+                throw new ArgumentNullException(nameof(context));
+
             payment = null;
             int asset;
             //check supported deposit operations is overkill, but we need to keep SupportedDepositOperations up to date
@@ -40,11 +46,11 @@ namespace Centaurus.Domain
             switch (operation.Discriminant.InnerValue)
             {
                 case OperationTypeEnum.PAYMENT:
-                    if (!TryGetAsset(operation.PaymentOp.Asset, out asset))
+                    if (!context.TryGetAsset(operation.PaymentOp.Asset, out asset))
                         return result;
                     var amount = operation.PaymentOp.Amount.InnerValue;
                     var destKeypair = stellar_dotnet_sdk.KeyPair.FromPublicKey(operation.PaymentOp.Destination.Ed25519.InnerValue);
-                    if (Global.Constellation.Vault.Equals((RawPubKey)destKeypair.PublicKey))
+                    if (context.Constellation.Vault.Equals((RawPubKey)destKeypair.PublicKey))
                         payment = new Deposit
                         {
                             Destination = new RawPubKey() { Data = source.PublicKey },
@@ -52,8 +58,8 @@ namespace Centaurus.Domain
                             Asset = asset,
                             TransactionHash = transactionHash
                         };
-                    else if (Global.Constellation.Vault.Equals((RawPubKey)source.PublicKey))
-                        payment = new Withdrawal { TransactionHash = transactionHash  };
+                    else if (context.Constellation.Vault.Equals((RawPubKey)source.PublicKey))
+                        payment = new Withdrawal { TransactionHash = transactionHash };
                     if (payment != null)
                     {
                         payment.PaymentResult = pResult;

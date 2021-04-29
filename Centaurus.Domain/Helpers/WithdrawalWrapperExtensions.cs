@@ -28,7 +28,7 @@ namespace Centaurus.Domain
         /// <returns></returns>
         public static bool IsExpired(this WithdrawalWrapper withdrawal, long currentTime)
         {
-            return currentTime - withdrawal.MaxTime > Global.MaxTxSubmitDelay;
+            return currentTime - withdrawal.MaxTime > ExecutionContext.MaxTxSubmitDelay;
         }
     }
 }

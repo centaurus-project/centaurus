@@ -11,13 +11,18 @@ namespace Centaurus.Domain
     /// </summary>
     public abstract class AlphaBaseQuantumHandler : BaseAlphaMessageHandler
     {
+        protected AlphaBaseQuantumHandler(AlphaContext context) 
+            : base(context)
+        {
+        }
+
         public override ConnectionState[] ValidConnectionStates { get; } = new ConnectionState[] { ConnectionState.Ready };
 
         public override bool IsAuditorOnly { get; } = false;
 
         public override Task HandleMessage(AlphaWebSocketConnection connection, IncomingMessage message)
         {
-            Global.QuantumHandler.HandleAsync(message.Envelope);
+            Context.QuantumHandler.HandleAsync(message.Envelope);
             return Task.CompletedTask;
         }
     }

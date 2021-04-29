@@ -8,12 +8,6 @@ namespace Centaurus.Domain
 {
     public static class MessageEnvelopeExtenstions
     {
-
-        public static void TryAssignAccountWrapper(this MessageEnvelope envelope)
-        {
-            envelope.TryAssignAccountWrapper(Global.AccountStorage);
-        }
-
         public static void TryAssignAccountWrapper(this MessageEnvelope envelope, AccountStorage accountStorage)
         {
             var requestMessage = default(RequestMessage);

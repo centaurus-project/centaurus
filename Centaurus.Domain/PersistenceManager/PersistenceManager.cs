@@ -189,7 +189,7 @@ namespace Centaurus.Domain
 
             var exchange = await GetRestoredExchange(orders);
 
-            var withdrawalsStorage = new WithdrawalStorage(withdrawals, false);
+            var withdrawalsStorage = new WithdrawalStorage(withdrawals);
 
             var batchSize = 1000;
             var effects = new List<Effect>();
@@ -209,7 +209,7 @@ namespace Centaurus.Domain
                 switch (currentEffect)
                 {
                     case AccountCreateEffect accountCreateEffect:
-                        processor = new AccountCreateEffectProcessor(accountCreateEffect, accountStorage);
+                        processor = new AccountCreateEffectProcessor(accountCreateEffect, accountStorage, settings.RequestRateLimits);
                         break;
                     case NonceUpdateEffect nonceUpdateEffect:
                         processor = new NonceUpdateEffectProcessor(nonceUpdateEffect);

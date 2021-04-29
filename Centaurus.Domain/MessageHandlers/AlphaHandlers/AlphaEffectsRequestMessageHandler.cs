@@ -10,6 +10,11 @@ namespace Centaurus.Domain
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
+        public AlphaEffectsRequestMessageHandler(AlphaContext context) 
+            : base(context)
+        {
+        }
+
         public override bool IsAuditorOnly => false;
 
         public override MessageTypes SupportedMessageType => MessageTypes.EffectsRequest;
@@ -27,7 +32,7 @@ namespace Centaurus.Domain
                     try
                     {
                         var request = message.Envelope.Message as EffectsRequest;
-                        var effectsResponse = await Global.PersistenceManager.LoadEffects(request.Cursor, request.IsDesc, request.Limit, request.Account);
+                        var effectsResponse = await connection.Context.PersistenceManager.LoadEffects(request.Cursor, request.IsDesc, request.Limit, request.Account);
                         effectsResponse.OriginalMessage = message.Envelope;
                         effectsResponse.Effects = new List<Effect>();
                         effectsResponse.Status = ResultStatusCodes.Success;

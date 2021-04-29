@@ -28,7 +28,7 @@ namespace Centaurus.Domain
                 .OrderBy(balance => balance.Asset)
                 .ToList();
 
-            resultMessage.Orders = Global.Exchange.OrderMap.GetAllAccountOrders(requestMessage.AccountWrapper)
+            resultMessage.Orders = context.CentaurusContext.Exchange.OrderMap.GetAllAccountOrders(requestMessage.AccountWrapper)
                 .Select(order =>
                     new Order
                     {

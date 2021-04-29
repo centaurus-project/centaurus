@@ -10,14 +10,18 @@ namespace Centaurus
     //TODO: cache the results
     public static class MajorityHelper
     {
-        public static int GetMajorityCount()
+        public static int GetMajorityCount(this ExecutionContext context)
         {
-            return GetMajorityCount(GetTotalAuditorsCount());
+            if (context == null)
+                throw new ArgumentNullException(nameof(context));
+            return GetMajorityCount(context.GetTotalAuditorsCount());
         }
 
-        public static int GetTotalAuditorsCount()
+        public static int GetTotalAuditorsCount(this ExecutionContext context)
         {
-            return Global.Constellation.Auditors.Count;
+            if (context == null)
+                throw new ArgumentNullException(nameof(context));
+            return context.Constellation.Auditors.Count;
         }
 
         public static int GetMajorityCount(int totalAuditorsCount)
@@ -27,10 +31,12 @@ namespace Centaurus
                 : (int)Math.Ceiling(totalAuditorsCount / 2.0);
         }
 
-        public static bool HasMajority(MessageEnvelope envelope)
+        public static bool HasMajority(this ExecutionContext context, MessageEnvelope envelope)
         {
+            if (context == null)
+                throw new ArgumentNullException(nameof(context));
             //imply that signatures are unique and were validated beforehand
-            return envelope.Signatures.Count >= GetMajorityCount();
+            return envelope.Signatures.Count >= context.GetMajorityCount();
         }
     }
 }

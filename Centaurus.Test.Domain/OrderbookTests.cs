@@ -25,6 +25,7 @@ namespace Centaurus.Test
         AccountWrapper account1;
         AccountWrapper account2;
         private bool useLegacyOrderbook;
+        private ExecutionContext context;
 
         [SetUp]
         public void Setup()
@@ -36,7 +37,11 @@ namespace Centaurus.Test
                 NetworkPassphrase = "Test SDF Network ; September 2015",
                 CWD = "AppData"
             };
-            Global.Setup(settings, new MockStorage(), useLegacyOrderbook).Wait();
+
+            var stellarProvider = new MockStellarDataProvider(settings.NetworkPassphrase, settings.HorizonUrl);
+
+            context = new AlphaContext(settings, new MockStorage(), stellarProvider, useLegacyOrderbook);
+            context.Init().Wait();
 
             var requestRateLimits = new RequestRateLimits { HourLimit = 1000, MinuteLimit = 100 };
 
@@ -64,7 +69,7 @@ namespace Centaurus.Test
             account2.Account.CreateBalance(1);
             account2.Account.GetBalance(1).UpdateBalance(10000000000);
 
-            Global.Setup(new Snapshot
+            context.Setup(new Snapshot
             {
                 Accounts = new List<AccountWrapper> { account1, account2 },
                 Apex = 0,
@@ -78,22 +83,22 @@ namespace Centaurus.Test
                 },
             }).Wait();
 
-            this.account1 = Global.AccountStorage.GetAccount(account1.Id);
-            this.account2 = Global.AccountStorage.GetAccount(account2.Id);
+            this.account1 = context.AccountStorage.GetAccount(account1.Id);
+            this.account2 = context.AccountStorage.GetAccount(account2.Id);
         }
 
         [TearDown]
         public void TearDown()
         {
-            Global.Exchange.Clear();
-            //Global.AccountStorage.Clear();
+            context.Exchange.Clear();
+            //CentaurusContext.Current.AccountStorage.Clear();
         }
 
         private void ExecuteWithOrderbook(int iterations, bool useNormalDistribution, Action<Action> executor)
         {
             var rnd = new Random();
 
-            var market = Global.Exchange.GetMarket(1);
+            var market = context.Exchange.GetMarket(1);
 
             var testTradeResults = new Dictionary<RequestQuantum, EffectProcessorsContainer>();
             for (var i = 1; i < iterations; i++)
@@ -130,7 +135,7 @@ namespace Centaurus.Test
                     Timestamp = DateTime.UtcNow.Ticks
                 };
                 var diffObject = new DiffObject();
-                var conterOrderEffectsContainer = new EffectProcessorsContainer(trade.CreateEnvelope(), diffObject);
+                var conterOrderEffectsContainer = new EffectProcessorsContainer(context, trade.CreateEnvelope(), diffObject);
                 testTradeResults.Add(trade, conterOrderEffectsContainer);
             }
 
@@ -141,14 +146,14 @@ namespace Centaurus.Test
             {
                 foreach (var trade in testTradeResults)
                 {
-                    Global.Exchange.ExecuteOrder(trade.Value);
+                    context.Exchange.ExecuteOrder(trade.Value);
                 }
             });
 
             //cleanup orders
             foreach (var account in new[] { account1, account2 })
             {
-                var activeOrders = Global.Exchange.OrderMap.GetAllAccountOrders(account);
+                var activeOrders = context.Exchange.OrderMap.GetAllAccountOrders(account);
                 foreach (var order in activeOrders)
                 {
                     var decodedOrderId = OrderIdConverter.Decode(order.OrderId);
@@ -188,7 +193,7 @@ namespace Centaurus.Test
         {
             ExecuteWithOrderbook(iterations, useNormalDistribution, executeOrders => PerfCounter.MeasureTime(executeOrders, () =>
             {
-                var market = Global.Exchange.GetMarket(1);
+                var market = context.Exchange.GetMarket(1);
                 return $"Is legacy orderbook: {useLegacyOrderbook}, {iterations} iterations, orderbook size: {market.Bids.Count} bids,  {market.Asks.Count} asks, {market.Bids.GetBestPrice().ToString("G3")}/{market.Asks.GetBestPrice().ToString("G3")} spread.";
             }));
         }
@@ -204,7 +209,7 @@ namespace Centaurus.Test
             var side = OrderSide.Buy;
             var asset = 1;
 
-            var orderbook = Global.Exchange.GetOrderbook(asset, side);
+            var orderbook = context.Exchange.GetOrderbook(asset, side);
             var ordersCount = 1000;
             for (var i = 1; i <= ordersCount; i++)
             {

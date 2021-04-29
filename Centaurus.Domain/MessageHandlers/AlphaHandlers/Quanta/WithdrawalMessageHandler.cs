@@ -7,6 +7,11 @@ namespace Centaurus.Domain
 {
     public class WithdrawalMessageHandler : AlphaBaseQuantumHandler
     {
+        public WithdrawalMessageHandler(AlphaContext context) 
+            : base(context)
+        {
+        }
+
         public override MessageTypes SupportedMessageType { get; } = MessageTypes.WithdrawalRequest;
     }
 }

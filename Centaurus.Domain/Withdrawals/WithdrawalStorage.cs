@@ -16,7 +16,7 @@ namespace Centaurus.Domain
 {
     public class WithdrawalStorage : IDisposable
     {
-        public WithdrawalStorage(IEnumerable<WithdrawalWrapper> withdrawals, bool startSubmitTimer = true)
+        public WithdrawalStorage(IEnumerable<WithdrawalWrapper> withdrawals)
         {
             this.withdrawals = new Dictionary<byte[], WithdrawalWrapper>(new HashComparer());
 
@@ -24,19 +24,26 @@ namespace Centaurus.Domain
                 return;
             foreach (var payment in withdrawals)
                 Add(payment);
-            if (startSubmitTimer)
+            if (!EnvironmentHelper.IsTest)
                 InitTimer();
         }
+
+        public event Func<Dictionary<byte[], WithdrawalWrapper>, Task> OnSubmitTimer;
 
         public void Add(WithdrawalWrapper withdrawal)
         {
             if (withdrawal == null)
                 throw new ArgumentNullException(nameof(withdrawal));
 
-            lock (withdrawals)
+            syncRoot.Wait();
+            try
             {
                 if (!withdrawals.TryAdd(withdrawal.Hash, withdrawal))
                     throw new Exception("Payment with specified transaction hash already exists");
+            }
+            finally
+            {
+                syncRoot.Release();
             }
         }
 
@@ -45,17 +52,29 @@ namespace Centaurus.Domain
             if (transactionHash == null)
                 throw new ArgumentNullException(nameof(transactionHash));
 
-            lock (withdrawals)
+            syncRoot.Wait();
+            try
             {
                 if (!withdrawals.Remove(transactionHash, out var withdrawal))
                     throw new Exception("Withdrawal with specified hash is not found");
+            }
+            finally
+            {
+                syncRoot.Release();
             }
         }
 
         public IEnumerable<WithdrawalWrapper> GetAll()
         {
-            lock (withdrawals)
+            syncRoot.Wait();
+            try
+            {
                 return withdrawals.Values.Select(w => w);
+            }
+            finally
+            {
+                syncRoot.Release();
+            }
         }
 
         public WithdrawalWrapper GetWithdrawal(byte[] transactionHash)
@@ -63,8 +82,15 @@ namespace Centaurus.Domain
             if (transactionHash == null)
                 throw new ArgumentNullException(nameof(transactionHash));
 
-            lock (withdrawals)
+            syncRoot.Wait();
+            try
+            {
                 return withdrawals.GetValueOrDefault(transactionHash);
+            }
+            finally
+            {
+                syncRoot.Release();
+            }
         }
 
         public WithdrawalWrapper GetWithdrawal(long apex)
@@ -72,8 +98,15 @@ namespace Centaurus.Domain
             if (apex == default)
                 throw new ArgumentNullException(nameof(apex));
 
-            lock (withdrawals)
+            syncRoot.Wait();
+            try
+            {
                 return withdrawals.Values.FirstOrDefault(w => w.Apex == apex);
+            }
+            finally
+            {
+                syncRoot.Release();
+            }
         }
 
         public void Dispose()
@@ -90,7 +123,7 @@ namespace Centaurus.Domain
 
         private Dictionary<byte[], WithdrawalWrapper> withdrawals;
         private System.Timers.Timer submitTimer;
-        private static Logger logger = LogManager.GetCurrentClassLogger();
+        private SemaphoreSlim syncRoot = new SemaphoreSlim(1);
 
         private void InitTimer()
         {
@@ -103,63 +136,15 @@ namespace Centaurus.Domain
 
         private async void SubmitTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
+            await syncRoot.WaitAsync();
             try
             {
-                if (Global.AppState.State == ApplicationState.Ready)
-                    await Cleanup();
-                submitTimer.Start();
+                if (OnSubmitTimer != null)
+                    await OnSubmitTimer.Invoke(withdrawals);
             }
-            catch (Exception exc)
+            finally
             {
-                logger.Error(exc, "Error on withdrawal cleanup.");
-                Global.AppState.State = ApplicationState.Failed;
-            }
-        }
-
-        private async Task Cleanup()
-        {
-            byte[][] expiredTransactions = null;
-            lock (withdrawals)
-            {
-                var currentTimeSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-                expiredTransactions = withdrawals.Where(w => w.Value.IsExpired(currentTimeSeconds)).Select(w => w.Key).ToArray();
-            }
-
-            if (expiredTransactions.Length < 1)
-                return;
-
-            //we must ignore all txs that was submitted. TxListener will handle submitted txs.
-            var unhandledTxs = await GetUnhandledTx();
-            foreach (var expiredTransaction in expiredTransactions.Where(tx => !unhandledTxs.Contains(tx, ByteArrayComparer.Default)))
-                _ = Global.QuantumHandler.HandleAsync(new WithrawalsCleanupQuantum { ExpiredWithdrawal = expiredTransaction }.CreateEnvelope());
-        }
-
-        private async Task<List<byte[]>> GetUnhandledTx()
-        {
-            var retries = 1;
-            while (true)
-            {
-                try
-                {
-                    var limit = 200;
-                    var unhandledTxs = new List<byte[]>();
-                    var pageResult = await Global.StellarNetwork.Server.GetTransactionsRequestBuilder(Global.Constellation.Vault.ToString(), Global.TxCursorManager.TxCursor, limit).Execute();
-                    while (pageResult.Records.Count > 0)
-                    {
-                        unhandledTxs.AddRange(pageResult.Records.Select(r => ByteArrayExtensions.FromHexString(r.Hash)));
-                        if (pageResult.Records.Count != limit)
-                            break;
-                        pageResult = await pageResult.NextPage();
-                    }
-                    return unhandledTxs;
-                }
-                catch
-                {
-                    if (retries == 5)
-                        throw;
-                    await Task.Delay(retries * 1000); 
-                    retries++;
-                }
+                syncRoot.Release();
             }
         }
 

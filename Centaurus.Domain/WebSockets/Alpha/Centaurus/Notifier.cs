@@ -14,10 +14,12 @@ namespace Centaurus.Domain
         /// </summary>
         /// <param name="account">Target account</param>
         /// <param name="envelope">Message to send</param>
-        public static void Notify(RawPubKey account, MessageEnvelope envelope)
+        public static void Notify(this AlphaContext context, RawPubKey account, MessageEnvelope envelope)
         {
-            Global.ExtensionsManager.BeforeNotify(account, envelope);
-            if (ConnectionManager.TryGetConnection(account, out Centaurus.AlphaWebSocketConnection connection))
+            if (context == null)
+                throw new ArgumentNullException(nameof(context));
+            context.ExtensionsManager.BeforeNotify(account, envelope);
+            if (context.ConnectionManager.TryGetConnection(account, out AlphaWebSocketConnection connection))
                 Task.Factory.StartNew(async () => await connection.SendMessage(envelope)).Unwrap();
         }
 
@@ -25,10 +27,12 @@ namespace Centaurus.Domain
         /// Sends the message to all connected auditors
         /// </summary>
         /// <param name="envelope">Message to send</param>
-        public static void NotifyAuditors(MessageEnvelope envelope)
+        public static void NotifyAuditors(this AlphaContext context, MessageEnvelope envelope)
         {
-            Global.ExtensionsManager.BeforeNotifyAuditors(envelope);
-            var auditors = ConnectionManager.GetAuditorConnections();
+            if (context == null)
+                throw new ArgumentNullException(nameof(context));
+            context.ExtensionsManager.BeforeNotifyAuditors(envelope);
+            var auditors = context.ConnectionManager.GetAuditorConnections();
             for (var i = 0; i < auditors.Count; i++)
             {
                 var auditor = auditors[i];
@@ -40,10 +44,12 @@ namespace Centaurus.Domain
         /// Notifies message author(s) about message processing result
         /// </summary>
         /// <param name="result">Result message</param>
-        public static void OnMessageProcessResult(ResultMessage result)
+        public static void OnMessageProcessResult(this AlphaContext context, ResultMessage result)
         {
             if (result == null)
                 return;
+            if (context == null)
+                throw new ArgumentNullException(nameof(context));
 
             var signatures = result.OriginalMessage.Signatures;
 
@@ -54,7 +60,7 @@ namespace Centaurus.Domain
             for (var i = 0; i < signatures.Count; i++)
             {
                 var accountToNotify = signatures[i];
-                Notify(accountToNotify.Signer, envelope);
+                context.Notify(accountToNotify.Signer, envelope);
             }
         }
     }

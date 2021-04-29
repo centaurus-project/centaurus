@@ -1,6 +1,7 @@
 ﻿using Centaurus.Models;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -10,20 +11,16 @@ namespace Centaurus.Domain
 {
     public class AuditLedgerManager : MajorityManager
     {
-        public AuditLedgerManager()
+        public AuditLedgerManager(AlphaContext context)
+            : base(context)
         {
-            alphaListener = (AlphaTxListener)Global.TxListener;
-            alphaListener.OnNewCursor += AlphaListener_OnNewCursor;
+            alphaListener = (AlphaTxListener)context.TxListener;
+            Task.Factory.StartNew(TryHandleTxCommit, TaskCreationOptions.LongRunning);
         }
 
         private Dictionary<long, TxCommitQuantum> pendingTxCommits = new Dictionary<long, TxCommitQuantum>();
         private AlphaTxListener alphaListener;
-        private SemaphoreSlim semaphore = new SemaphoreSlim(1);
-
-        private void AlphaListener_OnNewCursor()
-        {
-            _ = TryHandleTxCommit();
-        }
+        private object syncRoot = new { };
 
         protected override void OnResult(MajorityResults majorityResult, MessageEnvelope result)
         {
@@ -31,7 +28,7 @@ namespace Centaurus.Domain
             if (majorityResult != MajorityResults.Success)
             {
                 logger.Error($"Tx result received ({majorityResult}).");
-                Global.AppState.State = ApplicationState.Failed;
+                Context.AppState.State = ApplicationState.Failed;
             }
 
             var nextCursor = alphaListener.PeekCursor();
@@ -42,53 +39,54 @@ namespace Centaurus.Domain
                 return;
             }
             AddNewTxCommit(result);
-            _ = TryHandleTxCommit();
         }
 
         private void AddNewTxCommit(MessageEnvelope result)
         {
-            semaphore.Wait();
-            var txCursor = ((TxNotification)result.Message).TxCursor;
-            if (!pendingTxCommits.ContainsKey(((TxNotification)result.Message).TxCursor))
-                pendingTxCommits.Add(txCursor, new TxCommitQuantum { Source = result });
-            semaphore.Release();
+            lock (syncRoot)
+            {
+                var txCursor = ((TxNotification)result.Message).TxCursor;
+                if (!pendingTxCommits.ContainsKey(txCursor))
+                    pendingTxCommits.Add(txCursor, new TxCommitQuantum { Source = result });
+            }
         }
 
-        private async Task TryHandleTxCommit()
+        private bool TryGetTxCommit(long cursor, out TxCommitQuantum txCommit)
         {
-            await semaphore.WaitAsync();
+            lock (syncRoot)
+                return pendingTxCommits.Remove(cursor, out txCommit);
+        }
+
+        private void TryHandleTxCommit()
+        {
             try
             {
-                while (true)
+                while (!isStoped)
                 {
                     var nextCursor = alphaListener.PeekCursor();
-                    if (pendingTxCommits.Remove(nextCursor, out var txCommit))
+                    if (TryGetTxCommit(nextCursor, out var txCommit))
                     {
                         alphaListener.DequeueCursor();
                         var ledgerCommitEnvelope = txCommit.CreateEnvelope();
-                        await Global.QuantumHandler.HandleAsync(ledgerCommitEnvelope);
+                        Context.QuantumHandler.HandleAsync(ledgerCommitEnvelope);
                     }
                     else
-                        break;
+                        Thread.Sleep(100);
                 }
             }
             catch (Exception exc)
             {
                 logger.Error(exc, "Error on tx commit processing.");
-                Global.AppState.State = ApplicationState.Failed;
-            }
-            finally
-            {
-                semaphore.Release();
+                Context.AppState.State = ApplicationState.Failed;
             }
         }
 
+        private bool isStoped = false;
+
         public override void Dispose()
         {
+            isStoped = true;
             base.Dispose();
-            alphaListener.OnNewCursor -= AlphaListener_OnNewCursor;
-            semaphore?.Dispose();
-            semaphore = null;
         }
     }
 }

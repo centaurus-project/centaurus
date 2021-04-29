@@ -17,9 +17,9 @@ namespace Centaurus.Domain
             this.accounts = new Dictionary<int, AccountWrapper>(accounts.ToDictionary(m => m.Account.Id));
             this.accountIds = new Dictionary<RawPubKey, int>(accounts.ToDictionary(m => m.Account.Pubkey, v => v.Account.Id));
         }
-
-        Dictionary<RawPubKey, int> accountIds = new Dictionary<RawPubKey, int>();
-        Dictionary<int, AccountWrapper> accounts = new Dictionary<int, AccountWrapper>();
+        
+        readonly Dictionary<RawPubKey, int> accountIds = new Dictionary<RawPubKey, int>();
+        readonly Dictionary<int, AccountWrapper> accounts = new Dictionary<int, AccountWrapper>();
 
         /// <summary>
         /// Retrieve account record by its public key.
@@ -48,7 +48,7 @@ namespace Centaurus.Domain
             return accounts.GetValueOrDefault(id);
         }
 
-        public AccountWrapper CreateAccount(int id, RawPubKey pubkey)
+        public AccountWrapper CreateAccount(int id, RawPubKey pubkey, RequestRateLimits rateLimits)
         {
             if (pubkey == null)
                 throw new ArgumentNullException(nameof(pubkey));
@@ -62,7 +62,7 @@ namespace Centaurus.Domain
                 Pubkey = pubkey,
                 Balances = new List<Balance>()
             },
-                Global.Constellation.RequestRateLimits
+                rateLimits
             );
             accountIds.Add(pubkey, id);
             accounts.Add(id, acc);
@@ -70,10 +70,11 @@ namespace Centaurus.Domain
             return acc;
         }
 
-        public int GetNextAccountId()
-        {
-            return accountIds.Values.LastOrDefault() + 1;
-        }
+        public int NextAccountId => LastAccountId + 1;
+
+        public int LastAccountId => accountIds.Values.LastOrDefault();
+
+        public int Count => accountIds.Count;
 
         public void RemoveAccount(RawPubKey pubkey)
         {

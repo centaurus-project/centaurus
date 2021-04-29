@@ -9,13 +9,19 @@ namespace Centaurus.Domain
 {
     public class GetPriceHistoryCommandHandler : BaseCommandHandler<GetPriceHistoryCommand>
     {
+        public GetPriceHistoryCommandHandler(AlphaContext context)
+            : base(context)
+        {
+
+        }
+
         public override async Task<BaseResponse> Handle(InfoWebSocketConnection infoWebSocket, GetPriceHistoryCommand command)
         {
-            var asset = Global.Constellation.Assets.FirstOrDefault(a => a.Id == command.Market);
+            var asset = Context.Constellation.Assets.FirstOrDefault(a => a.Id == command.Market);
             if (asset == null && asset.IsXlm)
                 throw new BadRequestException("Invalid market.");
 
-            var res = await Global.AnalyticsManager.PriceHistoryManager.GetPriceHistory(command.Cursor, command.Market, command.Period);
+            var res = await Context.AnalyticsManager.PriceHistoryManager.GetPriceHistory(command.Cursor, command.Market, command.Period);
             return new PriceHistoryResponse  { 
                 RequestId = command.RequestId,
                 PriceHistory  = res.frames,

@@ -14,21 +14,22 @@ namespace Centaurus.Domain
     /// <summary>
     /// This class manages auditor snapshots and quanta when Alpha is rising
     /// </summary>
-    public static class AlphaCatchup
+    public class AlphaCatchup : ContextualBase<AlphaContext>, IDisposable
     {
-        static AlphaCatchup()
+        public AlphaCatchup(AlphaContext context)
+            :base(context)
         {
             InitTimer();
         }
 
         private static Logger logger = LogManager.GetCurrentClassLogger();
 
-        private static SemaphoreSlim semaphoreSlim = new SemaphoreSlim(1);
-        private static Dictionary<RawPubKey, AuditorState> allAuditorStates = new Dictionary<RawPubKey, AuditorState>();
-        private static Dictionary<RawPubKey, AuditorState> validAuditorStates = new Dictionary<RawPubKey, AuditorState>();
-        private static System.Timers.Timer applyDataTimer;
+        private SemaphoreSlim semaphoreSlim = new SemaphoreSlim(1);
+        private Dictionary<RawPubKey, AuditorState> allAuditorStates = new Dictionary<RawPubKey, AuditorState>();
+        private Dictionary<RawPubKey, AuditorState> validAuditorStates = new Dictionary<RawPubKey, AuditorState>();
+        private System.Timers.Timer applyDataTimer;
 
-        public static async Task AddAuditorState(RawPubKey pubKey, AuditorState auditorState)
+        public async Task AddAuditorState(RawPubKey pubKey, AuditorState auditorState)
         {
             await semaphoreSlim.WaitAsync();
             try
@@ -37,7 +38,7 @@ namespace Centaurus.Domain
                     applyDataTimer.Start();
 
                 logger.Trace($"Auditor state from {((KeyPair)pubKey).AccountId} received by AlphaCatchup.");
-                if (Global.AppState.State != ApplicationState.Rising)
+                if (Context.AppState.State != ApplicationState.Rising)
                 {
                     logger.Warn($"Auditor state messages can be only handled when Alpha is in rising state. State sent by {((KeyPair)pubKey).AccountId}");
                     return;
@@ -66,8 +67,8 @@ namespace Centaurus.Domain
                     validAuditorStates.Add(pubKey, pendingAuditorState);
                 }
 
-                int majority = MajorityHelper.GetMajorityCount(),
-                totalAuditorsCount = MajorityHelper.GetTotalAuditorsCount();
+                int majority = Context.GetMajorityCount(),
+                totalAuditorsCount = Context.GetTotalAuditorsCount();
 
                 var completedStatesCount = allAuditorStates.Count(s => !s.Value.HasMorePendingQuanta);
 
@@ -77,7 +78,7 @@ namespace Centaurus.Domain
             catch (Exception exc)
             {
                 logger.Error(exc, "Error on adding auditors state");
-                Global.AppState.State = ApplicationState.Failed;
+                Context.AppState.State = ApplicationState.Failed;
             }
             finally
             {
@@ -85,7 +86,7 @@ namespace Centaurus.Domain
             }
         }
 
-        public static void RemoveState(RawPubKey pubKey)
+        public void RemoveState(RawPubKey pubKey)
         {
             semaphoreSlim.Wait();
             try
@@ -99,7 +100,7 @@ namespace Centaurus.Domain
             }
         }
 
-        private static bool AddQuanta(RawPubKey pubKey, AuditorState currentState, AuditorState newAuditorState)
+        private bool AddQuanta(RawPubKey pubKey, AuditorState currentState, AuditorState newAuditorState)
         {
             if (!currentState.HasMorePendingQuanta
                 || newAuditorState.HasMorePendingQuanta && newAuditorState.PendingQuanta.Count < 1) //prevent spamming
@@ -109,7 +110,7 @@ namespace Centaurus.Domain
                 return false;
             }
             var lastAddedApex = currentState.PendingQuanta.LastOrDefault()?.Message.MessageId ?? -1;
-            var alphaPubkey = (RawPubKey)Global.Settings.KeyPair.PublicKey;
+            var alphaPubkey = (RawPubKey)Context.Settings.KeyPair.PublicKey;
             foreach (var envelope in newAuditorState.PendingQuanta)
             {
                 var currentQuantum = (Quantum)envelope.Message;
@@ -125,16 +126,16 @@ namespace Centaurus.Domain
             return true;
         }
 
-        private static async Task TryApplyAuditorsData()
+        private async Task TryApplyAuditorsData()
         {
             try
             {
                 logger.Trace($"Try apply auditors data.");
-                if (Global.AppState.State != ApplicationState.Rising)
+                if (Context.AppState.State != ApplicationState.Rising)
                     return;
 
-                int majority = MajorityHelper.GetMajorityCount(),
-                totalAuditorsCount = MajorityHelper.GetTotalAuditorsCount();
+                int majority = Context.GetMajorityCount(),
+                totalAuditorsCount = Context.GetTotalAuditorsCount();
                 var completedStatesCount = allAuditorStates.Count(s => !s.Value.HasMorePendingQuanta);
                 var possibleConsensusCount = (totalAuditorsCount - completedStatesCount) + validAuditorStates.Count;
                 if (validAuditorStates.Count >= majority)
@@ -154,7 +155,7 @@ namespace Centaurus.Domain
             catch (Exception exc)
             {
                 logger.Error(exc, "Error during raising.");
-                Global.AppState.State = ApplicationState.Failed;
+                Context.AppState.State = ApplicationState.Failed;
             }
             finally
             {
@@ -162,7 +163,7 @@ namespace Centaurus.Domain
             }
         }
 
-        private static void InitTimer()
+        private void InitTimer()
         {
             applyDataTimer = new System.Timers.Timer();
             applyDataTimer.Interval = 15000; //15 sec
@@ -170,7 +171,7 @@ namespace Centaurus.Domain
             applyDataTimer.Elapsed += ApplyDataTimer_Elapsed;
         }
 
-        private static void ApplyDataTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
+        private void ApplyDataTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
             semaphoreSlim.Wait();
             try
@@ -183,41 +184,21 @@ namespace Centaurus.Domain
             }
 
         }
-        /// <summary>
-        /// Checks that all quanta have valid Alpha signature
-        /// </summary>
-        private static bool IsStateValid(AuditorState state)
-        {
-            var alphaPubkey = (RawPubKey)Global.Settings.KeyPair.PublicKey;
-            var lastApex = Global.QuantumStorage.CurrentApex;
-            using var buffer = XdrBufferFactory.Rent();
-            for (int i = 0; i < state.PendingQuanta.Count; i++)
-            {
-                var currentQuantumEnvelope = state.PendingQuanta[i];
-                var currentQuantum = (Quantum)currentQuantumEnvelope.Message;
-                if (!(lastApex + 1 == currentQuantum.Apex
-                    && currentQuantumEnvelope.Signatures.Any(s => s.Signer.Equals(alphaPubkey))
-                    && currentQuantumEnvelope.AreSignaturesValid()))
-                    return false;
-                lastApex = currentQuantum.Apex;
-            }
-            return true;
-        }
 
-        private static async Task ApplyAuditorsData()
+        private async Task ApplyAuditorsData()
         {
             var validQuanta = await GetValidQuanta();
 
             await ApplyQuanta(validQuanta);
 
-            var alphaStateManager = (AlphaStateManager)Global.AppState;
+            var alphaStateManager = (AlphaStateManager)Context.AppState;
 
             alphaStateManager.AlphaRised();
 
-            Notifier.NotifyAuditors(AlphaStateHelper.GetCurrentState().CreateEnvelope());
+            Context.NotifyAuditors(Context.GetCurrentState().CreateEnvelope());
         }
 
-        private static async Task ApplyQuanta(List<MessageEnvelope> quanta)
+        private async Task ApplyQuanta(List<MessageEnvelope> quanta)
         {
             var quantaCount = quanta.Count;
             for (var i = 0; i < quantaCount; i++)
@@ -229,7 +210,7 @@ namespace Centaurus.Domain
                 if (currentQuantum is RequestQuantum)
                     currentQuantumEnvelope = ((RequestQuantum)currentQuantum).RequestEnvelope;
 
-                var resultMessage = await Global.QuantumHandler.HandleAsync(currentQuantumEnvelope, currentQuantum.Timestamp);
+                var resultMessage = await Context.QuantumHandler.HandleAsync(currentQuantumEnvelope, currentQuantum.Timestamp);
                 var processedQuantum = (Quantum)resultMessage.OriginalMessage.Message;
                 //TODO: check if we need some extra checks here
                 if (!ByteArrayPrimitives.Equals(currentQuantum.ComputeHash(), processedQuantum.ComputeHash()))
@@ -237,7 +218,7 @@ namespace Centaurus.Domain
             }
         }
 
-        private static async Task<List<MessageEnvelope>> GetValidQuanta()
+        private async Task<List<MessageEnvelope>> GetValidQuanta()
         {
             //group all quanta by their apex
             var quanta = validAuditorStates.Values
@@ -248,7 +229,7 @@ namespace Centaurus.Domain
             if (quanta.Count() == 0)
                 return new List<MessageEnvelope>();
 
-            var lastQuantumApex = await Global.PersistenceManager.GetLastApex();
+            var lastQuantumApex = await Context.PersistenceManager.GetLastApex();
             var validQuanta = new List<MessageEnvelope>();
 
             foreach (var currentQuantaGroup in quanta)
@@ -266,6 +247,12 @@ namespace Centaurus.Domain
             }
 
             return validQuanta;
+        }
+
+        public void Dispose()
+        {
+            applyDataTimer?.Dispose();
+            applyDataTimer = null;
         }
     }
 }

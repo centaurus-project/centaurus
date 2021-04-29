@@ -13,7 +13,7 @@ namespace Centaurus.Domain
         public long CurrentApex { get; protected set; }
         public byte[] LastQuantumHash { get; protected set; }
 
-        public QuantumStorageBase(long currentApex, byte[] lastQuantumHash)
+        public void Init(long currentApex, byte[] lastQuantumHash)
         {
             CurrentApex = currentApex;
             LastQuantumHash = lastQuantumHash;
@@ -30,11 +30,6 @@ namespace Centaurus.Domain
 
         private int QuantaCacheCapacity = 1_000_000;
         private int capacityThreshold = 100_000;
-
-        public AlphaQuantumStorage(long currentApex, byte[] lastQuantumHash)
-            : base(currentApex, lastQuantumHash)
-        {
-        }
 
         public override void AddQuantum(MessageEnvelope envelope, byte[] hash)
         {
@@ -79,12 +74,6 @@ namespace Centaurus.Domain
 
     public class AuditorQuantumStorage : QuantumStorageBase
     {
-        public AuditorQuantumStorage(long currentApex, byte[] lastQuantumHash)
-            : base(currentApex, lastQuantumHash)
-        {
-
-        }
-
         public override void AddQuantum(MessageEnvelope envelope, byte[] hash)
         {
             lock (this)

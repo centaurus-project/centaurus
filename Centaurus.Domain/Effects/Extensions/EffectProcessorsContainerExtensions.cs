@@ -42,7 +42,8 @@ namespace Centaurus.Domain
                     Pubkey = publicKey,
                     Apex = effectProcessors.Apex
                 },
-                accountStorage
+                accountStorage,
+                effectProcessors.Context.Constellation.RequestRateLimits
             ));
         }
 

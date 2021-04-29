@@ -69,11 +69,6 @@ namespace Centaurus.SDK.Models
             public string Passphrase { get; set; }
 
             public string Horizon { get; set; }
-
-            public Server GetServer()
-            {
-                return new Server(Horizon);
-            }
         }
 
         public class Asset

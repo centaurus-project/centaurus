@@ -63,35 +63,6 @@ namespace Centaurus
         }
 
         /// <summary>
-        /// Merges signatures to the source envelope. 
-        /// THIS METHOD DOESN'T VERIFY THAT ENVELOPS CONTAIN THE SAME MESSAGE!!
-        /// </summary>
-        /// <param name="envelope">Source envelope</param>
-        /// <param name="anotherEnvelope">Envelope to aggregate</param>
-        public static void AggregateEnvelopUnsafe(this MessageEnvelope envelope, MessageEnvelope anotherEnvelope)
-        {
-            if (envelope == null)
-                throw new ArgumentNullException(nameof(envelope));
-            if (anotherEnvelope == null)
-                throw new ArgumentNullException(nameof(anotherEnvelope));
-            foreach (var signature in anotherEnvelope.Signatures)
-            {
-                if (!envelope.Signatures.Contains(signature))
-                {
-                    //TODO: the signature has been checked on arrival, but there may be some edge cases when we need to check it regardless
-                    envelope.Signatures.Add(signature);
-                }
-            }
-            var resultMessage = envelope.Message as ITransactionResultMessage;
-            var anotherResultMessage = anotherEnvelope.Message as ITransactionResultMessage;
-            if (resultMessage is null != anotherResultMessage is null)
-                throw new Exception("Result types conflict");
-
-            if (resultMessage != null)
-                resultMessage.TxSignatures.AddRange(anotherResultMessage.TxSignatures);
-        }
-
-        /// <summary>
         /// Checks that all envelope signatures are valid
         /// </summary>
         /// <param name="envelope">Target envelope</param>

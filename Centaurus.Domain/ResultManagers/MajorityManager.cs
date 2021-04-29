@@ -10,9 +10,10 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public abstract class MajorityManager : IDisposable
+    public abstract class MajorityManager : ContextualBase<AlphaContext>, IDisposable
     {
-        public MajorityManager()
+        public MajorityManager(AlphaContext context)
+            : base(context)
         {
             InitCleanupTimer();
         }
@@ -105,7 +106,7 @@ namespace Centaurus.Domain
             {
                 var exc = new Exception("Majority is unreachable. The constellation collapsed.");
                 logger.Error(exc);
-                Global.AppState.State = ApplicationState.Failed;
+                Context.AppState.State = ApplicationState.Failed;
                 throw exc;
             }
         }
@@ -133,7 +134,7 @@ namespace Centaurus.Domain
 
             private MajorityManager majorityManager;
 
-            private Dictionary<byte[], MessageEnvelope> storage = new Dictionary<byte[], MessageEnvelope>(ByteArrayComparer.Default);
+            private Dictionary<byte[], MessageEnvelopeVote> storage = new Dictionary<byte[], MessageEnvelopeVote>(ByteArrayComparer.Default);
 
             public void Add(IncomingMessage message)
             {
@@ -141,17 +142,20 @@ namespace Centaurus.Domain
                 MajorityResults majorityResult = MajorityResults.Unknown;
                 lock (syncRoot)
                 {
-                    if (!storage.TryGetValue(message.MessageHash, out var resultStorageEnvelope))//first result with such hash
+                    if (!storage.TryGetValue(message.MessageHash, out var envelopeVote))//first result with such hash
                     {
-                        resultStorageEnvelope = message.Envelope;
-                        storage[message.MessageHash] = resultStorageEnvelope;
+                        envelopeVote = new MessageEnvelopeVote(message.Envelope, message.MessageHash);
+                        storage.Add(message.MessageHash, envelopeVote);
                     }
                     else
-                        resultStorageEnvelope.AggregateEnvelopUnsafe(message.Envelope);//we can use AggregateEnvelopUnsafe, we compute hash for every envelope above
+                        envelopeVote.AddSignature(message.Envelope.Signatures[0]);
+
+                    if (storage.Count > 1)
+                    { }
 
                     if (IsProcessed)
                     {
-                        if (resultStorageEnvelope.Signatures.Count == ((AlphaStateManager)Global.AppState).ConnectedAuditorsCount) //remove if all auditors sent results
+                        if (storage.Select(e => e.Value.Signatures.Count).Sum() == ((AlphaStateManager)majorityManager.Context.AppState).ConnectedAuditorsCount) //remove if all auditors sent results
                         {
                             majorityManager?.Remove(Id);
                         }
@@ -170,8 +174,8 @@ namespace Centaurus.Domain
             private MajorityResults CheckMajority(out MessageEnvelope consensus)
             {
                 //TODO: remove the item from storage once the majority succeeded of failed.
-                int requiredMajority = MajorityHelper.GetMajorityCount(),
-                    maxVotes = MajorityHelper.GetTotalAuditorsCount(),
+                int requiredMajority = majorityManager.Context.GetMajorityCount(),
+                    maxVotes = majorityManager.Context.GetTotalAuditorsCount(),
                     maxConsensus = 0,
                     totalOpposition = 0;
                 //try to find the majority
@@ -181,8 +185,11 @@ namespace Centaurus.Domain
                     //check if we have the majority
                     if (votes >= requiredMajority)
                     {
+                        //add signatures to envelope
+                        pair.Value.AggregateSignatures();
+
                         //return the messages for the consensus
-                        consensus = pair.Value;
+                        consensus = pair.Value.Envelope;
                         return MajorityResults.Success;
                     }
                     //check whether a current message is a potential consensus candidate
@@ -204,6 +211,39 @@ namespace Centaurus.Domain
                 }
                 //not enough votes to decided whether the consensus can be reached or not
                 return MajorityResults.Unknown;
+            }
+
+            class MessageEnvelopeVote
+            {
+                public MessageEnvelopeVote(MessageEnvelope envelope, byte[] messageHash)
+                {
+                    Envelope = envelope ?? throw new ArgumentNullException(nameof(envelope));
+                    Hash = messageHash ?? throw new ArgumentNullException(nameof(messageHash));
+                    var signature = envelope.Signatures[0];
+                    Signatures = new Dictionary<RawPubKey, Ed25519Signature> { { signature.Signer, signature } };
+
+                    //all signatures must be stored in Signatures prop
+                    Envelope.Signatures.Clear();
+                }
+
+                public byte[] Hash { get; }
+
+                public MessageEnvelope Envelope { get; }
+
+                public Dictionary<RawPubKey, Ed25519Signature> Signatures { get; }
+
+                public void AddSignature(Ed25519Signature signature)
+                {
+                    if (Signatures.ContainsKey(signature.Signer))
+                        throw new InvalidOperationException($"Already contains signature from {signature.Signer}");
+
+                    Signatures.Add(signature.Signer, signature);
+                }
+
+                public void AggregateSignatures()
+                {
+                    Envelope.Signatures.AddRange(Signatures.Values);
+                }
             }
         }
     }

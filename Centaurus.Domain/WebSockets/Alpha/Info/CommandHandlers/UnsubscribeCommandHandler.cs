@@ -9,6 +9,12 @@ namespace Centaurus.Domain
 {
     public class UnsubscribeCommandHandler : BaseCommandHandler<UnsubscribeCommand>
     {
+        public UnsubscribeCommandHandler(AlphaContext context)
+            :base(context)
+        {
+
+        }
+
         public override Task<BaseResponse> Handle(InfoWebSocketConnection infoWebSocket, UnsubscribeCommand command)
         {
             if (command.Subscriptions.Count < 0)
@@ -16,7 +22,7 @@ namespace Centaurus.Domain
 
             foreach (var subs in command.Subscriptions)
             {
-                var subscription = SubscriptionsManager.GetOrAddSubscription(BaseSubscription.GetBySubscriptionName(subs));
+                var subscription = Context.SubscriptionsManager.GetOrAddSubscription(BaseSubscription.GetBySubscriptionName(subs));
                 infoWebSocket.RemoveSubsctioption(subscription);
             }
             return Task.FromResult((BaseResponse)new SuccesResponse { RequestId = command.RequestId });

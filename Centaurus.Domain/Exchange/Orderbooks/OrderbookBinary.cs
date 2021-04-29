@@ -46,11 +46,17 @@ namespace Centaurus.Domain
         /// <returns>Removal result.</returns>
         public override bool RemoveOrder(ulong orderId, out Order order)
         {
+            var isHead = orderId == Head?.OrderId;
             if (!base.RemoveOrder(orderId, out order))
                 return false;
 
-            var index = sortedOrders.BinarySearch(order, comparer);
-            sortedOrders.RemoveAt(index);
+            if (isHead)
+                sortedOrders.RemoveAt(0);
+            else
+            {
+                var index = sortedOrders.BinarySearch(order, comparer);
+                sortedOrders.RemoveAt(index);
+            }
             return true;
         }
     }

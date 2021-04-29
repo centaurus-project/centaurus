@@ -7,8 +7,13 @@ using Centaurus.Models;
 
 namespace Centaurus.Domain
 {
-    public abstract class BaseAlphaMessageHandler: BaseMessageHandler<AlphaWebSocketConnection>, IAlphaMessageHandler
+    public abstract class BaseAlphaMessageHandler: BaseMessageHandler<AlphaWebSocketConnection, AlphaContext>, IAlphaMessageHandler
     {
+        public BaseAlphaMessageHandler(AlphaContext context) 
+            : base(context)
+        {
+        }
+
         /// <summary>
         /// Indicates whether authorization is required for the handler.
         /// </summary>
@@ -27,7 +32,7 @@ namespace Centaurus.Domain
                 && (connection.ClientPubKey == null || !message.Envelope.Signatures.Any(s => s.Signer != connection.ClientPubKey)))
                 throw new UnauthorizedException();
 
-            if (IsAuditorOnly && !Global.Constellation.Auditors.Contains(connection.ClientPubKey))
+            if (IsAuditorOnly && !connection.Context.Constellation.Auditors.Contains(connection.ClientPubKey))
                 throw new UnauthorizedException();
 
             if (connection.Account != null && !connection.Account.RequestCounter.IncRequestCount(DateTime.UtcNow.Ticks, out string error))

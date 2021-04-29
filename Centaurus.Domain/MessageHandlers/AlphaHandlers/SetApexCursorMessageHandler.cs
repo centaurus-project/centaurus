@@ -8,6 +8,11 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
 {
     public class SetApexCursorMessageHandler : BaseAlphaMessageHandler
     {
+        public SetApexCursorMessageHandler(AlphaContext context) 
+            : base(context)
+        {
+        }
+
         public override MessageTypes SupportedMessageType { get; } = MessageTypes.SetApexCursor;
 
         public override bool IsAuditorOnly { get; } = true;

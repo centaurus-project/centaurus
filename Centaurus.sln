@@ -43,6 +43,10 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Centaurus.Exchange.Analytic
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Centaurus.Test.Exchange.Analytics", "Centaurus.Test.Exchange.Analytics\Centaurus.Test.Exchange.Analytics.csproj", "{5A142170-1C8E-486C-8E18-C0C64ACF5A2D}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "SDK", "SDK", "{E5CBE171-375A-4F49-B337-D5528A1D9672}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Centaurus.SDK", "SDK\Centaurus.SDK\Centaurus.SDK.csproj", "{77B1A46B-1438-4056-BA5A-33A7DDFFE6F9}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -125,6 +129,10 @@ Global
 		{5A142170-1C8E-486C-8E18-C0C64ACF5A2D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5A142170-1C8E-486C-8E18-C0C64ACF5A2D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5A142170-1C8E-486C-8E18-C0C64ACF5A2D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{77B1A46B-1438-4056-BA5A-33A7DDFFE6F9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{77B1A46B-1438-4056-BA5A-33A7DDFFE6F9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{77B1A46B-1438-4056-BA5A-33A7DDFFE6F9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{77B1A46B-1438-4056-BA5A-33A7DDFFE6F9}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -139,6 +147,7 @@ Global
 		{60177E3D-1970-40A2-8779-28F246F51955} = {E7AE6334-8F96-4FD7-B7CE-DEE954AA4445}
 		{296B43F1-D12D-4D39-8A06-F6929B68D6F3} = {E7AE6334-8F96-4FD7-B7CE-DEE954AA4445}
 		{5A142170-1C8E-486C-8E18-C0C64ACF5A2D} = {E7AE6334-8F96-4FD7-B7CE-DEE954AA4445}
+		{77B1A46B-1438-4056-BA5A-33A7DDFFE6F9} = {E5CBE171-375A-4F49-B337-D5528A1D9672}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {39DB9995-0257-4C02-B0C5-886C29AD5F7B}

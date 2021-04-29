@@ -19,8 +19,12 @@ namespace Centaurus.Domain
         public ApplicationState PrevState { get; }
     }
 
-    public abstract class StateManager
+    public abstract class StateManager : ContextualBase
     {
+        public StateManager(ExecutionContext context)
+            : base(context)
+        {
+        }
 
         private ApplicationState state;
         public virtual ApplicationState State
@@ -45,5 +49,16 @@ namespace Centaurus.Domain
         }
 
         public event Action<StateChangedEventArgs> StateChanged;
+    }
+
+    public abstract class StateManager<TContext> : StateManager, IContextual<TContext>
+        where TContext: ExecutionContext
+    {
+        public StateManager(TContext context)
+            : base(context)
+        {
+        }
+
+        public new TContext Context => (TContext)base.Context;
     }
 }

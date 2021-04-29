@@ -1,6 +1,7 @@
 ﻿using Centaurus.Models;
 using Centaurus.Xdr;
 using NLog;
+using stellar_dotnet_sdk;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -11,23 +12,23 @@ using System.Threading.Tasks;
 namespace Centaurus.Domain
 {
 
-    public static class OutgoingMessageStorage
+    public class OutgoingMessageStorage
     {
-        private readonly static Queue<MessageEnvelope> outgoingMessages = new Queue<MessageEnvelope>();
+        private readonly Queue<MessageEnvelope> outgoingMessages = new Queue<MessageEnvelope>();
 
-        public static void OnTransaction(TxNotification tx)
+        public void OnTransaction(TxNotification tx)
         {
             EnqueueMessage(tx);
         }
 
-        public static void EnqueueMessage(Message message)
+        public void EnqueueMessage(Message message)
         {
             if (message == null)
                 throw new ArgumentNullException(nameof(message));
             EnqueueMessage(message.CreateEnvelope());
         }
 
-        public static void EnqueueMessage(MessageEnvelope message)
+        public void EnqueueMessage(MessageEnvelope message)
         {
             if (message == null)
                 throw new ArgumentNullException(nameof(message));
@@ -35,33 +36,34 @@ namespace Centaurus.Domain
                 outgoingMessages.Enqueue(message);
         }
 
-        public static bool TryPeek(out MessageEnvelope message)
+        public bool TryPeek(out MessageEnvelope message)
         {
             lock (outgoingMessages)
                 return outgoingMessages.TryPeek(out message);
         }
 
-        public static bool TryDequeue(out MessageEnvelope message)
+        public bool TryDequeue(out MessageEnvelope message)
         {
             lock (outgoingMessages)
                 return outgoingMessages.TryDequeue(out message);
         }
     }
 
-    public static class OutgoingResultsStorage
+    public class OutgoingResultsStorage: ContextualBase<AuditorContext>
     {
         const int MaxMessageBatchSize = 50;
 
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        private readonly static List<AuditorResultMessage> results = new List<AuditorResultMessage>();
+        readonly List<AuditorResultMessage> results = new List<AuditorResultMessage>();
 
-        static OutgoingResultsStorage()
+        public OutgoingResultsStorage(AuditorContext context)
+            :base(context)
         {
-            _ = Task.Factory.StartNew(RunWorker);
+            _ = Task.Factory.StartNew(RunWorker, TaskCreationOptions.LongRunning);
         }
 
-        private static void RunWorker()
+        private void RunWorker()
         {
             while (true)
             {
@@ -79,7 +81,7 @@ namespace Centaurus.Domain
                     }
                     if (resultsBatch != default)
                     {
-                        OutgoingMessageStorage.EnqueueMessage(new AuditorResultsBatch { AuditorResultMessages = resultsBatch });
+                        Context.OutgoingMessageStorage.EnqueueMessage(new AuditorResultsBatch { AuditorResultMessages = resultsBatch });
                         continue;
                     }
                     Thread.Sleep(50);
@@ -96,12 +98,11 @@ namespace Centaurus.Domain
         /// </summary>
         /// <param name="result"></param>
         /// <param name="buffer">Buffer to use for serialization</param>
-        public static void EnqueueResult(ResultMessage result, byte[] buffer)
+        public void EnqueueResult(ResultMessage result, byte[] buffer)
         {
             if (result == null)
                 throw new ArgumentNullException(nameof(result));
 
-            var signature = default(byte[]);
             var txSignature = default(byte[]);
             if (result is ITransactionResultMessage txResult)
             {
@@ -113,9 +114,8 @@ namespace Centaurus.Domain
                 txResult.TxSignatures.Clear();
             }
 
-            var resultEnvelope = result.CreateEnvelope();
-            resultEnvelope.Sign(Global.Settings.KeyPair, buffer);
-            signature = resultEnvelope.Signatures[0].Signature;
+            var resultHash = result.ComputeHash(buffer);
+            var signature = Context.Settings.KeyPair.Sign(resultHash);
 
             lock (results)
                 results.Add(new AuditorResultMessage

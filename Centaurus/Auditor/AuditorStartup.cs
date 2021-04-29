@@ -14,7 +14,7 @@ using System.Threading.Tasks;
 
 namespace Centaurus
 {
-    public class AuditorStartup : IStartup<AuditorSettings>
+    public class AuditorStartup : StartupBase<AuditorContext>
     {
         private AuditorWebSocketConnection auditor;
 
@@ -23,60 +23,69 @@ namespace Centaurus
         private Logger logger = LogManager.GetCurrentClassLogger();
         private ManualResetEvent resetEvent;
 
-        public async Task Run(AuditorSettings settings, ManualResetEvent resetEvent)
+        private Func<ClientConnectionWrapperBase> connectionFactory;
+
+        public AuditorStartup(AuditorContext context, Func<ClientConnectionWrapperBase> connectionFactory)
+            : base(context)
+        {
+            this.connectionFactory = connectionFactory;
+        }
+
+        public override async Task Run(ManualResetEvent resetEvent)
         {
             try
             {
                 this.resetEvent = resetEvent;
 
-                await Global.Setup(settings, new MongoStorage());
+                await Context.Init();
+                Context.AppState.StateChanged += StateChanged;
 
-                Global.AppState.StateChanged += StateChanged;
-
-                MessageHandlers<AuditorWebSocketConnection>.Init();
-
-                _ = InternalRun();
+                InternalRun();
             }
             catch (Exception exc)
             {
                 logger.Error(exc);
-                if (Global.AppState != null)
-                    Global.AppState.State = ApplicationState.Failed;
-                resetEvent.Set();
+                if (Context.AppState != null)
+                    Context.AppState.State = ApplicationState.Failed;
+                var isSet = resetEvent.WaitOne(0);
+                if (!isSet)
+                    resetEvent.Set();
             }
         }
 
-        private async Task InternalRun()
+        private void InternalRun()
         {
-            try
+            var runTask = Task.Factory.StartNew(async () =>
             {
-                while (!isAborted)
+                try
                 {
-                    var _auditor = new AuditorWebSocketConnection(new ClientWebSocket(), null);
-                    try
+                    while (!isAborted)
                     {
-                        Subscribe(_auditor);
-                        await _auditor.EstablishConnection();
-                        auditor = _auditor;
-                        break;
-                    }
-                    catch (Exception exc)
-                    {
-                        Unsubscribe(_auditor);
-                        await CloseConnection(_auditor);
-                        _auditor.Dispose();
+                        var _auditor = new AuditorWebSocketConnection(Context, connectionFactory());
+                        try
+                        {
+                            Subscribe(_auditor);
+                            await _auditor.EstablishConnection();
+                            auditor = _auditor;
+                            break;
+                        }
+                        catch (Exception exc)
+                        {
+                            Unsubscribe(_auditor);
+                            await CloseConnection(_auditor);
 
-                        if (!(exc is OperationCanceledException))
-                            logger.Info(exc, "Unable establish connection. Retry in 5000ms");
-                        Thread.Sleep(5000);
+                            if (!(exc is OperationCanceledException))
+                                logger.Info(exc, "Unable establish connection. Retry in 5000ms");
+                            Thread.Sleep(5000);
+                        }
                     }
                 }
-            }
-            catch (Exception exc)
-            {
-                logger.Error(exc, "Auditor startup error.");
-                Global.AppState.State = ApplicationState.Failed;
-            }
+                catch (Exception exc)
+                {
+                    logger.Error(exc, "Auditor startup error.");
+                    Context.AppState.State = ApplicationState.Failed;
+                }
+            }).Unwrap();
         }
 
         private void StateChanged(StateChangedEventArgs eventArgs)
@@ -89,12 +98,12 @@ namespace Centaurus
             }
         }
 
-        public async Task Shutdown()
+        public override async Task Shutdown()
         {
             isAborted = true;
             Unsubscribe(auditor);
             await CloseConnection(auditor);
-            await Global.TearDown();
+            Context.Dispose();
         }
 
         private void Subscribe(AuditorWebSocketConnection _auditor)
@@ -133,23 +142,23 @@ namespace Centaurus
             if (_auditor != null)
             {
                 await _auditor.CloseConnection();
+                _auditor.Dispose();
             }
         }
 
         private void Ready(BaseWebSocketConnection e)
         {
-            if (Global.AppState.State != ApplicationState.WaitingForInit)
-                Global.AppState.State = ApplicationState.Ready;
+            if (Context.AppState.State != ApplicationState.WaitingForInit)
+                Context.AppState.State = ApplicationState.Ready;
         }
 
         private async void Close(BaseWebSocketConnection e)
         {
-            Global.AppState.State = ApplicationState.Running;
+            Context.AppState.State = ApplicationState.Running;
             Unsubscribe(auditor);
             await CloseConnection(auditor);
-            auditor.Dispose();
             if (!isAborted)
-                _ = InternalRun();
+                InternalRun();
         }
     }
 }
