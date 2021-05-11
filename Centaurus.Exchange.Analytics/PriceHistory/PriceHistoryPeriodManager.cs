@@ -121,14 +121,9 @@ namespace Centaurus.Exchange.Analytics
 
         public void Dispose()
         {
-            framesUnit?.Dispose();
-            framesUnit = null;
-            if (locks != null)
-            {
-                foreach (var @lock in locks)
-                    @lock.Value.Dispose();
-                locks = null;
-            }
+            framesUnit.Dispose();
+            foreach (var @lock in locks)
+                @lock.Value.Dispose();
         }
 
         private UpdateContainer<DateTime, PriceHistoryFrame> updates = new UpdateContainer<DateTime, PriceHistoryFrame>();
@@ -163,7 +158,7 @@ namespace Centaurus.Exchange.Analytics
 
         private DateTime firstFramesUnitDate;
 
-        private ConcurrentDictionary<DateTime, SemaphoreSlim> locks = new ConcurrentDictionary<DateTime, SemaphoreSlim>();
+        private readonly ConcurrentDictionary<DateTime, SemaphoreSlim> locks = new ConcurrentDictionary<DateTime, SemaphoreSlim>();
 
         private int FramesPerUnit
         {

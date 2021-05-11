@@ -56,6 +56,8 @@ namespace Centaurus.Domain
 
             var updates = new ExchangeUpdate(asset, new DateTime(resultEffects.Quantum.Timestamp, DateTimeKind.Utc));
 
+            var tradeAssetAmount = 0L;
+            var tradeQuoteAmount = 0L;
             //orders in the orderbook are already sorted by price and age, so we can iterate through them in natural order
             while (counterOrder != null)
             {
@@ -63,7 +65,7 @@ namespace Centaurus.Domain
                 nextOrder = counterOrder?.Next;
                 //check that counter order price matches our order
                 if (side == OrderSide.Sell && counterOrder.Price < takerOrder.Price
-                    || side == OrderSide.Buy && counterOrder.Price > takerOrder.Price) 
+                    || side == OrderSide.Buy && counterOrder.Price > takerOrder.Price)
                     break;
 
                 var match = new OrderMatch(this, counterOrder);
@@ -71,18 +73,33 @@ namespace Centaurus.Domain
                 updates.Trades.Add(matchUpdates.trade);
                 updates.OrderUpdates.Add(matchUpdates.counterOrder);
 
+                tradeAssetAmount += matchUpdates.trade.Amount;
+                tradeQuoteAmount += matchUpdates.trade.QuoteAmount;
+
                 //stop if incoming order has been executed in full
                 if (takerOrder.Amount == 0)
                     break;
                 counterOrder = nextOrder;
             }
 
-            if (timeInForce == TimeInForce.GoodTillExpire)
-            {
-                if (PlaceReminderOrder())
+            RecordTrade(tradeAssetAmount, tradeQuoteAmount);
+
+            if (timeInForce == TimeInForce.GoodTillExpire && PlaceReminderOrder())
                     updates.OrderUpdates.Add(takerOrder.ToOrderInfo());
-            }
             return updates;
+        }
+
+        private void RecordTrade(long tradeAssetAmount, long tradeQuoteAmount)
+        {
+            if (tradeAssetAmount == 0)
+                return;
+            //record taker trade effect
+            resultEffects.AddTrade(
+                takerOrder,
+                tradeAssetAmount,
+                tradeQuoteAmount,
+                true
+            );
         }
 
         /// <summary>
@@ -107,10 +124,10 @@ namespace Centaurus.Domain
 
         private bool PlaceReminderOrder()
         {
-            if (takerOrder.Amount <= 0) 
+            if (takerOrder.Amount <= 0)
                 return false;
             var remainingQuoteAmount = EstimateQuoteAmount(takerOrder.Amount, takerOrder.Price, side);
-            if (remainingQuoteAmount <= 0) 
+            if (remainingQuoteAmount <= 0)
                 return false;
             takerOrder.QuoteAmount = remainingQuoteAmount;
 
@@ -179,14 +196,6 @@ namespace Centaurus.Domain
                          AssetAmount,
                          QuoteAmount,
                          false
-                     );
-
-                //record taker trade effect
-                matcher.resultEffects.AddTrade(
-                         matcher.takerOrder,
-                         AssetAmount,
-                         QuoteAmount,
-                         true
                      );
 
                 return new Trade

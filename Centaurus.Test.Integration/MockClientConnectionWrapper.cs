@@ -1,5 +1,6 @@
 ﻿using Centaurus.Alpha;
 using Centaurus.Domain;
+using NUnit.Framework;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -24,8 +25,9 @@ namespace Centaurus.Test
 
         public override Task Connect(Uri uri, CancellationToken cancellationToken)
         {
-            if (!AlphaHostBuilder.ValidApplicationStates.Contains(alphaContext.AppState.State))
+            if (alphaContext == null || !AlphaHostBuilder.ValidApplicationStates.Contains(alphaContext.AppState.State))
                 throw new InvalidOperationException("Alpha is not ready");
+
 
             ((MockWebSocket)WebSocket).Connect(webSocketServer);
             (webSocketServer).Connect((MockWebSocket)WebSocket);

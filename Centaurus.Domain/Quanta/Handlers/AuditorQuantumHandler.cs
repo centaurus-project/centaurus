@@ -13,7 +13,7 @@ using System.Threading.Tasks;
 namespace Centaurus.Domain
 {
     //TODO: add Stop method
-    public class AuditorQuantumHandler : QuantumHandler
+    public class AuditorQuantumHandler : QuantumHandler<AuditorContext>
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
@@ -37,8 +37,6 @@ namespace Centaurus.Domain
             return task;
         }
 
-        AuditorContext auditorContext => (AuditorContext)Context;
-
         protected override void OnProcessException(HandleItem handleItem, ResultMessage result, Exception exc)
         {
             throw exc;
@@ -51,7 +49,10 @@ namespace Centaurus.Domain
             if (quantum.Apex != Context.QuantumStorage.CurrentApex + 1)
                 throw new Exception($"Current quantum apex is {quantum.Apex} but {Context.QuantumStorage.CurrentApex + 1} was expected.");
 
-            ValidateAccountRequestRate(envelope);
+            if (!(envelope.IsSignedBy(Context.Settings.AlphaKeyPair) && envelope.AreSignaturesValid()))
+                throw new UnauthorizedAccessException($"Quantum {quantum.Apex} has invalid Alpha signature.");
+
+            ValidateRequestQuantum(envelope);
 
             var result = await ProcessQuantumEnvelope(envelope);
 
@@ -68,18 +69,31 @@ namespace Centaurus.Domain
 
             result.EffectProcessorsContainer.Complete(buffer.Buffer);
 
-            auditorContext.OutgoingResultsStorage.EnqueueResult(result.ResultMessage, buffer.Buffer);
+            Context.OutgoingResultsStorage.EnqueueResult(result.ResultMessage, buffer.Buffer);
 
             logger.Trace($"Message of type {quantum.MessageType} with apex {quantum.Apex} is handled.");
 
             return result.ResultMessage;
         }
 
-        void ValidateAccountRequestRate(MessageEnvelope envelope)
+        void ValidateRequestQuantum(MessageEnvelope envelope)
         {
             var request = envelope.Message as RequestQuantum;
             if (request == null)
                 return;
+            ValidateAccountRequestSignature(request);
+            ValidateAccountRequestRate(request);
+        }
+
+        void ValidateAccountRequestSignature(RequestQuantum request)
+        {
+            if (!(request.RequestEnvelope.IsSignedBy(request.RequestMessage.AccountWrapper.Account.Pubkey)
+                && request.RequestEnvelope.AreSignaturesValid()))
+                throw new UnauthorizedAccessException("Request quantum has invalid signature.");
+        }
+
+        void ValidateAccountRequestRate(RequestQuantum request)
+        {
             var account = request.RequestMessage.AccountWrapper;
             if (!account.RequestCounter.IncRequestCount(request.Timestamp, out string error))
                 throw new TooManyRequestsException($"Request limit reached for account {account.Account.Pubkey}.");

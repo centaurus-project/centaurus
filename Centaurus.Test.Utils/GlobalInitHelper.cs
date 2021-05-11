@@ -160,12 +160,10 @@ namespace Centaurus.Test
                 {
                     TxCursor = 2,
                     Payments = deposits
-                }.CreateEnvelope()
+                }.CreateEnvelope().Sign(TestEnvironment.Auditor1KeyPair)
             };
 
-            depositQuantum.Source.Sign(TestEnvironment.Auditor1KeyPair);
-
-            await context.QuantumHandler.HandleAsync(depositQuantum.CreateEnvelope());
+            await context.QuantumHandler.HandleAsync(depositQuantum.CreateEnvelope().Sign(TestEnvironment.AlphaKeyPair));
 
             //save all effects
             await SnapshotHelper.ApplyUpdates(context);

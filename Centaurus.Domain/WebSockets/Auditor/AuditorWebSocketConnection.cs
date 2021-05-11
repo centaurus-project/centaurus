@@ -84,8 +84,7 @@ namespace Centaurus.Domain
         public override void Dispose()
         {
             base.Dispose();
-            webSocket?.Dispose();
-            webSocket = null;
+            webSocket.Dispose();
         }
     }
 }

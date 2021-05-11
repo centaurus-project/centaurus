@@ -52,8 +52,7 @@ namespace Centaurus.Test
             var envelope = new AlphaState
             {
                 State = alphaState
-            }.CreateEnvelope();
-            envelope.Sign(TestEnvironment.AlphaKeyPair);
+            }.CreateEnvelope().Sign(TestEnvironment.AlphaKeyPair);
 
             using var writer = new XdrBufferWriter();
             var inMessage = envelope.ToIncomingMessage(writer);
@@ -112,8 +111,7 @@ namespace Centaurus.Test
             var orderEnvelope = new OrderRequest
             {
                 Account = account?.Account.Id ?? 0
-            }.CreateEnvelope();
-            orderEnvelope.Sign(clientKeyPair);
+            }.CreateEnvelope().Sign(clientKeyPair);
 
             var orderQuantumEnvelope = new RequestQuantum
             {

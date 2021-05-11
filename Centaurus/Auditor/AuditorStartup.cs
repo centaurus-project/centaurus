@@ -100,10 +100,19 @@ namespace Centaurus
 
         public override async Task Shutdown()
         {
-            isAborted = true;
-            Unsubscribe(auditor);
-            await CloseConnection(auditor);
-            Context.Dispose();
+            try
+            {
+                await syncRoot.WaitAsync();
+                isAborted = true;
+                Unsubscribe(auditor);
+                await CloseConnection(auditor);
+                Context.Dispose();
+                syncRoot.Dispose();
+            }
+            catch
+            {
+                syncRoot.Release();
+            }
         }
 
         private void Subscribe(AuditorWebSocketConnection _auditor)
@@ -122,7 +131,7 @@ namespace Centaurus
             }
         }
 
-        private void OnConnectionStateChanged((BaseWebSocketConnection connection, ConnectionState prev, ConnectionState current) args)
+        private async void OnConnectionStateChanged((BaseWebSocketConnection connection, ConnectionState prev, ConnectionState current) args)
         {
             switch (args.current)
             {
@@ -130,7 +139,7 @@ namespace Centaurus
                     Ready(args.connection);
                     break;
                 case ConnectionState.Closed:
-                    Close(args.connection);
+                    await Close(args.connection);
                     break;
                 default:
                     break;
@@ -152,13 +161,24 @@ namespace Centaurus
                 Context.AppState.State = ApplicationState.Ready;
         }
 
-        private async void Close(BaseWebSocketConnection e)
+        private async Task Close(BaseWebSocketConnection e)
         {
-            Context.AppState.State = ApplicationState.Running;
-            Unsubscribe(auditor);
-            await CloseConnection(auditor);
-            if (!isAborted)
-                InternalRun();
+            await syncRoot.WaitAsync();
+            try
+            {
+                Context.AppState.State = ApplicationState.Running;
+                Unsubscribe(auditor);
+                await CloseConnection(auditor);
+                auditor = null;
+                if (!isAborted)
+                    InternalRun();
+            }
+            finally
+            {
+                syncRoot.Release();
+            }
         }
+
+        private readonly SemaphoreSlim syncRoot = new SemaphoreSlim(1);
     }
 }

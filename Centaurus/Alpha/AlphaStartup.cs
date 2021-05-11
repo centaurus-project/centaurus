@@ -35,8 +35,19 @@ namespace Centaurus
         private ManualResetEvent resetEvent;
 
         public AlphaStartup(AlphaContext context)
+            : this(context, GetHost)
+        {
+        }
+
+        public AlphaStartup(AlphaContext context, Func<AlphaContext, IHost> hostFactory)
             : base(context)
         {
+            host = hostFactory?.Invoke(context);
+        }
+
+        private static IHost GetHost(AlphaContext context)
+        {
+            return new AlphaHostBuilder(context).CreateHost(context.Settings);
         }
 
         public override async Task Run(ManualResetEvent resetEvent)
@@ -45,12 +56,7 @@ namespace Centaurus
             {
                 this.resetEvent = resetEvent;
 
-                //TODO: mock host
-                if (!EnvironmentHelper.IsTest)
-                {
-                    host = new AlphaHostBuilder(Context).CreateHost(Context.Settings);
-                    _ = host.RunAsync();
-                }
+                _ = host.RunAsync();
 
                 await ConfigureConstellation();
             }
@@ -65,16 +71,14 @@ namespace Centaurus
 
         public override async Task Shutdown()
         {
+            Context.AppState.State = ApplicationState.Stopped;
+            await Context.ConnectionManager.CloseAllConnections();
+            await Context.InfoConnectionManager.CloseAllConnections();
+            Context.Dispose();
             if (host != null)
             {
-                await Context.ConnectionManager.CloseAllConnections();
-                await Context.InfoConnectionManager.CloseAllConnections();
-                Context.Dispose();
-                if (host != null)
-                {
-                    await host.StopAsync(CancellationToken.None);
-                    host = null;
-                }
+                await host.StopAsync(CancellationToken.None);
+                host = null;
             }
         }
 

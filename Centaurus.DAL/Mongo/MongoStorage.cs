@@ -249,41 +249,34 @@ namespace Centaurus.DAL.Mongo
         static TransactionOptions txOptions = new TransactionOptions(ReadConcern.Local, writeConcern: WriteConcern.W1.With(journal: false));
         public async Task<int> Update(DiffObject update)
         {
-            var stellarUpdates = GetStellarDataUpdate(update.StellarInfoData);
+            var constellationUpdate = GetConstellationUpdate(update.StellarInfoData);
             var accountUpdates = GetAccountUpdates(update.Accounts.Values.ToList());
             var balanceUpdates = GetBalanceUpdates(update.Balances.Values.ToList());
             var orderUpdates = GetOrderUpdates(update.Orders.Values.ToList());
             var quanta = update.Quanta;
-
-            //var retries = 1;
-            //var maxTries = 5;
-            //var isCommitInvoked = false;
-            //while (true)
-            //{
+            
             using (var session = await client.StartSessionAsync())
             {
                 var result = await session.WithTransactionAsync<bool>(async (s, ct) =>
                 {
-                    //try
-                    //{
                     var updateTasks = new List<Task>();
 
-                    if (stellarUpdates != null)
-                        updateTasks.Add(constellationStateCollection.BulkWriteAsync(s, new WriteModel<ConstellationState>[] { stellarUpdates }));
+                    if (constellationUpdate != null)
+                        updateTasks.Add(constellationStateCollection.BulkWriteAsync(s, new [] { constellationUpdate }, cancellationToken: ct));
 
                     if (update.ConstellationSettings != null)
-                        updateTasks.Add(settingsCollection.InsertOneAsync(s, update.ConstellationSettings));
+                        updateTasks.Add(settingsCollection.InsertOneAsync(s, update.ConstellationSettings, cancellationToken: ct));
 
                     if (accountUpdates != null)
-                        updateTasks.Add(accountsCollection.BulkWriteAsync(s, accountUpdates));
+                        updateTasks.AddRange(accountsCollection.SaveBatch(s, accountUpdates, ct));
 
                     if (balanceUpdates != null)
-                        updateTasks.Add(balancesCollection.BulkWriteAsync(s, balanceUpdates));
+                        updateTasks.AddRange(balancesCollection.SaveBatch(s, balanceUpdates, ct));
 
                     if (orderUpdates != null)
-                        updateTasks.Add(ordersCollection.BulkWriteAsync(s, orderUpdates));
+                        updateTasks.AddRange(ordersCollection.SaveBatch(s, orderUpdates, ct));
 
-                    SaveQuanta(ref updateTasks, quanta, s);
+                    updateTasks.AddRange(quantaCollection.InsertBatch(s, quanta, ct));
 
                     await Task.WhenAll(updateTasks);
 
@@ -295,51 +288,7 @@ namespace Centaurus.DAL.Mongo
             }
         }
 
-        private void SaveQuanta(ref List<Task> updateTasks, IEnumerable<QuantumModel> quanta, IClientSessionHandle session)
-        {
-            var batchSize = 5_000;
-
-            var savedQuantaCount = 0;
-            var quantaCount = quanta.Count();
-            while (savedQuantaCount < quantaCount)
-            {
-                updateTasks.Add(quantaCollection.InsertManyAsync(
-                    session,
-                    quanta.Skip(savedQuantaCount).Take(batchSize),
-                    new InsertManyOptions { BypassDocumentValidation = true, IsOrdered = false })
-                );
-                savedQuantaCount += batchSize;
-            }
-        }
-
-        static string[] retriableCommitErrors = new string[] { "UnknownTransactionCommitResult", "TransientTransactionError " };
-
-        private static async Task CommitWithRetry(IClientSessionHandle session)
-        {
-            var maxTries = 5;
-            var retries = 1;
-            while (true)
-            {
-                try
-                {
-                    await session.CommitTransactionAsync();
-                    break;
-                }
-                catch (MongoException exc)
-                {
-                    if (!(exc is MongoException mongoException
-                            && mongoException.ErrorLabels.Any(l => retriableCommitErrors.Contains(l))))
-                        throw;
-                    retries++;
-                    if (retries >= maxTries)
-                        throw new UnknownCommitResultException($"UnknownTransactionCommitResult or TransientTransactionError errors occurred after {retries} retries", exc);
-                    logger.Warn(exc, $"Error on commit. Labels: {string.Join(',', mongoException.ErrorLabels)}. {retries} try.");
-                    continue;
-                }
-            }
-        }
-
-        private WriteModel<ConstellationState> GetStellarDataUpdate(DiffObject.ConstellationState constellationState)
+        private WriteModel<ConstellationState> GetConstellationUpdate(DiffObject.ConstellationState constellationState)
         {
             if (constellationState == null)
                 return null;
@@ -371,7 +320,7 @@ namespace Centaurus.DAL.Mongo
             var accLength = accounts.Count;
             var updates = new WriteModel<AccountModel>[accLength];
 
-            for (int i = 0; i < accLength; i++)
+            Parallel.For(0, accLength, (i) =>
             {
                 var acc = accounts[i];
                 var currentAccFilter = filter.Eq(a => a.Id, acc.Id);
@@ -382,7 +331,7 @@ namespace Centaurus.DAL.Mongo
                         Nonce = acc.Nonce,
                         PubKey = acc.PubKey,
                         RequestRateLimits = acc.RequestRateLimits,
-                        Withdrawal = (acc.Withdrawal.HasValue ? acc.Withdrawal.Value : 0)
+                        Withdrawal = (acc.Withdrawal ?? 0)
                     });
                 else if (acc.IsDeleted)
                     updates[i] = new DeleteOneModel<AccountModel>(currentAccFilter);
@@ -400,7 +349,7 @@ namespace Centaurus.DAL.Mongo
 
                     updates[i] = new UpdateOneModel<AccountModel>(currentAccFilter, update.Combine(updateDefs));
                 }
-            }
+            });
             return updates;
         }
 
@@ -414,7 +363,7 @@ namespace Centaurus.DAL.Mongo
             var balancesLength = balances.Count;
             var updates = new WriteModel<BalanceModel>[balancesLength];
 
-            for (int i = 0; i < balancesLength; i++)
+            Parallel.For(0, balancesLength, (i) =>
             {
                 var balance = balances[i];
                 var currentBalanceFilter = filter.Eq(s => s.Id, balance.Id);
@@ -435,9 +384,9 @@ namespace Centaurus.DAL.Mongo
                         update
                             .Inc(b => b.Amount, balance.AmountDiff)
                             .Inc(b => b.Liabilities, balance.LiabilitiesDiff)
-                        );
+                    );
                 }
-            }
+            });
             return updates;
         }
 
@@ -453,16 +402,16 @@ namespace Centaurus.DAL.Mongo
                 var ordersLength = orders.Count;
                 var updates = new WriteModel<OrderModel>[ordersLength];
 
-                for (int i = 0; i < ordersLength; i++)
+                Parallel.For(0, ordersLength, (i) =>
                 {
                     var order = orders[i];
 
-                    var currentOrderFilter = filter.And(filter.Eq(s => s.Id, (long)order.OrderId));
+                    var currentOrderFilter = filter.And(filter.Eq(s => s.Id, (long) order.OrderId));
 
                     if (order.IsInserted)
                         updates[i] = new InsertOneModel<OrderModel>(new OrderModel
                         {
-                            Id = (long)order.OrderId,
+                            Id = (long) order.OrderId,
                             Amount = order.AmountDiff,
                             QuoteAmount = order.QuoteAmountDiff,
                             Price = order.Price,
@@ -477,7 +426,7 @@ namespace Centaurus.DAL.Mongo
                             update.Inc(b => b.Amount, order.AmountDiff).Inc(b => b.QuoteAmount, order.QuoteAmountDiff)
                         );
                     }
-                }
+                });
                 return updates;
             }
         }

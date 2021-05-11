@@ -34,10 +34,9 @@ namespace Centaurus
         private async Task SendQuantums()
         {
             var batchSize = Context.Settings.SyncBatchSize;
-            var quantumStorage = (AlphaQuantumStorage)Context.QuantumStorage;
             while (!cancellationToken.IsCancellationRequested)
             {
-                var apexDiff = quantumStorage.CurrentApex - CurrentApexCursor;
+                var apexDiff = Context.QuantumStorage.CurrentApex - CurrentApexCursor;
                 if (apexDiff < 0)
                 {
                     logger.Error($"Auditor {((KeyPair)auditor.ClientPubKey).AccountId} is above current constellation state.");
@@ -62,7 +61,7 @@ namespace Centaurus
                 try
                 {
                     List<MessageEnvelope> quanta = null;
-                    if (!quantumStorage.GetQuantaBacth(CurrentApexCursor + 1, batchSize, out quanta))
+                    if (!Context.QuantumStorage.GetQuantaBacth(CurrentApexCursor + 1, batchSize, out quanta))
                     {
                         quanta = await Context.PersistenceManager.GetQuantaAboveApex(CurrentApexCursor, batchSize); //quanta are not found in the in-memory storage
                         if (quanta.Count < 1)

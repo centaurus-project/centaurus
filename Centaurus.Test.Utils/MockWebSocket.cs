@@ -27,7 +27,8 @@ namespace Centaurus.Test
         public override void Abort()
         {
             state = WebSocketState.Aborted;
-            secondPartyWebsocket?.SetClosed();
+            if (secondPartyWebsocket != null)
+                Task.Factory.StartNew(secondPartyWebsocket.SetClosed);
         }
 
         private void SetClosed()

@@ -21,8 +21,6 @@ namespace Centaurus.Domain
             AppState = new AlphaStateManager(this);
             AppState.StateChanged += AppState_StateChanged;
 
-            QuantumStorage = new AlphaQuantumStorage();
-
             QuantumHandler = new AlphaQuantumHandler(this);
 
             ConnectionManager = new ConnectionManager(this);
@@ -40,8 +38,6 @@ namespace Centaurus.Domain
         public override bool IsAlpha => true;
 
         public override StateManager AppState { get; }
-
-        public override QuantumStorageBase QuantumStorage { get; }
 
         public override QuantumHandler QuantumHandler { get; }
 

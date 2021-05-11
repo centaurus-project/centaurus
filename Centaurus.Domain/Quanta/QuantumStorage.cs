@@ -8,7 +8,7 @@ using System.Timers;
 
 namespace Centaurus.Domain
 {
-    public abstract class QuantumStorageBase
+    public class QuantumStorage
     {
         public long CurrentApex { get; protected set; }
         public byte[] LastQuantumHash { get; protected set; }
@@ -18,22 +18,9 @@ namespace Centaurus.Domain
             CurrentApex = currentApex;
             LastQuantumHash = lastQuantumHash;
         }
-
-        public abstract void AddQuantum(MessageEnvelope envelope, byte[] hash);
-    }
-
-    public class AlphaQuantumStorage : QuantumStorageBase
-    {
-        private List<long> apexes = new List<long>();
-
-        private List<MessageEnvelope> quanta = new List<MessageEnvelope>();
-
-        private int QuantaCacheCapacity = 1_000_000;
-        private int capacityThreshold = 100_000;
-
-        public override void AddQuantum(MessageEnvelope envelope, byte[] hash)
+        public void AddQuantum(MessageEnvelope envelope, byte[] hash)
         {
-            lock (this)
+            lock (syncRoot)
             {
                 var quantum = (Quantum)envelope.Message;
                 if (quantum.Apex < 1)
@@ -60,7 +47,7 @@ namespace Centaurus.Domain
         /// <returns>True if data presented in the storage, otherwise false.</returns>
         public bool GetQuantaBacth(long apexFrom, int maxCount, out List<MessageEnvelope> messageEnvelopes)
         {
-            lock (this)
+            lock (syncRoot)
             {
                 messageEnvelopes = null;
                 var apexIndex = apexes.IndexOf(apexFrom);
@@ -70,20 +57,14 @@ namespace Centaurus.Domain
                 return true;
             }
         }
-    }
 
-    public class AuditorQuantumStorage : QuantumStorageBase
-    {
-        public override void AddQuantum(MessageEnvelope envelope, byte[] hash)
-        {
-            lock (this)
-            {
-                var quantum = (Quantum)envelope.Message;
-                if (quantum.Apex < 1) //when auditor receives quantum, the quantum should already contain apex
-                    throw new Exception("Quantum has no apex");
-                CurrentApex = quantum.Apex;
-                LastQuantumHash = hash;
-            }
-        }
+        private List<long> apexes = new List<long>();
+
+        private List<MessageEnvelope> quanta = new List<MessageEnvelope>();
+
+        private int QuantaCacheCapacity = 1_000_000;
+        private int capacityThreshold = 100_000;
+
+        private object syncRoot = new { };
     }
 }
