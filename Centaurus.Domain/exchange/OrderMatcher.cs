@@ -73,6 +73,8 @@ namespace Centaurus.Domain
                 updates.Trades.Add(matchUpdates.trade);
                 updates.OrderUpdates.Add(matchUpdates.counterOrder);
 
+                takerOrder.Amount -= matchUpdates.trade.Amount;
+
                 tradeAssetAmount += matchUpdates.trade.Amount;
                 tradeQuoteAmount += matchUpdates.trade.QuoteAmount;
 

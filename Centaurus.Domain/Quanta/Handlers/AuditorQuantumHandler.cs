@@ -58,7 +58,7 @@ namespace Centaurus.Domain
 
             if (!ByteArrayComparer.Default.Equals(result.Effects.Hash, quantum.EffectsHash) && !EnvironmentHelper.IsTest)
             {
-                throw new Exception("Effects hash is not equal to provided by Alpha.");
+                throw new Exception($"Effects hash for quantum {quantum.Apex} is not equal to provided by Alpha.");
             }
 
             var messageHash = envelope.ComputeMessageHash(buffer.Buffer);

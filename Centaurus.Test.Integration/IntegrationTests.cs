@@ -94,7 +94,7 @@ namespace Centaurus.Test
 
             await environment.AlphaWrapper.Run();
 
-            await environment.AssertConstellationState(ApplicationState.Ready, TimeSpan.FromSeconds(10));
+            await environment.AssertConstellationState(ApplicationState.Ready, TimeSpan.FromSeconds(15));
 
             await Task.WhenAll(environment.AuditorWrappers.Select(a => IntegrationTestEnvironmentExtensions.AssertState(a.Startup, ApplicationState.Ready, TimeSpan.FromSeconds(10))));
         }

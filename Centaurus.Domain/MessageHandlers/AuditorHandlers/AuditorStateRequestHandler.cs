@@ -34,6 +34,9 @@ namespace Centaurus.Domain
                         throw new Exception("No quanta from database.");
                 }
 
+                if (currentBatch == null)
+                    currentBatch = new List<MessageEnvelope>();
+
                 hasQuanta = currentBatch.Count == batchSize;
                 var state = new AuditorState
                 {
