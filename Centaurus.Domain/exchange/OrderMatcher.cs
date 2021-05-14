@@ -68,33 +68,30 @@ namespace Centaurus.Domain
                     || side == OrderSide.Buy && counterOrder.Price > takerOrder.Price)
                     break;
 
-                var match = new OrderMatch(this, counterOrder);
+                var availableOrderAmount = takerOrder.Amount - tradeAssetAmount;
+                var match = new OrderMatch(this, availableOrderAmount, counterOrder);
                 var matchUpdates = match.ProcessOrderMatch();
                 updates.Trades.Add(matchUpdates.trade);
                 updates.OrderUpdates.Add(matchUpdates.counterOrder);
-
-                takerOrder.Amount -= matchUpdates.trade.Amount;
 
                 tradeAssetAmount += matchUpdates.trade.Amount;
                 tradeQuoteAmount += matchUpdates.trade.QuoteAmount;
 
                 //stop if incoming order has been executed in full
-                if (takerOrder.Amount == 0)
-                    break;
+                if (tradeAssetAmount == takerOrder.Amount)
+                    return updates;
                 counterOrder = nextOrder;
             }
 
             RecordTrade(tradeAssetAmount, tradeQuoteAmount);
 
             if (timeInForce == TimeInForce.GoodTillExpire && PlaceReminderOrder())
-                    updates.OrderUpdates.Add(takerOrder.ToOrderInfo());
+                updates.OrderUpdates.Add(takerOrder.ToOrderInfo());
             return updates;
         }
 
         private void RecordTrade(long tradeAssetAmount, long tradeQuoteAmount)
         {
-            if (tradeAssetAmount == 0)
-                return;
             //record taker trade effect
             resultEffects.AddTrade(
                 takerOrder,
@@ -149,13 +146,14 @@ namespace Centaurus.Domain
             /// Create new instance of order match.
             /// </summary>
             /// <param name="matcher">Parent OrderMatcher instance</param>
+            /// <param name="takerOrderAmount">Taker order current amount</param>
             /// <param name="makerOrder">Crossed order from the orderbook</param>
-            public OrderMatch(OrderMatcher matcher, Order makerOrder)
+            public OrderMatch(OrderMatcher matcher, long takerOrderAmount, Order makerOrder)
             {
                 this.matcher = matcher;
                 this.makerOrder = makerOrder;
                 //amount of asset we are going to buy/sell
-                AssetAmount = Math.Min(matcher.takerOrder.Amount, makerOrder.Amount);
+                AssetAmount = Math.Min(takerOrderAmount, makerOrder.Amount);
                 QuoteAmount = EstimateQuoteAmount(AssetAmount, makerOrder.Price, matcher.side);
             }
 

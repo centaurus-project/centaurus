@@ -66,6 +66,11 @@ namespace Centaurus.Domain
             return Task.CompletedTask;
         }
 
+
+        //TODO: find more elegant and reliable way to validate cross orders count. This method is  could have rounding errors.
+        /// <summary>
+        /// Prevents too many trade effects.
+        /// </summary>
         private void ValidateCounterOrdersCount(OrderRequest orderRequest, OrderbookBase orderbook)
         {
             var counterOrdersSum = 0L;
@@ -77,7 +82,7 @@ namespace Centaurus.Domain
                 if (counterOrdersSum >= orderRequest.Amount)
                     break;
                 if (counterOrdersCount > MaxCrossOrdersCount)
-                    throw new BadRequestException("Too many cross orders");
+                    throw new BadRequestException("Failed to execute order. Maximum crossed orders length exceeded");
             }
         }
     }

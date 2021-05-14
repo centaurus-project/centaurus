@@ -10,39 +10,19 @@ namespace Centaurus.DAL.Mongo
 {
     public static class CollectionExtensions
     {
-        public static List<Task> SaveBatch<T>(this IMongoCollection<T> collection, IClientSessionHandle session, IEnumerable<WriteModel<T>> documents, CancellationToken ct, int batchSize = 5_000)
+        public static List<Task> WriteBatch<T>(this IMongoCollection<T> collection, IClientSessionHandle session, IList<WriteModel<T>> documents, CancellationToken ct, int batchSize = 5_000)
         {
-            var savedCount = 0;
-            var itemsCount = documents.Count();
+            var position = 0;
             var updateTasks = new List<Task>();
-            while (savedCount < itemsCount)
+            while (position < documents.Count)
             {
                 updateTasks.Add(collection.BulkWriteAsync(
                     session,
-                    documents.Skip(savedCount).Take(batchSize),
+                    documents.Skip(position).Take(batchSize),
                     new BulkWriteOptions { BypassDocumentValidation = true, IsOrdered = false },
                     ct)
                 );
-                savedCount += batchSize;
-            }
-
-            return updateTasks;
-        }
-
-        public static List<Task> InsertBatch<T>(this IMongoCollection<T> collection, IClientSessionHandle session, IEnumerable<T> documents, CancellationToken ct, int batchSize = 5_000)
-        {
-            var savedCount = 0;
-            var itemsCount = documents.Count();
-            var updateTasks = new List<Task>();
-            while (savedCount < itemsCount)
-            {
-                updateTasks.Add(collection.InsertManyAsync(
-                    session,
-                    documents.Skip(savedCount).Take(batchSize),
-                    new InsertManyOptions { BypassDocumentValidation = true, IsOrdered = false },
-                    ct)
-                );
-                savedCount += batchSize;
+                position += batchSize;
             }
 
             return updateTasks;

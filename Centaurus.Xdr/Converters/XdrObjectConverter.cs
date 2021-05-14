@@ -47,7 +47,7 @@ namespace Centaurus
             {
                 if (options == null)
                 {
-                    var options = new JsonSerializerOptions { IgnoreNullValues = true };
+                    options = new JsonSerializerOptions { IgnoreNullValues = true };
                     options.Converters.Add(new XdrObjectConverter());
                 }
                 return options;

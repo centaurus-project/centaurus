@@ -253,7 +253,7 @@ namespace Centaurus.DAL.Mongo
             var accountUpdates = GetAccountUpdates(update.Accounts.Values.ToList());
             var balanceUpdates = GetBalanceUpdates(update.Balances.Values.ToList());
             var orderUpdates = GetOrderUpdates(update.Orders.Values.ToList());
-            var quanta = update.Quanta;
+            var quanta = GetQuantaUpdates(update.Quanta);
             
             using (var session = await client.StartSessionAsync())
             {
@@ -268,15 +268,15 @@ namespace Centaurus.DAL.Mongo
                         updateTasks.Add(settingsCollection.InsertOneAsync(s, update.ConstellationSettings, cancellationToken: ct));
 
                     if (accountUpdates != null)
-                        updateTasks.AddRange(accountsCollection.SaveBatch(s, accountUpdates, ct));
+                        updateTasks.AddRange(accountsCollection.WriteBatch(s, accountUpdates, ct));
 
                     if (balanceUpdates != null)
-                        updateTasks.AddRange(balancesCollection.SaveBatch(s, balanceUpdates, ct));
+                        updateTasks.AddRange(balancesCollection.WriteBatch(s, balanceUpdates, ct));
 
                     if (orderUpdates != null)
-                        updateTasks.AddRange(ordersCollection.SaveBatch(s, orderUpdates, ct));
+                        updateTasks.AddRange(ordersCollection.WriteBatch(s, orderUpdates, ct));
 
-                    updateTasks.AddRange(quantaCollection.InsertBatch(s, quanta, ct));
+                    updateTasks.AddRange(quantaCollection.WriteBatch(s, quanta, ct));
 
                     await Task.WhenAll(updateTasks);
 
@@ -310,7 +310,7 @@ namespace Centaurus.DAL.Mongo
             return updateModel;
         }
 
-        private WriteModel<AccountModel>[] GetAccountUpdates(List<DiffObject.Account> accounts)
+        private List<WriteModel<AccountModel>> GetAccountUpdates(List<DiffObject.Account> accounts)
         {
             if (accounts == null || accounts.Count < 1)
                 return null;
@@ -318,7 +318,8 @@ namespace Centaurus.DAL.Mongo
             var update = Builders<AccountModel>.Update;
 
             var accLength = accounts.Count;
-            var updates = new WriteModel<AccountModel>[accLength];
+            var updates = new List<WriteModel<AccountModel>>(accLength);
+            updates.AddRange(Enumerable.Repeat(default(WriteModel<AccountModel>), accLength));
 
             Parallel.For(0, accLength, (i) =>
             {
@@ -353,7 +354,7 @@ namespace Centaurus.DAL.Mongo
             return updates;
         }
 
-        private WriteModel<BalanceModel>[] GetBalanceUpdates(List<DiffObject.Balance> balances)
+        private List<WriteModel<BalanceModel>> GetBalanceUpdates(List<DiffObject.Balance> balances)
         {
             if (balances == null || balances.Count < 1)
                 return null;
@@ -361,7 +362,8 @@ namespace Centaurus.DAL.Mongo
             var update = Builders<BalanceModel>.Update;
 
             var balancesLength = balances.Count;
-            var updates = new WriteModel<BalanceModel>[balancesLength];
+            var updates = new List<WriteModel<BalanceModel>>(balancesLength);
+            updates.AddRange(Enumerable.Repeat(default(WriteModel<BalanceModel>), balancesLength));
 
             Parallel.For(0, balancesLength, (i) =>
             {
@@ -390,7 +392,7 @@ namespace Centaurus.DAL.Mongo
             return updates;
         }
 
-        private WriteModel<OrderModel>[] GetOrderUpdates(List<DiffObject.Order> orders)
+        private List<WriteModel<OrderModel>> GetOrderUpdates(List<DiffObject.Order> orders)
         {
             if (orders == null || orders.Count < 1)
                 return null;
@@ -400,7 +402,8 @@ namespace Centaurus.DAL.Mongo
                 var update = Builders<OrderModel>.Update;
 
                 var ordersLength = orders.Count;
-                var updates = new WriteModel<OrderModel>[ordersLength];
+                var updates = new List<WriteModel<OrderModel>>(ordersLength);
+                updates.AddRange(Enumerable.Repeat(default(WriteModel<OrderModel>), ordersLength));
 
                 Parallel.For(0, ordersLength, (i) =>
                 {
@@ -429,6 +432,11 @@ namespace Centaurus.DAL.Mongo
                 });
                 return updates;
             }
+        }
+
+        private List<WriteModel<QuantumModel>> GetQuantaUpdates(List<QuantumModel> quanta)
+        {
+            return quanta.Select(q => (WriteModel<QuantumModel>)new InsertOneModel<QuantumModel>(q)).ToList();
         }
 
         public async Task SaveAnalytics(List<PriceHistoryFrameModel> frames)
