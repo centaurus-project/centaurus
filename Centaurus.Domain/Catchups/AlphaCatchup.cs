@@ -109,6 +109,7 @@ namespace Centaurus.Domain
                 currentState.HasMorePendingQuanta = false;
                 return false;
             }
+            currentState.HasMorePendingQuanta = newAuditorState.HasMorePendingQuanta;
             var lastAddedApex = currentState.PendingQuanta.LastOrDefault()?.Message.MessageId ?? -1;
             var alphaPubkey = (RawPubKey)Context.Settings.KeyPair.PublicKey;
             foreach (var envelope in newAuditorState.PendingQuanta)
@@ -121,7 +122,6 @@ namespace Centaurus.Domain
                     return false;
                 currentState.PendingQuanta.Add(envelope);
             }
-            currentState.HasMorePendingQuanta = newAuditorState.HasMorePendingQuanta;
             logger.Trace($"Auditor's {((KeyPair)pubKey).AccountId} quanta added.");
             return true;
         }

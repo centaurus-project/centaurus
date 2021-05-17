@@ -25,7 +25,8 @@ namespace Centaurus.Domain
             return Task.FromResult(context.Envelope.CreateResult(ResultStatusCodes.Success, accountEffects));
         }
 
-        //TODO: replace all system exceptions that occur on validation with our client exceptions
+        private int MaxCrossOrdersCount = 100;
+
         public override Task Validate(ProcessorContext context)
         {
             context.ValidateNonce();
@@ -60,7 +61,29 @@ namespace Centaurus.Domain
                     throw new BadRequestException("Insufficient funds");
             }
 
+            ValidateCounterOrdersCount(orderRequest, context.CentaurusContext.Exchange.GetOrderbook(orderRequest.Asset, orderRequest.Side.Inverse()));
+
             return Task.CompletedTask;
+        }
+
+
+        //TODO: find more elegant and reliable way to validate cross orders count. This method is  could have rounding errors.
+        /// <summary>
+        /// Prevents too many trade effects.
+        /// </summary>
+        private void ValidateCounterOrdersCount(OrderRequest orderRequest, OrderbookBase orderbook)
+        {
+            var counterOrdersSum = 0L;
+            var counterOrdersCount = 0;
+            foreach (var order in orderbook)
+            {
+                counterOrdersSum += order.Amount;
+                counterOrdersCount++;
+                if (counterOrdersSum >= orderRequest.Amount)
+                    break;
+                if (counterOrdersCount > MaxCrossOrdersCount)
+                    throw new BadRequestException("Failed to execute order. Maximum crossed orders length exceeded");
+            }
         }
     }
 }

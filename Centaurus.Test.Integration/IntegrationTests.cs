@@ -1,15 +1,18 @@
 ﻿using Centaurus.Controllers;
+using Centaurus.DAL;
 using Centaurus.DAL.Mongo;
 using Centaurus.Domain;
 using Centaurus.Models;
 using Centaurus.SDK.Models;
 using Centaurus.Stellar.Models;
+using Centaurus.Xdr;
 using Microsoft.AspNetCore.Mvc;
 using NUnit.Framework;
 using stellar_dotnet_sdk;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
@@ -20,198 +23,224 @@ namespace Centaurus.Test
 {
     public class IntegrationTests
     {
-        IntegrationTestEnvironment environment;
-
-        private async Task InitConstellation()
-        {
-            var assetCodes = new string[] {
-                "USD",
-                "EURO",
-                "GOLD",
-                "SILVER",
-                "OIL",
-                "NGAS",
-                "CORN",
-                "SUGAR"
-            };
-            var res = await environment.ConstellationController.Init(new ConstellationInitModel
-            {
-                Assets = assetCodes.Select(a => $"{a}-{environment.Issuer.AccountId}-{(a.Length > 4 ? 2 : 1)}").ToArray(),
-                Auditors = environment.GenesisQuorum.ToArray(),
-                MinAccountBalance = 1000,
-                MinAllowedLotSize = 100,
-                RequestRateLimits = new RequestRateLimitsModel { HourLimit = int.MaxValue, MinuteLimit = int.MaxValue }
-            });
-
-            var result = (ConstellationController.InitResult)((JsonResult)res).Value;
-
-            Assert.IsTrue(result.IsSuccess, "Init result.");
-        }
-
-        private async Task AssertConstellationState(ApplicationState targetState, TimeSpan timeOut)
-        {
-            Func<Task<bool>> func = () =>
-            {
-                return Task.FromResult(environment.ConstellationController.Info().State == targetState);
-            };
-
-            await AssertDuringPeriod(
-                func,
-                timeOut,
-                $"Unable to rich {targetState} state."
-            );
-        }
-
-        private async Task AssertDuringPeriod(Func<Task<bool>> predicate, TimeSpan timeout, string failMessage)
-        {
-            var waitStartDate = DateTime.UtcNow;
-            while (DateTime.UtcNow - waitStartDate < timeout)
-            {
-                var result = await predicate();
-                if (result)
-                    return;
-                Thread.Sleep(50);
-            }
-            Assert.Fail(failMessage);
-        }
-
-        private async Task AssertClientsCount(int clientsCount, TimeSpan timeout)
-        {
-            Func<Task<bool>> func = () =>
-            {
-                return Task.FromResult(environment.AlphaStartup.Context.AccountStorage.Count == clientsCount);
-            };
-
-            await AssertDuringPeriod(
-                func,
-                timeout,
-                $"Client count is not equal to expected."
-            );
-        }
-
-        private async Task<List<SDK.CentaurusClient>> ConnectClients(List<KeyPair> clients, SDK.Models.ConstellationInfo info)
-        {
-
-            var clientConnections = new List<SDK.CentaurusClient>();
-            foreach (var client in clients)
-            {
-                var clientConnection = new SDK.CentaurusClient(
-                    new Uri(IntegrationTestEnvironment.AlphaAddress),
-                    client,
-                    info,
-                    environment.StellarProvider,
-                    environment.GetClientConnectionWrapper
-                );
-
-                await clientConnection.Connect();
-
-                clientConnections.Add(clientConnection);
-            }
-            return clientConnections;
-        }
-
-        private void AsserFinalize(MessageEnvelope resultMessage)
-        {
-            if (resultMessage.Message.MessageType != MessageTypes.ITransactionResultMessage)
-                Assert.IsTrue(resultMessage.AreSignaturesValid(), "Signatures validation.");
-            Assert.IsTrue(resultMessage.Signatures.Count >= environment.AlphaStartup.Context.GetMajorityCount(), "Majority validation.");
-        }
-
-        private void AsserResult(MessageEnvelope resultMessage, ResultStatusCodes targetResult)
-        {
-            if (resultMessage.Message is ResultMessage result)
-            {
-                Assert.AreEqual(result.Status, targetResult, "Result message status assertion.");
-                return;
-            }
-            Assert.Fail("Specified message is not result message.");
-        }
-
-        private async Task AssertPayment(SDK.CentaurusClient client, KeyPair keyPair, int assetId, long amount)
-        {
-            var balance = client.AccountData.GetBalances().First(a => a.AssetId == assetId);
-            var balanceAmount = balance.Amount;
-            try
-            {
-                var result = await client.MakePayment(keyPair, amount, environment.SDKConstellationInfo.Assets.First(a => a.Id == assetId));
-                AsserFinalize(result);
-                AsserResult(result, ResultStatusCodes.Success);
-                await AssertBalance(client, assetId, balanceAmount - amount, 0);
-            }
-            catch (Exception exc)
-            {
-                Assert.Fail(exc.Message, "Error on payment.");
-            }
-        }
-
-        private async Task AssertWithdrawal(SDK.CentaurusClient client, KeyPair keyPair, int assetId, string amount)
-        {
-            var balance = client.AccountData.GetBalances().First(a => a.AssetId == assetId);
-            var balanceAmount = balance.Amount;
-            try
-            {
-                var result = await client.Withdrawal(keyPair, amount, environment.SDKConstellationInfo.Assets.First(a => a.Id == assetId));
-                AsserFinalize(result);
-                AsserResult(result, ResultStatusCodes.Success);
-                await AssertBalance(client, assetId, balanceAmount - Amount.ToXdr(amount), 0);
-            }
-            catch (Exception exc)
-            {
-                Assert.Fail(exc.Message, "Error on withdrawal.");
-            }
-        }
-
-        private async Task AssertBalance(SDK.CentaurusClient client, int assetId, long amount, long liabilities)
-        {
-            Func<Task<bool>> func = async () =>
-            {
-                await client.UpdateAccountData();
-                var balance = client.AccountData.GetBalances().First(a => a.AssetId == assetId);
-                return balance.Amount == amount && balance.Liabilities == liabilities;
-            };
-
-            await AssertDuringPeriod(
-                func,
-                TimeSpan.FromSeconds(1),
-                $"Balance is not equal to expected."
-            );
-        }
-
         [Test]
         [Explicit]
+        [TestCase(1, 0)]
         [TestCase(1, 100)]
         [TestCase(2, 100)]
         [TestCase(10, 10)]
         public async Task BaseTest(int auditorsCount, int clientsCount)
         {
-            environment = new IntegrationTestEnvironment();
+            var environment = new IntegrationTestEnvironment();
 
-            environment.Init(auditorsCount);
+            await environment.PrepareConstellation(auditorsCount, clientsCount);
 
-            await environment.RunAlpha();
+            var connectedClients = await environment.ConnectClients(environment.Clients, environment.SDKConstellationInfo);
 
-            await InitConstellation();
+            if (connectedClients.Count > 0)
+            {
+                var client = connectedClients.First();
+                await environment.AssertPayment(client, KeyPair.Random(), 0, environment.SDKConstellationInfo.MinAccountBalance);
 
-            await AssertConstellationState(ApplicationState.Running, TimeSpan.FromSeconds(5));
+                await environment.AssertClientsCount(clientsCount + 1, TimeSpan.FromSeconds(15)); //client should be created on payment
 
-            await environment.RunAuditors();
-
-            await AssertConstellationState(ApplicationState.Ready, TimeSpan.FromSeconds(50 * auditorsCount));
-
-            environment.GenerateCliens(clientsCount);
-
-            await AssertClientsCount(clientsCount, TimeSpan.FromSeconds(15));
-
-            var connectedClients = await ConnectClients(environment.Clients, environment.SDKConstellationInfo);
-
-            var client = connectedClients.First();
-            await AssertPayment(client, KeyPair.Random(), 0, environment.SDKConstellationInfo.MinAccountBalance);
-
-            await AssertClientsCount(clientsCount + 1, TimeSpan.FromSeconds(15)); //client should be created on payment
-
-            await AssertWithdrawal(client, client.KeyPair, 0, 1.ToString());
+                await environment.AssertWithdrawal(client, client.KeyPair, 0, 1.ToString());
+            }
 
             environment.Dispose();
+        }
+
+        [Test]
+        [Explicit]
+        public async Task AuditorRestartTest()
+        {
+            var environment = new IntegrationTestEnvironment();
+
+            await environment.PrepareConstellation(3, 0);
+
+            var auditorStartup = environment.AuditorWrappers.First();
+            await auditorStartup.Shutdown();
+
+            Assert.AreEqual(2, ((AlphaStateManager)environment.AlphaWrapper.Context.AppState).ConnectedAuditorsCount, "Auditors count assertion.");
+            await environment.AssertConstellationState(ApplicationState.Ready, TimeSpan.FromSeconds(10));
+
+            var clientsCount = 100;
+            environment.GenerateCliens(clientsCount);
+
+            await environment.AssertClientsCount(clientsCount, TimeSpan.FromSeconds(15));
+
+            await auditorStartup.Run();
+
+            await IntegrationTestEnvironmentExtensions.AssertState(auditorStartup.Startup, ApplicationState.Ready, TimeSpan.FromSeconds(10));
+            await IntegrationTestEnvironmentExtensions.AssertDuringPeriod(
+                () => Task.FromResult(auditorStartup.Context.QuantumStorage.CurrentApex == environment.AlphaWrapper.Context.QuantumStorage.CurrentApex),
+                TimeSpan.FromSeconds(5),
+                "Apexes are not equal"
+            );
+        }
+
+
+        [Test]
+        [Explicit]
+        public async Task AlphaRestartTest()
+        {
+            var environment = new IntegrationTestEnvironment();
+
+            await environment.PrepareConstellation(3, 0);
+
+            await environment.AlphaWrapper.Shutdown();
+
+            await Task.WhenAll(environment.AuditorWrappers.Select(a => IntegrationTestEnvironmentExtensions.AssertState(a.Startup, ApplicationState.Running, TimeSpan.FromSeconds(10))));
+
+            await environment.AlphaWrapper.Run();
+
+            await environment.AssertConstellationState(ApplicationState.Ready, TimeSpan.FromSeconds(15));
+
+            await Task.WhenAll(environment.AuditorWrappers.Select(a => IntegrationTestEnvironmentExtensions.AssertState(a.Startup, ApplicationState.Ready, TimeSpan.FromSeconds(10))));
+        }
+
+        [Test]
+        [Explicit]
+        [TestCase(false, false, false)]
+        [TestCase(true, false, false)]
+        [TestCase(false, true, false)]
+        [TestCase(false, false, true)]
+        public async Task AlphaRestartWithQuantaDelayTest(bool invalidHash, bool invalidClientSignature, bool invalidAlphaSignature)
+        {
+            var environment = new IntegrationTestEnvironment();
+
+            await environment.PrepareConstellation(1, 3);
+
+            var lastApex = environment.AlphaWrapper.Context.QuantumStorage.CurrentApex;
+            var lastHash = environment.AlphaWrapper.Context.QuantumStorage.LastQuantumHash;
+
+            var clientPk = environment.Clients.First();
+            var client = environment.AlphaWrapper.Context.AccountStorage.GetAccount(clientPk);
+
+            //wait while all auditors will process all available quanta
+            await environment.AssertConstellationApex(lastApex, TimeSpan.FromSeconds(5));
+
+            //generate quantum that will not be processed by Alpha
+            var request = new AccountDataRequest
+            {
+                Account = client.Id,
+                RequestId = DateTime.UtcNow.Ticks,
+                AccountWrapper = client
+            }
+                .CreateEnvelope()
+                .Sign(clientPk);
+
+            var quantum = new RequestQuantum
+            {
+                Apex = lastApex + 1,
+                PrevHash = lastHash,
+                RequestEnvelope = request,
+                Timestamp = DateTime.UtcNow.Ticks
+            };
+            var quantumEnvelope = quantum
+                .CreateEnvelope();
+
+            var result = await environment.ProcessQuantumIsolated(quantumEnvelope);
+
+            quantum.EffectsHash = result.effectsHash;
+            quantumEnvelope.Sign(environment.AlphaWrapper.Settings.KeyPair);
+
+            await environment.AlphaWrapper.Shutdown();
+
+            await Task.WhenAll(environment.AuditorWrappers.Select(a => IntegrationTestEnvironmentExtensions.AssertState(a.Startup, ApplicationState.Running, TimeSpan.FromSeconds(10))));
+
+            //handle quantum
+            await Task.WhenAll(environment.AuditorWrappers.Select(a =>
+            {
+                var rawQuantum = quantumEnvelope.ToByteArray();
+                var auditorsQuantum = XdrConverter.Deserialize<MessageEnvelope>(rawQuantum);
+                return a.Context.QuantumHandler.HandleAsync(auditorsQuantum);
+            }));
+
+            //change quantum
+            environment.AuditorWrappers.ForEach(a =>
+            {
+                a.Context.QuantumStorage.GetQuantaBacth(lastApex + 1, 1, out var quanta);
+                var quantum = quanta.First();
+                if (invalidHash)
+                    ((Quantum)quantum.Message).Timestamp = DateTime.UtcNow.Ticks;
+                if (invalidClientSignature)
+                {
+                    var request = (RequestQuantum)quantum.Message;
+                    request.RequestEnvelope.Signatures.Clear();
+                    request.RequestEnvelope.Sign(KeyPair.Random());
+                }
+                if (invalidAlphaSignature)
+                {
+                    quantum.Signatures.Clear();
+                    quantum.Sign(KeyPair.Random());
+                }
+            });
+
+            await environment.AlphaWrapper.Run();
+
+            var expectedState = invalidHash || invalidClientSignature || invalidAlphaSignature ? ApplicationState.Failed : ApplicationState.Ready;
+
+            await IntegrationTestEnvironmentExtensions.AssertState(environment.AlphaWrapper.Startup, expectedState, TimeSpan.FromSeconds(30));
+
+            if (expectedState == ApplicationState.Failed)
+                return;
+
+            await Task.WhenAll(environment.AuditorWrappers.Select(a => IntegrationTestEnvironmentExtensions.AssertState(a.Startup, ApplicationState.Ready, TimeSpan.FromSeconds(10))));
+
+            await environment.AssertConstellationApex(lastApex + 1, TimeSpan.FromSeconds(5));
+        }
+
+        [Test]
+        [Explicit]
+        [TestCase(false, false, false)]
+        [TestCase(true, false, false)]
+        [TestCase(false, true, false)]
+        [TestCase(false, false, true)]
+        public async Task ScamQuantaTest(bool useFakeClient, bool useFakeAlpha, bool invalidBalance)
+        {
+            var environment = new IntegrationTestEnvironment();
+
+            await environment.PrepareConstellation(3, 1);
+
+            var clientPk = environment.Clients.First();
+            var client = environment.AlphaWrapper.Context.AccountStorage.GetAccount(clientPk);
+            var quantaStorage = environment.AlphaWrapper.Context.QuantumStorage;
+
+            EnvironmentHelper.SetTestEnvironmentVariable();
+
+            var amount = invalidBalance
+                ? client.Account.Balances[0].Amount + 1
+                : environment.AlphaWrapper.Context.Constellation.MinAllowedLotSize + 1;
+            var sqamRequest = new OrderRequest
+            {
+                Account = client.Id,
+                AccountWrapper = client,
+                Amount = amount,
+                Price = 1,
+                Asset = 1,
+                RequestId = 1,
+                Side = OrderSide.Buy
+            }.CreateEnvelope().Sign(useFakeClient ? KeyPair.Random() : clientPk);
+
+            var apex = quantaStorage.CurrentApex + 1;
+            var requestQuantum = new RequestQuantum
+            {
+                Apex = quantaStorage.CurrentApex + 1,
+                EffectsHash = new byte[] { },
+                PrevHash = quantaStorage.LastQuantumHash,
+                RequestEnvelope = sqamRequest,
+                Timestamp = DateTime.UtcNow.Ticks
+            }.CreateEnvelope().Sign(useFakeAlpha ? KeyPair.Random() : environment.AlphaWrapper.Settings.KeyPair);
+
+            quantaStorage.AddQuantum(requestQuantum, requestQuantum.ComputeMessageHash());
+
+            var expectedState = useFakeClient || useFakeAlpha || invalidBalance ? ApplicationState.Failed : ApplicationState.Ready;
+
+            if (expectedState == ApplicationState.Ready)
+                await environment.AssertConstellationApex(apex, TimeSpan.FromSeconds(10));
+
+            await Task.WhenAll(environment.AuditorWrappers.Select(a => IntegrationTestEnvironmentExtensions.AssertState(a.Startup, expectedState, TimeSpan.FromSeconds(10))));
         }
     }
 }

@@ -34,5 +34,24 @@ namespace Centaurus
             }
             writer.WriteEndObject();
         }
+
+        public static string Convert(object xdrObject)
+        {
+            return JsonSerializer.Serialize(xdrObject, Options);
+        }
+
+        private static JsonSerializerOptions options;
+        private static JsonSerializerOptions Options
+        {
+            get
+            {
+                if (options == null)
+                {
+                    options = new JsonSerializerOptions { IgnoreNullValues = true };
+                    options.Converters.Add(new XdrObjectConverter());
+                }
+                return options;
+            }
+        }
     }
 }

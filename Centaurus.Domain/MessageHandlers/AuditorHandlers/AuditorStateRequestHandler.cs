@@ -23,11 +23,21 @@ namespace Centaurus.Domain
             var stateRequestMessage = (AuditorStateRequest)message.Envelope.Message;
             var hasQuanta = true;
             var aboveApex = stateRequestMessage.TargetApex;
-            var quantaPerMessage = 50;
+            var batchSize = 50;
             while (hasQuanta)
             {
-                var currentBatch = await Context.PersistenceManager.GetQuantaAboveApex(aboveApex, 50);
-                hasQuanta = currentBatch.Count == quantaPerMessage;
+                if (!Context.QuantumStorage.GetQuantaBacth(aboveApex + 1, batchSize, out var currentBatch) 
+                    && (aboveApex + 1 < Context.QuantumStorage.CurrentApex))
+                {
+                    currentBatch = await Context.PersistenceManager.GetQuantaAboveApex(aboveApex, batchSize); //quanta are not found in the in-memory storage
+                    if (currentBatch.Count < 1)
+                        throw new Exception("No quanta from database.");
+                }
+
+                if (currentBatch == null)
+                    currentBatch = new List<MessageEnvelope>();
+
+                hasQuanta = currentBatch.Count == batchSize;
                 var state = new AuditorState
                 {
                     State = Context.AppState.State,

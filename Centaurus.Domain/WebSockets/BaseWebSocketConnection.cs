@@ -36,7 +36,7 @@ namespace Centaurus
     public abstract class BaseWebSocketConnection : ContextualBase, IDisposable
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
-        protected WebSocket webSocket;
+        protected readonly WebSocket webSocket;
         public BaseWebSocketConnection(Domain.ExecutionContext context, WebSocket webSocket, string ip, int inBufferSize, int outBufferSize)
             :base(context)
         {
@@ -99,8 +99,8 @@ namespace Centaurus
             }
         }
 
-        protected CancellationTokenSource cancellationTokenSource;
-        protected CancellationToken cancellationToken;
+        protected readonly CancellationTokenSource cancellationTokenSource;
+        protected readonly CancellationToken cancellationToken;
 
         public event Action<(BaseWebSocketConnection connection, ConnectionState prev, ConnectionState current)> OnConnectionStateChanged;
 
@@ -117,7 +117,7 @@ namespace Centaurus
                     await sendMessageSemaphore.WaitAsync();
                     try
                     {
-                        cancellationTokenSource?.Cancel();
+                        cancellationTokenSource.Cancel();
                         var timeoutTokenSource = new CancellationTokenSource(1000);
                         await webSocket.CloseAsync(status, desc, timeoutTokenSource.Token);
                     }
@@ -147,7 +147,7 @@ namespace Centaurus
             await SendMessage(envelope);
         }
 
-        private SemaphoreSlim sendMessageSemaphore = new SemaphoreSlim(1);
+        private readonly SemaphoreSlim sendMessageSemaphore = new SemaphoreSlim(1);
 
         public virtual async Task SendMessage(MessageEnvelope envelope)
         {
@@ -210,8 +210,8 @@ namespace Centaurus
                             }
                             finally
                             {
-                                sendMessageSemaphore?.Release();
-                                cancellationTokenSource?.Cancel();
+                                sendMessageSemaphore.Release();
+                                cancellationTokenSource.Cancel();
                             }
                         }
                         else
@@ -271,16 +271,18 @@ namespace Centaurus
 
         protected abstract Task<bool> HandleMessage(MessageEnvelope message);
 
+        bool isDisposed = false;
+
         public virtual void Dispose()
         {
+            if (isDisposed)
+                throw new ObjectDisposedException("Connection already disposed.");
             Thread.Sleep(100); //wait all tasks to exit
 
-            sendMessageSemaphore?.Dispose();
-            sendMessageSemaphore = null;
+            sendMessageSemaphore.Dispose();
 
-            cancellationTokenSource?.Cancel();
-            cancellationTokenSource?.Dispose();
-            cancellationTokenSource = null;
+            cancellationTokenSource.Cancel();
+            cancellationTokenSource.Dispose();
 
             //make sure the socket is closed
             if (webSocket.State != WebSocketState.Closed)
@@ -291,6 +293,8 @@ namespace Centaurus
 
             outgoingBuffer?.Dispose();
             outgoingBuffer = null;
+
+            isDisposed = true;
         }
     }
 

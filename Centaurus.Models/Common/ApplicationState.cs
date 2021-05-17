@@ -22,6 +22,8 @@ namespace Centaurus.Models
 
         Rising = 4,
 
-        Failed = 10
+        Failed = 10,
+
+        Stopped = 20
     }
 }

@@ -16,8 +16,8 @@ namespace Centaurus.Exchange.Analytics
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        private System.Timers.Timer saveTimer;
-        private System.Timers.Timer updateTimer;
+        private readonly System.Timers.Timer saveTimer = new System.Timers.Timer();
+        private readonly System.Timers.Timer updateTimer = new System.Timers.Timer();
 
         public AnalyticsManager(IAnalyticsStorage analyticsStorage, List<double> precisions, List<int> markets, List<OrderInfo> orders, int tradesHistorySize = 100)
         {
@@ -41,21 +41,19 @@ namespace Centaurus.Exchange.Analytics
         /// </summary>
         public void StartTimers()
         {
-            saveTimer = new System.Timers.Timer();
             saveTimer.Interval = 5 * 1000;
             saveTimer.AutoReset = false;
             saveTimer.Elapsed += SaveTimer_Elapsed;
             saveTimer.Start();
 
-            updateTimer = new System.Timers.Timer();
             updateTimer.Interval = 1000;
             updateTimer.AutoReset = false;
             updateTimer.Elapsed += UpdateTimer_Elapsed;
             updateTimer.Start();
         }
 
-        private SemaphoreSlim savingSemaphore = new SemaphoreSlim(1);
-        public async Task SaveUpdates(IAnalyticsStorage analyticsStorage, int numberOfTries = 5)
+        private readonly SemaphoreSlim savingSemaphore = new SemaphoreSlim(1);
+        public async Task SaveUpdates(IAnalyticsStorage analyticsStorage, int maxAttempts = 5)
         {
             await savingSemaphore.WaitAsync();
             try
@@ -63,8 +61,8 @@ namespace Centaurus.Exchange.Analytics
                 var frames = PriceHistoryManager.PullUpdates();
                 if (frames.Count < 1)
                     return;
-                var currentTry = 0;
-                while (currentTry < numberOfTries)
+                var attempt = 0;
+                while (attempt < maxAttempts)
                 {
                     try
                     {
@@ -74,10 +72,10 @@ namespace Centaurus.Exchange.Analytics
                     }
                     catch
                     {
-                        currentTry++;
-                        if (currentTry == numberOfTries)
+                        attempt++;
+                        if (attempt == maxAttempts)
                             throw;
-                        Thread.Sleep(currentTry * 500);
+                        Thread.Sleep(attempt * 500);
                     }
                 }
             }
@@ -91,30 +89,51 @@ namespace Centaurus.Exchange.Analytics
 
         public event Action<Exception> OnError;
 
-        public PriceHistoryManager PriceHistoryManager { get; private set; }
-        public TradesHistoryManager TradesHistoryManager { get; private set; }
-        public MarketDepthsManager MarketDepthsManager { get; private set; }
-        public MarketTickersManager MarketTickersManager { get; private set; }
+        public PriceHistoryManager PriceHistoryManager { get; }
+        public TradesHistoryManager TradesHistoryManager { get; }
+        public MarketDepthsManager MarketDepthsManager { get; }
+        public MarketTickersManager MarketTickersManager { get; }
+
 
         public void Dispose()
         {
-            syncRoot?.Dispose();
-            syncRoot = null;
+            DisposeSaveTimer();
 
-            savingSemaphore?.Dispose();
-            savingSemaphore = null;
+            DisposeUpdateTimer();
 
-            saveTimer?.Stop();
-            saveTimer?.Dispose();
-            saveTimer = null;
+            syncRoot.Dispose();
 
-            updateTimer?.Stop();
-            updateTimer?.Dispose();
-            updateTimer = null;
+            savingSemaphore.Dispose();
 
-            PriceHistoryManager?.Dispose();
-            PriceHistoryManager = null;
-            TradesHistoryManager = null;
+            PriceHistoryManager.Dispose();
+        }
+
+        private void DisposeSaveTimer()
+        {
+            try
+            {
+                savingSemaphore.Wait();
+                saveTimer.Stop();
+                saveTimer.Dispose();
+            }
+            finally
+            {
+                savingSemaphore.Release();
+            }
+        }
+
+        private void DisposeUpdateTimer()
+        {
+            try
+            {
+                syncRoot.Wait();
+                updateTimer.Stop();
+                updateTimer.Dispose();
+            }
+            finally
+            {
+                syncRoot.Release();
+            }
         }
 
         private async void UpdateTimer_Elapsed(object sender, ElapsedEventArgs e)
@@ -124,7 +143,7 @@ namespace Centaurus.Exchange.Analytics
             {
                 PriceHistoryManager.Update();
                 await MarketTickersManager.Update();
-                updateTimer?.Start();
+                updateTimer.Start();
                 OnUpdate?.Invoke();
             }
             catch (Exception exc)
@@ -142,7 +161,7 @@ namespace Centaurus.Exchange.Analytics
             try
             {
                 await SaveUpdates(analyticsStorage);
-                saveTimer?.Start();
+                saveTimer.Start();
             }
             catch (Exception exc)
             {
@@ -151,7 +170,7 @@ namespace Centaurus.Exchange.Analytics
         }
 
 
-        private SemaphoreSlim syncRoot = new SemaphoreSlim(1);
+        private readonly SemaphoreSlim syncRoot = new SemaphoreSlim(1);
 
         public async Task OnUpdates(ExchangeUpdate updates)
         {

@@ -57,7 +57,7 @@ namespace Centaurus.Domain
             return newHandleItem.HandlingTaskSource.Task;
         }
 
-        public int QuantaQueueLenght => awaitedQuanta.Count;
+        public int QuantaQueueLenght => awaitedQuanta?.Count ?? 0;
 
         private async Task RunQuantumWorker()
         {

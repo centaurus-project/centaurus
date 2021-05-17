@@ -37,7 +37,7 @@ namespace Centaurus.Domain
             }
         }
 
-        public void Stop()
+        public void Stop(TimeSpan timeout)
         {
             //refresh container to put current updates into the awaited updates
             RefreshUpdatesContainer();
@@ -46,14 +46,12 @@ namespace Centaurus.Domain
                 awaitedUpdates.CompleteAdding();
             if (IsRunning)
             {
-                //add some threshold just for case 
-                var maxWaitTime = 60 * 1000 * 5;
-
                 var sw = new Stopwatch();
                 sw.Start();
 
                 //wait while all pending updates are saved
-                while (!savingOperation.IsCompleted && maxWaitTime > sw.ElapsedMilliseconds)
+                while (!savingOperation.IsCompleted 
+                    && (timeout.TotalMilliseconds == 0 || timeout.TotalMilliseconds > sw.ElapsedMilliseconds))
                     Thread.Sleep(100);
 
                 if (!savingOperation.IsCompleted)

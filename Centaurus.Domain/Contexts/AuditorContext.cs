@@ -15,7 +15,6 @@ namespace Centaurus.Domain
             AppState = new AuditorStateManager(this);
             AppState.StateChanged += AppState_StateChanged;
 
-            QuantumStorage = new AuditorQuantumStorage();
             QuantumHandler = new AuditorQuantumHandler(this);
 
             OutgoingMessageStorage = new OutgoingMessageStorage();
@@ -25,8 +24,6 @@ namespace Centaurus.Domain
         }
 
         public override StateManager AppState { get; }
-
-        public override QuantumStorageBase QuantumStorage { get; }
 
         public override QuantumHandler QuantumHandler { get; }
 

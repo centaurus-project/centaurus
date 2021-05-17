@@ -71,19 +71,21 @@ namespace Centaurus.Domain
         /// </summary>
         public async Task CloseAllConnections(bool includingAuditors = true)
         {
-            foreach (var connection in connections)
+            var pubkeys = connections.Keys.ToArray();
+            foreach (var pk in pubkeys)
                 try
                 {
                     //skip if auditor
-                    if (!includingAuditors && Context.Constellation.Auditors.Contains(connection.Value.ClientPubKey))
+                    if (!includingAuditors && Context.Constellation.Auditors.Contains(pk) 
+                        || !connections.TryRemove(pk, out var connection))
                         continue;
-                    await UnsubscribeAndClose(connection.Value);
+                    await UnsubscribeAndClose(connection);
+
                 }
                 catch (Exception e)
                 {
                     logger.Error(e, "Unable to close connection");
                 }
-            connections.Clear();
         }
 
         #region Private members

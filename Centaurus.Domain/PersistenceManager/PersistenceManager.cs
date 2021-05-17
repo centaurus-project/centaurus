@@ -21,8 +21,6 @@ namespace Centaurus.Domain
         private SemaphoreSlim saveSnapshotSemaphore = new SemaphoreSlim(1);
         private IStorage storage;
 
-        public object Stop { get; internal set; }
-
         public PersistenceManager(IStorage storage)
         {
             this.storage = storage ?? throw new ArgumentNullException(nameof(storage));

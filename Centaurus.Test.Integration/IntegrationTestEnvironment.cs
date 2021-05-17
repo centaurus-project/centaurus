@@ -1,5 +1,7 @@
 ﻿using Centaurus.Controllers;
+using Centaurus.DAL;
 using Centaurus.DAL.Models;
+using Centaurus.DAL.Mongo;
 using Centaurus.Domain;
 using Centaurus.Stellar;
 using Microsoft.AspNetCore.Mvc;
@@ -14,12 +16,10 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Test
 {
-    public class IntegrationTestEnvironment: IDisposable
+    public class IntegrationTestEnvironment : IDisposable
     {
         public IntegrationTestEnvironment()
         {
-            EnvironmentHelper.SetTestEnvironmentVariable();
-
             StellarProvider = new MockStellarDataProvider(NetworkPassphrase, HorizonUrl);
             Reset = new ManualResetEvent(false);
         }
@@ -34,9 +34,10 @@ namespace Centaurus.Test
 
         public MockStellarDataProvider StellarProvider { get; }
         public ManualResetEvent Reset { get; }
-        public AlphaStartup AlphaStartup { get; private set; }
-        public ConstellationController ConstellationController { get; private set; }
-        public List<AuditorStartup> AuditorStartups { get; } = new List<AuditorStartup>();
+
+        public AlphaStartupWrapper AlphaWrapper { get; private set; }
+
+        public List<AuditorStartupWrapper> AuditorWrappers { get; private set; }
         public List<KeyPair> Clients { get; } = new List<KeyPair>();
 
         public void Init(int auditorsCount)
@@ -50,22 +51,23 @@ namespace Centaurus.Test
 
         private void GenerateAlpha()
         {
-            alphaSettings = GetAlphaSettings();
+            var alphaSettings = GetAlphaSettings();
             RegisterStellarAccount(alphaSettings.KeyPair);
+            AlphaWrapper = new AlphaStartupWrapper(alphaSettings, StellarProvider, Reset);
         }
 
         private void GenerateAuditors(int auditorsCount)
         {
             var keyPairs = Enumerable.Range(0, auditorsCount).Select(_ => KeyPair.Random()).ToArray();
-            GenesisQuorum = keyPairs.Select(k => k.AccountId);
-            auditorSettings = keyPairs.Select(kp => GetAuditorSettings(kp)).ToList();
+            var genesisQuorum = keyPairs.Select(k => k.AccountId);
+            AuditorWrappers = keyPairs.Select(kp => new AuditorStartupWrapper(GetAuditorSettings(kp, genesisQuorum), StellarProvider, Reset, GetClientConnectionWrapper)).ToList();
         }
 
         public void GenerateCliens(int clientsCount)
         {
             EnsureInited();
             var clients = Enumerable.Range(0, clientsCount).Select(_ => KeyPair.Random()).ToList();
-            var info = ConstellationController.Info();
+            var info = AlphaWrapper.ConstellationController.Info();
             var assets = info.Assets;
             var vault = KeyPair.FromAccountId(info.Vault);
             foreach (var client in clients)
@@ -88,17 +90,11 @@ namespace Centaurus.Test
         {
             var clientConnection = new MockWebSocket();
             var serverConnection = new MockWebSocket();
-            return new MockClientConnectionWrapper(AlphaStartup.Context, clientConnection, serverConnection);
-
-            //return new ClientConnectionWrapper(new ClientWebSocket());
+            return new MockClientConnectionWrapper(AlphaWrapper.Startup?.Context, clientConnection, serverConnection);
         }
 
         SDK.Models.ConstellationInfo sdkConstellationInfo;
-        private AlphaSettings alphaSettings;
 
-        public IEnumerable<string> GenesisQuorum { get; private set; }
-
-        private List<AuditorSettings> auditorSettings;
         private bool isInited;
 
         public SDK.Models.ConstellationInfo SDKConstellationInfo
@@ -107,19 +103,20 @@ namespace Centaurus.Test
             {
                 EnsureInited();
                 if (sdkConstellationInfo == null)
-                    sdkConstellationInfo = ConstellationController.Info().ToSdkModel();
+                    sdkConstellationInfo = AlphaWrapper.ConstellationController.Info().ToSdkModel();
                 return sdkConstellationInfo;
             }
         }
 
         private AlphaSettings GetAlphaSettings()
         {
+            var kp = KeyPair.Random();
             var alphaSettings = new AlphaSettings
             {
                 AlphaPort = 5000,
                 HorizonUrl = HorizonUrl,
                 NetworkPassphrase = NetworkPassphrase,
-                Secret = KeyPair.Random().SecretSeed,
+                Secret = kp.SecretSeed,
                 SyncBatchSize = 500
             };
             alphaSettings.Build();
@@ -129,10 +126,7 @@ namespace Centaurus.Test
         public async Task RunAlpha()
         {
             EnsureInited();
-            var alphaContext = new AlphaContext(alphaSettings, new MockStorage(), StellarProvider);
-            AlphaStartup = new AlphaStartup(alphaContext);
-            ConstellationController = new ConstellationController(alphaContext);
-            await AlphaStartup.Run(Reset);
+            await AlphaWrapper.Run();
         }
 
         private Stellar.Models.AccountModel RegisterStellarAccount(KeyPair keyPair)
@@ -147,37 +141,26 @@ namespace Centaurus.Test
             return accountModel;
         }
 
-        private AuditorSettings GetAuditorSettings(KeyPair keyPair)
+        private AuditorSettings GetAuditorSettings(KeyPair keyPair, IEnumerable<string> genesisQuorum)
         {
             var settings = new AuditorSettings
             {
-                AlphaPubKey = alphaSettings.KeyPair.AccountId,
+                AlphaPubKey = AlphaWrapper.Settings.KeyPair.AccountId,
                 Secret = keyPair.SecretSeed,
                 NetworkPassphrase = NetworkPassphrase,
                 HorizonUrl = HorizonUrl,
-                GenesisQuorum = GenesisQuorum,
+                GenesisQuorum = genesisQuorum,
                 AlphaAddress = AlphaAddress
             };
             settings.Build();
             return settings;
         }
 
-        private async Task<AuditorStartup> RunAuditor(AuditorSettings settings)
-        {
-            var auditorContext = new AuditorContext(settings, new MockStorage(), StellarProvider);
-
-            var auditorStartup = new AuditorStartup(auditorContext, GetClientConnectionWrapper);
-
-            await auditorStartup.Run(Reset);
-
-            return auditorStartup;
-        }
-
         public async Task RunAuditors()
         {
             EnsureInited();
-            foreach (var settings in auditorSettings)
-                AuditorStartups.Add(await RunAuditor(settings));
+            foreach (var auditor in AuditorWrappers)
+                await auditor.Run();
         }
 
         private void EnsureInited()
@@ -188,11 +171,9 @@ namespace Centaurus.Test
 
         public void Dispose()
         {
-            AlphaStartup.Shutdown().Wait();
-            foreach (var auditor in AuditorStartups)
-            {
-                auditor.Shutdown().Wait();
-            }
+            AlphaWrapper.Dispose();
+            foreach (var auditor in AuditorWrappers)
+                auditor.Dispose();
         }
     }
 }

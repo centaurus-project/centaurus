@@ -122,8 +122,7 @@ namespace Centaurus.Exchange.Analytics
         {
             foreach (var m in managers)
                 m.Value.Dispose();
-            syncRoot?.Dispose();
-            syncRoot = null;
+            syncRoot.Dispose();
         }
 
         public static long EncodeAssetTradesResolution(int market, PriceHistoryPeriod period)
@@ -141,6 +140,6 @@ namespace Centaurus.Exchange.Analytics
 
         private readonly Dictionary<long, PriceHistoryPeriodManager> managers = new Dictionary<long, PriceHistoryPeriodManager>();
         private IEnumerable<PriceHistoryPeriod> periods;
-        private SemaphoreSlim syncRoot = new SemaphoreSlim(1);
+        private readonly SemaphoreSlim syncRoot = new SemaphoreSlim(1);
     }
 }

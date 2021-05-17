@@ -35,6 +35,8 @@ namespace Centaurus.Domain
             PendingUpdatesManager = new PendingUpdatesManager(this);
             PendingUpdatesManager.OnBatchSaved += PendingUpdatesManager_OnBatchSaved;
 
+            QuantumStorage = new QuantumStorage();
+
             this.useLegacyOrderbook = useLegacyOrderbook;
         }
 
@@ -92,7 +94,7 @@ namespace Centaurus.Domain
 
         public virtual void Dispose()
         {
-            PendingUpdatesManager?.Stop(); PendingUpdatesManager?.Dispose();
+            PendingUpdatesManager?.Stop(TimeSpan.FromMilliseconds(0)); PendingUpdatesManager?.Dispose();
 
             ExtensionsManager?.Dispose();
             WithdrawalStorage?.Dispose();
@@ -158,6 +160,8 @@ namespace Centaurus.Domain
 
         public QuantumProcessorsStorage QuantumProcessor { get; }
 
+        public QuantumStorage QuantumStorage { get; }
+
         public IStorage PermanentStorage { get; }
 
         public BaseSettings Settings { get; }
@@ -167,8 +171,6 @@ namespace Centaurus.Domain
         public virtual bool IsAlpha { get; } = false;
 
         public abstract StateManager AppState { get; }
-
-        public abstract QuantumStorageBase QuantumStorage { get; }
 
         public virtual QuantumHandler QuantumHandler { get; }
 
