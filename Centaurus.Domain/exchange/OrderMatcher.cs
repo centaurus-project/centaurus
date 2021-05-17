@@ -79,7 +79,7 @@ namespace Centaurus.Domain
 
                 //stop if incoming order has been executed in full
                 if (tradeAssetAmount == takerOrder.Amount)
-                    return updates;
+                    break;
                 counterOrder = nextOrder;
             }
 
@@ -92,7 +92,10 @@ namespace Centaurus.Domain
 
         private void RecordTrade(long tradeAssetAmount, long tradeQuoteAmount)
         {
-            //record taker trade effect
+            if (tradeAssetAmount == 0)
+                return;
+
+            //record taker trade effect. AddTrade will update order amount
             resultEffects.AddTrade(
                 takerOrder,
                 tradeAssetAmount,
