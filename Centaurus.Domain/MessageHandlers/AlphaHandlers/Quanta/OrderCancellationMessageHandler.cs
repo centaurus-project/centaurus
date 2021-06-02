@@ -8,7 +8,7 @@ namespace Centaurus.Domain
 {
     public class OrderCancellationMessageHandler : AlphaBaseQuantumHandler
     {
-        public OrderCancellationMessageHandler(AlphaContext context) 
+        public OrderCancellationMessageHandler(ExecutionContext context) 
             : base(context)
         {
         }

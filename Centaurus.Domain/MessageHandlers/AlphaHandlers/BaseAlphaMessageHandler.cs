@@ -7,9 +7,9 @@ using Centaurus.Models;
 
 namespace Centaurus.Domain
 {
-    public abstract class BaseAlphaMessageHandler: BaseMessageHandler<AlphaWebSocketConnection, AlphaContext>, IAlphaMessageHandler
+    public abstract class BaseAlphaMessageHandler: BaseMessageHandler<IncomingWebSocketConnection>, IAlphaMessageHandler
     {
-        public BaseAlphaMessageHandler(AlphaContext context) 
+        public BaseAlphaMessageHandler(ExecutionContext context) 
             : base(context)
         {
         }
@@ -25,7 +25,7 @@ namespace Centaurus.Domain
         /// </summary>
         public abstract bool IsAuditorOnly { get; }
 
-        public override async Task Validate(AlphaWebSocketConnection connection, IncomingMessage message)
+        public override async Task Validate(IncomingWebSocketConnection connection, IncomingMessage message)
         {
             //if auth is required, then we should check that the current client public key is set, and that the envelope signatures contains it
             if (IsAuthRequired 

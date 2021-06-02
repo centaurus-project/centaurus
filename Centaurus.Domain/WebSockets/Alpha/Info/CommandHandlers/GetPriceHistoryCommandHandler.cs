@@ -9,7 +9,7 @@ namespace Centaurus.Domain
 {
     public class GetPriceHistoryCommandHandler : BaseCommandHandler<GetPriceHistoryCommand>
     {
-        public GetPriceHistoryCommandHandler(AlphaContext context)
+        public GetPriceHistoryCommandHandler(ExecutionContext context)
             : base(context)
         {
 

@@ -35,7 +35,11 @@ namespace Centaurus.Domain
             {
                 case ConstellationInitEffect constellationInit:
                     pendingDiffObject.ConstellationSettings = GetConstellationSettings(constellationInit);
-                    pendingDiffObject.StellarInfoData = new DiffObject.ConstellationState { TxCursor = constellationInit.TxCursor, IsInserted = true };
+                    foreach (var c in constellationInit.Cursors)
+                    { 
+                        var cursorDiff = new DiffObject.PaymentCursor { Cursor = c.Cursor, Provider = (int)c.Provider, IsInserted = true };
+                        pendingDiffObject.Cursors.Add((int)cursorDiff.Provider, cursorDiff);
+                    }
                     break;
                 case ConstellationUpdateEffect constellationUpdate:
                     throw new NotImplementedException();
@@ -137,12 +141,14 @@ namespace Centaurus.Domain
                         order.QuoteAmountDiff += -quoteAmount;
                     }
                     break;
-                case TxCursorUpdateEffect cursorUpdateEffect:
+                case CursorUpdateEffect cursorUpdateEffect:
                     {
-                        if (pendingDiffObject.StellarInfoData == null)
-                            pendingDiffObject.StellarInfoData = new DiffObject.ConstellationState { TxCursor = cursorUpdateEffect.Cursor };
-                        else
-                            pendingDiffObject.StellarInfoData.TxCursor = cursorUpdateEffect.Cursor;
+                        if (!pendingDiffObject.Cursors.TryGetValue((int)cursorUpdateEffect.Provider, out var paymentCursor))
+                        {
+                            paymentCursor = new DiffObject.PaymentCursor { Provider = (int)cursorUpdateEffect.Provider };
+                            pendingDiffObject.Cursors.Add(paymentCursor.Provider, paymentCursor);
+                        }
+                        paymentCursor.Cursor = cursorUpdateEffect.Cursor;
                     }
                     break;
                 case WithdrawalCreateEffect withdrawalCreateEffect:
@@ -217,7 +223,7 @@ namespace Centaurus.Domain
                 Auditors = constellationInit.Auditors.Select(a => a.Data).ToArray(),
                 MinAccountBalance = constellationInit.MinAccountBalance,
                 MinAllowedLotSize = constellationInit.MinAllowedLotSize,
-                Vault = constellationInit.Vault.Data,
+                Vaults = constellationInit.Vaults.Select(v => new VaultModel { Provider = (int)v.Provider, Vault = v.AccountId }).ToList(),
                 Assets = constellationInit.Assets.Select(a => a.ToAssetModel()).ToList()
             };
 

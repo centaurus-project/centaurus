@@ -1,5 +1,6 @@
 ﻿using Centaurus.Domain;
 using Centaurus.Models;
+using Centaurus.Models.Extensions;
 using NUnit.Framework;
 using stellar_dotnet_sdk;
 using stellar_dotnet_sdk.responses;
@@ -41,7 +42,6 @@ namespace Centaurus.Test
             {
                 client1StartBalanceAmount = clientAccountBalance.Amount;
 
-
                 context.Constellation.TryFindAssetSettings(asset, out var assetSettings);
 
                 var account = new stellar_dotnet_sdk.Account(TestEnvironment.Client1KeyPair.AccountId, 1);
@@ -50,7 +50,7 @@ namespace Centaurus.Test
                 txBuilder.AddTimeBounds(new stellar_dotnet_sdk.TimeBounds(DateTimeOffset.UtcNow, new TimeSpan(0, 5, 0)));
                 txBuilder.AddOperation(
                     new PaymentOperation.Builder(withdrawalDest, assetSettings.ToAsset(), Amount.FromXdr(amount).ToString())
-                        .SetSourceAccount((KeyPair)context.Constellation.Vault)
+                        .SetSourceAccount(KeyPair.FromAccountId(context.Constellation.Vaults.Find(v => v.Provider == PaymentProvider.Stellar).AccountId))
                         .Build()
                     );
                 var tx = txBuilder.Build();
@@ -83,10 +83,10 @@ namespace Centaurus.Test
 
             var depositAmount = new Random().Next(10, 1000);
 
-            var ledgerNotification = new TxNotification
+            var paymentNotification = new PaymentNotification
             {
-                TxCursor = (uint)cursor,
-                Payments = new List<PaymentBase>
+                Cursor = cursor.ToString(),
+                Items = new List<PaymentBase>
                     {
                         new Deposit
                         {
@@ -101,17 +101,18 @@ namespace Centaurus.Test
                         }
                     }
             };
-            var ledgerNotificationEnvelope = ledgerNotification.CreateEnvelope();
-            ledgerNotificationEnvelope.Sign(TestEnvironment.Auditor1KeyPair);
 
-            var ledgerCommitEnv = new TxCommitQuantum
+            context.PaymentsManager.TryGetManager(PaymentProvider.Stellar, out var provider);
+            provider.NotificationsManager.RegisterNotification(paymentNotification);
+
+            var ledgerCommitEnv = new PaymentCommitQuantum
             {
-                Source = ledgerNotificationEnvelope,
+                Source = paymentNotification,
                 Apex = ++apex
             }.CreateEnvelope();
             if (!context.IsAlpha)
             {
-                var msg = ((TxCommitQuantum)ledgerCommitEnv.Message);
+                var msg = ((PaymentCommitQuantum)ledgerCommitEnv.Message);
                 msg.Timestamp = DateTime.UtcNow.Ticks;
                 ledgerCommitEnv = msg.CreateEnvelope().Sign(TestEnvironment.AlphaKeyPair);
             }
@@ -119,7 +120,8 @@ namespace Centaurus.Test
             await AssertQuantumHandling(ledgerCommitEnv, excpectedException);
             if (excpectedException == null)
             {
-                Assert.AreEqual(context.TxCursorManager.TxCursor, ledgerNotification.TxCursor);
+                context.PaymentsManager.TryGetManager(PaymentProvider.Stellar, out var paymentsProvider);
+                Assert.AreEqual(paymentsProvider.Cursor, paymentNotification.Cursor);
 
                 Assert.AreEqual(account1.GetBalance(asset).Liabilities, 0);
                 Assert.AreEqual(account1.GetBalance(asset).Amount, client1StartBalanceAmount - amount + depositAmount); //acc balance + deposit - withdrawal
@@ -245,7 +247,9 @@ namespace Centaurus.Test
             var txBuilder = new TransactionBuilder(new AccountResponse(TestEnvironment.Client1KeyPair.AccountId, 1));
             txBuilder.SetFee(10_000);
 
-            txBuilder.AddOperation(new PaymentOperation.Builder(TestEnvironment.Client1KeyPair, new AssetTypeNative(), (amount / AssetsHelper.StroopsPerAsset).ToString("0.##########", CultureInfo.InvariantCulture)).SetSourceAccount(TestEnvironment.AlphaKeyPair).Build());
+            var vault = KeyPair.FromAccountId(context.Constellation.Vaults.GetVault(PaymentProvider.Stellar).AccountId);
+
+            txBuilder.AddOperation(new PaymentOperation.Builder(TestEnvironment.Client1KeyPair, new AssetTypeNative(), (amount / AssetsHelper.StroopsPerAsset).ToString("0.##########", CultureInfo.InvariantCulture)).SetSourceAccount(vault).Build());
             txBuilder.AddTimeBounds(new stellar_dotnet_sdk.TimeBounds(maxTime: DateTimeOffset.UtcNow.AddSeconds(60)));
             var tx = txBuilder.Build();
             stellar_dotnet_sdk.xdr.Transaction.Encode(outputStream, tx.ToXdrV1());
@@ -287,7 +291,9 @@ namespace Centaurus.Test
             var txBuilder = new TransactionBuilder(new AccountResponse(TestEnvironment.Client1KeyPair.AccountId, 1));
             txBuilder.SetFee(10_000);
 
-            txBuilder.AddOperation(new PaymentOperation.Builder(TestEnvironment.Client1KeyPair, new AssetTypeNative(), (amount / AssetsHelper.StroopsPerAsset).ToString("0.##########", CultureInfo.InvariantCulture)).SetSourceAccount(TestEnvironment.AlphaKeyPair).Build());
+            var vault = KeyPair.FromAccountId(context.Constellation.Vaults.GetVault(PaymentProvider.Stellar).AccountId);
+
+            txBuilder.AddOperation(new PaymentOperation.Builder(TestEnvironment.Client1KeyPair, new AssetTypeNative(), (amount / AssetsHelper.StroopsPerAsset).ToString("0.##########", CultureInfo.InvariantCulture)).SetSourceAccount(vault).Build());
             txBuilder.AddTimeBounds(new stellar_dotnet_sdk.TimeBounds(maxTime: DateTimeOffset.UtcNow.AddSeconds(60)));
             var tx = txBuilder.Build();
             stellar_dotnet_sdk.xdr.Transaction.Encode(outputStream, tx.ToXdrV1());
@@ -303,17 +309,11 @@ namespace Centaurus.Test
                 AccountWrapper = account
             };
 
-            var envelope = withdrawal.CreateEnvelope();
-            envelope.Sign(TestEnvironment.Client1KeyPair);
+            var envelope = withdrawal
+                .CreateEnvelope()
+                .Sign(TestEnvironment.Client1KeyPair);
 
-            if (!context.IsAlpha)
-            {
-                var quantum = new RequestQuantum { Apex = context.QuantumStorage.CurrentApex + 1, RequestEnvelope = envelope, Timestamp = DateTime.UtcNow.Ticks };
-                envelope = quantum.CreateEnvelope();
-                envelope.Sign(TestEnvironment.AlphaKeyPair);
-            }
-
-            var result = await AssertQuantumHandling(envelope, null);
+            var result = await AssertQuantumHandling(envelope);
 
             if (result.Status != ResultStatusCodes.Success)
                 throw new Exception("Withdrawal creation failed.");
@@ -325,14 +325,6 @@ namespace Centaurus.Test
             };
 
             envelope = cleanup.CreateEnvelope();
-
-
-            if (!context.IsAlpha)
-            {
-                cleanup.Timestamp = DateTime.UtcNow.Ticks;
-                envelope = cleanup.CreateEnvelope();
-                envelope.Sign(TestEnvironment.AlphaKeyPair);
-            }
 
             await AssertQuantumHandling(envelope, excpectedException);
 
@@ -454,7 +446,7 @@ namespace Centaurus.Test
             {
                 var result = await context.QuantumHandler.HandleAsync(quantum);
 
-                await SnapshotHelper.ApplyUpdates(context);
+                await ContextHelpers.ApplyUpdates(context);
 
                 //check that processed quanta is saved to the storage
                 var lastApex = await context.PermanentStorage.GetLastApex();

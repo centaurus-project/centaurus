@@ -8,9 +8,9 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public class ResultManager : ContextualBase<AlphaContext>, IDisposable
+    public class ResultManager : ContextualBase, IDisposable
     {
-        public ResultManager(AlphaContext context)
+        public ResultManager(ExecutionContext context)
             :base(context)
         {
             InitTimers();
@@ -225,7 +225,7 @@ namespace Centaurus.Domain
 
         class ResultMessageItem
         {
-            public ResultMessageItem(MessageEnvelope resultEnvelope, byte[] messageHash, Dictionary<int, Message> notifications, AlphaContext context)
+            public ResultMessageItem(MessageEnvelope resultEnvelope, byte[] messageHash, Dictionary<int, Message> notifications, ExecutionContext context)
             {
                 ResultEnvelope = resultEnvelope ?? throw new ArgumentNullException(nameof(resultEnvelope));
                 Hash = messageHash;
@@ -248,7 +248,7 @@ namespace Centaurus.Domain
 
             public RawPubKey AccountPubKey { get; }
 
-            private RawPubKey GetMessageAccount(AlphaContext context)
+            private RawPubKey GetMessageAccount(ExecutionContext context)
             {
                 var originalEnvelope = ResultMessage.OriginalMessage;
                 SequentialRequestMessage requestMessage = null;

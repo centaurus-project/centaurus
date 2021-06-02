@@ -6,7 +6,7 @@ namespace Centaurus.DAL.Models
 {
     public class SettingsModel
     {
-        public byte[] Vault { get; set; }
+        public List<VaultModel> Vaults { get; set; }
 
         public byte[][] Auditors { get; set; }
 

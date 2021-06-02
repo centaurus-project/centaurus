@@ -5,14 +5,17 @@ using System.Text;
 
 namespace Centaurus.Models
 {
-    public class TxCursorUpdateEffect : Effect
+    public class CursorUpdateEffect : Effect
     {
         public override EffectTypes EffectType => EffectTypes.TxCursorUpdate;
 
         [XdrField(0)]
-        public long Cursor { get; set; }
+        public PaymentProvider Provider { get; set; }
 
         [XdrField(1)]
-        public long PrevCursor { get; set; }
+        public string Cursor { get; set; }
+
+        [XdrField(2)]
+        public string PrevCursor { get; set; }
     }
 }

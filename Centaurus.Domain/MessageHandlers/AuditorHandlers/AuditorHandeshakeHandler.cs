@@ -8,7 +8,7 @@ namespace Centaurus.Domain
 {
     public class AuditorHandeshakeHandler : BaseAuditorMessageHandler
     {
-        public AuditorHandeshakeHandler(AuditorContext context) 
+        public AuditorHandeshakeHandler(ExecutionContext context) 
             : base(context)
         {
         }
@@ -17,7 +17,7 @@ namespace Centaurus.Domain
 
         public override ConnectionState[] ValidConnectionStates { get; } = new ConnectionState[] { ConnectionState.Connected };
 
-        public override async Task HandleMessage(AuditorWebSocketConnection connection, IncomingMessage message)
+        public override async Task HandleMessage(OutgoingWebSocketConnection connection, IncomingMessage message)
         {
             //send message back. The message contains handshake data
             await connection.SendMessage(message.Envelope.Message);

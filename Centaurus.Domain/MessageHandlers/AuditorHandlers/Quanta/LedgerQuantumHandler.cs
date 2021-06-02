@@ -7,7 +7,7 @@ namespace Centaurus.Domain
 {
     public class LedgerQuantumHandler : AuditorBaseQuantumHandler
     {
-        public LedgerQuantumHandler(AuditorContext context) 
+        public LedgerQuantumHandler(ExecutionContext context) 
             : base(context)
         {
         }

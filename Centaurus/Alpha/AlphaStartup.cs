@@ -28,24 +28,24 @@ using Centaurus.Alpha;
 
 namespace Centaurus
 {
-    public class AlphaStartup : StartupBase<AlphaContext>
+    public class AlphaStartup : StartupBase
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
         private IHost host;
         private ManualResetEvent resetEvent;
 
-        public AlphaStartup(AlphaContext context)
+        public AlphaStartup(Domain.ExecutionContext context)
             : this(context, GetHost)
         {
         }
 
-        public AlphaStartup(AlphaContext context, Func<AlphaContext, IHost> hostFactory)
+        public AlphaStartup(Domain.ExecutionContext context, Func<Domain.ExecutionContext, IHost> hostFactory)
             : base(context)
         {
             host = hostFactory?.Invoke(context);
         }
 
-        private static IHost GetHost(AlphaContext context)
+        private static IHost GetHost(Domain.ExecutionContext context)
         {
             return new AlphaHostBuilder(context).CreateHost(context.Settings);
         }

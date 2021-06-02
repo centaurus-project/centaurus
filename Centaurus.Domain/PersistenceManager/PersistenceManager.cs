@@ -121,7 +121,7 @@ namespace Centaurus.Domain
                 Apex = constellationInitEffect.Apex,
                 Accounts = new List<AccountWrapper>(),
                 Orders = new List<Order>(),
-                Withdrawals = new List<WithdrawalWrapper>(),
+                Withdrawals = new Dictionary<PaymentProvider, WithdrawalStorage>(),
                 Settings = new ConstellationSettings
                 {
                     Apex = constellationInitEffect.Apex,
@@ -129,10 +129,10 @@ namespace Centaurus.Domain
                     Auditors = constellationInitEffect.Auditors,
                     MinAccountBalance = constellationInitEffect.MinAccountBalance,
                     MinAllowedLotSize = constellationInitEffect.MinAllowedLotSize,
-                    Vault = constellationInitEffect.Vault,
+                    Vaults = constellationInitEffect.Vaults,
                     RequestRateLimits = constellationInitEffect.RequestRateLimits
                 },
-                TxCursor = constellationInitEffect.TxCursor,
+                Cursors = constellationInitEffect.Cursors,
                 LastHash = quantumHash
             };
             return snapshot;
@@ -175,7 +175,7 @@ namespace Centaurus.Domain
             if (settings == null)
                 return null;
 
-            var stellarData = await storage.LoadConstellationState();
+            var cursors = await storage.LoadCursors();
 
             var accounts = (await GetAccounts()).Select(a => new AccountWrapper(a, settings.RequestRateLimits));
 
@@ -186,8 +186,6 @@ namespace Centaurus.Domain
             var orders = await GetOrders(accountStorage);
 
             var exchange = await GetRestoredExchange(orders);
-
-            var withdrawalsStorage = new WithdrawalStorage(withdrawals);
 
             var batchSize = 1000;
             var effects = new List<Effect>();
@@ -244,14 +242,22 @@ namespace Centaurus.Domain
                         break;
                     case WithdrawalCreateEffect withdrawalCreate:
                         {
-                            var withdrawal = withdrawalsStorage.GetWithdrawal(withdrawalCreate.Apex);
-                            processor = new WithdrawalCreateEffectProcessor(withdrawalCreate, withdrawal, withdrawalsStorage);
+                            if (!withdrawals.TryGetValue(withdrawalCreate.Provider, out var storage))
+                                throw new Exception($"No storage for provider {withdrawalCreate.Provider}.");
+
+                            var withdrawal = storage.GetWithdrawal(withdrawalCreate.Apex);
+                            processor = new WithdrawalCreateEffectProcessor(withdrawalCreate, withdrawal, storage);
                         }
                         break;
                     case WithdrawalRemoveEffect withdrawalRemove:
                         {
-                            var withdrawal = withdrawalsStorage.GetWithdrawal(withdrawalRemove.Apex);
-                            processor = new WithdrawalRemoveEffectProcessor(withdrawalRemove, withdrawal, withdrawalsStorage);
+                            if (!withdrawals.TryGetValue(withdrawalRemove.Provider, out var storage))
+                            {
+                                storage = new WithdrawalStorage();
+                                withdrawals.Add(withdrawalRemove.Provider, storage);
+                            }
+                            var withdrawal = storage.GetWithdrawal(withdrawalRemove.Apex);
+                            processor = new WithdrawalRemoveEffectProcessor(withdrawalRemove, withdrawal, storage);
                         }
                         break;
                     default:
@@ -276,10 +282,10 @@ namespace Centaurus.Domain
             {
                 Apex = apex,
                 Accounts = accountStorage.GetAll().OrderBy(a => a.Account.Id).ToList(),
-                TxCursor = stellarData?.TxCursor ?? 0,
+                Cursors = cursors.Select(c => new PaymentCursor { Cursor = c.Cursor, Provider = (PaymentProvider)c.Provider }).ToList(),
                 Orders = allOrders.OrderBy(o => o.OrderId).ToList(),
                 Settings = settings,
-                Withdrawals = withdrawalsStorage.GetAll().OrderBy(w => w.Apex).ToList(),
+                Withdrawals = withdrawals,
                 LastHash = lastQuantumData.Quantum.Message.ComputeHash()
             };
         }
@@ -323,22 +329,38 @@ namespace Centaurus.Domain
             return accounts;
         }
 
-        private async Task<List<WithdrawalWrapper>> GetWithdrawals(AccountStorage accountStorage, ConstellationSettings constellationSettings)
+        private async Task<Dictionary<PaymentProvider, WithdrawalStorage>> GetWithdrawals(AccountStorage accountStorage, ConstellationSettings constellationSettings)
         {
+            var result = new Dictionary<PaymentProvider, WithdrawalStorage>();
             var withdrawalApexes = accountStorage.GetAll().Where(a => a.Account.Withdrawal != default).Select(a => a.Account.Withdrawal).ToArray();
             if (withdrawalApexes.Length < 1)
-                return new List<WithdrawalWrapper>();
-            var withdrawalQuanta = await storage.LoadQuanta(withdrawalApexes);
-            var withdrawals = withdrawalQuanta
-                .Select(w =>
-                {
-                    var withdrawalQuantum = XdrConverter.Deserialize<MessageEnvelope>(w.Bin);
-                    var withdrawalRequest = ((WithdrawalRequest)((RequestQuantum)withdrawalQuantum.Message).RequestMessage);
-                    withdrawalQuantum.TryAssignAccountWrapper(accountStorage);
-                    return WithdrawalWrapperExtensions.GetWithdrawal(withdrawalQuantum, constellationSettings);
-                });
+                return result;
 
-            return withdrawals.OrderBy(w => w.Apex).ToList();
+            var withdrawalQuanta = await storage.LoadQuanta(withdrawalApexes);
+
+            foreach (var w in withdrawalQuanta.OrderBy(w => w.Apex))
+            {
+                var withdrawalQuantum = XdrConverter.Deserialize<MessageEnvelope>(w.Bin);
+                var withdrawalRequest = ((WithdrawalRequest)((RequestQuantum)withdrawalQuantum.Message).RequestMessage);
+                withdrawalQuantum.TryAssignAccountWrapper(accountStorage);
+
+                if (!PaymentsParserManager.TryGetParser(withdrawalRequest.PaymentProvider, out var parser))
+                    throw new Exception($"Unable to find parser for {withdrawalRequest.PaymentProvider} provider.");
+
+                if (!parser.TryDeserializeTransaction(withdrawalRequest.TransactionXdr, out var transactionWrapper))
+                    throw new Exception($"Invalid {withdrawalRequest.PaymentProvider} withdrawal bin.");
+
+                var vault = constellationSettings.Vaults.FirstOrDefault(v => v.Provider == withdrawalRequest.PaymentProvider);
+                if (vault == null)
+                    throw new Exception($"Unable to find vault for {withdrawalRequest.PaymentProvider} provider.");
+
+                var withdrawal = parser.GetWithdrawal(withdrawalQuantum, transactionWrapper, constellationSettings, vault.AccountId.ToString());
+
+                if (!result.TryGetValue(withdrawalRequest.PaymentProvider, out var storage))
+                    storage.Add(withdrawal);
+            }
+
+            return result;
         }
 
         private async Task<List<Order>> GetOrders(AccountStorage accountStorage)

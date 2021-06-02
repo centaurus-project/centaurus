@@ -16,11 +16,6 @@ namespace Centaurus.Domain
     {
         private readonly Queue<MessageEnvelope> outgoingMessages = new Queue<MessageEnvelope>();
 
-        public void OnTransaction(TxNotification tx)
-        {
-            EnqueueMessage(tx);
-        }
-
         public void EnqueueMessage(Message message)
         {
             if (message == null)
@@ -49,7 +44,7 @@ namespace Centaurus.Domain
         }
     }
 
-    public class OutgoingResultsStorage: ContextualBase<AuditorContext>
+    public class OutgoingResultsStorage: ContextualBase
     {
         const int MaxMessageBatchSize = 50;
 
@@ -57,7 +52,7 @@ namespace Centaurus.Domain
 
         readonly List<AuditorResultMessage> results = new List<AuditorResultMessage>();
 
-        public OutgoingResultsStorage(AuditorContext context)
+        public OutgoingResultsStorage(ExecutionContext context)
             :base(context)
         {
             _ = Task.Factory.StartNew(RunWorker, TaskCreationOptions.LongRunning);

@@ -22,7 +22,7 @@ namespace Centaurus.Test
         private List<QuantumModel> quantaCollection = new List<QuantumModel>();
         private List<SettingsModel> settingsCollection = new List<SettingsModel>();
         private List<PriceHistoryFrameModel> frames = new List<PriceHistoryFrameModel>();
-        private ConstellationState constellationState;
+        private List<PaymentCursorModel> paymentCursors = new List<PaymentCursorModel>();
 
         public Task OpenConnection(string connectionString)
         {
@@ -98,16 +98,16 @@ namespace Centaurus.Test
             return Task.FromResult(ordersCollection.OrderBy(o => o.Id).ToList());
         }
 
-        public Task<ConstellationState> LoadConstellationState()
+        public Task<List<PaymentCursorModel>> LoadCursors()
         {
-            return Task.FromResult(constellationState);
+            return Task.FromResult(paymentCursors);
         }
 
         public Task<int> Update(DiffObject update)
         {
             UpdateSettings(update.ConstellationSettings);
 
-            UpdateStellarData(update.StellarInfoData);
+            UpdateStellarData(update.Cursors.Values.ToList());
 
             UpdateAccount(update.Accounts.Values.ToList());
 
@@ -131,14 +131,19 @@ namespace Centaurus.Test
                 settingsCollection.Add(settings);
         }
 
-        private void UpdateStellarData(DiffObject.ConstellationState _stellarData)
+        private void UpdateStellarData(List<DiffObject.PaymentCursor> cursors)
         {
-            if (_stellarData != null)
+            if (cursors != null && cursors.Count > 0)
             {
-                if (constellationState == null)
-                    constellationState = new ConstellationState();
-                if (_stellarData.TxCursor > 0)
-                    constellationState.TxCursor = _stellarData.TxCursor;
+                foreach (var cursor in cursors)
+                {
+                    var currentCursor = paymentCursors.FirstOrDefault(c => (int)c.Provider == cursor.Provider);
+                    if (currentCursor == null)
+                    {
+                        currentCursor = new PaymentCursorModel { Provider = (int)cursor.Provider };
+                    }
+                    currentCursor.Cursor = cursor.Cursor;
+                }
             }
         }
 
@@ -297,7 +302,7 @@ namespace Centaurus.Test
             quantaCollection.Clear();
             settingsCollection.Clear();
             frames.Clear();
-            constellationState = null;
+            paymentCursors.Clear();
             return Task.CompletedTask;
         }
     }

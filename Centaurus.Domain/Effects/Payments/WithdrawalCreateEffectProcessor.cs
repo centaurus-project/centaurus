@@ -7,20 +7,20 @@ namespace Centaurus.Domain
 {
     public class WithdrawalCreateEffectProcessor : EffectProcessor<WithdrawalCreateEffect>
     {
-        private WithdrawalStorage withdrawalStorage;
+        private WithdrawalStorage withdrawalsStorage;
         private WithdrawalWrapper withdrawal;
 
-        public WithdrawalCreateEffectProcessor(WithdrawalCreateEffect effect, WithdrawalWrapper withdrawal, WithdrawalStorage withdrawalStorage)
+        public WithdrawalCreateEffectProcessor(WithdrawalCreateEffect effect, WithdrawalWrapper withdrawal, WithdrawalStorage withdrawalsStorage)
             :base(effect)
         {
-            this.withdrawalStorage = withdrawalStorage ?? throw new ArgumentNullException(nameof(withdrawalStorage));
+            this.withdrawalsStorage = withdrawalsStorage ?? throw new ArgumentNullException(nameof(withdrawalsStorage));
             this.withdrawal = withdrawal ?? throw new ArgumentNullException(nameof(withdrawal));
         }
 
         public override void CommitEffect()
         {
             MarkAsProcessed();
-            withdrawalStorage.Add(withdrawal);
+            withdrawalsStorage.Add(withdrawal);
             withdrawal.Source.Withdrawal = withdrawal;
             withdrawal.Source.Account.Withdrawal = withdrawal.Apex;
             foreach (var withdrawalItem in Effect.Items)
@@ -32,7 +32,7 @@ namespace Centaurus.Domain
             MarkAsProcessed();
             withdrawal.Source.Account.Withdrawal = 0;
             withdrawal.Source.Withdrawal = null;
-            withdrawalStorage.Remove(withdrawal.Hash);
+            withdrawalsStorage.Remove(withdrawal.Hash);
             foreach (var withdrawalItem in Effect.Items)
                 Effect.AccountWrapper.Account.GetBalance(withdrawalItem.Asset).UpdateLiabilities(-withdrawalItem.Amount);
         }

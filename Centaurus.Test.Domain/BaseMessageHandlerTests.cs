@@ -11,15 +11,25 @@ namespace Centaurus.Test
     public abstract class BaseMessageHandlerTests
     {
         protected async Task AssertMessageHandling<T>(T connection, IncomingMessage message, Type excpectedException = null)
-            where T: BaseWebSocketConnection
+            where T : BaseWebSocketConnection
         {
             if (excpectedException == null)
             {
-                var isHandled = await connection.Context.MessageHandlers.HandleMessage(connection, message);
+                var isHandled = false;
+                if (connection.Context.IsAlpha)
+                    isHandled = await connection.Context.AlphaMessageHandlers.HandleMessage(connection, message);
+                else
+                    isHandled = await connection.Context.AuditorMessageHandlers.HandleMessage(connection, message);
                 Assert.IsTrue(isHandled);
             }
             else
-                Assert.ThrowsAsync(excpectedException, async () => await connection.Context.MessageHandlers.HandleMessage(connection, message));
+                Assert.ThrowsAsync(excpectedException, 
+                    async () => {
+                        if (connection.Context.IsAlpha)
+                            await connection.Context.AlphaMessageHandlers.HandleMessage(connection, message);
+                        else
+                            await connection.Context.AuditorMessageHandlers.HandleMessage(connection, message);
+                    });
         }
     }
 }

@@ -13,12 +13,12 @@ namespace Centaurus.Domain
 
         public ConstellationSettings Settings { get; set; }
 
-        public long TxCursor { get; set; }
+        public List<PaymentCursor> Cursors { get; set; }
 
         public List<AccountWrapper> Accounts { get; set; }
 
         public List<Order> Orders { get; set; }
 
-        public List<WithdrawalWrapper> Withdrawals { get; set; }
+        public Dictionary<PaymentProvider, WithdrawalStorage> Withdrawals { get; set; }
     }
 }

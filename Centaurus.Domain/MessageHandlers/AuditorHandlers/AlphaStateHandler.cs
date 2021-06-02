@@ -12,7 +12,7 @@ namespace Centaurus.Domain
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public AlphaStateHandler(AuditorContext context) 
+        public AlphaStateHandler(ExecutionContext context) 
             : base(context)
         {
         }
@@ -21,7 +21,7 @@ namespace Centaurus.Domain
 
         public override ConnectionState[] ValidConnectionStates { get; } = new ConnectionState[] { ConnectionState.Connected };
 
-        public override Task HandleMessage(AuditorWebSocketConnection connection, IncomingMessage message)
+        public override Task HandleMessage(OutgoingWebSocketConnection connection, IncomingMessage message)
         {
             //if we got this message than verification succeeded 
             var alphaState = (AlphaState)message.Envelope.Message;

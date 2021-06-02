@@ -10,28 +10,27 @@ using System.Threading.Tasks;
 
 namespace Centaurus
 {
-    public abstract class StartupBase
+    public abstract class StartupBase: ContextualBase
     {
         public StartupBase(Domain.ExecutionContext context)
+            :base(context)
         {
-            Context = context ?? throw new ArgumentNullException(nameof(context));
         }
 
         public abstract Task Run(ManualResetEvent resetEvent);
         public abstract Task Shutdown();
         public Domain.ExecutionContext Context { get; }
 
-        public static StartupBase GetStartup(BaseSettings settings)
+        public static StartupBase GetStartup(Settings settings)
         {
             var startup = default(StartupBase);
             var storage = new MongoStorage();
             var stellarDataProvider = new StellarDataProvider(settings.NetworkPassphrase, settings.HorizonUrl);
-            if (settings is AlphaSettings alphaSettings)
-                startup = new AlphaStartup(new AlphaContext(alphaSettings, storage, stellarDataProvider));
-            else if (settings is AuditorSettings auditorSettings)
-                startup = new AuditorStartup(new AuditorContext(auditorSettings, storage, stellarDataProvider), () => new ClientConnectionWrapper(new ClientWebSocket()));
+            var context = new Domain.ExecutionContext(settings, storage, stellarDataProvider);
+            if (context.IsAlpha)
+                startup = new AlphaStartup(context);
             else
-                throw new NotSupportedException("Unknown settings type.");
+                startup = new AuditorStartup(context, () => new ClientConnectionWrapper(new ClientWebSocket()));
             return startup;
         }
     }

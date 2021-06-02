@@ -8,7 +8,7 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
 {
     public class SetApexCursorMessageHandler : BaseAlphaMessageHandler
     {
-        public SetApexCursorMessageHandler(AlphaContext context) 
+        public SetApexCursorMessageHandler(ExecutionContext context) 
             : base(context)
         {
         }
@@ -23,7 +23,7 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
                 ConnectionState.Ready
             };
 
-        public override Task HandleMessage(AlphaWebSocketConnection connection, IncomingMessage message)
+        public override Task HandleMessage(IncomingWebSocketConnection connection, IncomingMessage message)
         {
             connection.ResetApexCursor(message.Envelope.Message as SetApexCursor);
             return Task.CompletedTask;

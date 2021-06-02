@@ -13,8 +13,7 @@ namespace Centaurus.Domain
                 throw new ArgumentNullException(nameof(context));
             return new AlphaState
             {
-                State = context.AppState.State,
-                TxCursor = context.TxCursorManager.TxCursor
+                State = context.AppState.State
             };
         }
     }

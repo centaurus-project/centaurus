@@ -5,7 +5,7 @@ namespace Centaurus.Domain
 {
     public class AuditorStateMessageHandler : BaseAlphaMessageHandler
     {
-        public AuditorStateMessageHandler(AlphaContext context) 
+        public AuditorStateMessageHandler(ExecutionContext context) 
             : base(context)
         {
         }
@@ -20,7 +20,7 @@ namespace Centaurus.Domain
                 ConnectionState.Ready
             };
 
-        public override async Task HandleMessage(AlphaWebSocketConnection connection, IncomingMessage message)
+        public override async Task HandleMessage(IncomingWebSocketConnection connection, IncomingMessage message)
         {
             await Context.Catchup.AddAuditorState(connection.ClientPubKey, (AuditorState)message.Envelope.Message);
         }

@@ -8,14 +8,14 @@ namespace Centaurus.Domain
 {
     public class RequestQuantumHandler : AuditorBaseQuantumHandler
     {
-        public RequestQuantumHandler(AuditorContext context) 
+        public RequestQuantumHandler(ExecutionContext context) 
             : base(context)
         {
         }
 
         public override MessageTypes SupportedMessageType { get; } = MessageTypes.RequestQuantum;
 
-        public override async Task Validate(AuditorWebSocketConnection connection, IncomingMessage message)
+        public override async Task Validate(OutgoingWebSocketConnection connection, IncomingMessage message)
         {
             await base.Validate(connection, message);
 

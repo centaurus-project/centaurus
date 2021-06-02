@@ -7,7 +7,7 @@ namespace Centaurus.Domain
 {
     public class PaymentMessageHandler : AlphaBaseQuantumHandler
     {
-        public PaymentMessageHandler(AlphaContext context) 
+        public PaymentMessageHandler(ExecutionContext context) 
             : base(context)
         {
         }

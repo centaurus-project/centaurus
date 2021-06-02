@@ -61,7 +61,7 @@ namespace Centaurus.Test
             var auditorStartup = environment.AuditorWrappers.First();
             await auditorStartup.Shutdown();
 
-            Assert.AreEqual(2, ((AlphaStateManager)environment.AlphaWrapper.Context.AppState).ConnectedAuditorsCount, "Auditors count assertion.");
+            Assert.AreEqual(2, environment.AlphaWrapper.Context.AppState.ConnectedAuditorsCount, "Auditors count assertion.");
             await environment.AssertConstellationState(ApplicationState.Ready, TimeSpan.FromSeconds(10));
 
             var clientsCount = 100;

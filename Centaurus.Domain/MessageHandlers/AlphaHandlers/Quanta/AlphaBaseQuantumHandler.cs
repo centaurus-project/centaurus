@@ -11,7 +11,7 @@ namespace Centaurus.Domain
     /// </summary>
     public abstract class AlphaBaseQuantumHandler : BaseAlphaMessageHandler
     {
-        protected AlphaBaseQuantumHandler(AlphaContext context) 
+        protected AlphaBaseQuantumHandler(ExecutionContext context) 
             : base(context)
         {
         }
@@ -20,7 +20,7 @@ namespace Centaurus.Domain
 
         public override bool IsAuditorOnly { get; } = false;
 
-        public override Task HandleMessage(AlphaWebSocketConnection connection, IncomingMessage message)
+        public override Task HandleMessage(IncomingWebSocketConnection connection, IncomingMessage message)
         {
             Context.QuantumHandler.HandleAsync(message.Envelope);
             return Task.CompletedTask;

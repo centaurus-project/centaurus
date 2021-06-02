@@ -25,7 +25,7 @@ namespace Centaurus.Test
         {
             context.AppState.State = ApplicationState.Running;
 
-            var clientConnection = new AuditorWebSocketConnection(context, new FakeAuditorConnectionInfo(new FakeWebSocket()));
+            var clientConnection = new OutgoingWebSocketConnection(context, new FakeAuditorConnectionInfo(new FakeWebSocket()));
 
             var hd = new HandshakeData();
             hd.Randomize();
@@ -34,7 +34,7 @@ namespace Centaurus.Test
             envelope.Sign(TestEnvironment.AlphaKeyPair);
             using var writer = new XdrBufferWriter();
             var inMessage = envelope.ToIncomingMessage(writer);
-            var isHandled = await context.MessageHandlers.HandleMessage(clientConnection, inMessage);
+            var isHandled = await context.AuditorMessageHandlers.HandleMessage(clientConnection, inMessage);
 
             Assert.IsTrue(isHandled);
         }
@@ -47,16 +47,18 @@ namespace Centaurus.Test
         {
             context.AppState.State = ApplicationState.Running;
 
-            var clientConnection = new AuditorWebSocketConnection(context, new FakeAuditorConnectionInfo(new FakeWebSocket()));
+            var clientConnection = new OutgoingWebSocketConnection(context, new FakeAuditorConnectionInfo(new FakeWebSocket()));
 
             var envelope = new AlphaState
             {
                 State = alphaState
-            }.CreateEnvelope().Sign(TestEnvironment.AlphaKeyPair);
+            }
+            .CreateEnvelope()
+            .Sign(TestEnvironment.AlphaKeyPair);
 
             using var writer = new XdrBufferWriter();
             var inMessage = envelope.ToIncomingMessage(writer);
-            var isHandled = await context.MessageHandlers.HandleMessage(clientConnection, inMessage);
+            var isHandled = await context.AuditorMessageHandlers.HandleMessage(clientConnection, inMessage);
 
             Assert.IsTrue(isHandled);
         }
@@ -74,17 +76,17 @@ namespace Centaurus.Test
         {
             context.AppState.State = ApplicationState.Ready;
 
-            var clientConnection = new AuditorWebSocketConnection(context, new FakeAuditorConnectionInfo(new FakeWebSocket())) { ConnectionState = state };
+            var clientConnection = new OutgoingWebSocketConnection(context, new FakeAuditorConnectionInfo(new FakeWebSocket())) { ConnectionState = state };
 
-            var ledgerNotification = new TxNotification
+            var ledgerNotification = new PaymentNotification
             {
-                TxCursor = 0,
-                Payments = new List<PaymentBase>()
+                Cursor = "0",
+                Items = new List<PaymentBase>()
             };
 
-            var envelope = new TxCommitQuantum
+            var envelope = new PaymentCommitQuantum
             {
-                Source = ledgerNotification.CreateEnvelope()
+                Source = ledgerNotification
             }.CreateEnvelope();
             envelope.Sign(alphaKeyPair);
             using var writer = new XdrBufferWriter();
@@ -106,7 +108,7 @@ namespace Centaurus.Test
         {
             context.AppState.State = ApplicationState.Ready;
 
-            var clientConnection = new AuditorWebSocketConnection(context, new FakeAuditorConnectionInfo(new FakeWebSocket())) { ConnectionState = state };
+            var clientConnection = new OutgoingWebSocketConnection(context, new FakeAuditorConnectionInfo(new FakeWebSocket())) { ConnectionState = state };
             var account = context.AccountStorage.GetAccount(clientKeyPair);
             var orderEnvelope = new OrderRequest
             {
@@ -132,7 +134,8 @@ namespace Centaurus.Test
             new object[] { TestEnvironment.AlphaKeyPair, ConnectionState.Ready, null },
             new object[] { TestEnvironment.AlphaKeyPair, ConnectionState.Connected, null },
         };
-        private AuditorContext context;
+
+        private ExecutionContext context;
 
         [Test]
         [TestCaseSource(nameof(QuantaBatchTestCases))]
@@ -140,7 +143,7 @@ namespace Centaurus.Test
         {
             context.AppState.State = ApplicationState.Ready;
 
-            var clientConnection = new AuditorWebSocketConnection(context, new FakeAuditorConnectionInfo(new FakeWebSocket())) { ConnectionState = state };
+            var clientConnection = new OutgoingWebSocketConnection(context, new FakeAuditorConnectionInfo(new FakeWebSocket())) { ConnectionState = state };
             var orderEnvelope = new QuantaBatch
             {
                 Quanta = new List<MessageEnvelope>()

@@ -7,8 +7,8 @@ namespace Centaurus.Domain
 {
     public interface ITransactionProcessorContext
     {
-        public Transaction Transaction { get; set; }
+        public TransactionWrapper Transaction { get; }
 
-        public byte[] TransactionHash { get; set; }
+        public PaymentsProviderBase PaymentsManager { get; }
     }
 }

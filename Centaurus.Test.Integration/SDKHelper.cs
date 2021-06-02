@@ -26,7 +26,7 @@ namespace Centaurus
                 MinAllowedLotSize = info.MinAllowedLotSize,
                 RequestRateLimits = info.RequestRateLimits,
                 State = (SdkState)(int)info.State,
-                Vault = info.Vault,
+                Vaults = info.Vaults,
                 StellarNetwork = new Network(info.StellarNetwork.Passphrase, info.StellarNetwork.Horizon)
             };
         }

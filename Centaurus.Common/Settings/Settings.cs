@@ -4,13 +4,16 @@ using stellar_dotnet_sdk;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 
 namespace Centaurus
 {
-    public abstract class BaseSettings
+    public class Settings
     {
-        public KeyPair KeyPair { get; set; }
+        public KeyPair KeyPair { get; private set; }
+
+        public KeyPair AlphaKeyPair { get; private set; }
 
         [Option("verbose", Default = false, HelpText = "Logs all messages. The verbose option overrides the silent one.")]
         public bool Verbose { get; set; }
@@ -36,17 +39,8 @@ namespace Centaurus
         [Option("extensions_config_file_path", Required = false, HelpText = "Path to extensions config file.")]
         public string ExtensionsConfigFilePath { get; set; }
 
-        public virtual void Build()
-        {
-            KeyPair = KeyPair.FromSecretSeed(Secret);
-        }
-    }
-
-    [Verb("auditor", HelpText = "Launch Centaurus in auditor mode.")]
-    public class AuditorSettings : BaseSettings
-    {
-        [Option("alpha_address", Required = true, HelpText = "URL of Alpha server.")]
-        public string AlphaAddress { get; set; }
+        [Option("auditor_address_book", Required = true, HelpText = "Auditor URL addresses. ")]
+        public IEnumerable<string> AuditorAddressBook { get; set; }
 
         [Option("alpha_pubkey", Required = true, HelpText = "Alpha server public key.")]
         public string AlphaPubKey { get; set; }
@@ -54,20 +48,6 @@ namespace Centaurus
         [Option("genesis_quorum", Separator = ',', HelpText = "Public keys of all auditors in genesis quorum, delimited with coma.")]
         public IEnumerable<string> GenesisQuorum { get; set; }
 
-        public KeyPair AlphaKeyPair { get; set; }
-
-        public override void Build()
-        {
-            if (!Uri.TryCreate(AlphaAddress, UriKind.Absolute, out _))
-                throw new ArgumentException("Invalid Alpha address url.", nameof(AlphaAddress));
-            base.Build();
-            AlphaKeyPair = KeyPair.FromAccountId(AlphaPubKey);
-        }
-    }
-
-    [Verb("alpha", HelpText = "Launch Centaurus in alpha mode.")]
-    public class AlphaSettings : BaseSettings
-    {
         [Option("alpha_port", Required = true, HelpText = "Port the alpha will listen on.")]
         public int AlphaPort { get; set; }
 
@@ -79,5 +59,13 @@ namespace Centaurus
 
         [Option("sync_batch_size", Default = 500, HelpText = "Max quanta sync batch size.")]
         public int SyncBatchSize { get; set; }
+
+        public void Build()
+        {
+            if (AuditorAddressBook == null || !AuditorAddressBook.Any(a => Uri.TryCreate(a, UriKind.Absolute, out _)))
+                throw new ArgumentException("At least one auditor address is invalid.", nameof(AuditorAddressBook));
+            KeyPair = KeyPair.FromSecretSeed(Secret);
+            AlphaKeyPair = KeyPair.FromAccountId(AlphaPubKey);
+        }
     }
 }

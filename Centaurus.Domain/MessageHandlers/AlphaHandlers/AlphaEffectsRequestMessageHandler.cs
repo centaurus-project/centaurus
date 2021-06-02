@@ -10,7 +10,7 @@ namespace Centaurus.Domain
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public AlphaEffectsRequestMessageHandler(AlphaContext context) 
+        public AlphaEffectsRequestMessageHandler(ExecutionContext context) 
             : base(context)
         {
         }
@@ -21,7 +21,7 @@ namespace Centaurus.Domain
 
         public override ConnectionState[] ValidConnectionStates => new ConnectionState[] { ConnectionState.Ready };
 
-        public override Task HandleMessage(AlphaWebSocketConnection connection, IncomingMessage message)
+        public override Task HandleMessage(IncomingWebSocketConnection connection, IncomingMessage message)
         {
             //run it in the separate thread to avoid blocking quanta handling
             Task.Factory.StartNew(async () =>

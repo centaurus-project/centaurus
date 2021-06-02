@@ -8,7 +8,7 @@ namespace Centaurus.Domain
 {
     public class AccountDataRequestHandler : AlphaBaseQuantumHandler
     {
-        public AccountDataRequestHandler(AlphaContext context) 
+        public AccountDataRequestHandler(ExecutionContext context) 
             : base(context)
         {
         }

@@ -38,17 +38,14 @@ namespace Centaurus.Domain
         public abstract Task HandleMessage(BaseWebSocketConnection connection, IncomingMessage message);
     }
 
-    public abstract class BaseMessageHandler<TConnection, TContext> : BaseMessageHandler, IContextual<TContext>
+    public abstract class BaseMessageHandler<TConnection> : BaseMessageHandler, IContextual
         where TConnection: BaseWebSocketConnection
-        where TContext: ExecutionContext
     {
-        public BaseMessageHandler(TContext context)
+        public BaseMessageHandler(ExecutionContext context)
             :base(context)
         {
 
         }
-
-        public new TContext Context => (TContext)base.Context;
 
         /// <summary>
         /// Validates authentication, connection state and message.

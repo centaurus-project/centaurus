@@ -6,14 +6,14 @@ using Centaurus.Models;
 
 namespace Centaurus.Domain
 {
-    public abstract class BaseAuditorMessageHandler: BaseMessageHandler<AuditorWebSocketConnection, AuditorContext>, IAuditorMessageHandler
+    public abstract class BaseAuditorMessageHandler: BaseMessageHandler<OutgoingWebSocketConnection>, IAuditorMessageHandler
     {
-        public BaseAuditorMessageHandler(AuditorContext context) 
+        public BaseAuditorMessageHandler(ExecutionContext context) 
             : base(context)
         {
         }
 
-        public override async Task Validate(AuditorWebSocketConnection connection, IncomingMessage message)
+        public override async Task Validate(OutgoingWebSocketConnection connection, IncomingMessage message)
         {
             //validate that alpha has signed the message
             if (!message.Envelope.IsSignedBy(Context.Settings.AlphaKeyPair))

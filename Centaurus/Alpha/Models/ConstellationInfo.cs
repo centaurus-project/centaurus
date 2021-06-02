@@ -1,5 +1,6 @@
 ﻿using Centaurus.Models;
 using stellar_dotnet_sdk;
+using System.Collections.Generic;
 
 namespace Centaurus
 {
@@ -7,7 +8,7 @@ namespace Centaurus
     {
         public ApplicationState State { get; set; }
 
-        public string Vault { get; set; }
+        public Dictionary<string, string> Vaults { get; set; }
 
         public string[] Auditors { get; set; }
 

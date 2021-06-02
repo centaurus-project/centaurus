@@ -14,20 +14,19 @@ namespace Centaurus
 
         public static void Main(string[] args)
         {
-            var mergedArgs = CommandLineHelper.GetMergedArgs<AuditorSettings>(CommandLineHelper.GetMergedArgs<AlphaSettings>(args));
+            var mergedArgs = CommandLineHelper.GetMergedArgs<Settings>(args);
 
-            Parser.Default.ParseArguments<AlphaSettings, AuditorSettings>(mergedArgs)
-                .WithParsed<AlphaSettings>(s => ConfigureAndRun(s))
-                .WithParsed<AuditorSettings>(s => ConfigureAndRun(s));
+            Parser.Default.ParseArguments<Settings>(mergedArgs)
+                .WithParsed(s => ConfigureAndRun(s));
         }
 
         static void ConfigureAndRun<T>(T settings)
-            where T : BaseSettings
+            where T : Settings
         {
             var isLoggerInited = false;
             try
             {
-                var isAlpha = settings is AlphaSettings;
+                var isAlpha = settings.KeyPair.AccountId == settings.AlphaKeyPair.AccountId;
                 Console.Title = isAlpha ? "CentaurusAlpha" : "CentaurusAuditor";
 
                 settings.Build();

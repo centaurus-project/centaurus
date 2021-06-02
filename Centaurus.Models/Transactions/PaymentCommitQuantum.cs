@@ -5,13 +5,13 @@ using Centaurus.Xdr;
 namespace Centaurus.Models
 {
     /// <summary>
-    /// Quantum created by Alpha server that contains aggregated tx updates provided by <see cref="TxNotification"/>.
+    /// Quantum created contains aggregated payments provided by <see cref="PaymentNotification"/>.
     /// </summary>
-    public class TxCommitQuantum : Quantum
+    public class PaymentCommitQuantum : Quantum
     {
         public override MessageTypes MessageType => MessageTypes.TxCommitQuantum;
 
         [XdrField(0)]
-        public MessageEnvelope Source { get; set; }
+        public PaymentNotification Source { get; set; }
     }
 }

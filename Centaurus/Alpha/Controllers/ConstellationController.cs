@@ -9,14 +9,14 @@ using stellar_dotnet_sdk;
 namespace Centaurus.Controllers
 {
     [Route("api/[controller]")]
-    public class ConstellationController : Controller, IContextual<AlphaContext>
+    public class ConstellationController : Controller, IContextual
     {
-        public ConstellationController(AlphaContext centaurusContext)
+        public ConstellationController(ExecutionContext centaurusContext)
         {
             Context = centaurusContext;
         }
 
-        public AlphaContext Context { get; }
+        public ExecutionContext Context { get; }
 
         [HttpGet("[action]")]
         public ConstellationInfo Info()
@@ -39,7 +39,7 @@ namespace Centaurus.Controllers
                 info = new ConstellationInfo
                 {
                     State = Context.AppState.State,
-                    Vault = ((KeyPair)Context.Constellation.Vault).AccountId,
+                    Vaults = Context.Constellation.Vaults.ToDictionary(v => v.Provider.ToString(), v => v.AccountId.ToString()),
                     Auditors = Context.Constellation.Auditors.Select(a => ((KeyPair)a).AccountId).ToArray(),
                     MinAccountBalance = Context.Constellation.MinAccountBalance,
                     MinAllowedLotSize = Context.Constellation.MinAllowedLotSize,

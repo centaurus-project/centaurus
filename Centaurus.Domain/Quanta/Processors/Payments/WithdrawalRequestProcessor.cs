@@ -17,14 +17,7 @@ namespace Centaurus.Domain
         {
             context.UpdateNonce();
 
-            var withdrawal = new WithdrawalWrapper
-            {
-                Envelope = context.Envelope,
-                Hash = context.TransactionHash,
-                Withdrawals = context.WithdrawalItems,
-                MaxTime = context.Transaction.TimeBounds.MaxTime
-            };
-            context.EffectProcessors.AddWithdrawalCreate(withdrawal, context.CentaurusContext.WithdrawalStorage);
+            context.EffectProcessors.AddWithdrawalCreate(context.Withdrawal, context.PaymentsManager.WithdrawalStorage);
 
             var effects = context.EffectProcessors.Effects;
 
@@ -45,33 +38,12 @@ namespace Centaurus.Domain
             if (context.Request.RequestMessage.AccountWrapper.HasPendingWithdrawal)
                 throw new BadRequestException("Withdrawal already exists.");
 
-            context.Transaction = context.WithdrawalRequest.DeserializeTransaction();
-            ValidateTransaction(context);
+            context.PaymentsManager.PaymentsParser.ValidateTransaction(context.Transaction, context.PaymentsManager.Vault);
 
-            context.WithdrawalItems = context.Transaction.GetWithdrawals(context.WithdrawalRequest.AccountWrapper.Account, context.CentaurusContext.Constellation);
-            if (context.WithdrawalItems.Count() < 1)
+            context.Withdrawal = context.PaymentsManager.PaymentsParser.GetWithdrawal(context.Envelope, context.Transaction, context.CentaurusContext.Constellation, context.PaymentsManager.Vault);
+
+            if (context.Withdrawal.Items.Count() < 1)
                 throw new BadRequestException("No payment operations.");
-        }
-
-        private void ValidateTransaction(WithdrawalProcessorContext context)
-        {
-            var transaction = context.Transaction;
-            var txSourceAccount = transaction.SourceAccount;
-            if (ByteArrayPrimitives.Equals(context.CentaurusContext.Constellation.Vault.Data, txSourceAccount.PublicKey))
-                throw new BadRequestException("Vault account cannot be used as transaction source.");
-
-            if (transaction.TimeBounds == null || transaction.TimeBounds.MaxTime <= 0)
-                throw new BadRequestException("Max time must be set.");
-
-            var currentTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            if (transaction.TimeBounds.MaxTime - currentTime > 1000)
-                throw new BadRequestException("Transaction expiration time is to far.");
-
-            if (transaction.Operations.Any(o => !(o is PaymentOperation)))
-                throw new BadRequestException("Only payment operations are allowed.");
-
-            if (transaction.Operations.Length > 100)
-                throw new BadRequestException("Too many operations.");
         }
 
         public override WithdrawalProcessorContext GetContext(EffectProcessorsContainer container)

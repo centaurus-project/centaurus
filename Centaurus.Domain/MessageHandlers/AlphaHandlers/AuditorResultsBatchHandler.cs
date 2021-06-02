@@ -9,7 +9,7 @@ namespace Centaurus.Domain
 {
     public class AuditorResultsBatchHandler : BaseAlphaMessageHandler
     {
-        public AuditorResultsBatchHandler(AlphaContext context) 
+        public AuditorResultsBatchHandler(ExecutionContext context) 
             : base(context)
         {
         }
@@ -21,7 +21,7 @@ namespace Centaurus.Domain
         public override bool IsAuditorOnly { get; } = true;
 
         //TODO: run result aggregation in separate thread
-        public override Task HandleMessage(AlphaWebSocketConnection connection, IncomingMessage message)
+        public override Task HandleMessage(IncomingWebSocketConnection connection, IncomingMessage message)
         {
             var resultsBatch = (AuditorResultsBatch)message.Envelope.Message;
             foreach (var result in resultsBatch.AuditorResultMessages)

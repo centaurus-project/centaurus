@@ -16,9 +16,9 @@ using Centaurus.Xdr;
 namespace Centaurus.Domain
 {
     //TODO: TESTS!
-    public class InfoWebSocketConnection : ContextualBase<AlphaContext>, IDisposable
+    public class InfoWebSocketConnection : ContextualBase, IDisposable
     {
-        public InfoWebSocketConnection(AlphaContext context, WebSocket webSocket, string connectionId, string ip)
+        public InfoWebSocketConnection(ExecutionContext context, WebSocket webSocket, string connectionId, string ip)
             :base(context)
         {
             this.webSocket = webSocket ?? throw new ArgumentNullException(nameof(webSocket));

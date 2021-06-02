@@ -10,12 +10,10 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Test
 {
-    public abstract class StartupWrapper<TSettings, TStartup, TContext>: IDisposable
-        where TSettings : BaseSettings
-        where TStartup : StartupBase<TContext>
-        where TContext : Domain.ExecutionContext
+    public abstract class StartupWrapper<TStartup>: IDisposable
+        where TStartup : StartupBase
     {
-        public StartupWrapper(TSettings settings, StellarDataProviderBase stellarDataProvider, ManualResetEvent resetEvent)
+        public StartupWrapper(Settings settings, StellarDataProviderBase stellarDataProvider, ManualResetEvent resetEvent)
         {
             Settings = settings ?? throw new ArgumentNullException(nameof(settings));
             Storage = GetStorage() ?? throw new ArgumentNullException(nameof(Storage));
@@ -23,13 +21,13 @@ namespace Centaurus.Test
             this.resetEvent = resetEvent ?? throw new ArgumentNullException(nameof(resetEvent));
         }
 
-        public TSettings Settings { get; }
+        public Settings Settings { get; }
 
         public TStartup Startup { get; private set; }
 
         public IStorage Storage { get; }
 
-        public TContext Context => Startup?.Context;
+        public Domain.ExecutionContext Context => Startup?.Context;
 
         public virtual async Task Run()
         {
@@ -67,9 +65,9 @@ namespace Centaurus.Test
         }
     }
 
-    public class AlphaStartupWrapper : StartupWrapper<AlphaSettings, AlphaStartup, AlphaContext>
+    public class AlphaStartupWrapper : StartupWrapper<AlphaStartup>
     {
-        public AlphaStartupWrapper(AlphaSettings settings, StellarDataProviderBase stellarDataProvider, ManualResetEvent resetEvent)
+        public AlphaStartupWrapper(Settings settings, StellarDataProviderBase stellarDataProvider, ManualResetEvent resetEvent)
             : base(settings, stellarDataProvider, resetEvent)
         {
 
@@ -79,15 +77,15 @@ namespace Centaurus.Test
 
         public override AlphaStartup GenarateStartup()
         {
-            var alphaContext = new AlphaContext(Settings, Storage, stellarDataProvider);
-            var alphaStartup = new AlphaStartup(alphaContext, null);
+            var ExecutionContext = new Domain.ExecutionContext(Settings, Storage, stellarDataProvider);
+            var alphaStartup = new AlphaStartup(ExecutionContext, null);
             return alphaStartup;
         }
 
         public override async Task Run()
         {
             await base.Run();
-            ConstellationController = new ConstellationController(Startup.Context);
+            ConstellationController = new ConstellationController(Context);
         }
 
         public override async Task Shutdown()
@@ -97,11 +95,11 @@ namespace Centaurus.Test
         }
     }
 
-    public class AuditorStartupWrapper : StartupWrapper<AuditorSettings, AuditorStartup, AuditorContext>
+    public class AuditorStartupWrapper : StartupWrapper<AuditorStartup>
     {
         private Func<ClientConnectionWrapperBase> connectionFactory;
 
-        public AuditorStartupWrapper(AuditorSettings settings, StellarDataProviderBase stellarDataProvider, ManualResetEvent resetEvent, Func<ClientConnectionWrapperBase> connectionFactory)
+        public AuditorStartupWrapper(Settings settings, StellarDataProviderBase stellarDataProvider, ManualResetEvent resetEvent, Func<ClientConnectionWrapperBase> connectionFactory)
             : base(settings, stellarDataProvider, resetEvent)
         {
             this.connectionFactory = connectionFactory;
@@ -109,7 +107,7 @@ namespace Centaurus.Test
 
         public override AuditorStartup GenarateStartup()
         {
-            var context = new AuditorContext(Settings, Storage, stellarDataProvider);
+            var context = new Domain.ExecutionContext(Settings, Storage, stellarDataProvider);
             var startup = new AuditorStartup(context, connectionFactory);
             return startup;
         }

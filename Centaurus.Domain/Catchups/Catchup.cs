@@ -14,9 +14,9 @@ namespace Centaurus.Domain
     /// <summary>
     /// This class manages auditor snapshots and quanta when Alpha is rising
     /// </summary>
-    public class AlphaCatchup : ContextualBase<AlphaContext>, IDisposable
+    public class Catchup : ContextualBase, IDisposable
     {
-        public AlphaCatchup(AlphaContext context)
+        public Catchup(ExecutionContext context)
             :base(context)
         {
             InitTimer();
@@ -136,8 +136,8 @@ namespace Centaurus.Domain
 
                 int majority = Context.GetMajorityCount(),
                 totalAuditorsCount = Context.GetTotalAuditorsCount();
-                var completedStatesCount = allAuditorStates.Count(s => !s.Value.HasMorePendingQuanta);
-                var possibleConsensusCount = (totalAuditorsCount - completedStatesCount) + validAuditorStates.Count;
+                var completedStatesCount = allAuditorStates.Count(s => !s.Value.HasMorePendingQuanta) + 1; // +1 is current server
+                var possibleConsensusCount = (totalAuditorsCount - completedStatesCount) + validAuditorStates.Count; 
                 if (validAuditorStates.Count >= majority)
                 {
                     await ApplyAuditorsData();
@@ -191,7 +191,7 @@ namespace Centaurus.Domain
 
             await ApplyQuanta(validQuanta);
 
-            var alphaStateManager = (AlphaStateManager)Context.AppState;
+            var alphaStateManager = Context.AppState;
 
             alphaStateManager.AlphaRised();
 

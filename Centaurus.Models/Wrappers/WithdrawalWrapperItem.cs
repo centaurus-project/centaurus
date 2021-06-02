@@ -8,19 +8,26 @@ namespace Centaurus.Models
 {
     public class WithdrawalWrapper
     {
-        public MessageEnvelope Envelope { get; set; }
+        public WithdrawalWrapper(MessageEnvelope envelope, byte[] txHash, long maxTime)
+        {
+            Envelope = envelope ?? throw new ArgumentNullException(nameof(envelope));
+            Hash = txHash ?? throw new ArgumentNullException(nameof(txHash));
+            MaxTime = maxTime;
+        }
+
+        public MessageEnvelope Envelope { get; }
 
         public long Apex => ((Quantum)Envelope.Message).Apex;
 
-        public byte[] Hash { get; set; }
+        public byte[] Hash { get; }
 
         public AccountWrapper Source => ((RequestQuantum)Envelope.Message).RequestMessage.AccountWrapper;
 
-        public List<WithdrawalWrapperItem> Withdrawals { get; set; }
+        public List<WithdrawalWrapperItem> Items { get; set; }
 
         public List<DecoratedSignature> Signatures { get; set; }
 
-        public long MaxTime { get; set; }
+        public long MaxTime { get; }
     }
 
     public class WithdrawalWrapperItem
@@ -31,6 +38,4 @@ namespace Centaurus.Models
 
         public RawPubKey Destination { get; set; }
     }
-
-
 }

@@ -21,17 +21,17 @@ using Microsoft.AspNetCore.Server.Kestrel.Https;
 
 namespace Centaurus.Alpha
 {
-    public class AlphaHostBuilder : ContextualBase<AlphaContext>
+    public class AlphaHostBuilder : ContextualBase
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public AlphaHostBuilder(AlphaContext context)
+        public AlphaHostBuilder(ExecutionContext context)
             : base(context)
         {
 
         }
 
-        public IHost CreateHost(AlphaSettings settings)
+        public IHost CreateHost(Settings settings)
         {
             SetupCertificate(settings);
             return Host.CreateDefaultBuilder()
@@ -77,7 +77,7 @@ namespace Centaurus.Alpha
         public const string centaurusWebSocketEndPoint = "/centaurus";
         public const string infoWebSocketEndPoint = "/info";
 
-        private void SetupCertificate(AlphaSettings alphaSettings)
+        private void SetupCertificate(Settings alphaSettings)
         {
             if (alphaSettings.TlsCertificatePath == null)
                 return;
@@ -159,7 +159,7 @@ namespace Centaurus.Alpha
 
             static async Task CentaurusWebSocketHandler(HttpContext context, Func<Task> next)
             {
-                var centaurusContext = context.RequestServices.GetService<AlphaContext>();
+                var centaurusContext = context.RequestServices.GetService<ExecutionContext>();
                 if (centaurusContext.AppState == null || ValidApplicationStates.Contains(centaurusContext.AppState.State))
                 {
                     using (var webSocket = await context.WebSockets.AcceptWebSocketAsync())
@@ -173,7 +173,7 @@ namespace Centaurus.Alpha
 
             static async Task InfoWebSocketHandler(HttpContext context, Func<Task> next)
             {
-                var centaurusContext = context.RequestServices.GetService<AlphaContext>();
+                var centaurusContext = context.RequestServices.GetService<ExecutionContext>();
                 var webSocket = await context.WebSockets.AcceptWebSocketAsync();
                 await centaurusContext.InfoConnectionManager.OnNewConnection(webSocket, context.Connection.Id, context.Connection.RemoteIpAddress.ToString());
             }

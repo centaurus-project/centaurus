@@ -36,7 +36,7 @@ namespace Centaurus.Models
         /// </summary>
         RequestQuantum = 48,
         /// <summary>
-        /// Quantum created by Alpha server that contains aggregated ledger updates provided by <see cref="TxNotification"/>.
+        /// Quantum created by Alpha server that contains aggregated ledger updates provided by <see cref="PaymentNotification"/>.
         /// </summary>
         TxCommitQuantum = 49,
         /// <summary>
@@ -68,10 +68,6 @@ namespace Centaurus.Models
         /// </summary>
         EffectsNotification = 104,
         /// <summary>
-        /// Message from auditor to Alpha server that contains Stellar payments (obtained from the Horizon).
-        /// </summary>
-        TxNotification = 105,
-        /// <summary>
         /// Auditor current state (the last snapshot, and all quanta after the last snapshot).
         /// </summary>
         AuditorState = 106,
@@ -94,11 +90,11 @@ namespace Centaurus.Models
         /// <summary>
         /// Contains data for init. It will be created by alpha on init.
         /// </summary>
-        ConstellationInitQuantum = 200,
+        ConstellationInitRequest = 200,
         /// <summary>
         /// Upgrade quorum, add/remove auditors, apply new settings etc.
         /// </summary>
-        ConstellationUpgradeQuantum = 201,
+        ConstellationUpgradeRequest = 201,
         /// <summary>
         /// Alpha state message. It contains Alpha state and last snapshot.
         /// </summary>
@@ -111,6 +107,10 @@ namespace Centaurus.Models
         /// Contains batch of quanta
         /// </summary>
         QuantaBatch = 204,
+        /// <summary>
+        /// Wrapper for constellation requests.
+        /// </summary>
+        ConstellationQuantum = 205,
         /// <summary>
         /// Contains array of auditor's quantum processing results
         /// </summary>

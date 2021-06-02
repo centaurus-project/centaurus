@@ -8,11 +8,11 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public class InfoCommandsHandlers: ContextualBase<AlphaContext>
+    public class InfoCommandsHandlers: ContextualBase
     {
         ImmutableDictionary<string, IBaseCommandHandler> handlers;
 
-        public InfoCommandsHandlers(AlphaContext context)
+        public InfoCommandsHandlers(ExecutionContext context)
             :base(context)
         {
                 var discoveredRequestProcessors = Assembly.GetExecutingAssembly()

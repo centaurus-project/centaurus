@@ -14,9 +14,9 @@ using System.Threading.Tasks;
 
 namespace Centaurus
 {
-    public class AuditorStartup : StartupBase<AuditorContext>
+    public class AuditorStartup : StartupBase
     {
-        private AuditorWebSocketConnection auditor;
+        private OutgoingWebSocketConnection auditor;
 
         private bool isAborted = false;
 
@@ -25,7 +25,7 @@ namespace Centaurus
 
         private Func<ClientConnectionWrapperBase> connectionFactory;
 
-        public AuditorStartup(AuditorContext context, Func<ClientConnectionWrapperBase> connectionFactory)
+        public AuditorStartup(Domain.ExecutionContext context, Func<ClientConnectionWrapperBase> connectionFactory)
             : base(context)
         {
             this.connectionFactory = connectionFactory;
@@ -61,7 +61,7 @@ namespace Centaurus
                 {
                     while (!isAborted)
                     {
-                        var _auditor = new AuditorWebSocketConnection(Context, connectionFactory());
+                        var _auditor = new OutgoingWebSocketConnection(Context, connectionFactory());
                         try
                         {
                             Subscribe(_auditor);
@@ -115,7 +115,7 @@ namespace Centaurus
             }
         }
 
-        private void Subscribe(AuditorWebSocketConnection _auditor)
+        private void Subscribe(OutgoingWebSocketConnection _auditor)
         {
             if (_auditor != null)
             {
@@ -123,7 +123,7 @@ namespace Centaurus
             }
         }
 
-        private void Unsubscribe(AuditorWebSocketConnection _auditor)
+        private void Unsubscribe(OutgoingWebSocketConnection _auditor)
         {
             if (_auditor != null)
             {
@@ -146,7 +146,7 @@ namespace Centaurus
             }
         }
 
-        private async Task CloseConnection(AuditorWebSocketConnection _auditor)
+        private async Task CloseConnection(OutgoingWebSocketConnection _auditor)
         {
             if (_auditor != null)
             {

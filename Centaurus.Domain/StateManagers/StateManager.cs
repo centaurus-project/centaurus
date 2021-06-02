@@ -2,6 +2,7 @@
 using stellar_dotnet_sdk;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace Centaurus.Domain
@@ -19,7 +20,7 @@ namespace Centaurus.Domain
         public ApplicationState PrevState { get; }
     }
 
-    public abstract class StateManager : ContextualBase
+    public class StateManager : ContextualBase
     {
         public StateManager(ExecutionContext context)
             : base(context)
@@ -48,17 +49,48 @@ namespace Centaurus.Domain
             }
         }
 
-        public event Action<StateChangedEventArgs> StateChanged;
-    }
 
-    public abstract class StateManager<TContext> : StateManager, IContextual<TContext>
-        where TContext: ExecutionContext
-    {
-        public StateManager(TContext context)
-            : base(context)
+
+        private Dictionary<RawPubKey, ConnectionState> ConnectedAuditors = new Dictionary<RawPubKey, ConnectionState>();
+
+        public bool HasMajority => ConnectedAuditors.Count(a => a.Value == ConnectionState.Ready) >= Context.GetMajorityCount();
+
+        public int ConnectedAuditorsCount => ConnectedAuditors.Count;
+
+        public void RegisterAuditorState(RawPubKey rawPubKey, ConnectionState connectionState)
         {
+            lock (this)
+            {
+                ConnectedAuditors[rawPubKey] = connectionState;
+                if (Context.IsAlpha && HasMajority && State == ApplicationState.Running)
+                    State = ApplicationState.Ready;
+            }
         }
 
-        public new TContext Context => (TContext)base.Context;
+        public void AuditorConnectionClosed(RawPubKey rawPubKey)
+        {
+            lock (this)
+            {
+                ConnectedAuditors.Remove(rawPubKey);
+                if (Context.IsAlpha && !HasMajority && State == ApplicationState.Ready)
+                    State = ApplicationState.Running;
+            }
+        }
+
+        public void AlphaRised()
+        {
+            lock (this)
+            {
+                if (!Context.IsAlpha)
+                    return;
+
+                if (HasMajority)
+                    State = ApplicationState.Ready;
+                else
+                    State = ApplicationState.Running;
+            }
+        }
+
+        public event Action<StateChangedEventArgs> StateChanged;
     }
 }

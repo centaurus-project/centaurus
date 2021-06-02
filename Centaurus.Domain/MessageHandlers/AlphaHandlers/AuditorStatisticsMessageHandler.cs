@@ -8,7 +8,7 @@ namespace Centaurus.Domain
 {
     public class AuditorPerfStatisticsMessageHandler : BaseAlphaMessageHandler
     {
-        public AuditorPerfStatisticsMessageHandler(AlphaContext context) 
+        public AuditorPerfStatisticsMessageHandler(ExecutionContext context) 
             : base(context)
         {
         }
@@ -19,12 +19,11 @@ namespace Centaurus.Domain
 
         public override bool IsAuditorOnly => true;
 
-        public override Task HandleMessage(AlphaWebSocketConnection connection, IncomingMessage message)
+        public override Task HandleMessage(IncomingWebSocketConnection connection, IncomingMessage message)
         {
             var auditor = connection.ClientKPAccountId;
             var statistics = (AuditorPerfStatistics)message.Envelope.Message;
-            var alphaPerfManager = (AlphaPerformanceStatisticsManager)Context.PerformanceStatisticsManager;
-            _ = Task.Factory.StartNew(() => alphaPerfManager.AddAuditorStatistics(auditor, statistics));
+            _ = Task.Factory.StartNew(() => Context.PerformanceStatisticsManager.AddAuditorStatistics(auditor, statistics));
             return Task.CompletedTask;
         }
     }

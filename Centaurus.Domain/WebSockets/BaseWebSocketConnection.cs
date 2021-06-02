@@ -297,14 +297,4 @@ namespace Centaurus
             isDisposed = true;
         }
     }
-
-    public abstract class BaseWebSocketConnection<TContext> : BaseWebSocketConnection, IContextual<TContext>
-        where TContext : Domain.ExecutionContext
-    {
-        public BaseWebSocketConnection(Domain.ExecutionContext context, WebSocket webSocket, string ip, int inBufferSize, int outBufferSize)
-            :base(context, webSocket, ip, inBufferSize, outBufferSize)
-        { }
-
-        public new TContext Context => (TContext)base.Context;
-    }
 }

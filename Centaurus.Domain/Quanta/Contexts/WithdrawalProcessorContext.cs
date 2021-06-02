@@ -12,26 +12,38 @@ namespace Centaurus.Domain
             : base(effectProcessorsContainer)
         {
             WithdrawalRequest = (WithdrawalRequest)Request.RequestEnvelope.Message;
+
+            if (!CentaurusContext.PaymentsManager.TryGetManager(WithdrawalRequest.PaymentProvider, out var paymentsManager))
+                throw new BadRequestException($"Provider {WithdrawalRequest.PaymentProvider} is not supported.");
+
+            PaymentsManager = paymentsManager;
+
+            if (!PaymentsManager.PaymentsParser.TryDeserializeTransaction(WithdrawalRequest.TransactionXdr, out var transaction))
+                throw new BadRequestException($"Invalid transaction data.");
+
+            Transaction = transaction;
         }
 
-        public List<WithdrawalWrapperItem> WithdrawalItems { get; set; } = new List<WithdrawalWrapperItem>();
+        public WithdrawalWrapper Withdrawal { get; set; }
 
         public WithdrawalRequest WithdrawalRequest { get; }
 
-        private Transaction transaction;
-        public Transaction Transaction
-        {
-            get => transaction;
-            set
-            {
-                if (value != null && value != transaction)
-                {
-                    transaction = value;
-                    TransactionHash = transaction.Hash();
-                }
-            }
-        }
+        public TransactionWrapper Transaction { get; }
 
-        public byte[] TransactionHash { get; set; }
+        public PaymentsProviderBase PaymentsManager { get; }
+    }
+
+    public class TransactionWrapper
+    {
+        public virtual object Transaction { get; set; }
+
+        public byte[] Hash { get; set; }
+
+        public long MaxTime { get; set; }
+    }
+
+    public class TransactionWrapper<T>: TransactionWrapper
+    {
+        public new T Transaction { get; set; }
     }
 }

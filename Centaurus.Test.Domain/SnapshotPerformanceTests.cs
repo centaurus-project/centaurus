@@ -21,12 +21,12 @@ namespace Centaurus.Test
         public void Setup()
         {
             EnvironmentHelper.SetTestEnvironmentVariable();
-            var settings = new AlphaSettings 
+            var settings = new Settings 
             { 
                 CWD = "AppData"
             };
             var stellarProvider = new MockStellarDataProvider(settings.NetworkPassphrase, settings.HorizonUrl);
-            context = new AlphaContext(settings, new MongoStorage(), stellarProvider);
+            context = new ExecutionContext(settings, new MongoStorage(), stellarProvider);
 
             context.Init().Wait();
         }

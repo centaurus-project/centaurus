@@ -17,13 +17,13 @@ namespace Centaurus.Test.Exchange.Analytics
     {
         AccountWrapper account1;
         AccountWrapper account2;
-        private AlphaContext context;
+        private ExecutionContext context;
 
         [SetUp]
         public void Setup()
         {
             EnvironmentHelper.SetTestEnvironmentVariable();
-            var settings = new AlphaSettings
+            var settings = new Settings
             {
                 HorizonUrl = "https://horizon-testnet.stellar.org",
                 NetworkPassphrase = "Test SDF Network ; September 2015",
@@ -32,7 +32,7 @@ namespace Centaurus.Test.Exchange.Analytics
 
             var stellarProvider = new MockStellarDataProvider(settings.NetworkPassphrase, settings.HorizonUrl);
 
-            context = new AlphaContext(settings, new MockStorage(), stellarProvider);
+            context = new ExecutionContext(settings, new MockStorage(), stellarProvider);
             context.Init().Wait();
             var requestsLimit = new RequestRateLimits();
 
@@ -65,11 +65,11 @@ namespace Centaurus.Test.Exchange.Analytics
             {
                 Accounts = new List<AccountWrapper> { account1, account2 },
                 Apex = 0,
-                TxCursor = 1,
+                Cursors = new List<PaymentCursor> { new PaymentCursor { Cursor = "1", Provider = PaymentProvider.Stellar } },
                 Orders = new List<Order>(),
                 Settings = new ConstellationSettings
                 {
-                    Vault = KeyPair.Random().PublicKey,
+                    Vaults = new List<Vault> { new Vault { AccountId = KeyPair.Random().AccountId, Provider = PaymentProvider.Stellar } },
                     Assets = new List<AssetSettings> { new AssetSettings { Id = 1, Code = "X", Issuer = new RawPubKey() } },
                     RequestRateLimits = new RequestRateLimits { HourLimit = 1000, MinuteLimit = 100 }
                 },

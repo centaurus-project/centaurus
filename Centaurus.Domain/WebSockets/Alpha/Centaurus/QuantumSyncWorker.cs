@@ -10,11 +10,11 @@ using System.Threading.Tasks;
 
 namespace Centaurus
 {
-    public class QuantumSyncWorker : ContextualBase<AlphaContext>, IDisposable
+    public class QuantumSyncWorker : ContextualBase, IDisposable
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public QuantumSyncWorker(AlphaContext context, long apexCursor, AlphaWebSocketConnection auditor)
+        public QuantumSyncWorker(Domain.ExecutionContext context, long apexCursor, IncomingWebSocketConnection auditor)
             :base(context)
         {
             this.auditor = auditor ?? throw new ArgumentNullException(nameof(auditor));
@@ -24,7 +24,7 @@ namespace Centaurus
             Task.Factory.StartNew(SendQuantums, TaskCreationOptions.LongRunning);
         }
 
-        private readonly AlphaWebSocketConnection auditor;
+        private readonly IncomingWebSocketConnection auditor;
 
         private CancellationTokenSource cancellationTokenSource;
         private CancellationToken cancellationToken;

@@ -1,4 +1,5 @@
 ﻿using Centaurus.Domain;
+using Centaurus.Models;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -7,16 +8,16 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Test
 {
-    public static class SnapshotHelper
+    public static class ContextHelpers
     {
         static MethodInfo applyUpdatesMethod;
         static MethodInfo refreshUpdatesContainerMethod;
 
-        static SnapshotHelper()
+        static ContextHelpers()
         {
             var updatesManagerType = typeof(PendingUpdatesManager);
             applyUpdatesMethod = updatesManagerType.GetMethod("ApplyUpdates", BindingFlags.NonPublic | BindingFlags.Instance);
-            refreshUpdatesContainerMethod = updatesManagerType.GetMethod("RefreshUpdatesContainer", BindingFlags.NonPublic | BindingFlags.Instance);
+            refreshUpdatesContainerMethod = updatesManagerType.GetMethod("RefreshUpdatesContainer", BindingFlags.NonPublic | BindingFlags.Instance); 
         }
 
         public static async Task ApplyUpdates(ExecutionContext context)

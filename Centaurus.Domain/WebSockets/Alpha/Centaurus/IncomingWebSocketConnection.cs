@@ -10,13 +10,13 @@ using stellar_dotnet_sdk;
 
 namespace Centaurus
 {
-    public class AlphaWebSocketConnection : BaseWebSocketConnection<AlphaContext>
+    public class IncomingWebSocketConnection : BaseWebSocketConnection
     {
         public const int AuditorBufferSize = 50 * 1024 * 1024;
 
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public AlphaWebSocketConnection(AlphaContext context, WebSocket webSocket, string ip)
+        public IncomingWebSocketConnection(ExecutionContext context, WebSocket webSocket, string ip)
             : base(context, webSocket, ip, 1024, 64 * 1024)
         {
             var hd = new HandshakeData();
@@ -63,7 +63,7 @@ namespace Centaurus
 
         protected override async Task<bool> HandleMessage(MessageEnvelope envelope)
         {
-            var isHandled = await Context.MessageHandlers.HandleMessage(this, envelope.ToIncomingMessage(incommingBuffer));
+            var isHandled = await Context.AlphaMessageHandlers.HandleMessage(this, envelope.ToIncomingMessage(incommingBuffer));
 
             return isHandled;
         }

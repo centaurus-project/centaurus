@@ -14,20 +14,20 @@ using Centaurus.Xdr;
 
 namespace Centaurus.Domain
 {
-    public class AuditorWebSocketConnection : BaseWebSocketConnection<AuditorContext>
+    public class OutgoingWebSocketConnection : BaseWebSocketConnection
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
         private ClientConnectionWrapperBase connection;
 
-        public AuditorWebSocketConnection(AuditorContext context, ClientConnectionWrapperBase connection)
-            : base(context, connection.WebSocket, null, AlphaWebSocketConnection.AuditorBufferSize, AlphaWebSocketConnection.AuditorBufferSize)
+        public OutgoingWebSocketConnection(ExecutionContext context, ClientConnectionWrapperBase connection)
+            : base(context, connection.WebSocket, null, IncomingWebSocketConnection.AuditorBufferSize, IncomingWebSocketConnection.AuditorBufferSize)
         {
             this.connection = connection;
         }
 
         public async Task EstablishConnection()
         {
-            await connection.Connect(new Uri(Context.Settings.AlphaAddress), cancellationToken);
+            await connection.Connect(new Uri(Context.Settings.AuditorAddressBook.First()), cancellationToken);
             _ = Task.Factory.StartNew(Listen, TaskCreationOptions.LongRunning);
             ProcessOutgoingMessageQueue();
         }
@@ -39,7 +39,7 @@ namespace Centaurus.Domain
 
         protected override async Task<bool> HandleMessage(MessageEnvelope envelope)
         {
-            return await Context.MessageHandlers.HandleMessage(this, envelope.ToIncomingMessage(incommingBuffer));
+            return await Context.AuditorMessageHandlers.HandleMessage(this, envelope.ToIncomingMessage(incommingBuffer));
         }
 
         private void ProcessOutgoingMessageQueue()

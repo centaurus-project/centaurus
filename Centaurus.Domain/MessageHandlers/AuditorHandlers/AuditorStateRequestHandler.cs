@@ -9,7 +9,7 @@ namespace Centaurus.Domain
 {
     public class AuditorStateRequestHandler : BaseAuditorMessageHandler
     {
-        public AuditorStateRequestHandler(AuditorContext context) 
+        public AuditorStateRequestHandler(ExecutionContext context) 
             : base(context)
         {
         }
@@ -18,7 +18,7 @@ namespace Centaurus.Domain
 
         public override ConnectionState[] ValidConnectionStates { get; } = new ConnectionState[] { ConnectionState.Connected };
 
-        public override async Task HandleMessage(AuditorWebSocketConnection connection, IncomingMessage message)
+        public override async Task HandleMessage(OutgoingWebSocketConnection connection, IncomingMessage message)
         {
             var stateRequestMessage = (AuditorStateRequest)message.Envelope.Message;
             var hasQuanta = true;

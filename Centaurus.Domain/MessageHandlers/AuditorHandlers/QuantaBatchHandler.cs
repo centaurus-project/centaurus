@@ -11,7 +11,7 @@ namespace Centaurus.Domain
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public QuantaBatchHandler(AuditorContext context) 
+        public QuantaBatchHandler(ExecutionContext context) 
             : base(context)
         {
         }
@@ -20,9 +20,9 @@ namespace Centaurus.Domain
 
         public override ConnectionState[] ValidConnectionStates => new ConnectionState[] { ConnectionState.Connected, ConnectionState.Ready };
 
-        public override async Task HandleMessage(AuditorWebSocketConnection connection, IncomingMessage message)
+        public override async Task HandleMessage(OutgoingWebSocketConnection connection, IncomingMessage message)
         {
-            var quantumHandler = (AuditorQuantumHandler)connection.Context.QuantumHandler;
+            var quantumHandler = connection.Context.QuantumHandler;
             var quantaBatch = (QuantaBatch)message.Envelope.Message;
             var quanta = quantaBatch.Quanta;
             var quantaBatchCount = quanta.Count;

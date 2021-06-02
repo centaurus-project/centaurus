@@ -14,6 +14,7 @@ namespace Centaurus.Domain
 {
     public class ConstellationInitInfo
     {
+        public List<Vault> Vaults { get; set; }
         public KeyPair[] Auditors { get; set; }
         public long MinAccountBalance { get; set; }
         public long MinAllowedLotSize { get; set; }
@@ -25,13 +26,13 @@ namespace Centaurus.Domain
     /// Initializes the application. 
     /// It can only be called from the Alpha, and only when it is in the waiting for initialization state.
     /// </summary>
-    public class ConstellationInitializer: ContextualBase<AlphaContext>
+    public class ConstellationInitializer: ContextualBase
     {
         const int minAuditorsCount = 1;
 
         ConstellationInitInfo constellationInitInfo;
 
-        public ConstellationInitializer(ConstellationInitInfo constellationInitInfo, AlphaContext context)
+        public ConstellationInitializer(ConstellationInitInfo constellationInitInfo, ExecutionContext context)
             :base(context)
         {
             if (constellationInitInfo.Auditors == null || constellationInitInfo.Auditors.Count() < minAuditorsCount)
@@ -64,25 +65,22 @@ namespace Centaurus.Domain
             if (alphaAccountData == null)
                 throw new InvalidOperationException($"The vault ({Context.Settings.KeyPair.AccountId}) is not yet funded");
 
-            var txCursor = await BuildAndConfigureVault(alphaAccountData);
+            var cursors = await BuildAndConfigureVault(alphaAccountData);
 
             SetIdToAssets();
 
-            var initQuantum = new ConstellationInitQuantum
+            var initQuantum = new ConstellationInitRequest
             {
                 Assets = constellationInitInfo.Assets.ToList(),
                 Auditors = constellationInitInfo.Auditors.Select(key => (RawPubKey)key.PublicKey).ToList(),
-                Vault = Context.Settings.KeyPair.PublicKey,
+                Vaults = constellationInitInfo.Vaults,
                 MinAccountBalance = constellationInitInfo.MinAccountBalance,
                 MinAllowedLotSize = constellationInitInfo.MinAllowedLotSize,
-                PrevHash = new byte[] { },
                 RequestRateLimits = constellationInitInfo.RequestRateLimits,
-                TxCursor = txCursor
-            };
+                Cursors = cursors
+            }.CreateEnvelope();
 
-            var envelope = initQuantum.CreateEnvelope();
-
-            var res = await Context.QuantumHandler.HandleAsync(envelope);
+            var res = await Context.QuantumHandler.HandleAsync(initQuantum);
         }
 
         private void SetIdToAssets()
@@ -98,7 +96,7 @@ namespace Centaurus.Domain
         /// Builds and configures Centaurus vault
         /// </summary>
         /// <returns>Transaction cursor</returns>
-        private async Task<long> BuildAndConfigureVault(AccountModel vaultAccount)
+        private async Task<List<PaymentCursor>> BuildAndConfigureVault(AccountModel vaultAccount)
         {
             var majority = MajorityHelper.GetMajorityCount(constellationInitInfo.Auditors.Count());
 
@@ -143,7 +141,7 @@ namespace Centaurus.Domain
             }
 
             var tx = await Context.StellarDataProvider.GetTransaction(result.Hash);
-            return tx.PagingToken;
+            return new List<PaymentCursor> { new PaymentCursor { Provider = PaymentProvider.Stellar, Cursor = tx.PagingToken.ToString() } };
         }
 
         private async Task<AccountModel> DoesAlphaAccountExist()

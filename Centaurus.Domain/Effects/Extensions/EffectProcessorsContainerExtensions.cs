@@ -15,7 +15,7 @@ namespace Centaurus.Domain
                 Apex = effectProcessors.Apex,
                 Account = withdrawal.Source.Account.Id,
                 AccountWrapper = withdrawal.Source,
-                Items = withdrawal.Withdrawals.Select(w => new WithdrawalEffectItem { Asset = w.Asset, Amount = w.Amount }).OrderBy(a => a.Asset).ToList()
+                Items = withdrawal.Items.Select(w => new WithdrawalEffectItem { Asset = w.Asset, Amount = w.Amount }).OrderBy(a => a.Asset).ToList()
             };
             effectProcessors.Add(new WithdrawalCreateEffectProcessor(effect, withdrawal, withdrawalStorage));
         }
@@ -28,7 +28,7 @@ namespace Centaurus.Domain
                 Account = withdrawal.Source.Account.Id,
                 AccountWrapper = withdrawal.Source,
                 IsSuccessful = isSuccessful,
-                Items = withdrawal.Withdrawals.Select(w => new WithdrawalEffectItem { Asset = w.Asset, Amount = w.Amount }).OrderBy(a => a.Asset).ToList()
+                Items = withdrawal.Items.Select(w => new WithdrawalEffectItem { Asset = w.Asset, Amount = w.Amount }).OrderBy(a => a.Asset).ToList()
             };
             effectProcessors.Add(new WithdrawalRemoveEffectProcessor(effect, withdrawal, withdrawalStorage));
         }
@@ -143,32 +143,32 @@ namespace Centaurus.Domain
             ));
         }
 
-        public static void AddCursorUpdate(this EffectProcessorsContainer effectProcessors, TxCursorManager txManager, long newCursor, long prevCursor)
+        public static void AddCursorUpdate(this EffectProcessorsContainer effectProcessors, PaymentNotificationManager notificationManager, string newCursor, string prevCursor)
         {
             effectProcessors.Add(new TxCursorUpdateEffectProcessor(
-                new TxCursorUpdateEffect
+                new CursorUpdateEffect
                 {
                     Apex = effectProcessors.Apex,
                     Cursor = newCursor,
                     PrevCursor = prevCursor
                 },
-                txManager
+                notificationManager
             ));
         }
 
-        public static void AddConstellationInit(this EffectProcessorsContainer effectProcessors, ConstellationInitQuantum initQuantum)
+        public static void AddConstellationInit(this EffectProcessorsContainer effectProcessors, ConstellationInitRequest initQuantum)
         {
             effectProcessors.Add(new ConstellationInitEffectProcessor(
                 new ConstellationInitEffect
                 {
-                    Apex = initQuantum.Apex,
+                    Apex = effectProcessors.Apex,
                     Assets = initQuantum.Assets,
                     Auditors = initQuantum.Auditors,
                     MinAccountBalance = initQuantum.MinAccountBalance,
                     MinAllowedLotSize = initQuantum.MinAllowedLotSize,
-                    Vault = initQuantum.Vault,
+                    Vaults = initQuantum.Vaults,
                     RequestRateLimits = initQuantum.RequestRateLimits,
-                    TxCursor = initQuantum.TxCursor
+                    Cursors = initQuantum.Cursors
                 }
             ));
         }

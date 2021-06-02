@@ -11,7 +11,7 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public AuditorResultMessageHandler(AuditorContext context) 
+        public AuditorResultMessageHandler(ExecutionContext context) 
             : base(context)
         {
         }
@@ -20,7 +20,7 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
 
         public override ConnectionState[] ValidConnectionStates { get; } = null;
 
-        public override Task HandleMessage(AuditorWebSocketConnection connection, IncomingMessage message)
+        public override Task HandleMessage(OutgoingWebSocketConnection connection, IncomingMessage message)
         {
             var resultMessage = (ResultMessage)message.Envelope.Message;
             logger.Error($"Result message received. Status {resultMessage.Status}, original message type is {resultMessage.OriginalMessage.Message.MessageType}");

@@ -17,9 +17,9 @@ namespace Centaurus.Test
         /// Generates alpha server settings
         /// </summary>
         /// <returns>Settings object</returns>
-        public static AlphaSettings GetAlphaSettings()
+        public static Settings GetAlphaSettings()
         {
-            var settings = new AlphaSettings();
+            var settings = new Settings();
             SetCommonSettings(settings, TestEnvironment.AlphaKeyPair.SecretSeed);
             settings.ConnectionString = "mongodb://localhost:27001/alphaDBTest?replicaSet=centaurus";
             settings.Build();
@@ -31,23 +31,27 @@ namespace Centaurus.Test
         /// Generates auditor server settings
         /// </summary>
         /// <returns>Settings object</returns>
-        public static AuditorSettings GetAuditorSettings()
+        public static Settings GetAuditorSettings()
         {
-            var settings = new AuditorSettings();
+            var settings = new Settings();
             SetCommonSettings(settings, TestEnvironment.Auditor1KeyPair.SecretSeed);
-            settings.AlphaAddress = "http://localhost";
             settings.ConnectionString = "mongodb://localhost:27001/auditorDBTest?replicaSet=centaurus";
-            settings.AlphaPubKey = TestEnvironment.AlphaKeyPair.AccountId;
-            settings.GenesisQuorum = new string[] { TestEnvironment.Auditor1KeyPair.AccountId };
             settings.Build();
             return settings;
         }
 
-        private static void SetCommonSettings(BaseSettings settings, string secret)
+        private static void SetCommonSettings(Settings settings, string secret)
         {
             settings.HorizonUrl = "https://horizon-testnet.stellar.org";
             settings.NetworkPassphrase = "Test SDF Network ; September 2015";
             settings.CWD = "AppData";
+            settings.AlphaPubKey = TestEnvironment.AlphaKeyPair.AccountId;
+            settings.GenesisQuorum = new string[]
+            {
+                TestEnvironment.AlphaKeyPair.AccountId,
+                TestEnvironment.Auditor1KeyPair.AccountId
+            };
+            settings.AuditorAddressBook = new string[] { "http://localhost" };
             settings.Secret = secret;
         }
 
@@ -73,21 +77,21 @@ namespace Centaurus.Test
         /// <summary>
         /// Setups Global with predefined settings
         /// </summary>
-        public static async Task<AlphaContext> DefaultAlphaSetup()
+        public static async Task<ExecutionContext> DefaultAlphaSetup()
         {
             var settings = GetAlphaSettings();
             var storage = await GetStorage(settings.ConnectionString);
-            return (AlphaContext)await Setup(GetPredefinedClients(), GetPredefinedAuditors(), settings, storage);
+            return await Setup(GetPredefinedClients(), GetPredefinedAuditors(), settings, storage);
         }
 
         /// <summary>
         /// Setups Global with predefined settings
         /// </summary>
-        public static async Task<AuditorContext> DefaultAuditorSetup()
+        public static async Task<ExecutionContext> DefaultAuditorSetup()
         {
             var settings = GetAuditorSettings();
             var storage = await GetStorage(settings.ConnectionString);
-            return (AuditorContext)await Setup(GetPredefinedClients(), GetPredefinedAuditors(), settings, storage);
+            return await Setup(GetPredefinedClients(), GetPredefinedAuditors(), settings, storage);
         }
 
         /// <summary>
@@ -96,41 +100,31 @@ namespace Centaurus.Test
         /// <param name="clients">Clients to add to constellation</param>
         /// <param name="auditors">Auditors to add to constellation</param>
         /// <param name="settings">Settings that will be used to init Global</param>
-        public static async Task<ExecutionContext> Setup(List<KeyPair> clients, List<KeyPair> auditors, BaseSettings settings, IStorage storage)
+        public static async Task<ExecutionContext> Setup(List<KeyPair> clients, List<KeyPair> auditors, Settings settings, IStorage storage)
         {
             var stellarProvider = new MockStellarDataProvider(settings.NetworkPassphrase, settings.HorizonUrl);
 
-            var context = settings is AlphaSettings 
-                ? (ExecutionContext)new AlphaContext((AlphaSettings)settings, storage, stellarProvider) 
-                : new AuditorContext((AuditorSettings)settings, storage, stellarProvider);
+            var context = new ExecutionContext(settings, storage, stellarProvider);
 
             await context.Init();
 
             var assets = new List<AssetSettings> { new AssetSettings { Id = 1, Code = "X", Issuer = KeyPair.Random() } };
 
-            var initQuantum = new ConstellationInitQuantum
+            var initRequest = new ConstellationInitRequest
             {
-                Apex = 1,
                 Assets = assets,
                 Auditors = auditors.Select(a => (RawPubKey)a.PublicKey).ToList(),
                 MinAccountBalance = 1,
                 MinAllowedLotSize = 1,
-                Vault = settings is AlphaSettings ? settings.KeyPair.PublicKey : ((AuditorSettings)settings).AlphaKeyPair.PublicKey,
-                PrevHash = new byte[] { },
-                RequestRateLimits = new RequestRateLimits { HourLimit = 1000, MinuteLimit = 100 }
-            };
+                Vaults = new List<Vault> { new Vault { Provider = PaymentProvider.Stellar, AccountId = KeyPair.Random().AccountId } },
+                RequestRateLimits = new RequestRateLimits { HourLimit = 1000, MinuteLimit = 100 },
+                Cursors = new List<PaymentCursor> { new PaymentCursor { Cursor = "0", Provider = PaymentProvider.Stellar } }
+            }.CreateEnvelope();
 
-            if (!context.IsAlpha)
-                initQuantum.Timestamp = DateTime.UtcNow.Ticks;
+            initRequest.Sign(TestEnvironment.AlphaKeyPair);
+            initRequest.Sign(TestEnvironment.Auditor1KeyPair);
 
-            var envelope = initQuantum.CreateEnvelope();
-            if (!context.IsAlpha)
-            {
-                var alphaKeyPair = KeyPair.FromSecretSeed(TestEnvironment.AlphaKeyPair.SecretSeed);
-                envelope.Sign(alphaKeyPair);
-            }
-
-            await context.QuantumHandler.HandleAsync(envelope);
+            await context.QuantumHandler.HandleAsync(initRequest);
 
             var deposits = new List<PaymentBase>();
             Action<byte[], int> addAssetsFn = (acc, asset) =>
@@ -152,21 +146,26 @@ namespace Centaurus.Test
                     addAssetsFn(clients[i].PublicKey, assets[c].Id);
             }
 
-            var depositQuantum = new TxCommitQuantum
+            var txNotification = new PaymentNotification
+            {
+                Cursor = "2",
+                Items = deposits
+            };
+
+            context.PaymentsManager.TryGetManager(PaymentProvider.Stellar, out var paymentsProvider);
+            paymentsProvider.NotificationsManager.RegisterNotification(txNotification);
+
+            var depositQuantum = new PaymentCommitQuantum
             {
                 Apex = 2,
                 PrevHash = context.QuantumStorage.LastQuantumHash,
-                Source = new TxNotification
-                {
-                    TxCursor = 2,
-                    Payments = deposits
-                }.CreateEnvelope().Sign(TestEnvironment.Auditor1KeyPair)
+                Source = txNotification
             };
 
-            await context.QuantumHandler.HandleAsync(depositQuantum.CreateEnvelope().Sign(TestEnvironment.AlphaKeyPair));
+            await context.QuantumHandler.HandleAsync(depositQuantum.CreateEnvelope());
 
             //save all effects
-            await SnapshotHelper.ApplyUpdates(context);
+            await ContextHelpers.ApplyUpdates(context);
             return context;
         }
     }

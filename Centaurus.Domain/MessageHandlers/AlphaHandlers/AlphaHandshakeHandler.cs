@@ -9,7 +9,7 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
 {
     public class AlphaHandshakeHandler : BaseAlphaMessageHandler
     {
-        public AlphaHandshakeHandler(AlphaContext context) 
+        public AlphaHandshakeHandler(ExecutionContext context) 
             : base(context)
         {
         }
@@ -22,7 +22,7 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
 
         public override bool IsAuditorOnly { get; } = false;
 
-        public override async Task HandleMessage(AlphaWebSocketConnection connection, IncomingMessage message)
+        public override async Task HandleMessage(IncomingWebSocketConnection connection, IncomingMessage message)
         {
             var handshakeInit = message.Envelope.Message as HandshakeInit;
             if (!ByteArrayPrimitives.Equals(handshakeInit.HandshakeData.Data, connection.HandshakeData.Data))
@@ -38,7 +38,7 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
 
         }
 
-        private async Task HandleAuditorHandshake(AlphaWebSocketConnection connection)
+        private async Task HandleAuditorHandshake(IncomingWebSocketConnection connection)
         {
             connection.SetAuditor();
             Message message;
@@ -49,7 +49,7 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
             await connection.SendMessage(message);
         }
 
-        private async Task HandleClientHandshake(AlphaWebSocketConnection connection, MessageEnvelope envelope)
+        private async Task HandleClientHandshake(IncomingWebSocketConnection connection, MessageEnvelope envelope)
         {
             if (connection.Context.AppState.State != ApplicationState.Ready)
                 throw new ConnectionCloseException(WebSocketCloseStatus.ProtocolError, "Alpha is not in Ready state.");

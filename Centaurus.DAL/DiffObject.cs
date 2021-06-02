@@ -9,11 +9,11 @@ namespace Centaurus.DAL
 {
     public class DiffObject
     {
-        public List<QuantumModel> Quanta { get; set; } = new List<QuantumModel>();
+        public List<QuantumModel> Quanta { get; } = new List<QuantumModel>();
 
         public SettingsModel ConstellationSettings { get; set; }
 
-        public ConstellationState StellarInfoData { get; set; }
+        public Dictionary<int, PaymentCursor> Cursors { get; } = new Dictionary<int, PaymentCursor>();
 
         public Dictionary<int, Account> Accounts { get; } = new Dictionary<int, Account>();
 
@@ -93,9 +93,11 @@ namespace Centaurus.DAL
             public int Account { get; set; }
         }
 
-        public class ConstellationState : BaseDiffModel
+        public class PaymentCursor : BaseDiffModel
         {
-            public long TxCursor { get; set; }
+            public int Provider { get; set; }
+
+            public string Cursor { get; set; }
         }
 
         #endregion

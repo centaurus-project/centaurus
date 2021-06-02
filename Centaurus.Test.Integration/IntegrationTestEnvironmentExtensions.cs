@@ -230,7 +230,7 @@ namespace Centaurus.Test
 
         public static async Task<(ResultMessage result, byte[] effectsHash, EffectProcessorsContainer container)> ProcessQuantumIsolated(this IntegrationTestEnvironment environment, MessageEnvelope envelope)
         {
-            var context = new AlphaContext(environment.AlphaWrapper.Context.Settings, new MockStorage(), environment.AlphaWrapper.Context.StellarDataProvider);
+            var context = new Domain.ExecutionContext(environment.AlphaWrapper.Context.Settings, new MockStorage(), environment.AlphaWrapper.Context.StellarDataProvider);
 
             await context.Init();
 

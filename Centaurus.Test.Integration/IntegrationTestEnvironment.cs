@@ -3,6 +3,7 @@ using Centaurus.DAL;
 using Centaurus.DAL.Models;
 using Centaurus.DAL.Mongo;
 using Centaurus.Domain;
+using Centaurus.Models;
 using Centaurus.Stellar;
 using Microsoft.AspNetCore.Mvc;
 using stellar_dotnet_sdk;
@@ -69,7 +70,8 @@ namespace Centaurus.Test
             var clients = Enumerable.Range(0, clientsCount).Select(_ => KeyPair.Random()).ToList();
             var info = AlphaWrapper.ConstellationController.Info();
             var assets = info.Assets;
-            var vault = KeyPair.FromAccountId(info.Vault);
+            info.Vaults.TryGetValue(PaymentProvider.Stellar.ToString(), out var rawVault);
+            var vault = KeyPair.FromAccountId(rawVault);
             foreach (var client in clients)
             {
                 var accountModel = RegisterStellarAccount(client);
@@ -108,10 +110,10 @@ namespace Centaurus.Test
             }
         }
 
-        private AlphaSettings GetAlphaSettings()
+        private Settings GetAlphaSettings()
         {
             var kp = KeyPair.Random();
-            var alphaSettings = new AlphaSettings
+            var alphaSettings = new Settings
             {
                 AlphaPort = 5000,
                 HorizonUrl = HorizonUrl,
@@ -141,16 +143,16 @@ namespace Centaurus.Test
             return accountModel;
         }
 
-        private AuditorSettings GetAuditorSettings(KeyPair keyPair, IEnumerable<string> genesisQuorum)
+        private Settings GetAuditorSettings(KeyPair keyPair, IEnumerable<string> genesisQuorum)
         {
-            var settings = new AuditorSettings
+            var settings = new Settings
             {
                 AlphaPubKey = AlphaWrapper.Settings.KeyPair.AccountId,
                 Secret = keyPair.SecretSeed,
                 NetworkPassphrase = NetworkPassphrase,
                 HorizonUrl = HorizonUrl,
                 GenesisQuorum = genesisQuorum,
-                AlphaAddress = AlphaAddress
+                AuditorAddressBook = new string[] { AlphaAddress }
             };
             settings.Build();
             return settings;

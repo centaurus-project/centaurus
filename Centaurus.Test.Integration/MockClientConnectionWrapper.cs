@@ -13,25 +13,25 @@ namespace Centaurus.Test
 {
     public class MockClientConnectionWrapper : ClientConnectionWrapperBase
     {
-        private AlphaContext alphaContext;
+        private Domain.ExecutionContext ExecutionContext;
         private MockWebSocket webSocketServer;
 
-        public MockClientConnectionWrapper(AlphaContext alphaContext, MockWebSocket webSocket, MockWebSocket webSocketServer)
+        public MockClientConnectionWrapper(Domain.ExecutionContext ExecutionContext, MockWebSocket webSocket, MockWebSocket webSocketServer)
             : base(webSocket)
         {
-            this.alphaContext = alphaContext;
+            this.ExecutionContext = ExecutionContext;
             this.webSocketServer = webSocketServer;
         }
 
         public override Task Connect(Uri uri, CancellationToken cancellationToken)
         {
-            if (alphaContext == null || !AlphaHostBuilder.ValidApplicationStates.Contains(alphaContext.AppState.State))
+            if (ExecutionContext == null || !AlphaHostBuilder.ValidApplicationStates.Contains(ExecutionContext.AppState.State))
                 throw new InvalidOperationException("Alpha is not ready");
 
 
             ((MockWebSocket)WebSocket).Connect(webSocketServer);
             (webSocketServer).Connect((MockWebSocket)WebSocket);
-            Task.Factory.StartNew(() => alphaContext.ConnectionManager.OnNewConnection(webSocketServer, null), TaskCreationOptions.LongRunning);
+            Task.Factory.StartNew(() => ExecutionContext.ConnectionManager.OnNewConnection(webSocketServer, null), TaskCreationOptions.LongRunning);
             return Task.CompletedTask;
         }
     }

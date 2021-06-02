@@ -9,53 +9,39 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-
-    public abstract class MessageHandlers : ContextualBase
-    {
-        public MessageHandlers(ExecutionContext context)
-            :base(context)
-        {
-
-        }
-
-        public abstract Task<bool> HandleMessage(BaseWebSocketConnection connetction, IncomingMessage message);
-    }
-
     /// <summary>
     /// Contains all registered handlers
     /// </summary>
-    public class MessageHandlers<TConnection, TContext>: MessageHandlers, IContextual<TContext>
+    public class MessageHandlers<TConnection>: ContextualBase
         where TConnection : BaseWebSocketConnection
-        where TContext : ExecutionContext
     {
-        readonly ImmutableDictionary<MessageTypes, BaseMessageHandler<TConnection, TContext>> handlers;
+        readonly ImmutableDictionary<MessageTypes, BaseMessageHandler<TConnection>> handlers;
 
-        public MessageHandlers(TContext context)
+        public MessageHandlers(ExecutionContext context)
             :base(context)
         {
+            //TODO: rename auditor and alpha interfaces to more generic and clear
             var currentServerHandlerType = typeof(IAuditorMessageHandler);
-            if (context.IsAlpha)
+            if (typeof(TConnection) == typeof(IncomingWebSocketConnection))
                 currentServerHandlerType = typeof(IAlphaMessageHandler);
 
             var discoveredRequestProcessors = Assembly.GetExecutingAssembly()
                 .GetTypes()
-                .Where(x => typeof(BaseMessageHandler<TConnection, TContext>).IsAssignableFrom(x)
+                .Where(x => typeof(BaseMessageHandler<TConnection>).IsAssignableFrom(x)
                     && currentServerHandlerType.IsAssignableFrom(x)
                     && !x.IsInterface
                     && !x.IsAbstract);
 
-            var processors = new Dictionary<MessageTypes, BaseMessageHandler<TConnection, TContext>>();
+            var processors = new Dictionary<MessageTypes, BaseMessageHandler<TConnection>>();
             foreach (var processorType in discoveredRequestProcessors)
             {
-                var instance = Activator.CreateInstance(processorType, new object[] { Context }) as BaseMessageHandler<TConnection, TContext>;
+                var instance = Activator.CreateInstance(processorType, new object[] { Context }) as BaseMessageHandler<TConnection>;
                 if (processors.ContainsKey(instance.SupportedMessageType))
                     throw new Exception($"Handler for message type {instance.SupportedMessageType} is already registered");
                 processors.Add(instance.SupportedMessageType, instance);
             }
             handlers = processors.ToImmutableDictionary();
         }
-
-        public new TContext Context => (TContext)base.Context;
 
         public async Task<bool> HandleMessage(TConnection connetction, IncomingMessage message)
         {
@@ -73,7 +59,7 @@ namespace Centaurus.Domain
             return true;
         }
 
-        public override async Task<bool> HandleMessage(BaseWebSocketConnection connetction, IncomingMessage message)
+        public async Task<bool> HandleMessage(BaseWebSocketConnection connetction, IncomingMessage message)
         {
             return await HandleMessage((TConnection)connetction, message);
         }
