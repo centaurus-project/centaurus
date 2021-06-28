@@ -12,11 +12,5 @@ namespace Centaurus.Domain
         {
             return new ExchangeMarket(asset.Id, orderMap, useLegacyOrderbook);
         }
-
-        public static Asset ToAsset(this AssetSettings assetSettings)
-        {
-            if (assetSettings.IsXlm) return new AssetTypeNative();
-            return Asset.CreateNonNativeAsset(assetSettings.Code, assetSettings.Issuer.ToString());
-        }
     }
 }

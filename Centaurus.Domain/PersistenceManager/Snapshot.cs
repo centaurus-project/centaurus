@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using Centaurus.Domain.Models;
 using Centaurus.Models;
+using Centaurus.PaymentProvider;
 using Centaurus.Xdr;
 
 namespace Centaurus.Domain
@@ -13,12 +15,10 @@ namespace Centaurus.Domain
 
         public ConstellationSettings Settings { get; set; }
 
-        public List<PaymentCursor> Cursors { get; set; }
-
         public List<AccountWrapper> Accounts { get; set; }
 
-        public List<Order> Orders { get; set; }
+        public List<OrderWrapper> Orders { get; set; }
 
-        public Dictionary<PaymentProvider, WithdrawalStorage> Withdrawals { get; set; }
+        public Dictionary<string, WithdrawalStorage> Withdrawals { get; set; }
     }
 }

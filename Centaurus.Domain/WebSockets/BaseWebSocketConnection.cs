@@ -10,6 +10,8 @@ using Centaurus.Xdr;
 using System.Reflection;
 using System.Diagnostics;
 using stellar_dotnet_sdk;
+using System.Linq;
+using Centaurus.Domain.Models;
 
 namespace Centaurus
 {
@@ -35,7 +37,10 @@ namespace Centaurus
 
     public abstract class BaseWebSocketConnection : ContextualBase, IDisposable
     {
+        public const int AuditorBufferSize = 50 * 1024 * 1024;
+
         static Logger logger = LogManager.GetCurrentClassLogger();
+
         protected readonly WebSocket webSocket;
         public BaseWebSocketConnection(Domain.ExecutionContext context, WebSocket webSocket, string ip, int inBufferSize, int outBufferSize)
             :base(context)
@@ -48,34 +53,80 @@ namespace Centaurus
 
             cancellationTokenSource = new CancellationTokenSource();
             cancellationToken = cancellationTokenSource.Token;
+
+            var hd = new HandshakeData();
+            hd.Randomize();
+            HandshakeData = hd;
+            _ = SendMessage(new HandshakeRequest { HandshakeData = hd });
         }
+
+        public QuantumSyncWorker QuantumWorker { get; private set; }
+        private readonly object apexCursorSyncRoot = new { };
+
+        private void ResetApexCursor(long newApexCursor)
+        {
+            lock (apexCursorSyncRoot)
+            {
+                logger.Trace($"Connection {PubKeyAddress}, apex cursor reset requested. New apex cursor {newApexCursor}");
+                //cancel current quantum worker
+                QuantumWorker?.Dispose();
+
+                //set new apex cursor, and start quantum worker
+                QuantumWorker = new QuantumSyncWorker(Context, newApexCursor, this);
+                logger.Trace($"Connection {PubKeyAddress}, apex cursor reseted. New apex cursor {newApexCursor}");
+            }
+        }
+
+        public void ResetApexCursor(SetApexCursor message)
+        {
+            ResetApexCursor(message.Apex);
+        }
+
+        public HandshakeData HandshakeData { get; }
+
+        public AccountWrapper Account { get; set; }
 
         public string Ip { get; }
 
         /// <summary>
         /// Current connection public key
         /// </summary>
-        public RawPubKey ClientPubKey { get; set; }
+        public RawPubKey PubKey { get; private set; }
 
-        private string clientKPAccountId;
-        public string ClientKPAccountId
+        public string PubKeyAddress { get; private set; } = "n/a";
+
+        public void SetPubKey(RawPubKey pubKey)
         {
-            get
-            {
-                if (clientKPAccountId == null)
-                    if (ClientPubKey != null)
-                    {
-                        clientKPAccountId = ((KeyPair)ClientPubKey).AccountId;
-                    }
-                    else
-                        return "n/a";
-                return clientKPAccountId;
-            }
+            PubKey = pubKey;
+            PubKeyAddress = PubKey.ToString();
+            if (Context.Constellation.Auditors.Contains(pubKey))
+                SetAuditor();
+            else
+                SetClient();
+        }
+
+        private void SetAuditor()
+        {
+            incommingBuffer.Dispose();
+            incommingBuffer = XdrBufferFactory.Rent(AuditorBufferSize);
+            outgoingBuffer.Dispose();
+            outgoingBuffer = XdrBufferFactory.Rent(AuditorBufferSize);
+            IsAuditor = true;
+            logger.Trace($"Connection {PubKeyAddress} promoted to Auditor.");
+            ConnectionState = ConnectionState.Validated;
+        }
+
+        private void SetClient()
+        {
+            Account = Context.AccountStorage.GetAccount(PubKey);
+            if (Account == null)
+                throw new ConnectionCloseException(WebSocketCloseStatus.NormalClosure, "Account is not registered.");
+            ConnectionState = ConnectionState.Ready;
         }
 
         protected XdrBufferFactory.RentedBuffer incommingBuffer;
         protected XdrBufferFactory.RentedBuffer outgoingBuffer;
-        public bool IsResultRequired { get; protected set; } = true;
+        public bool IsAuditor { get; private set; } = false;
 
         ConnectionState connectionState;
         /// <summary>
@@ -93,7 +144,7 @@ namespace Centaurus
                 {
                     var prevValue = connectionState;
                     connectionState = value;
-                    logger.Trace($"Connection {ClientKPAccountId} is in {connectionState} state. Prev state is {prevValue}.");
+                    logger.Trace($"Connection {PubKeyAddress} is in {connectionState} state. Prev state is {prevValue}.");
                     OnConnectionStateChanged?.Invoke((this, prevValue, connectionState));
                 }
             }
@@ -112,7 +163,7 @@ namespace Centaurus
                 if (webSocket.State == WebSocketState.Open)
                 {
                     desc = desc ?? status.ToString();
-                    logger.Trace($"Connection with {ClientKPAccountId} is closed. Status: {status}, description: {desc}");
+                    logger.Trace($"Connection with {PubKeyAddress} is closed. Status: {status}, description: {desc}");
 
                     await sendMessageSemaphore.WaitAsync();
                     try
@@ -160,7 +211,7 @@ namespace Centaurus
                 if (!envelope.IsSignedBy(Context.Settings.KeyPair.PublicKey))
                     envelope.Sign(Context.Settings.KeyPair, outgoingBuffer.Buffer);
 
-                logger.Trace($"Connection {ClientKPAccountId}, about to send {envelope.Message.MessageType} message.");
+                logger.Trace($"Connection {PubKeyAddress}, about to send {envelope.Message.MessageType} message.");
 
                 using (var writer = new XdrBufferWriter(outgoingBuffer.Buffer))
                 {
@@ -171,7 +222,7 @@ namespace Centaurus
                         await webSocket.SendAsync(outgoingBuffer.Buffer.AsMemory(0, writer.Length), WebSocketMessageType.Binary, true, cancellationToken);
                     Context.ExtensionsManager.AfterSendMessage(this, envelope);
 
-                    logger.Trace($"Connection {ClientKPAccountId}, message {envelope.Message.MessageType} sent. Size: {writer.Length}");
+                    logger.Trace($"Connection {PubKeyAddress}, message {envelope.Message.MessageType} sent. Size: {writer.Length}");
                 }
             }
             catch (Exception exc)
@@ -222,10 +273,10 @@ namespace Centaurus
                                 var reader = new XdrBufferReader(incommingBuffer.Buffer, incommingBuffer.Length);
                                 envelope = XdrConverter.Deserialize<MessageEnvelope>(reader);
 
-                                logger.Trace($"Connection {ClientKPAccountId}, message {envelope.Message.MessageType} received.");
+                                logger.Trace($"Connection {PubKeyAddress}, message {envelope.Message.MessageType} received.");
                                 if (!await HandleMessage(envelope))
                                     throw new UnexpectedMessageException($"No handler registered for message type {envelope.Message.MessageType}.");
-                                logger.Trace($"Connection {ClientKPAccountId}, message {envelope.Message.MessageType} handled.");
+                                logger.Trace($"Connection {PubKeyAddress}, message {envelope.Message.MessageType} handled.");
                             }
                             catch (BaseClientException exc)
                             {
@@ -234,7 +285,7 @@ namespace Centaurus
                                 var statusCode = exc.GetStatusCode();
 
                                 //prevent recursive error sending
-                                if (IsResultRequired && !(envelope == null || envelope.Message is ResultMessage))
+                                if (!IsAuditor && !(envelope == null || envelope.Message is ResultMessage))
                                     _ = SendMessage(envelope.CreateResult(statusCode));
                                 if (statusCode == ResultStatusCodes.InternalError || !Context.IsAlpha)
                                     logger.Error(exc);
@@ -269,7 +320,10 @@ namespace Centaurus
             }
         }
 
-        protected abstract Task<bool> HandleMessage(MessageEnvelope message);
+        private async Task<bool> HandleMessage(MessageEnvelope envelope)
+        {
+            return await Context.MessageHandlers.HandleMessage(this, envelope.ToIncomingMessage(incommingBuffer));
+        }
 
         bool isDisposed = false;
 
@@ -277,6 +331,9 @@ namespace Centaurus
         {
             if (isDisposed)
                 throw new ObjectDisposedException("Connection already disposed.");
+
+            QuantumWorker?.Dispose();
+
             Thread.Sleep(100); //wait all tasks to exit
 
             sendMessageSemaphore.Dispose();

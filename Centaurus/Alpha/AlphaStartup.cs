@@ -1,32 +1,13 @@
 using System;
-using System.Net.WebSockets;
 using Centaurus.Domain;
 using Centaurus.Models;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Infrastructure;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using NLog;
-using System.Linq;
 using System.Threading.Tasks;
-using Centaurus.DAL.Mongo;
-using Microsoft.Extensions.Logging;
-using NLog.Web;
-using System.IO;
-using Microsoft.AspNetCore.Http;
-using System.Collections.Generic;
 using System.Threading;
-using System.Diagnostics;
-using System.Security.Cryptography.X509Certificates;
-using Microsoft.AspNetCore.Server.Kestrel.Https;
-using System.Net;
-using System.Text.RegularExpressions;
-using Centaurus.Alpha;
 
-namespace Centaurus
+namespace Centaurus.Alpha
 {
     public class AlphaStartup : StartupBase
     {
@@ -34,20 +15,10 @@ namespace Centaurus
         private IHost host;
         private ManualResetEvent resetEvent;
 
-        public AlphaStartup(Domain.ExecutionContext context)
-            : this(context, GetHost)
-        {
-        }
-
-        public AlphaStartup(Domain.ExecutionContext context, Func<Domain.ExecutionContext, IHost> hostFactory)
+        public AlphaStartup(Domain.ExecutionContext context, AlphaHostFactoryBase hostFactory)
             : base(context)
         {
-            host = hostFactory?.Invoke(context);
-        }
-
-        private static IHost GetHost(Domain.ExecutionContext context)
-        {
-            return new AlphaHostBuilder(context).CreateHost(context.Settings);
+            host = hostFactory.GetHost(context);
         }
 
         public override async Task Run(ManualResetEvent resetEvent)
@@ -71,10 +42,8 @@ namespace Centaurus
 
         public override async Task Shutdown()
         {
-            Context.AppState.State = ApplicationState.Stopped;
             await Context.ConnectionManager.CloseAllConnections();
             await Context.InfoConnectionManager.CloseAllConnections();
-            Context.Dispose();
             if (host != null)
             {
                 await host.StopAsync(CancellationToken.None);

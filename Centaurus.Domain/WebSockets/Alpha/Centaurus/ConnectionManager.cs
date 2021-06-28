@@ -106,19 +106,19 @@ namespace Centaurus.Domain
         {
             Unsubscribe(connection);
             await connection.CloseConnection();
-            logger.Trace($"{connection.ClientPubKey} is disconnected.");
+            logger.Trace($"{connection.PubKey} is disconnected.");
         }
 
         void AddConnection(IncomingWebSocketConnection connection)
         {
             lock (connection)
             {
-                connections.AddOrUpdate(connection.ClientPubKey, connection, (key, oldConnection) =>
+                connections.AddOrUpdate(connection.PubKey, connection, (key, oldConnection) =>
                 {
                     RemoveConnection(oldConnection);
                     return connection;
                 });
-                logger.Trace($"{connection.ClientPubKey} is connected.");
+                logger.Trace($"{connection.PubKey} is connected.");
             }
         }
 
@@ -146,10 +146,10 @@ namespace Centaurus.Domain
 
         void TrySetAuditorState(IncomingWebSocketConnection connection, ConnectionState state)
         {
-            if (Context.Constellation.Auditors.Contains(connection.ClientPubKey))
+            if (connection.IsAuditor)
             {
-                Context.AppState.RegisterAuditorState(connection.ClientPubKey, state);
-                logger.Trace($"Auditor {connection.ClientPubKey} is connected.");
+                Context.AppState.RegisterAuditorState(connection.PubKey, state);
+                logger.Trace($"Auditor {connection.PubKey} is connected.");
             }
         }
 
@@ -159,13 +159,13 @@ namespace Centaurus.Domain
             {
                 _ = UnsubscribeAndClose(connection);
 
-                if (connection.ClientPubKey != null)
+                if (connection.PubKey != null)
                 {
-                    connections.TryRemove(connection.ClientPubKey, out _);
-                    if (Context.Constellation.Auditors.Contains(connection.ClientPubKey))
+                    connections.TryRemove(connection.PubKey, out _);
+                    if (connection.IsAuditor)
                     {
-                        Context.AppState.AuditorConnectionClosed(connection.ClientPubKey);
-                        Context.Catchup.RemoveState(connection.ClientPubKey);
+                        Context.AppState.AuditorConnectionClosed(connection.PubKey);
+                        Context.Catchup.RemoveState(connection.PubKey);
                     }
                 }
             }

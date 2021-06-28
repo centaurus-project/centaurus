@@ -137,10 +137,10 @@ namespace Centaurus.Test
             {
                 foreach (var cursor in cursors)
                 {
-                    var currentCursor = paymentCursors.FirstOrDefault(c => (int)c.Provider == cursor.Provider);
+                    var currentCursor = paymentCursors.FirstOrDefault(c => c.Provider == cursor.Provider);
                     if (currentCursor == null)
                     {
-                        currentCursor = new PaymentCursorModel { Provider = (int)cursor.Provider };
+                        currentCursor = new PaymentCursorModel { Provider = cursor.Provider };
                     }
                     currentCursor.Cursor = cursor.Cursor;
                 }

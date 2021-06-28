@@ -1,4 +1,5 @@
-﻿using Centaurus.Models;
+﻿using Centaurus.Domain.Models;
+using Centaurus.Models;
 using NLog;
 using System;
 using System.Collections;
@@ -20,9 +21,9 @@ namespace Centaurus.Domain
         /// Add new order to the orderbook.
         /// </summary>
         /// <param name="order">An order to add</param>
-        public override void InsertOrder(Order order)
+        public override void InsertOrder(OrderWrapper order)
         {
-            var price = order.Price;
+            var price = order.Order.Price;
             //just set Head reference if it's the first order
             if (Head == null)
             {
@@ -31,8 +32,8 @@ namespace Centaurus.Domain
             }
             //find position to insert the order
             var cursor = Head;
-            while ((Side == OrderSide.Sell && price >= cursor.Price)
-                || (Side == OrderSide.Buy && price <= cursor.Price))
+            while ((Side == OrderSide.Sell && price >= cursor.Order.Price)
+                || (Side == OrderSide.Buy && price <= cursor.Order.Price))
             {
                 cursor = cursor.Next;
                 if (cursor == null) break; //the last record

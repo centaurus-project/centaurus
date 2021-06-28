@@ -20,7 +20,22 @@ namespace Centaurus.Domain
                 Auditors = settings.Auditors.Select(a => (RawPubKey)a).OrderBy(a => a.ToString()).ToList(),
                 MinAccountBalance = settings.MinAccountBalance,
                 MinAllowedLotSize = settings.MinAllowedLotSize,
-                Vaults = settings.Vaults.Select(v => new Vault { Provider = (PaymentProvider)v.Provider, AccountId = v.Vault }).ToList(),
+                Providers = settings.Providers.Select(pm => new ProviderSettings
+                {
+                    Provider = pm.Provider,
+                    Name = pm.Name,
+                    Cursor = pm.Cursor,
+                    PaymentSubmitDelay = pm.PaymentSubmitDelay,
+                    Vault = pm.Vault,
+                    Assets = pm.Assets
+                        .Select(am => new ProviderAsset
+                        {
+                            CentaurusAsset = am.CentaurusAsset,
+                            Token = am.Token,
+                            IsVirtual = am.IsVirtual
+                        })
+                        .ToList()
+                }).ToList(),
                 Assets = assets,
                 RequestRateLimits = new RequestRateLimits
                 {

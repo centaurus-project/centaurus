@@ -19,39 +19,13 @@ namespace Centaurus.Models
         /// <summary>
         /// Asset code.
         /// </summary>
-        [XdrField(1, Optional = true)]
+        [XdrField(1)]
         public string Code { get; set; }
 
         /// <summary>
-        /// Asset issuer address.
+        /// Is native asset or not.
         /// </summary>
-        [XdrField(2, Optional = true)]
-        public RawPubKey Issuer { get; set; }
-
-        public bool IsXlm => Issuer == null;
-
-        public override string ToString()
-        {
-            if (IsXlm) 
-                return AssetsHelper.XLMCode;
-            return AssetsHelper.GetCode(Code, Issuer.ToString());
-        }
-
-        /// <summary>
-        /// Converts a string asset code into AssetSettings object
-        /// </summary>
-        /// <param name="code"></param>
-        /// <returns></returns>
-        public static AssetSettings FromCode(string code)
-        {
-            if (string.IsNullOrEmpty(code))
-                throw new ArgumentNullException(nameof(code));
-
-            var assetData = code.Split("-", StringSplitOptions.RemoveEmptyEntries);
-            if (assetData.Length != 1 && assetData.Length != 3) //if length is 1 then it's a native asset, else it should have code, asset type and issuer
-                throw new Exception("Unable to parse asset");
-
-            return new AssetSettings { Code = assetData[0], Issuer = assetData.Length > 1 ? new RawPubKey(assetData[1]) : null };
-        }
+        [XdrField(2)]
+        public long IsSuspended { get; set; }
     }
 }

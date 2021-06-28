@@ -1,6 +1,5 @@
 ﻿using Centaurus.Domain;
 using Centaurus.Models;
-using Centaurus.Models.Extensions;
 using NUnit.Framework;
 using stellar_dotnet_sdk;
 using stellar_dotnet_sdk.responses;
@@ -65,9 +64,9 @@ namespace Centaurus.Test
                 var withdrawal = new WithdrawalRequest
                 {
                     Account = accountWrapper.Account.Id,
-                    TransactionXdr = txStream.ToArray(),
+                    Transaction = txStream.ToArray(),
                     RequestId = DateTime.UtcNow.Ticks,
-                    AccountWrapper = accountWrapper
+                    PaymentProvider = "Stellar"
                 };
 
                 MessageEnvelope quantum = withdrawal.CreateEnvelope();
@@ -99,10 +98,11 @@ namespace Centaurus.Test
                             TransactionHash = txHash,
                             PaymentResult = PaymentResults.Success
                         }
-                    }
+                    },
+                ProviderId = "Stellar"
             };
 
-            context.PaymentsManager.TryGetManager(PaymentProvider.Stellar, out var provider);
+            context.PaymentProvidersManager.TryGetManager(PaymentProvider.Stellar, out var provider);
             provider.NotificationsManager.RegisterNotification(paymentNotification);
 
             var ledgerCommitEnv = new PaymentCommitQuantum
@@ -120,8 +120,8 @@ namespace Centaurus.Test
             await AssertQuantumHandling(ledgerCommitEnv, excpectedException);
             if (excpectedException == null)
             {
-                context.PaymentsManager.TryGetManager(PaymentProvider.Stellar, out var paymentsProvider);
-                Assert.AreEqual(paymentsProvider.Cursor, paymentNotification.Cursor);
+                context.PaymentProvidersManager.TryGetManager(PaymentProvider.Stellar, out var paymentProvider);
+                Assert.AreEqual(paymentProvider.Cursor, paymentNotification.Cursor);
 
                 Assert.AreEqual(account1.GetBalance(asset).Liabilities, 0);
                 Assert.AreEqual(account1.GetBalance(asset).Amount, client1StartBalanceAmount - amount + depositAmount); //acc balance + deposit - withdrawal
@@ -259,19 +259,16 @@ namespace Centaurus.Test
             {
                 Account = account.Account.Id,
                 RequestId = 1,
-                TransactionXdr = outputStream.ToArray(),
-                AccountWrapper = account
+                Transaction = outputStream.ToArray(),
+                AccountWrapper = account,
+                PaymentProvider = PaymentProvider.Stellar
             };
 
-            var envelope = withdrawal.CreateEnvelope().Sign(useFakeSigner ? TestEnvironment.Client2KeyPair : TestEnvironment.Client1KeyPair);
+            var envelope = withdrawal
+                .CreateEnvelope()
+                .Sign(useFakeSigner ? TestEnvironment.Client2KeyPair : TestEnvironment.Client1KeyPair);
 
-            if (!context.IsAlpha)
-            {
-                var quantum = new RequestQuantum { Apex = context.QuantumStorage.CurrentApex + 1, RequestEnvelope = envelope, Timestamp = DateTime.UtcNow.Ticks };
-                envelope = quantum.CreateEnvelope().Sign(TestEnvironment.AlphaKeyPair);
-            }
-
-            var result = await AssertQuantumHandling(envelope, excpectedException);
+            var result = await AssertQuantumHandling(new RequestQuantum { RequestEnvelope = envelope, Apex = context.QuantumStorage.CurrentApex + 1 }.CreateEnvelope(), excpectedException);
 
             if (excpectedException == null)
             {
@@ -305,15 +302,16 @@ namespace Centaurus.Test
             {
                 Account = acc.Account.Id,
                 RequestId = 1,
-                TransactionXdr = outputStream.ToArray(),
-                AccountWrapper = account
+                Transaction = outputStream.ToArray(),
+                AccountWrapper = account,
+                PaymentProvider = PaymentProvider.Stellar
             };
 
             var envelope = withdrawal
                 .CreateEnvelope()
                 .Sign(TestEnvironment.Client1KeyPair);
 
-            var result = await AssertQuantumHandling(envelope);
+            var result = await AssertQuantumHandling(new RequestQuantum { Apex = context.QuantumStorage.CurrentApex + 1, RequestEnvelope = envelope }.CreateEnvelope());
 
             if (result.Status != ResultStatusCodes.Success)
                 throw new Exception("Withdrawal creation failed.");
@@ -321,7 +319,8 @@ namespace Centaurus.Test
             var cleanup = new WithrawalsCleanupQuantum
             {
                 ExpiredWithdrawal = useFakeHash ? new byte[] { } : tx.Hash(),
-                Apex = context.QuantumStorage.CurrentApex + 1
+                Apex = context.QuantumStorage.CurrentApex + 1,
+                ProviderId = PaymentProvider.Stellar
             };
 
             envelope = cleanup.CreateEnvelope();
@@ -386,8 +385,7 @@ namespace Centaurus.Test
             var order = new AccountDataRequest
             {
                 Account = accountWrapper.Account.Id,
-                RequestId = nonce,
-                AccountWrapper = accountWrapper
+                RequestId = nonce
             };
 
             var envelope = order.CreateEnvelope();
@@ -422,8 +420,7 @@ namespace Centaurus.Test
                 var envelope = new AccountDataRequest
                 {
                     Account = account.Account.Id,
-                    RequestId = i + 1,
-                    AccountWrapper = account
+                    RequestId = i + 1
                 }.CreateEnvelope();
                 envelope.Sign(clientKeyPair);
                 if (!context.IsAlpha)

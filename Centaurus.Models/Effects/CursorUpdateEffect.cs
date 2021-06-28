@@ -10,7 +10,7 @@ namespace Centaurus.Models
         public override EffectTypes EffectType => EffectTypes.TxCursorUpdate;
 
         [XdrField(0)]
-        public PaymentProvider Provider { get; set; }
+        public string ProviderId { get; set; }
 
         [XdrField(1)]
         public string Cursor { get; set; }

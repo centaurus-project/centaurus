@@ -8,8 +8,7 @@ using Centaurus.DAL;
 using Centaurus.DAL.Mongo;
 using Centaurus.Exchange.Analytics;
 using Centaurus.Models;
-using Centaurus.Stellar;
-using Centaurus.Xdr;
+using Centaurus.PaymentProvider;
 using NLog;
 
 namespace Centaurus.Domain
@@ -21,18 +20,21 @@ namespace Centaurus.Domain
         /// <param name="settings">Application config</param>
         /// <param name="storage">Permanent storage object</param>
         /// <param name="useLegacyOrderbook"></param>
-        public ExecutionContext(Settings settings, IStorage storage, StellarDataProviderBase stellarDataProvider, bool useLegacyOrderbook = false)
+        public ExecutionContext(Settings settings, IStorage storage, PaymentProviderFactoryBase paymentProviderFactory, bool useLegacyOrderbook = false)
         {
-            RoleManager = new RoleManager(
-                settings.AlphaPubKey == settings.KeyPair.AccountId
-                ? CentaurusRole.Alpha
-                : CentaurusRole.Beta);
-
             PermanentStorage = storage ?? throw new ArgumentNullException(nameof(storage));
             Settings = settings ?? throw new ArgumentNullException(nameof(settings));
-            StellarDataProvider = stellarDataProvider ?? throw new ArgumentNullException(nameof(settings));
+            PaymentProviderFactory = paymentProviderFactory ?? throw new ArgumentNullException(nameof(paymentProviderFactory));
 
-            ExtensionsManager = new ExtensionsManager(settings.ExtensionsConfigFilePath);
+            PaymentParsersManager = new PaymentParsersManager();
+
+            RoleManager = new RoleManager(
+                (CentaurusNodeParticipationLevel)Settings.ParticipationLevel,
+                Settings.AlphaPubKey == Settings.KeyPair.AccountId
+                ? CentaurusNodeRole.Alpha
+                : CentaurusNodeRole.Beta);
+
+            ExtensionsManager = new ExtensionsManager(Settings.ExtensionsConfigFilePath);
 
             PersistenceManager = new PersistenceManager(PermanentStorage);
             QuantumProcessor = new QuantumProcessorsStorage();
@@ -42,9 +44,7 @@ namespace Centaurus.Domain
 
             QuantumStorage = new QuantumStorage();
 
-            AlphaMessageHandlers = new MessageHandlers<IncomingWebSocketConnection>(this);
-
-            AuditorMessageHandlers = new MessageHandlers<OutgoingWebSocketConnection>(this);
+            MessageHandlers = new MessageHandlers(this);
 
             InfoCommandsHandlers = new InfoCommandsHandlers(this);
 
@@ -88,7 +88,7 @@ namespace Centaurus.Domain
                 var lastQuantum = await PersistenceManager.GetQuantum(lastApex);
 
                 lastHash = lastQuantum.Message.ComputeHash();
-                var snapshot = await PersistenceManager.GetSnapshot(lastApex);
+                var snapshot = await PersistenceManager.GetSnapshot(PaymentParsersManager, lastApex);
                 await Setup(snapshot);
                 if (IsAlpha)
                     AppState.State = ApplicationState.Rising;//Alpha should ensure that it has all quanta from auditors
@@ -115,7 +115,7 @@ namespace Centaurus.Domain
 
             Exchange?.Dispose(); Exchange = Exchange.RestoreExchange(snapshot.Settings.Assets, snapshot.Orders, IsAlpha, useLegacyOrderbook);
 
-            PaymentsManager?.Dispose(); PaymentsManager = new PaymentsManager(this, snapshot.Cursors, snapshot.Withdrawals);
+            PaymentProvidersManager?.Dispose(); PaymentProvidersManager = new PaymentProvidersManager(PaymentParsersManager, PaymentProviderFactory, Constellation.Providers, snapshot.Withdrawals);
 
             AuditResultManager?.Dispose(); AuditResultManager = new ResultManager(this);
 
@@ -124,8 +124,8 @@ namespace Centaurus.Domain
             AnalyticsManager = new AnalyticsManager(
                 PermanentStorage,
                 DepthsSubscription.Precisions.ToList(),
-                Constellation.Assets.Where(a => !a.IsXlm).Select(a => a.Id).ToList(),
-                snapshot.Orders.Select(o => o.ToOrderInfo()).ToList()
+                Constellation.Assets.Where(a => a.Id > 0).Select(a => a.Id).ToList(), //all but base asset
+                snapshot.Orders.Select(o => o.Order.ToOrderInfo()).ToList()
             );
 
             await AnalyticsManager.Restore(DateTime.UtcNow);
@@ -144,7 +144,7 @@ namespace Centaurus.Domain
             PendingUpdatesManager?.Stop(TimeSpan.FromMilliseconds(0)); PendingUpdatesManager?.Dispose();
 
             ExtensionsManager?.Dispose();
-            PaymentsManager?.Dispose();
+            PaymentProvidersManager?.Dispose();
 
             QuantumHandler.Dispose();
             AuditResultManager?.Dispose();
@@ -198,7 +198,7 @@ namespace Centaurus.Domain
             }
         }
 
-        public bool IsAlpha => RoleManager.Role == CentaurusRole.Alpha;
+        public bool IsAlpha => RoleManager.Role == CentaurusNodeRole.Alpha;
 
         public ExtensionsManager ExtensionsManager { get; }
 
@@ -211,8 +211,7 @@ namespace Centaurus.Domain
         public IStorage PermanentStorage { get; }
 
         public Settings Settings { get; }
-
-        public StellarDataProviderBase StellarDataProvider { get; }
+        public PaymentProviderFactoryBase PaymentProviderFactory { get; }
 
         public StateManager AppState { get; }
 
@@ -228,19 +227,19 @@ namespace Centaurus.Domain
 
         public InfoCommandsHandlers InfoCommandsHandlers { get; }
 
-        public MessageHandlers<IncomingWebSocketConnection> AlphaMessageHandlers { get; }
-
-        public MessageHandlers<OutgoingWebSocketConnection> AuditorMessageHandlers { get; }
+        public MessageHandlers MessageHandlers { get; }
 
         public OutgoingMessageStorage OutgoingMessageStorage { get; }
 
         public OutgoingResultsStorage OutgoingResultsStorage { get; }
 
+        public PaymentParsersManager PaymentParsersManager { get; }
+
         public Exchange Exchange { get; private set; }
 
         public AccountStorage AccountStorage { get; private set; }
 
-        public PaymentsManager PaymentsManager { get; private set; }
+        public PaymentProvidersManager PaymentProvidersManager { get; private set; }
 
         public PerformanceStatisticsManager PerformanceStatisticsManager { get; private set; }
 

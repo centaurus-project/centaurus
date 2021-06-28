@@ -1,4 +1,5 @@
-﻿using Centaurus.Models;
+﻿using Centaurus.Domain.Models;
+using Centaurus.Models;
 using Microsoft.Extensions.Logging;
 using NLog;
 using System;
@@ -61,14 +62,14 @@ namespace Centaurus.Domain
             awaitedUpdates?.Add(updates);
         }
 
-        public void RemoveOrder(EffectProcessorsContainer effectsContainer, OrderbookBase orderbook, Order order)
+        public void RemoveOrder(EffectProcessorsContainer effectsContainer, OrderbookBase orderbook, OrderWrapper order)
         {
             effectsContainer.AddOrderRemoved(orderbook, order);
             if (awaitedUpdates != null)
             {
                 var updateTime = new DateTime(((Quantum)effectsContainer.Envelope.Message).Timestamp, DateTimeKind.Utc);
                 var exchangeItem = new ExchangeUpdate(orderbook.Market, updateTime);
-                exchangeItem.OrderUpdates.Add(order.ToOrderInfo(OrderState.Deleted));
+                exchangeItem.OrderUpdates.Add(order.Order.ToOrderInfo(OrderState.Deleted));
                 awaitedUpdates.Add(exchangeItem);
             }
         }
@@ -110,7 +111,7 @@ namespace Centaurus.Domain
             return GetMarket(asset).GetOrderbook(side);
         }
 
-        public static Exchange RestoreExchange(List<AssetSettings> assets, List<Order> orders, bool observeTrades, bool useLegacyOrderbook = false)
+        public static Exchange RestoreExchange(List<AssetSettings> assets, List<OrderWrapper> orders, bool observeTrades, bool useLegacyOrderbook = false)
         {
             var exchange = new Exchange(observeTrades);
             foreach (var asset in assets)

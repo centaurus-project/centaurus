@@ -23,12 +23,7 @@ namespace Centaurus.Test.Exchange.Analytics
         public void Setup()
         {
             EnvironmentHelper.SetTestEnvironmentVariable();
-            var settings = new Settings
-            {
-                HorizonUrl = "https://horizon-testnet.stellar.org",
-                NetworkPassphrase = "Test SDF Network ; September 2015",
-                CWD = "AppData"
-            };
+            var settings = GlobalInitHelper.GetAlphaSettings();
 
             var stellarProvider = new MockStellarDataProvider(settings.NetworkPassphrase, settings.HorizonUrl);
 
@@ -61,18 +56,34 @@ namespace Centaurus.Test.Exchange.Analytics
 
             account2.Account.CreateBalance(1);
             account2.Account.GetBalance(1).UpdateBalance(10000000000);
+
+            var stellarPaymentProviderVault = KeyPair.Random().AccountId;
+            var stellarPaymentProvider = new ProviderSettings
+            {
+                Provider = "Stellar",
+                Name = settings.NetworkPassphrase,
+                Vault = stellarPaymentProviderVault,
+                Assets = new List<ProviderAsset>
+                {
+                    new ProviderAsset { CentaurusAsset = 0},
+                    new ProviderAsset { CentaurusAsset = 1, IsVirtual = true, Token = $"USD-{stellarPaymentProviderVault}-1" }
+                },
+                Cursor = "1",
+                PaymentSubmitDelay = 0
+            };
+
             context.Setup(new Snapshot
             {
                 Accounts = new List<AccountWrapper> { account1, account2 },
                 Apex = 0,
-                Cursors = new List<PaymentCursor> { new PaymentCursor { Cursor = "1", Provider = PaymentProvider.Stellar } },
                 Orders = new List<Order>(),
                 Settings = new ConstellationSettings
                 {
-                    Vaults = new List<Vault> { new Vault { AccountId = KeyPair.Random().AccountId, Provider = PaymentProvider.Stellar } },
-                    Assets = new List<AssetSettings> { new AssetSettings { Id = 1, Code = "X", Issuer = new RawPubKey() } },
+                    Providers = new List<ProviderSettings> { stellarPaymentProvider },
+                    Assets = new List<AssetSettings> { new AssetSettings { Id = 0, Code = "XLM", MinDeposit = 1 }, new AssetSettings { Id = 1, Code = "USD", MinDeposit = -1 } },
                     RequestRateLimits = new RequestRateLimits { HourLimit = 1000, MinuteLimit = 100 }
                 },
+                Withdrawals = new Dictionary<string, WithdrawalStorage>()
             }).Wait();
         }
 
@@ -133,7 +144,7 @@ namespace Centaurus.Test.Exchange.Analytics
             {
                 foreach (var asset in context.Constellation.Assets)
                 {
-                    if (asset.IsXlm)
+                    if (asset.Id == 0) //base asset
                         continue;
                     foreach (var precision in DepthsSubscription.Precisions)
                     {

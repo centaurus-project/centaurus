@@ -9,16 +9,16 @@ namespace Centaurus.Domain
     public static class ClientRequestProcessingHelper
     {
         public static void UpdateNonce<T>(this T context)
-            where T : ProcessorContext
+            where T : RequestContext
         {
             var requestQuantum = (RequestQuantum)context.Envelope.Message;
             var requestMessage = requestQuantum.RequestMessage;
 
-            context.EffectProcessors.AddNonceUpdate(requestMessage.AccountWrapper, requestMessage.Nonce, requestMessage.AccountWrapper.Account.Nonce);
+            context.EffectProcessors.AddNonceUpdate(context.SourceAccount, requestMessage.Nonce, context.SourceAccount.Account.Nonce);
         }
 
         public static void ValidateNonce<T>(this T context)
-            where T : ProcessorContext
+            where T : RequestContext
         {
             var requestQuantum = context.Envelope.Message as RequestQuantum;
             if (requestQuantum == null)
@@ -28,12 +28,8 @@ namespace Centaurus.Domain
             if (requestMessage == null)
                 throw new BadRequestException($"Invalid message type. {typeof(RequestQuantum).Name} should contain message of type {typeof(SequentialRequestMessage).Name}.");
 
-            var currentUser = requestMessage.AccountWrapper;
-            if (currentUser == null)
-                throw new Exception($"Account with public key '{requestMessage}' is not found.");
-
-            if (requestMessage.Nonce < 1 || currentUser.Account.Nonce >= requestMessage.Nonce)
-                throw new UnauthorizedException($"Specified nonce is invalid. Current nonce: {currentUser.Account}; request nonce: {requestMessage.Nonce}.");
+            if (requestMessage.Nonce < 1 || context.SourceAccount.Account.Nonce >= requestMessage.Nonce)
+                throw new UnauthorizedException($"Specified nonce is invalid. Current nonce: {context.SourceAccount.Account}; request nonce: {requestMessage.Nonce}.");
         }
     }
 }

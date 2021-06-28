@@ -39,7 +39,7 @@ namespace Centaurus.Test
 
             var clientConnection = new IncomingWebSocketConnection(context, new FakeWebSocket(), "127.0.0.1");
 
-            var message = new HandshakeInit { HandshakeData = clientConnection.HandshakeData };
+            var message = new HandshakeResponse { HandshakeData = clientConnection.HandshakeData };
             var envelope = message.CreateEnvelope();
             envelope.Sign(clientKeyPair);
 
@@ -47,17 +47,17 @@ namespace Centaurus.Test
             var inMessage = envelope.ToIncomingMessage(writer);
             if (expectedException == null)
             {
-                var isHandled = await context.AlphaMessageHandlers.HandleMessage(clientConnection, inMessage);
+                var isHandled = await context.MessageHandlers.HandleMessage(clientConnection, inMessage);
 
                 Assert.IsTrue(isHandled);
-                Assert.AreEqual(clientConnection.ClientPubKey, new RawPubKey(clientKeyPair.AccountId));
-                if (clientConnection.ClientPubKey.Equals((RawPubKey)TestEnvironment.Auditor1KeyPair))
+                Assert.AreEqual(clientConnection.PubKey, new RawPubKey(clientKeyPair.AccountId));
+                if (clientConnection.PubKey.Equals((RawPubKey)TestEnvironment.Auditor1KeyPair))
                     Assert.AreEqual(clientConnection.ConnectionState, ConnectionState.Validated);
                 else
                     Assert.AreEqual(clientConnection.ConnectionState, ConnectionState.Ready);
             }
             else
-                Assert.ThrowsAsync(expectedException, async () => await context.AlphaMessageHandlers.HandleMessage(clientConnection, inMessage));
+                Assert.ThrowsAsync(expectedException, async () => await context.MessageHandlers.HandleMessage(clientConnection, inMessage));
         }
 
         [Test]
@@ -70,13 +70,13 @@ namespace Centaurus.Test
             var handshake = new HandshakeData();
             handshake.Randomize();
 
-            var envelope = new HandshakeInit { HandshakeData = handshake }.CreateEnvelope();
+            var envelope = new HandshakeResponse { HandshakeData = handshake }.CreateEnvelope();
             envelope.Sign(TestEnvironment.Client1KeyPair);
 
             using var writer = new XdrBufferWriter();
             var inMessage = envelope.ToIncomingMessage(writer);
 
-            Assert.ThrowsAsync<ConnectionCloseException>(async () => await context.AlphaMessageHandlers.HandleMessage(clientConnection, inMessage));
+            Assert.ThrowsAsync<ConnectionCloseException>(async () => await context.MessageHandlers.HandleMessage(clientConnection, inMessage));
         }
 
         [Test]
@@ -94,10 +94,7 @@ namespace Centaurus.Test
             envelope.Sign(TestEnvironment.Auditor1KeyPair);
 
 
-            var auditorConnection = new IncomingWebSocketConnection(context, new FakeWebSocket(), "127.0.0.1")
-            {
-                ClientPubKey = TestEnvironment.Auditor1KeyPair
-            };
+            var auditorConnection = GetIncomingConnection(context, TestEnvironment.Auditor1KeyPair.PublicKey, ConnectionState.Validated);
 
             using var writer = new XdrBufferWriter();
             var inMessage = envelope.ToIncomingMessage(writer);
@@ -119,11 +116,7 @@ namespace Centaurus.Test
         {
             context.AppState.State = ApplicationState.Ready;
 
-            var clientConnection = new IncomingWebSocketConnection(context, new FakeWebSocket(), "127.0.0.1")
-            {
-                ClientPubKey = clientKeyPair.PublicKey,
-                ConnectionState = state
-            };
+            var clientConnection = GetIncomingConnection(context, clientKeyPair.PublicKey, state);
 
             var envelope = new SetApexCursor { Apex = 1 }.CreateEnvelope();
             envelope.Sign(clientKeyPair);
@@ -146,11 +139,7 @@ namespace Centaurus.Test
         {
             context.AppState.State = ApplicationState.Rising;
 
-            var clientConnection = new IncomingWebSocketConnection(context, new FakeWebSocket(), "127.0.0.1")
-            {
-                ClientPubKey = clientKeyPair.PublicKey,
-                ConnectionState = state
-            };
+            var clientConnection = GetIncomingConnection(context, clientKeyPair.PublicKey, state);
 
             var envelope = new AuditorState
             {
@@ -179,11 +168,7 @@ namespace Centaurus.Test
         {
             context.AppState.State = ApplicationState.Ready;
 
-            var clientConnection = new IncomingWebSocketConnection(context, new FakeWebSocket(), "127.0.0.1")
-            {
-                ClientPubKey = TestEnvironment.Client1KeyPair.PublicKey,
-                ConnectionState = state
-            };
+            var clientConnection = GetIncomingConnection(context, TestEnvironment.Client1KeyPair.PublicKey, state);
 
             var account = context.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
 
@@ -211,17 +196,11 @@ namespace Centaurus.Test
         {
             context.AppState.State = ApplicationState.Ready;
 
-            var clientConnection = new IncomingWebSocketConnection(context, new FakeWebSocket(), "127.0.0.1")
-            {
-                ClientPubKey = TestEnvironment.Client1KeyPair.PublicKey,
-                ConnectionState = state
-            };
-
-            var account = context.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
+            var clientConnection = GetIncomingConnection(context, TestEnvironment.Client1KeyPair.PublicKey, state);
 
             var envelope = new AccountDataRequest
             {
-                Account = account.Account.Id,
+                Account = clientConnection.Account.Id,
                 RequestId = 1
             }.CreateEnvelope();
             envelope.Sign(TestEnvironment.Client1KeyPair);
@@ -259,12 +238,7 @@ namespace Centaurus.Test
                 var effectProcessor = new RequestRateLimitUpdateEffectProcessor(effect, context.Constellation.RequestRateLimits);
                 effectProcessor.CommitEffect();
             }
-            var clientConnection = new IncomingWebSocketConnection(context, new FakeWebSocket(), "127.0.0.1")
-            {
-                ClientPubKey = clientKeyPair,
-                ConnectionState = ConnectionState.Ready,
-                Account = account
-            };
+            var clientConnection = GetIncomingConnection(context, clientKeyPair.PublicKey, ConnectionState.Ready);
 
             var minuteLimit = (account.Account.RequestRateLimits ?? context.Constellation.RequestRateLimits).MinuteLimit;
             var minuteIterCount = minuteLimit + 1;
@@ -301,12 +275,7 @@ namespace Centaurus.Test
 
             var account = context.AccountStorage.GetAccount(client);
 
-            var clientConnection = new IncomingWebSocketConnection(context, new FakeWebSocket(), "127.0.0.1")
-            {
-                ClientPubKey = client,
-                ConnectionState = state,
-                Account = account
-            };
+            var clientConnection = GetIncomingConnection(context, client.PublicKey, state);
 
             var envelope = new EffectsRequest { Account = account.Account.Id, AccountWrapper = account }.CreateEnvelope();
             envelope.Sign(client);

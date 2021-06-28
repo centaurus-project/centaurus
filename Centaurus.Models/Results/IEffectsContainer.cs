@@ -6,6 +6,8 @@ namespace Centaurus.Models
 {
     public interface IEffectsContainer
     {
-        public List<Effect> Effects { get; }
+        public List<Effect> ClientEffects { get; set; }
+
+        public EffectsProof Effects { get; set; }
     }
 }

@@ -9,24 +9,21 @@ namespace Centaurus.Models
     public abstract class ConstellationEffect : Effect
     {
         [XdrField(0)]
-        public List<Vault> Vaults { get; set; }
+        public List<ProviderSettings> Providers { get; set; }
 
         [XdrField(1)]
-        public List<PaymentCursor> Cursors { get; set; }
-
-        [XdrField(2)]
         public List<RawPubKey> Auditors { get; set; }
 
-        [XdrField(3)]
+        [XdrField(2)]
         public long MinAccountBalance { get; set; }
 
-        [XdrField(4)]
+        [XdrField(3)]
         public long MinAllowedLotSize { get; set; }
 
-        [XdrField(5)]
+        [XdrField(4)]
         public List<AssetSettings> Assets { get; set; }
 
-        [XdrField(6, Optional = true)]
+        [XdrField(5, Optional = true)]
         public RequestRateLimits RequestRateLimits { get; set; }
     }
 }

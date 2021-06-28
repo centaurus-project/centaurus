@@ -46,13 +46,9 @@ namespace Centaurus.Test
             settings.NetworkPassphrase = "Test SDF Network ; September 2015";
             settings.CWD = "AppData";
             settings.AlphaPubKey = TestEnvironment.AlphaKeyPair.AccountId;
-            settings.GenesisQuorum = new string[]
-            {
-                TestEnvironment.AlphaKeyPair.AccountId,
-                TestEnvironment.Auditor1KeyPair.AccountId
-            };
             settings.AuditorAddressBook = new string[] { "http://localhost" };
             settings.Secret = secret;
+            settings.ParticipationLevel = 1;
         }
 
         public static List<KeyPair> GetPredefinedClients()
@@ -62,7 +58,7 @@ namespace Centaurus.Test
 
         public static List<KeyPair> GetPredefinedAuditors()
         {
-            return new List<KeyPair> { TestEnvironment.Auditor1KeyPair };
+            return new List<KeyPair> { TestEnvironment.AlphaKeyPair, TestEnvironment.Auditor1KeyPair };
         }
 
         private static async Task<IStorage> GetStorage(string connectionString)
@@ -108,7 +104,23 @@ namespace Centaurus.Test
 
             await context.Init();
 
-            var assets = new List<AssetSettings> { new AssetSettings { Id = 1, Code = "X", Issuer = KeyPair.Random() } };
+            var assets = new List<AssetSettings> { new AssetSettings { Id = 0, Code = "XLM", MinDeposit = 1 }, new AssetSettings { Id = 1, Code = "USD", MinDeposit = -1 } };
+
+            var stellarProviderVault = KeyPair.Random().AccountId;
+
+            var stellarProviderSettings = new ProviderSettings
+            {
+                Provider = "Stellar",
+                Cursor = "0",
+                Vault = stellarProviderVault,
+                Assets = new List<ProviderAsset>
+                        {
+                            new ProviderAsset { CentaurusAsset = 0 },
+                            new ProviderAsset { CentaurusAsset = 1, Token = $"USD-{stellarProviderVault}-1", IsVirtual = true }
+                        },
+                Name = "Test SDF Network ; September 2015",
+                PaymentSubmitDelay = 0
+            };
 
             var initRequest = new ConstellationInitRequest
             {
@@ -116,15 +128,13 @@ namespace Centaurus.Test
                 Auditors = auditors.Select(a => (RawPubKey)a.PublicKey).ToList(),
                 MinAccountBalance = 1,
                 MinAllowedLotSize = 1,
-                Vaults = new List<Vault> { new Vault { Provider = PaymentProvider.Stellar, AccountId = KeyPair.Random().AccountId } },
+                Providers = new List<ProviderSettings> { stellarProviderSettings },
                 RequestRateLimits = new RequestRateLimits { HourLimit = 1000, MinuteLimit = 100 },
-                Cursors = new List<PaymentCursor> { new PaymentCursor { Cursor = "0", Provider = PaymentProvider.Stellar } }
-            }.CreateEnvelope();
+            }.CreateEnvelope()
+                .Sign(TestEnvironment.AlphaKeyPair)
+                .Sign(TestEnvironment.Auditor1KeyPair);
 
-            initRequest.Sign(TestEnvironment.AlphaKeyPair);
-            initRequest.Sign(TestEnvironment.Auditor1KeyPair);
-
-            await context.QuantumHandler.HandleAsync(initRequest);
+            await context.QuantumHandler.HandleAsync(new ConstellationQuantum { Apex = 1, RequestEnvelope = initRequest }.CreateEnvelope());
 
             var deposits = new List<PaymentBase>();
             Action<byte[], int> addAssetsFn = (acc, asset) =>
@@ -146,20 +156,23 @@ namespace Centaurus.Test
                     addAssetsFn(clients[i].PublicKey, assets[c].Id);
             }
 
+            var providerId = PaymentProviderBase.GetProviderId(stellarProviderSettings.Provider, stellarProviderSettings.Name);
+
             var txNotification = new PaymentNotification
             {
                 Cursor = "2",
-                Items = deposits
+                Items = deposits,
+                ProviderId = providerId
             };
 
-            context.PaymentsManager.TryGetManager(PaymentProvider.Stellar, out var paymentsProvider);
-            paymentsProvider.NotificationsManager.RegisterNotification(txNotification);
+            context.PaymentProvidersManager.TryGetManager(providerId, out var paymentProvider);
+            paymentProvider.NotificationsManager.RegisterNotification(txNotification);
 
             var depositQuantum = new PaymentCommitQuantum
             {
                 Apex = 2,
                 PrevHash = context.QuantumStorage.LastQuantumHash,
-                Source = txNotification
+                Source = txNotification,
             };
 
             await context.QuantumHandler.HandleAsync(depositQuantum.CreateEnvelope());

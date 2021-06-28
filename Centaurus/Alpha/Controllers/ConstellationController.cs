@@ -31,20 +31,14 @@ namespace Centaurus.Controllers
                 };
             else
             {
-                var network = new ConstellationInfo.Network(
-                   Context.StellarDataProvider.NetworkPassphrase,
-                   Context.StellarDataProvider.Horizon
-                    );
-                var assets = Context.Constellation.Assets.Select(a => ConstellationInfo.Asset.FromAssetSettings(a)).ToArray();
                 info = new ConstellationInfo
                 {
                     State = Context.AppState.State,
-                    Vaults = Context.Constellation.Vaults.ToDictionary(v => v.Provider.ToString(), v => v.AccountId.ToString()),
+                    Providers = Context.Constellation.Providers.ToArray(),
                     Auditors = Context.Constellation.Auditors.Select(a => ((KeyPair)a).AccountId).ToArray(),
                     MinAccountBalance = Context.Constellation.MinAccountBalance,
                     MinAllowedLotSize = Context.Constellation.MinAllowedLotSize,
-                    StellarNetwork = network,
-                    Assets = assets,
+                    Assets = Context.Constellation.Assets.ToArray(),
                     RequestRateLimits = Context.Constellation.RequestRateLimits
                 };
             }
@@ -53,34 +47,16 @@ namespace Centaurus.Controllers
         }
 
         [HttpPost("[action]")]
-        public async Task<IActionResult> Init([FromBody] ConstellationInitModel constellationInit)
+        public async Task<IActionResult> Init([FromBody] MessageEnvelope constellationInitEnvelope)
         {
             try
             {
-                if (constellationInit == null)
+                if (constellationInitEnvelope == null)
                     return StatusCode(415);
 
-                if (constellationInit.RequestRateLimits == null)
-                    throw new ArgumentNullException(nameof(constellationInit.RequestRateLimits), "RequestRateLimits parameter is required.");
-                var requestRateLimits = new RequestRateLimits
-                {
-                    HourLimit = constellationInit.RequestRateLimits.HourLimit,
-                    MinuteLimit = constellationInit.RequestRateLimits.MinuteLimit
-                };
+                var constellationInitRequest = (ConstellationInitRequest)constellationInitEnvelope.Message;
 
-                var constellationInitializer = new ConstellationInitializer(
-                    new ConstellationInitInfo
-                    {
-                        Auditors = constellationInit.Auditors.Select(a => KeyPair.FromAccountId(a)).ToArray(),
-                        MinAccountBalance = constellationInit.MinAccountBalance,
-                        MinAllowedLotSize = constellationInit.MinAllowedLotSize,
-                        Assets = constellationInit.Assets.Select(a => AssetSettings.FromCode(a)).ToArray(),
-                        RequestRateLimits = requestRateLimits
-                    },
-                    Context
-                );
-
-                await constellationInitializer.Init();
+                await Context.QuantumHandler.HandleAsync(constellationInitEnvelope);
 
                 return new JsonResult(new InitResult { IsSuccess = true });
             }

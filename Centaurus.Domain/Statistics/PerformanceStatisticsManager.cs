@@ -72,7 +72,7 @@ namespace Centaurus.Domain
                 var auditorConnections = Context.ConnectionManager.GetAuditorConnections();
                 foreach (var auditorConnection in auditorConnections)
                 {
-                    var accountId = auditorConnection?.ClientKPAccountId;
+                    var accountId = auditorConnection?.PubKeyAddress;
                     if (!auditorsStatistics.TryGetValue(accountId, out var statistics))
                         continue;
                     var auditorApex = auditorConnection?.QuantumWorker?.CurrentApexCursor ?? -1;

@@ -20,10 +20,5 @@ namespace Centaurus.Models
         /// </summary>
         [XdrField(1)]
         public long RequestId { get; set; }
-
-        /// <summary>
-        /// For request processing purposes. Do not serialize it.
-        /// </summary>
-        public AccountWrapper AccountWrapper { get; set; }
     }
 }

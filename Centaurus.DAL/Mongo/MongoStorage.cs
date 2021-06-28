@@ -193,7 +193,7 @@ namespace Centaurus.DAL.Mongo
             }
             else
             {
-                filter = fBuilder.And(filter, fBuilder.Ne(e => e.Apex, apex)); // 
+                filter = fBuilder.And(filter, fBuilder.Ne(e => e.Apex, apex));
             }
 
             var query = quantaCollection
@@ -304,7 +304,7 @@ namespace Centaurus.DAL.Mongo
                         Cursor = cursor.Cursor
                     });
                 else if (cursor.IsDeleted)
-                    throw new InvalidOperationException("Stellar data entry cannot be deleted");
+                    throw new InvalidOperationException($"{cursor.Provider} cursor cannot be deleted.");
                 else
                 {
                     updateModel = new UpdateOneModel<PaymentCursorModel>(

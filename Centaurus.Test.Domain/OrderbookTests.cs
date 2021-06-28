@@ -31,12 +31,7 @@ namespace Centaurus.Test
         public void Setup()
         {
             EnvironmentHelper.SetTestEnvironmentVariable();
-            var settings = new Settings
-            {
-                HorizonUrl = "https://horizon-testnet.stellar.org",
-                NetworkPassphrase = "Test SDF Network ; September 2015",
-                CWD = "AppData"
-            };
+            var settings = GlobalInitHelper.GetAlphaSettings();
 
             var stellarProvider = new MockStellarDataProvider(settings.NetworkPassphrase, settings.HorizonUrl);
 
@@ -81,6 +76,7 @@ namespace Centaurus.Test
                     Assets = new List<AssetSettings> { new AssetSettings { Id = 1, Code = "X", Issuer = new RawPubKey() } },
                     RequestRateLimits = requestRateLimits
                 },
+                Withdrawals = new Dictionary<PaymentProvider, WithdrawalStorage>()
             }).Wait();
 
             this.account1 = context.AccountStorage.GetAccount(account1.Id);

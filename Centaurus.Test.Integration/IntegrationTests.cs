@@ -25,9 +25,9 @@ namespace Centaurus.Test
     {
         [Test]
         [Explicit]
-        [TestCase(1, 0)]
-        [TestCase(1, 100)]
+        [TestCase(2, 0)]
         [TestCase(2, 100)]
+        [TestCase(3, 100)]
         [TestCase(10, 10)]
         public async Task BaseTest(int auditorsCount, int clientsCount)
         {
@@ -61,8 +61,8 @@ namespace Centaurus.Test
             var auditorStartup = environment.AuditorWrappers.First();
             await auditorStartup.Shutdown();
 
-            Assert.AreEqual(2, environment.AlphaWrapper.Context.AppState.ConnectedAuditorsCount, "Auditors count assertion.");
-            await environment.AssertConstellationState(ApplicationState.Ready, TimeSpan.FromSeconds(10));
+            Assert.AreEqual(1, environment.AlphaWrapper.Context.AppState.ConnectedAuditorsCount, "Auditors count assertion.");
+            await environment.AssertConstellationState(ApplicationState.Ready, TimeSpan.FromSeconds(5));
 
             var clientsCount = 100;
             environment.GenerateCliens(clientsCount);
@@ -73,7 +73,10 @@ namespace Centaurus.Test
 
             await IntegrationTestEnvironmentExtensions.AssertState(auditorStartup.Startup, ApplicationState.Ready, TimeSpan.FromSeconds(10));
             await IntegrationTestEnvironmentExtensions.AssertDuringPeriod(
-                () => Task.FromResult(auditorStartup.Context.QuantumStorage.CurrentApex == environment.AlphaWrapper.Context.QuantumStorage.CurrentApex),
+                () =>
+                {
+                    return Task.FromResult(auditorStartup.Context.QuantumStorage.CurrentApex == environment.AlphaWrapper.Context.QuantumStorage.CurrentApex);
+                },
                 TimeSpan.FromSeconds(5),
                 "Apexes are not equal"
             );
@@ -124,8 +127,7 @@ namespace Centaurus.Test
             var request = new AccountDataRequest
             {
                 Account = client.Id,
-                RequestId = DateTime.UtcNow.Ticks,
-                AccountWrapper = client
+                RequestId = DateTime.UtcNow.Ticks
             }
                 .CreateEnvelope()
                 .Sign(clientPk);

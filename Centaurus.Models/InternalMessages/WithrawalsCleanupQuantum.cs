@@ -13,6 +13,6 @@ namespace Centaurus.Models
         public byte[] ExpiredWithdrawal { get; set; }
 
         [XdrField(1)]
-        public PaymentProvider Provider { get; set; }
+        public string ProviderId { get; set; }
     }
 }

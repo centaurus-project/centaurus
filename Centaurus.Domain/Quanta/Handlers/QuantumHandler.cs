@@ -1,10 +1,12 @@
-﻿using Centaurus.Models;
+﻿using Centaurus.Domain.Models;
+using Centaurus.Models;
 using Centaurus.Xdr;
 using NLog;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -125,7 +127,6 @@ namespace Centaurus.Domain
 
         async Task<ResultMessage> HandleQuantumInternal(MessageEnvelope quantumEnvelope, long timestamp)
         {
-            quantumEnvelope.TryAssignAccountWrapper(Context.AccountStorage);
             await Context.PendingUpdatesManager.UpdatesSyncRoot.WaitAsync();
             try
             {
@@ -137,7 +138,7 @@ namespace Centaurus.Domain
             }
         }
 
-        void ValidateQuantum(MessageEnvelope envelope, long timestamp)
+        void ValidateQuantum(MessageEnvelope envelope, AccountWrapper account, long timestamp)
         {
             var quantum = (Quantum)envelope.Message;
 
@@ -152,17 +153,32 @@ namespace Centaurus.Domain
                 if (quantum.Apex != Context.QuantumStorage.CurrentApex + 1)
                     throw new Exception($"Current quantum apex is {quantum.Apex} but {Context.QuantumStorage.CurrentApex + 1} was expected.");
 
-                ValidateRequestQuantum(envelope);
+                ValidateRequestQuantum(envelope, account);
             }
+        }
+
+        AccountWrapper GetAccountWrapper(MessageEnvelope envelope)
+        {
+            var requestMessage = default(RequestMessage);
+            if (envelope.Message is RequestQuantum requestQuantum)
+                requestMessage = requestQuantum.RequestMessage;
+            else if (envelope.Message is RequestMessage)
+                requestMessage = (RequestMessage)envelope.Message;
+            else
+                return null; //the quantum is not client quantum
+
+            return Context.AccountStorage.GetAccount(requestMessage.Account);
         }
 
         async Task<ResultMessage> HandleQuantum(MessageEnvelope envelope, long timestamp)
         {
             var quantum = (Quantum)envelope.Message;
 
-            ValidateQuantum(envelope, timestamp);
+            var account = GetAccountWrapper(envelope);
 
-            var result = await ProcessQuantumEnvelope(envelope);
+            ValidateQuantum(envelope, account, timestamp);
+
+            var result = await ProcessQuantumEnvelope(envelope, account);
 
             EnsureMessageHash(envelope, result);
 
@@ -176,32 +192,29 @@ namespace Centaurus.Domain
 
             Context.QuantumStorage.AddQuantum(envelope, messageHash);
 
-            result.EffectProcessorsContainer.Complete(buffer.Buffer);
+            result.EffectProcessorsContainer.Complete(result.ResultMessage.Effects, buffer.Buffer);
 
-            EnsureOutgoingResult(result.ResultMessage);
+            EnsureOutgoingResult(result.EffectProcessorsContainer.Apex, result.ResultMessage);
 
             logger.Trace($"Message of type {quantum.MessageType} with apex {quantum.Apex} is handled.");
 
             return result.ResultMessage;
         }
 
-        void EnsureOutgoingResult(ResultMessage result)
+        void EnsureOutgoingResult(long apex, QuantumResultMessage result)
         {
-            if (!Context.IsAlpha)
-                Context.OutgoingResultsStorage.EnqueueResult(result, buffer.Buffer);
+            Context.OutgoingResultsStorage.EnqueueResult(apex, result);
         }
 
         private void RegisterResult(QuantumProcessingResult result)
         {
-            var resultEnvelope = result.ResultMessage.CreateEnvelope();
-            var resultMessageHash = result.ResultMessage.CreateEnvelope().ComputeMessageHash(buffer.Buffer);
-            resultEnvelope.Signatures.Add(resultMessageHash.Sign(Context.Settings.KeyPair));
+            var effectsHash = result.Effects.EffectsProof.Hashes.ComputeHash(buffer.Buffer);
+            result.Effects.EffectsProof.Signatures.Add(effectsHash.Sign(Context.Settings.KeyPair));
 
-            //TODO: create new Xdr class for notification and sign that instance
-            Context.AuditResultManager.Register(resultEnvelope, resultMessageHash, result.EffectProcessorsContainer.GetNotificationMessages());
+            Context.AuditResultManager.Add(result.EffectProcessorsContainer.Apex, result.ResultMessage, effectsHash, result.EffectProcessorsContainer.GetNotificationMessages());
         }
 
-        void ProcessTransaction(ResultMessage resultMessage, Ed25519Signature signature)
+        void ProcessTransaction(ResultMessage resultMessage, TxSignature signature)
         {
             if (signature == null)
                 return;
@@ -212,38 +225,37 @@ namespace Centaurus.Domain
             txResult.TxSignatures.Add(signature);
         }
 
-        void ValidateRequestQuantum(MessageEnvelope envelope)
+        void ValidateRequestQuantum(MessageEnvelope envelope, AccountWrapper accountWrapper)
         {
             var request = envelope.Message as RequestQuantum;
             if (request == null)
                 return;
-            ValidateAccountRequestSignature(request);
-            ValidateAccountRequestRate(request);
+            ValidateAccountRequestSignature(request, accountWrapper);
+            ValidateAccountRequestRate(request, accountWrapper);
         }
 
-        void ValidateAccountRequestSignature(RequestQuantum request)
+        void ValidateAccountRequestSignature(RequestQuantum request, AccountWrapper accountWrapper)
         {
-            if (!(request.RequestEnvelope.IsSignedBy(request.RequestMessage.AccountWrapper.Account.Pubkey)
+            if (!(request.RequestEnvelope.IsSignedBy(accountWrapper.Account.Pubkey)
                 && request.RequestEnvelope.AreSignaturesValid()))
                 throw new UnauthorizedAccessException("Request quantum has invalid signature.");
         }
 
-        void ValidateAccountRequestRate(RequestQuantum request)
+        void ValidateAccountRequestRate(RequestQuantum request, AccountWrapper accountWrapper)
         {
-            var account = request.RequestMessage.AccountWrapper;
-            if (!account.RequestCounter.IncRequestCount(request.Timestamp, out string error))
-                throw new TooManyRequestsException($"Request limit reached for account {account.Account.Pubkey}.");
+            if (!accountWrapper.RequestCounter.IncRequestCount(request.Timestamp, out string error))
+                throw new TooManyRequestsException($"Request limit reached for account {accountWrapper.Account.Pubkey}.");
         }
 
-        EffectProcessorsContainer GetEffectProcessorsContainer(MessageEnvelope envelope)
+        EffectProcessorsContainer GetEffectProcessorsContainer(MessageEnvelope envelope, AccountWrapper account)
         {
-            return new EffectProcessorsContainer(Context, envelope, Context.PendingUpdatesManager.Current);
+            return new EffectProcessorsContainer(Context, envelope, Context.PendingUpdatesManager.Current, account);
         }
 
         /// <summary>
         /// Looks for a processor for the specified message type
         /// </summary>
-        IQuantumRequestProcessor GetProcessorItem(MessageEnvelope envelope)
+        IQuantumProcessor GetProcessorItem(MessageEnvelope envelope)
         {
             var messageType = GetMessageType(envelope);
 
@@ -253,11 +265,11 @@ namespace Centaurus.Domain
             return processor;
         }
 
-        async Task<QuantumProcessingResult> ProcessQuantumEnvelope(MessageEnvelope envelope)
+        async Task<QuantumProcessingResult> ProcessQuantumEnvelope(MessageEnvelope envelope, AccountWrapper account)
         {
             var processor = GetProcessorItem(envelope);
 
-            var effectsContainer = GetEffectProcessorsContainer(envelope);
+            var effectsContainer = GetEffectProcessorsContainer(envelope, account);
 
             var processorContext = processor.GetContext(effectsContainer);
 
@@ -265,21 +277,24 @@ namespace Centaurus.Domain
 
             var resultMessage = await processor.Process(processorContext);
 
-            var effectsData = GetEffectsData(effectsContainer);
+            var effects = GetEffectsData(effectsContainer);
+
+            if (envelope.Message is RequestQuantum request)
+                resultMessage.ClientEffects = effectsContainer.Effects.Where(e => e.Account == request.RequestMessage.Account).ToList();
+            else
+                resultMessage.ClientEffects = effectsContainer.Effects;
+
+            resultMessage.Effects = effects.EffectsProof;
 
             var result = new QuantumProcessingResult
             {
                 ResultMessage = resultMessage,
-                Effects = new QuantumProcessingEffects
-                {
-                    Data = effectsData,
-                    Hash = effectsData.ComputeHash()
-                },
+                Effects = effects,
                 EffectProcessorsContainer = effectsContainer
             };
 
             if (processorContext is ITransactionProcessorContext transactionContext)
-                result.TxSignature = transactionContext.PaymentsManager.SignTransaction(transactionContext.Transaction);
+                result.TxSignature = transactionContext.PaymentProvider.SignTransaction(transactionContext.Transaction);
 
             return result;
         }
@@ -296,11 +311,26 @@ namespace Centaurus.Domain
             }
         }
 
-        byte[] GetEffectsData(EffectProcessorsContainer effectsContainer)
+        EffectsData GetEffectsData(EffectProcessorsContainer effectsContainer)
         {
             var resultEffectsContainer = new EffectsContainer { Effects = effectsContainer.Effects };
+            var effectsBin = resultEffectsContainer.ToByteArray(buffer.Buffer);
 
-            return resultEffectsContainer.ToByteArray(buffer.Buffer);
+            var effectsProof = new EffectsProof
+            {
+                Hashes = new EffectHashes
+                {
+                    Hashes = effectsContainer.Effects.Select(e => new Hash { Data = e.ComputeHash() }).ToList()
+                },
+                Signatures = new List<Ed25519Signature>()
+            };
+
+            return new EffectsData
+            {
+                Data = resultEffectsContainer.ToByteArray(buffer.Buffer),
+                Hash = effectsBin.ComputeHash(),
+                EffectsProof = effectsProof
+            };
         }
 
         MessageTypes GetMessageType(MessageEnvelope envelope)
@@ -322,18 +352,19 @@ namespace Centaurus.Domain
         {
             public EffectProcessorsContainer EffectProcessorsContainer { get; set; }
 
-            public ResultMessage ResultMessage { get; set; }
+            public QuantumResultMessage ResultMessage { get; set; }
 
-            public QuantumProcessingEffects Effects { get; set; }
+            public EffectsData Effects { get; set; }
 
-            public Ed25519Signature TxSignature { get; set; }
+            public TxSignature TxSignature { get; set; }
         }
 
-        protected class QuantumProcessingEffects
+        protected class EffectsData
         {
             public byte[] Data { get; set; }
 
             public byte[] Hash { get; set; }
+            public EffectsProof EffectsProof { get; internal set; }
         }
     }
 }

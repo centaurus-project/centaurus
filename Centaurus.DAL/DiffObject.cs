@@ -13,7 +13,7 @@ namespace Centaurus.DAL
 
         public SettingsModel ConstellationSettings { get; set; }
 
-        public Dictionary<int, PaymentCursor> Cursors { get; } = new Dictionary<int, PaymentCursor>();
+        public Dictionary<string, PaymentCursor> Cursors { get; } = new Dictionary<string, PaymentCursor>();
 
         public Dictionary<int, Account> Accounts { get; } = new Dictionary<int, Account>();
 
@@ -95,7 +95,7 @@ namespace Centaurus.DAL
 
         public class PaymentCursor : BaseDiffModel
         {
-            public int Provider { get; set; }
+            public string Provider { get; set; }
 
             public string Cursor { get; set; }
         }

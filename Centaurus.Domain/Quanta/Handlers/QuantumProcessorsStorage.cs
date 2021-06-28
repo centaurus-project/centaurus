@@ -15,12 +15,12 @@ namespace Centaurus.Domain
         {
             var discoveredRequestProcessors = Assembly.GetExecutingAssembly()
                 .GetTypes()
-                .Where(x => typeof(IQuantumRequestProcessor).IsAssignableFrom(x) && !x.IsInterface && !x.IsAbstract);
+                .Where(x => typeof(IQuantumProcessor).IsAssignableFrom(x) && !x.IsInterface && !x.IsAbstract);
 
-            var _processors = new Dictionary<MessageTypes, IQuantumRequestProcessor>();
+            var _processors = new Dictionary<MessageTypes, IQuantumProcessor>();
             foreach (var processorType in discoveredRequestProcessors)
             {
-                var instance = (IQuantumRequestProcessor)Activator.CreateInstance(processorType);
+                var instance = (IQuantumProcessor)Activator.CreateInstance(processorType);
                 if (_processors.ContainsKey(instance.SupportedMessageType))
                     throw new Exception($"Processor for message type {instance.SupportedMessageType} is already registered");
 
@@ -29,9 +29,9 @@ namespace Centaurus.Domain
             processors = _processors.ToImmutableDictionary();
         }
 
-        readonly ImmutableDictionary<MessageTypes, IQuantumRequestProcessor> processors;
+        readonly ImmutableDictionary<MessageTypes, IQuantumProcessor> processors;
 
-        public bool TryGetValue(MessageTypes messageType, out IQuantumRequestProcessor processor)
+        public bool TryGetValue(MessageTypes messageType, out IQuantumProcessor processor)
         {
             return processors.TryGetValue(messageType, out processor);
         }

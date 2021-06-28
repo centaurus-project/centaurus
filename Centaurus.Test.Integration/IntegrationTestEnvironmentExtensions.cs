@@ -30,14 +30,28 @@ namespace Centaurus.Test
                 "CORN",
                 "SUGAR"
             };
-            var res = await environment.AlphaWrapper.ConstellationController.Init(new ConstellationInitModel
+
+            var assets = new List<AssetSettings>();
+            for (var i = 0; i < assetCodes.Length; i++)
+                assets.Add(new AssetSettings { Id = i + 1, Code = assetCodes[i], Issuer = environment.Issuer });
+
+            var auditors = new List<KeyPair> { environment.AlphaWrapper.Settings.KeyPair };
+            auditors.AddRange(environment.AuditorWrappers.Select(a => a.Settings.KeyPair));
+            var constellationInit = new ConstellationInitRequest
             {
-                Assets = assetCodes.Select(a => $"{a}-{environment.Issuer.AccountId}-{(a.Length > 4 ? 2 : 1)}").ToArray(),
-                Auditors = environment.AuditorWrappers.Select(a => a.Settings.KeyPair.AccountId).ToArray(),
+                Assets = assets,
+                Auditors = auditors.Select(a => (RawPubKey)a).ToList(),
+                Cursors = new List<PaymentCursor> { new PaymentCursor { Cursor = "0", Provider = PaymentProvider.Stellar } },
                 MinAccountBalance = 1000,
                 MinAllowedLotSize = 100,
-                RequestRateLimits = new RequestRateLimitsModel { HourLimit = int.MaxValue, MinuteLimit = int.MaxValue }
-            });
+                RequestRateLimits = new RequestRateLimits { HourLimit = int.MaxValue, MinuteLimit = int.MaxValue },
+                Vaults = new List<Vault> { environment.Vault }
+            }.CreateEnvelope();
+
+            foreach (var a in auditors)
+                constellationInit.Sign(a);
+
+            var res = await environment.AlphaWrapper.ConstellationController.Init(constellationInit);
 
             var result = (ConstellationController.InitResult)((JsonResult)res).Value;
 
@@ -117,7 +131,7 @@ namespace Centaurus.Test
             await AssertDuringPeriod(
                 func,
                 timeout,
-                $"Client count is not equal to expected."
+                $"Client count {environment.AlphaWrapper.Startup.Context.AccountStorage.Count} is not equal to expected {clientsCount}."
             );
         }
 
@@ -221,11 +235,11 @@ namespace Centaurus.Test
 
             await environment.RunAuditors();
 
-            await environment.AssertConstellationState(ApplicationState.Ready, TimeSpan.FromSeconds(50 * auditorsCount));
+            await environment.AssertConstellationState(ApplicationState.Ready, TimeSpan.FromSeconds(5));
 
             environment.GenerateCliens(clientsCount);
 
-            await environment.AssertClientsCount(clientsCount, TimeSpan.FromSeconds(15));
+            await environment.AssertClientsCount(clientsCount, TimeSpan.FromSeconds(150));
         }
 
         public static async Task<(ResultMessage result, byte[] effectsHash, EffectProcessorsContainer container)> ProcessQuantumIsolated(this IntegrationTestEnvironment environment, MessageEnvelope envelope)

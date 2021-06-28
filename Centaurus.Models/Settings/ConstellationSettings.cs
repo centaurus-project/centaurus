@@ -11,7 +11,7 @@ namespace Centaurus.Models
         public long Apex { get; set; }
 
         [XdrField(1)]
-        public List<Vault> Vaults { get; set; }
+        public List<ProviderSettings> Providers { get; set; }
 
         [XdrField(2)]
         public List<RawPubKey> Auditors { get; set; }

@@ -22,9 +22,6 @@ namespace Centaurus.Models
     {
         public abstract EffectTypes EffectType { get; }
 
-        //ignore it during the serialization - we need it only to decide which effects to send back to a particular user
-        public AccountWrapper AccountWrapper { get; set; }
-
         public long Apex { get; set; }
 
         [XdrField(0)]

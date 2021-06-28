@@ -1,4 +1,5 @@
-﻿using Centaurus.Models;
+﻿using Centaurus.Domain.Models;
+using Centaurus.Models;
 using NLog;
 using System;
 using System.Collections;
@@ -23,13 +24,13 @@ namespace Centaurus.Domain
         public OrderSide Side { get; }
 
         public int Market { get; }
-        public Order Head { get; set; }
+        public OrderWrapper Head { get; set; }
 
-        public Order Tail { get; set; }
+        public OrderWrapper Tail { get; set; }
 
         public int Count { get; set; }
 
-        public IEnumerator<Order> GetEnumerator()
+        public IEnumerator<OrderWrapper> GetEnumerator()
         {
             var cursor = Head;
             while (cursor != null)
@@ -44,7 +45,7 @@ namespace Centaurus.Domain
             return GetEnumerator();
         }
 
-        public abstract void InsertOrder(Order order);
+        public abstract void InsertOrder(OrderWrapper order);
 
         /// <summary>
         /// Insert order before the specific offer.
@@ -52,7 +53,7 @@ namespace Centaurus.Domain
         /// <param name="orderbook">Orderbook</param>
         /// <param name="order">An order to insert</param>
         /// <param name="before"></param>
-        protected void InsertOrderBefore(Order order, Order before)
+        protected void InsertOrderBefore(OrderWrapper order, OrderWrapper before)
         {
             if (before == null)
             {
@@ -98,7 +99,7 @@ namespace Centaurus.Domain
         /// <returns>Best price.</returns>
         public double GetBestPrice()
         {
-            return Head?.Price ?? .0;
+            return Head?.Order.Price ?? .0;
         }
 
         /// <summary>
@@ -106,7 +107,7 @@ namespace Centaurus.Domain
         /// </summary>
         /// <param name="orderId"></param>
         /// <returns>Removal result.</returns>
-        public virtual bool RemoveOrder(ulong orderId, out Order order)
+        public virtual bool RemoveOrder(ulong orderId, out OrderWrapper order)
         {
             if (!orderMap.RemoveOrder(orderId, out order))
                 return false;
@@ -125,7 +126,7 @@ namespace Centaurus.Domain
             return true;
         }
 
-        public Order GetOrder(ulong orderId)
+        public OrderWrapper GetOrder(ulong orderId)
         {
             return orderMap.GetOrder(orderId);
         }

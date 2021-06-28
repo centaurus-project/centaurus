@@ -45,9 +45,6 @@ namespace Centaurus
         [Option("alpha_pubkey", Required = true, HelpText = "Alpha server public key.")]
         public string AlphaPubKey { get; set; }
 
-        [Option("genesis_quorum", Separator = ',', HelpText = "Public keys of all auditors in genesis quorum, delimited with coma.")]
-        public IEnumerable<string> GenesisQuorum { get; set; }
-
         [Option("alpha_port", Required = true, HelpText = "Port the alpha will listen on.")]
         public int AlphaPort { get; set; }
 
@@ -59,6 +56,9 @@ namespace Centaurus
 
         [Option("sync_batch_size", Default = 500, HelpText = "Max quanta sync batch size.")]
         public int SyncBatchSize { get; set; }
+
+        [Option("participation_level", Default = 0, HelpText = "Centaurus node participation level.")]
+        public int ParticipationLevel { get; set; }
 
         public void Build()
         {

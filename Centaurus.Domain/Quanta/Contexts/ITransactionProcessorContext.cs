@@ -1,4 +1,5 @@
-﻿using stellar_dotnet_sdk;
+﻿using Centaurus.PaymentProvider;
+using stellar_dotnet_sdk;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -9,6 +10,6 @@ namespace Centaurus.Domain
     {
         public TransactionWrapper Transaction { get; }
 
-        public PaymentsProviderBase PaymentsManager { get; }
+        public PaymentProviderBase PaymentProvider { get; }
     }
 }

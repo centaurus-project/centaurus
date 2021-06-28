@@ -35,10 +35,10 @@ namespace Centaurus.Domain
             {
                 case ConstellationInitEffect constellationInit:
                     pendingDiffObject.ConstellationSettings = GetConstellationSettings(constellationInit);
-                    foreach (var c in constellationInit.Cursors)
-                    { 
-                        var cursorDiff = new DiffObject.PaymentCursor { Cursor = c.Cursor, Provider = (int)c.Provider, IsInserted = true };
-                        pendingDiffObject.Cursors.Add((int)cursorDiff.Provider, cursorDiff);
+                    foreach (var c in constellationInit.Providers)
+                    {
+                        var cursorDiff = new DiffObject.PaymentCursor { Cursor = c.Cursor, Provider = c.Provider.ToString(), IsInserted = true };
+                        pendingDiffObject.Cursors.Add(cursorDiff.Provider, cursorDiff);
                     }
                     break;
                 case ConstellationUpdateEffect constellationUpdate:
@@ -54,27 +54,27 @@ namespace Centaurus.Domain
                     break;
                 case NonceUpdateEffect nonceUpdateEffect:
                     {
-                        var accId = nonceUpdateEffect.AccountWrapper.Account.Id;
+                        var accId = nonceUpdateEffect.Account;
                         GetAccount(pendingDiffObject.Accounts, accId).Nonce = nonceUpdateEffect.Nonce;
                     }
                     break;
                 case BalanceCreateEffect balanceCreateEffect:
                     {
-                        var accId = balanceCreateEffect.AccountWrapper.Account.Id;
+                        var accId = balanceCreateEffect.Account;
                         var balanceId = BalanceModelIdConverter.EncodeId(accId, balanceCreateEffect.Asset);
                         GetBalance(pendingDiffObject.Balances, balanceId).IsInserted = true;
                     }
                     break;
                 case BalanceUpdateEffect balanceUpdateEffect:
                     {
-                        var accId = balanceUpdateEffect.AccountWrapper.Account.Id;
+                        var accId = balanceUpdateEffect.Account;
                         var balanceId = BalanceModelIdConverter.EncodeId(accId, balanceUpdateEffect.Asset);
                         GetBalance(pendingDiffObject.Balances, balanceId).AmountDiff += balanceUpdateEffect.Amount;
                     }
                     break;
                 case RequestRateLimitUpdateEffect requestRateLimitUpdateEffect:
                     {
-                        var accId = requestRateLimitUpdateEffect.AccountWrapper.Account.Id;
+                        var accId = requestRateLimitUpdateEffect.Account;
                         GetAccount(pendingDiffObject.Accounts, accId).RequestRateLimits = new RequestRateLimitsModel
                         {
                             HourLimit = requestRateLimitUpdateEffect.RequestRateLimits.HourLimit,
@@ -84,7 +84,7 @@ namespace Centaurus.Domain
                     break;
                 case OrderPlacedEffect orderPlacedEffect:
                     {
-                        var accId = orderPlacedEffect.AccountWrapper.Account.Id;
+                        var accId = orderPlacedEffect.Account;
                         var orderId = orderPlacedEffect.OrderId;
                         pendingDiffObject.Orders[orderId] = new DiffObject.Order
                         {
@@ -100,7 +100,7 @@ namespace Centaurus.Domain
                     break;
                 case OrderRemovedEffect orderRemovedEffect:
                     {
-                        var accId = orderRemovedEffect.AccountWrapper.Account.Id;
+                        var accId = orderRemovedEffect.Account;
                         var orderId = orderRemovedEffect.OrderId;
                         var quoteAmount = -orderRemovedEffect.QuoteAmount;
                         var assetAmount = -orderRemovedEffect.Amount;
@@ -110,7 +110,7 @@ namespace Centaurus.Domain
                     break;
                 case TradeEffect tradeEffect:
                     {
-                        var accId = tradeEffect.AccountWrapper.Account.Id;
+                        var accId = tradeEffect.Account;
                         var orderId = tradeEffect.OrderId;
                         var assetAmount = tradeEffect.AssetAmount;
                         var quoteAmount = tradeEffect.QuoteAmount;
@@ -143,9 +143,9 @@ namespace Centaurus.Domain
                     break;
                 case CursorUpdateEffect cursorUpdateEffect:
                     {
-                        if (!pendingDiffObject.Cursors.TryGetValue((int)cursorUpdateEffect.Provider, out var paymentCursor))
+                        if (!pendingDiffObject.Cursors.TryGetValue(cursorUpdateEffect.ProviderId.ToString(), out var paymentCursor))
                         {
-                            paymentCursor = new DiffObject.PaymentCursor { Provider = (int)cursorUpdateEffect.Provider };
+                            paymentCursor = new DiffObject.PaymentCursor { Provider = cursorUpdateEffect.ProviderId.ToString() };
                             pendingDiffObject.Cursors.Add(paymentCursor.Provider, paymentCursor);
                         }
                         paymentCursor.Cursor = cursorUpdateEffect.Cursor;
@@ -153,7 +153,7 @@ namespace Centaurus.Domain
                     break;
                 case WithdrawalCreateEffect withdrawalCreateEffect:
                     {
-                        var accId = withdrawalCreateEffect.AccountWrapper.Account.Id;
+                        var accId = withdrawalCreateEffect.Account;
                         GetAccount(pendingDiffObject.Accounts, accId).Withdrawal = withdrawalCreateEffect.Apex;
                         foreach (var withdrawalItem in withdrawalCreateEffect.Items)
                             GetBalance(pendingDiffObject.Balances, BalanceModelIdConverter.EncodeId(accId, withdrawalItem.Asset)).LiabilitiesDiff += withdrawalItem.Amount;
@@ -161,7 +161,7 @@ namespace Centaurus.Domain
                     break;
                 case WithdrawalRemoveEffect withdrawalRemoveEffect:
                     {
-                        var accId = withdrawalRemoveEffect.AccountWrapper.Account.Id;
+                        var accId = withdrawalRemoveEffect.Account;
                         GetAccount(pendingDiffObject.Accounts, accId).Withdrawal = 0;
                         foreach (var withdrawalItem in withdrawalRemoveEffect.Items)
                         {
@@ -223,7 +223,18 @@ namespace Centaurus.Domain
                 Auditors = constellationInit.Auditors.Select(a => a.Data).ToArray(),
                 MinAccountBalance = constellationInit.MinAccountBalance,
                 MinAllowedLotSize = constellationInit.MinAllowedLotSize,
-                Vaults = constellationInit.Vaults.Select(v => new VaultModel { Provider = (int)v.Provider, Vault = v.AccountId }).ToList(),
+                Providers = constellationInit.Providers.Select(p => new ProviderSettingsModel
+                {
+                    ProviderId = p.ProviderId,
+                    Provider = p.Provider,
+                    Vault = p.Vault,
+                    Name = p.Name,
+                    Cursor = p.Cursor,
+                    PaymentSubmitDelay = p.PaymentSubmitDelay,
+                    Assets = p.Assets
+                        .Select(pa => new ProviderAssetModel { CentaurusAsset = pa.CentaurusAsset, Token = pa.Token, IsVirtual = pa.IsVirtual })
+                        .ToList()
+                }).ToList(),
                 Assets = constellationInit.Assets.Select(a => a.ToAssetModel()).ToList()
             };
 

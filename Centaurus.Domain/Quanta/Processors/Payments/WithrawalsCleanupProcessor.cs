@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public class WithrawalsCleanupProcessor : QuantumRequestProcessor<WithdrawalCleanupProcessorContext>
+    public class WithrawalsCleanupProcessor : QuantumProcessor<WithdrawalCleanupProcessorContext>
     {
         public override MessageTypes SupportedMessageType => MessageTypes.WithrawalsCleanup;
 
@@ -16,10 +16,10 @@ namespace Centaurus.Domain
             return new WithdrawalCleanupProcessorContext(container);
         }
 
-        public override Task<ResultMessage> Process(WithdrawalCleanupProcessorContext context)
+        public override Task<QuantumResultMessage> Process(WithdrawalCleanupProcessorContext context)
         {
-            context.EffectProcessors.AddWithdrawalRemove(context.Withdrawal, false, context.PaymentsProvider.WithdrawalStorage);
-            return Task.FromResult(context.Envelope.CreateResult(ResultStatusCodes.Success, context.EffectProcessors.Effects));
+            context.EffectProcessors.AddWithdrawalRemove(context.Withdrawal, false, context.PaymentProvider.WithdrawalStorage);
+            return Task.FromResult((QuantumResultMessage)context.Envelope.CreateResult(ResultStatusCodes.Success));
         }
 
         public override Task Validate(WithdrawalCleanupProcessorContext context)
@@ -28,7 +28,7 @@ namespace Centaurus.Domain
             if (cleanup.ExpiredWithdrawal == null)
                 throw new InvalidOperationException("No withdrawal was specified.");
 
-            var withdrawal = context.PaymentsProvider.WithdrawalStorage.GetWithdrawal(cleanup.ExpiredWithdrawal);
+            var withdrawal = context.PaymentProvider.WithdrawalStorage.GetWithdrawal(cleanup.ExpiredWithdrawal);
             if (withdrawal == null)
                 throw new InvalidOperationException("Withdrawal is missing.");
             context.Withdrawal = withdrawal;

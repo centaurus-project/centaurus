@@ -1,4 +1,5 @@
-﻿using Centaurus.Models;
+﻿using Centaurus.Domain.Models;
+using Centaurus.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,35 +10,35 @@ namespace Centaurus.Domain
     public class OrderMap
     {
 
-        private Dictionary<ulong, Order> map = new Dictionary<ulong, Order>();
+        private Dictionary<ulong, OrderWrapper> map = new Dictionary<ulong, OrderWrapper>();
 
         public void Clear()
         {
             map.Clear();
         }
 
-        public void AddOrder(Order order)
+        public void AddOrder(OrderWrapper order)
         {
             map.Add(order.OrderId, order);
         }
 
-        public bool RemoveOrder(ulong orderId, out Order order)
+        public bool RemoveOrder(ulong orderId, out OrderWrapper order)
         {
             return map.Remove(orderId, out order);
         }
 
-        public Order GetOrder(ulong orderId)
+        public OrderWrapper GetOrder(ulong orderId)
         {
-            if (!map.TryGetValue(orderId, out Order order)) return null;
+            if (!map.TryGetValue(orderId, out OrderWrapper order)) return null;
             return order;
         }
 
-        public IEnumerable<Order> GetAllOrders()
+        public IEnumerable<OrderWrapper> GetAllOrders()
         {
             return map.Values;
         }
 
-        public IEnumerable<Order> GetAllAccountOrders(AccountWrapper account)
+        public IEnumerable<OrderWrapper> GetAllAccountOrders(AccountWrapper account)
         {
             return map.Values.Where(o => o.AccountWrapper == account);
         }

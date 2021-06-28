@@ -93,7 +93,7 @@ namespace Centaurus.Domain
         /// </summary>
         /// <param name="result"></param>
         /// <param name="buffer">Buffer to use for serialization</param>
-        public void EnqueueResult(ResultMessage result, byte[] buffer)
+        public void EnqueueResult(long apex, QuantumResultMessage result)
         {
             if (result == null)
                 throw new ArgumentNullException(nameof(result));
@@ -109,14 +109,11 @@ namespace Centaurus.Domain
                 txResult.TxSignatures.Clear();
             }
 
-            var resultHash = result.ComputeHash(buffer);
-            var signature = Context.Settings.KeyPair.Sign(resultHash);
-
             lock (results)
                 results.Add(new AuditorResultMessage
                 {
-                    Apex = result.MessageId,
-                    Signature = signature,
+                    Apex = apex,
+                    Signature = result.Effects.Signatures[0].Signature,
                     TxSignature = txSignature
                 });
         }

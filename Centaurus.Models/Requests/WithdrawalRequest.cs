@@ -8,9 +8,9 @@ namespace Centaurus.Models
         public override MessageTypes MessageType => MessageTypes.WithdrawalRequest;
 
         [XdrField(0)]
-        public PaymentProvider PaymentProvider { get; set; }
+        public string PaymentProvider { get; set; }
 
         [XdrField(1)]
-        public byte[] TransactionXdr { get; set; }
+        public byte[] Transaction { get; set; }
     }
 }

@@ -31,9 +31,9 @@ namespace Centaurus.Alpha
 
         }
 
-        public IHost CreateHost(Settings settings)
+        public IHost CreateHost()
         {
-            SetupCertificate(settings);
+            SetupCertificate(Context.Settings);
             return Host.CreateDefaultBuilder()
                 .ConfigureLogging(logging =>
                 {
@@ -41,9 +41,9 @@ namespace Centaurus.Alpha
                     logging.ClearProviders();
                     logging.AddConsole();
 
-                    if (settings.Verbose)
+                    if (Context.Settings.Verbose)
                         logging.SetMinimumLevel(Microsoft.Extensions.Logging.LogLevel.Trace);
-                    else if (settings.Silent)
+                    else if (Context.Settings.Silent)
                         logging.SetMinimumLevel(Microsoft.Extensions.Logging.LogLevel.Error);
                     else
                         logging.SetMinimumLevel(Microsoft.Extensions.Logging.LogLevel.Information);
@@ -52,13 +52,13 @@ namespace Centaurus.Alpha
                 .UseNLog()
                 .ConfigureWebHostDefaults(webBuilder =>
                 {
-                    webBuilder.ConfigureServices(s => s.AddSingleton(Context))
+                    webBuilder
                         .UseStartup<HostStartup>()
                         .UseKestrel(options =>
                         {
                             if (Certificate != null)
                             {
-                                options.ListenAnyIP(settings.AlphaPort,
+                                options.ListenAnyIP(Context.Settings.AlphaPort,
                                 listenOptions =>
                                 {
                                     var httpsOptions = new HttpsConnectionAdapterOptions();
@@ -67,7 +67,7 @@ namespace Centaurus.Alpha
                                 });
                             }
                             else
-                                options.ListenAnyIP(settings.AlphaPort);
+                                options.ListenAnyIP(Context.Settings.AlphaPort);
                         });
                 }).Build();
         }
@@ -147,7 +147,10 @@ namespace Centaurus.Alpha
             public void ConfigureServices(IServiceCollection services)
             {
                 services
-                    .AddMvc(options => options.EnableEndpointRouting = false);
+                    .AddMvc(options => options.EnableEndpointRouting = false)
+                    .AddControllersAsServices() 
+                    .SetCompatibilityVersion(CompatibilityVersion.Version_3_0);
+
                 services.Add(
                     new ServiceDescriptor(
                         typeof(IActionResultExecutor<JsonResult>),
@@ -155,6 +158,11 @@ namespace Centaurus.Alpha
                         ServiceLifetime.Singleton)
                 );
                 services.AddOptions<HostOptions>().Configure(opts => opts.ShutdownTimeout = TimeSpan.FromDays(365));
+
+                services.AddControllers(opts =>
+                {
+                    opts.ModelBinderProviders.Insert(0, new XdrModelBinderProvider());
+                });
             }
 
             static async Task CentaurusWebSocketHandler(HttpContext context, Func<Task> next)

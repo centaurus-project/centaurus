@@ -69,9 +69,7 @@ namespace Centaurus.Domain
 
                 int majority = Context.GetMajorityCount(),
                 totalAuditorsCount = Context.GetTotalAuditorsCount();
-
-                var completedStatesCount = allAuditorStates.Count(s => !s.Value.HasMorePendingQuanta);
-
+                var completedStatesCount = allAuditorStates.Count(s => !s.Value.HasMorePendingQuanta) + 1; //+1 is current server
                 if (completedStatesCount == totalAuditorsCount)
                     await TryApplyAuditorsData();
             }
@@ -136,9 +134,7 @@ namespace Centaurus.Domain
 
                 int majority = Context.GetMajorityCount(),
                 totalAuditorsCount = Context.GetTotalAuditorsCount();
-                var completedStatesCount = allAuditorStates.Count(s => !s.Value.HasMorePendingQuanta) + 1; // +1 is current server
-                var possibleConsensusCount = (totalAuditorsCount - completedStatesCount) + validAuditorStates.Count; 
-                if (validAuditorStates.Count >= majority)
+                if (Context.HasMajority(validAuditorStates.Count, false))
                 {
                     await ApplyAuditorsData();
                     allAuditorStates.Clear();

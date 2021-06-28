@@ -8,7 +8,7 @@ namespace Centaurus.DAL.Models
     public class PaymentCursorModel
     {
         [BsonId]
-        public int Provider { get; set; }
+        public string Provider { get; set; }
 
         public string Cursor { get; set; }
     }

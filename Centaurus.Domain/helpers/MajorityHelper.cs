@@ -31,12 +31,21 @@ namespace Centaurus
                 : (int)Math.Ceiling(totalAuditorsCount / 2.0);
         }
 
-        public static bool HasMajority(this ExecutionContext context, MessageEnvelope envelope)
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="context">Current execution context.</param>
+        /// <param name="auditorsCount">Auditors count.</param>
+        /// <param name="currentIncluded">Specifies if current server is included to auditors count.</param>
+        /// <returns></returns>
+        public static bool HasMajority(this ExecutionContext context, int auditorsCount, bool currentIncluded = true)
         {
             if (context == null)
                 throw new ArgumentNullException(nameof(context));
-            //imply that signatures are unique and were validated beforehand
-            return envelope.Signatures.Count >= context.GetMajorityCount();
+            if (!currentIncluded)
+                auditorsCount++;
+            //+1 is current auditor
+            return auditorsCount >= context.GetMajorityCount();
         }
     }
 }

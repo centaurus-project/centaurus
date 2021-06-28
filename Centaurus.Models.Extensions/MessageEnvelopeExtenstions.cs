@@ -110,7 +110,7 @@ namespace Centaurus
             return envelope.Signatures.Any(s => s.Signer.Equals(pubKey));
         }
 
-        private static TResultMessage CreateResult<TResultMessage>(this MessageEnvelope envelope, ResultStatusCodes status = ResultStatusCodes.InternalError, List<Effect> effects = null)
+        private static TResultMessage CreateResult<TResultMessage>(this MessageEnvelope envelope, ResultStatusCodes status = ResultStatusCodes.InternalError)
             where TResultMessage : ResultMessage
         {
             if (envelope == null)
@@ -118,11 +118,11 @@ namespace Centaurus
             var resultMessage = Activator.CreateInstance<TResultMessage>();
             resultMessage.OriginalMessage = envelope;
             resultMessage.Status = status;
-            resultMessage.Effects = effects ?? new List<Effect>();
             return resultMessage;
         }
 
-        public static ResultMessage CreateResult(this MessageEnvelope envelope, ResultStatusCodes status = ResultStatusCodes.InternalError, List<Effect> effects = null)
+        //TODO: create class for effects and quantumEffects
+        public static ResultMessage CreateResult(this MessageEnvelope envelope, ResultStatusCodes status = ResultStatusCodes.InternalError)
         {
             if (envelope == null)
                 throw new ArgumentNullException(nameof(envelope));
@@ -132,14 +132,18 @@ namespace Centaurus
 
             switch (messageType)
             {
-                case MessageTypes.HandshakeInit:
-                    return CreateResult<HandshakeResult>(envelope, status, effects);
+                case MessageTypes.HandshakeResponse:
+                    return CreateResult<ClientConnectionSuccess>(envelope, status);
                 case MessageTypes.AccountDataRequest:
-                    return CreateResult<AccountDataResponse>(envelope, status, effects);
+                    return CreateResult<AccountDataResponse>(envelope, status);
                 case MessageTypes.WithdrawalRequest:
-                    return CreateResult<ITransactionResultMessage>(envelope, status, effects);
+                    return CreateResult<ITransactionResultMessage>(envelope, status);
                 default:
-                    return CreateResult<ResultMessage>(envelope, status, effects);
+                    {
+                        if (envelope.Message is Quantum)
+                            return CreateResult<QuantumResultMessage>(envelope, status);
+                        return CreateResult<ResultMessage>(envelope, status);
+                    }
             }
         }
 

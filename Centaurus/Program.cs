@@ -1,7 +1,12 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Net.WebSockets;
 using System.Threading;
+using Centaurus.Alpha;
+using Centaurus.Client;
+using Centaurus.DAL;
+using Centaurus.DAL.Mongo;
 using CommandLine;
 using NLog;
 
@@ -35,13 +40,13 @@ namespace Centaurus
                 LogConfigureHelper.Configure(logsDirectory, settings.Silent, settings.Verbose);
                 isLoggerInited = true;
 
-                var startup = StartupBase.GetStartup(settings);
+                var context = new Domain.ExecutionContext(settings, new MongoStorage(), PaymentProvider.PaymentProviderFactoryBase.Default);
+                var startup = new StartupMain(context, ClientConnectionFactoryBase.Default, AlphaHostFactoryBase.Default);
 
                 var resetEvent = new ManualResetEvent(false);
-                startup.Run(resetEvent);
+                startup.Run(resetEvent).Wait();
 
-                if (!isAlpha)
-                    logger.Info("Auditor is started");
+                logger.Info("Auditor is started");
                 Console.WriteLine("Press Ctrl+C to quit");
                 Console.CancelKeyPress += (sender, eventArgs) =>
                 {
@@ -50,7 +55,7 @@ namespace Centaurus
                     resetEvent.Set();
                 };
                 resetEvent.WaitOne();
-                startup.Shutdown();
+                startup.Shutdown().Wait();
             }
             catch (Exception exc)
             {
@@ -60,6 +65,5 @@ namespace Centaurus
                 Thread.Sleep(5000);
             }
         }
-
     }
 }

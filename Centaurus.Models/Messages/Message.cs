@@ -4,10 +4,13 @@ using Centaurus.Xdr;
 namespace Centaurus.Models
 {
     [XdrContract]
-    [XdrUnion((int)MessageTypes.HandshakeInit, typeof(HandshakeInit))]
-    [XdrUnion((int)MessageTypes.HandshakeResult, typeof(HandshakeResult))]
+    [XdrUnion((int)MessageTypes.HandshakeRequest, typeof(HandshakeRequest))]
+    [XdrUnion((int)MessageTypes.HandshakeResponse, typeof(HandshakeResponse))]
+    [XdrUnion((int)MessageTypes.ClientConnectionSuccess, typeof(ClientConnectionSuccess))]
     [XdrUnion((int)MessageTypes.WithdrawalRequest, typeof(WithdrawalRequest))]
     [XdrUnion((int)MessageTypes.AccountDataRequest, typeof(AccountDataRequest))]
+    [XdrUnion((int)MessageTypes.ResultMessage, typeof(ResultMessage))]
+    [XdrUnion((int)MessageTypes.QuantumResultMessage, typeof(QuantumResultMessage))]
     [XdrUnion((int)MessageTypes.AccountDataResponse, typeof(AccountDataResponse))]
     [XdrUnion((int)MessageTypes.ITransactionResultMessage, typeof(ITransactionResultMessage))]
     [XdrUnion((int)MessageTypes.EffectsNotification, typeof(EffectsNotification))]
@@ -16,7 +19,6 @@ namespace Centaurus.Models
     [XdrUnion((int)MessageTypes.OrderCancellationRequest, typeof(OrderCancellationRequest))]
     [XdrUnion((int)MessageTypes.RequestQuantum, typeof(RequestQuantum))]
     [XdrUnion((int)MessageTypes.TxCommitQuantum, typeof(PaymentCommitQuantum))]
-    [XdrUnion((int)MessageTypes.ResultMessage, typeof(ResultMessage))]
     [XdrUnion((int)MessageTypes.AuditorState, typeof(AuditorState))]
     [XdrUnion((int)MessageTypes.AuditorPerfStatistics, typeof(AuditorPerfStatistics))]
     [XdrUnion((int)MessageTypes.SetApexCursor, typeof(SetApexCursor))]

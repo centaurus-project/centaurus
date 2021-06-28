@@ -9,20 +9,17 @@ using stellar_dotnet_sdk;
 namespace Centaurus.Domain
 {
 
-    public class WithdrawalProcessor : QuantumRequestProcessor<WithdrawalProcessorContext>
+    public class WithdrawalProcessor : QuantumProcessor<WithdrawalProcessorContext>
     {
         public override MessageTypes SupportedMessageType => MessageTypes.WithdrawalRequest;
 
-        public override Task<ResultMessage> Process(WithdrawalProcessorContext context)
+        public override Task<QuantumResultMessage> Process(WithdrawalProcessorContext context)
         {
             context.UpdateNonce();
 
-            context.EffectProcessors.AddWithdrawalCreate(context.Withdrawal, context.PaymentsManager.WithdrawalStorage);
+            context.EffectProcessors.AddWithdrawalCreate(context.Withdrawal, context.PaymentProvider.WithdrawalStorage);
 
-            var effects = context.EffectProcessors.Effects;
-
-            var accountEffects = effects.Where(e => e.AccountWrapper?.Account.Id == context.WithdrawalRequest.Account).ToList();
-            return Task.FromResult(context.Envelope.CreateResult(ResultStatusCodes.Success, accountEffects));
+            return Task.FromResult((QuantumResultMessage)context.Envelope.CreateResult(ResultStatusCodes.Success));
         }
 
         public override Task Validate(WithdrawalProcessorContext context)
@@ -35,15 +32,25 @@ namespace Centaurus.Domain
 
         private void ValidateWithdrawal(WithdrawalProcessorContext context)
         {
-            if (context.Request.RequestMessage.AccountWrapper.HasPendingWithdrawal)
+            if (context.SourceAccount.HasPendingWithdrawal)
                 throw new BadRequestException("Withdrawal already exists.");
 
-            context.PaymentsManager.PaymentsParser.ValidateTransaction(context.Transaction, context.PaymentsManager.Vault);
+            context.PaymentProvider.ValidateTransaction(context.Transaction);
+            context.Withdrawal = context.PaymentProvider.GetWithdrawal(context.Envelope, context.SourceAccount, context.Transaction);
 
-            context.Withdrawal = context.PaymentsManager.PaymentsParser.GetWithdrawal(context.Envelope, context.Transaction, context.CentaurusContext.Constellation, context.PaymentsManager.Vault);
+            var sourceAccount = context.SourceAccount.Account;
 
-            if (context.Withdrawal.Items.Count() < 1)
-                throw new BadRequestException("No payment operations.");
+            foreach (var withdrawalItem in context.Withdrawal.Items)
+            {
+                var centaurusAsset = context.CentaurusContext.Constellation.Assets.FirstOrDefault(a => a.Id == withdrawalItem.Asset);
+                if (withdrawalItem.Asset == 0 && withdrawalItem.Amount < context.CentaurusContext.Constellation.MinAccountBalance)
+                    throw new BadRequestException($"Min account balance is {context.CentaurusContext.Constellation.MinAccountBalance}.");
+
+                if (!(sourceAccount.GetBalance(withdrawalItem.Asset)?.HasSufficientBalance(withdrawalItem.Amount) ?? false))
+                    throw new BadRequestException($"Insufficient balance.");
+                if (context.Withdrawal.Items.Count() < 1)
+                    throw new BadRequestException("No payment operations.");
+            }
         }
 
         public override WithdrawalProcessorContext GetContext(EffectProcessorsContainer container)

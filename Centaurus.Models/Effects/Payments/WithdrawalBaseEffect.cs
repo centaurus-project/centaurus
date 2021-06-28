@@ -8,7 +8,7 @@ namespace Centaurus.Models
     public abstract class WithdrawalBaseEffect: Effect
     {
         [XdrField(0)]
-        public PaymentProvider Provider { get; set; }
+        public string Provider { get; set; }
 
         [XdrField(1)]
         public List<WithdrawalEffectItem> Items { get; set; }

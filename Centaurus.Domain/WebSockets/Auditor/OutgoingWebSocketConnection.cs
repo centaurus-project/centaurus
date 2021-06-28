@@ -11,6 +11,7 @@ using System.Net.WebSockets;
 using System.Threading;
 using System.Threading.Tasks;
 using Centaurus.Xdr;
+using Centaurus.Client;
 
 namespace Centaurus.Domain
 {
@@ -30,16 +31,6 @@ namespace Centaurus.Domain
             await connection.Connect(new Uri(Context.Settings.AuditorAddressBook.First()), cancellationToken);
             _ = Task.Factory.StartNew(Listen, TaskCreationOptions.LongRunning);
             ProcessOutgoingMessageQueue();
-        }
-
-        public override async Task SendMessage(MessageEnvelope envelope)
-        {
-            await base.SendMessage(envelope);
-        }
-
-        protected override async Task<bool> HandleMessage(MessageEnvelope envelope)
-        {
-            return await Context.AuditorMessageHandlers.HandleMessage(this, envelope.ToIncomingMessage(incommingBuffer));
         }
 
         private void ProcessOutgoingMessageQueue()

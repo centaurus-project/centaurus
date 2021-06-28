@@ -18,7 +18,7 @@ namespace Centaurus.Domain
         public override async Task<BaseResponse> Handle(InfoWebSocketConnection infoWebSocket, GetPriceHistoryCommand command)
         {
             var asset = Context.Constellation.Assets.FirstOrDefault(a => a.Id == command.Market);
-            if (asset == null && asset.IsXlm)
+            if (asset == null || asset.Id == 0)
                 throw new BadRequestException("Invalid market.");
 
             var res = await Context.AnalyticsManager.PriceHistoryManager.GetPriceHistory(command.Cursor, command.Market, command.Period);

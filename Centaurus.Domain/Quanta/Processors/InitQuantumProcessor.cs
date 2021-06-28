@@ -9,13 +9,13 @@ using stellar_dotnet_sdk;
 
 namespace Centaurus.Domain
 {
-    public class InitQuantumProcessor : QuantumRequestProcessor
+    public class InitQuantumProcessor : QuantumProcessor
     {
         public override MessageTypes SupportedMessageType => MessageTypes.ConstellationInitRequest;
 
-        public override async Task<ResultMessage> Process(ProcessorContext context)
+        public override async Task<QuantumResultMessage> Process(ProcessorContext context)
         {
-            var initQuantum = (ConstellationInitRequest)context.Envelope.Message;
+            var initQuantum = (ConstellationInitRequest)((ConstellationQuantum)context.Envelope.Message).RequestMessage;
 
             context.EffectProcessors.AddConstellationInit(initQuantum);
             var initSnapshot = PersistenceManager.GetSnapshot(
@@ -32,19 +32,41 @@ namespace Centaurus.Domain
                 context.CentaurusContext.AppState.State = ApplicationState.Ready;
             }
 
-            return context.Envelope.CreateResult(ResultStatusCodes.Success, context.EffectProcessors.Effects);
+            return (QuantumResultMessage)context.Envelope.CreateResult(ResultStatusCodes.Success);
         }
+
+        const int minAuditorsCount = 2;
 
         public override Task Validate(ProcessorContext context)
         {
             if (context.CentaurusContext.AppState.State != ApplicationState.WaitingForInit)
                 throw new InvalidOperationException("Init quantum can be handled only when application is in WaitingForInit state.");
 
-            if (!context.CentaurusContext.Settings.GenesisQuorum.All(a => context.Envelope.IsSignedBy(KeyPair.FromAccountId(a))))
+            var requestEnvelope = ((ConstellationQuantum)context.Envelope.Message).RequestEnvelope;
+
+            if (!(requestEnvelope.Message is ConstellationInitRequest constellationInit))
+                throw new ArgumentException("Message is not ConstellationInitRequest");
+
+            if (constellationInit.Auditors == null || constellationInit.Auditors.Count() < minAuditorsCount)
+                throw new ArgumentException($"Min auditors count is {minAuditorsCount}");
+
+            if (!constellationInit.Auditors.All(a => requestEnvelope.IsSignedBy((KeyPair)a)))
                 throw new InvalidOperationException("The quantum should be signed by all auditors.");
 
-            if (!context.Envelope.AreSignaturesValid())
+            if (!requestEnvelope.AreSignaturesValid())
                 throw new InvalidOperationException("The quantum's signatures are invalid.");
+
+            if (constellationInit.MinAccountBalance < 1)
+                throw new ArgumentException("Minimal account balance is less then 0");
+
+            if (constellationInit.MinAllowedLotSize < 1)
+                throw new ArgumentException("Minimal allowed lot size is less then 0");
+
+            if (constellationInit.Assets.GroupBy(a => a.ToString()).Any(g => g.Count() > 1))
+                throw new ArgumentException("All asset values should be unique");
+
+            if (constellationInit.RequestRateLimits == null || constellationInit.RequestRateLimits.HourLimit < 1 || constellationInit.RequestRateLimits.MinuteLimit < 1)
+                throw new ArgumentException("Request rate limit values should be greater than 0");
 
             return Task.CompletedTask;
         }

@@ -15,7 +15,7 @@ namespace Centaurus.SDK.Models
 
         public Dictionary<string, string> Vaults { get; set; }
 
-        public RawPubKey VaultPubKey { get; private set; }
+        public RawPubKey AlphaPubKey { get; private set; }
 
         private string[] auditors;
         public string[] Auditors 
@@ -32,11 +32,11 @@ namespace Centaurus.SDK.Models
                         throw new ArgumentException($"Invalid ed25519 public key {auditor}");
                     auditorKeys.Add(StrKey.DecodeStellarAccountId(auditor));
                 }
-                AuditorPubKeys = auditorKeys.ToArray();
+                AuditorPubKeys = auditorKeys;
             }
         }
 
-        public RawPubKey[] AuditorPubKeys { get; private set; }
+        public List<RawPubKey> AuditorPubKeys { get; private set; }
 
         public long MinAccountBalance { get; set; }
 
@@ -63,11 +63,11 @@ namespace Centaurus.SDK.Models
 
         public class Asset
         {
+            public int Id { get; set; }
+
             public string Code { get; set; }
 
-            public string Issuer { get; set; }
-
-            public int Id { get; set; }
+            public string Provider { get; set; }
 
             public static Asset FromAssetSettings(AssetSettings assetSettings)
             {

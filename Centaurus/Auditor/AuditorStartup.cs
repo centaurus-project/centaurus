@@ -12,7 +12,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Centaurus
+namespace Centaurus.Client
 {
     public class AuditorStartup : StartupBase
     {
@@ -23,9 +23,9 @@ namespace Centaurus
         private Logger logger = LogManager.GetCurrentClassLogger();
         private ManualResetEvent resetEvent;
 
-        private Func<ClientConnectionWrapperBase> connectionFactory;
+        private ClientConnectionFactoryBase connectionFactory;
 
-        public AuditorStartup(Domain.ExecutionContext context, Func<ClientConnectionWrapperBase> connectionFactory)
+        public AuditorStartup(Domain.ExecutionContext context, ClientConnectionFactoryBase connectionFactory)
             : base(context)
         {
             this.connectionFactory = connectionFactory;
@@ -61,7 +61,7 @@ namespace Centaurus
                 {
                     while (!isAborted)
                     {
-                        var _auditor = new OutgoingWebSocketConnection(Context, connectionFactory());
+                        var _auditor = new OutgoingWebSocketConnection(Context, connectionFactory.GetConnection());
                         try
                         {
                             Subscribe(_auditor);
@@ -106,7 +106,6 @@ namespace Centaurus
                 isAborted = true;
                 Unsubscribe(auditor);
                 await CloseConnection(auditor);
-                Context.Dispose();
                 syncRoot.Dispose();
             }
             catch

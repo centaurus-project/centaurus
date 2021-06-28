@@ -53,7 +53,7 @@ namespace Centaurus.Domain
 
         private Dictionary<RawPubKey, ConnectionState> ConnectedAuditors = new Dictionary<RawPubKey, ConnectionState>();
 
-        public bool HasMajority => ConnectedAuditors.Count(a => a.Value == ConnectionState.Ready) >= Context.GetMajorityCount();
+        public bool HasMajority => Context.HasMajority(ConnectedAuditors.Count(a => a.Value == ConnectionState.Ready), false);
 
         public int ConnectedAuditorsCount => ConnectedAuditors.Count;
 

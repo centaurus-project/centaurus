@@ -15,21 +15,36 @@ namespace Centaurus.Test
         {
             if (excpectedException == null)
             {
-                var isHandled = false;
-                if (connection.Context.IsAlpha)
-                    isHandled = await connection.Context.AlphaMessageHandlers.HandleMessage(connection, message);
-                else
-                    isHandled = await connection.Context.AuditorMessageHandlers.HandleMessage(connection, message);
+                var isHandled = await connection.Context.MessageHandlers.HandleMessage(connection, message);
                 Assert.IsTrue(isHandled);
             }
             else
-                Assert.ThrowsAsync(excpectedException, 
-                    async () => {
-                        if (connection.Context.IsAlpha)
-                            await connection.Context.AlphaMessageHandlers.HandleMessage(connection, message);
-                        else
-                            await connection.Context.AuditorMessageHandlers.HandleMessage(connection, message);
+                Assert.ThrowsAsync(excpectedException,
+                    async () =>
+                    {
+                        await connection.Context.MessageHandlers.HandleMessage(connection, message);
                     });
+        }
+
+        protected IncomingWebSocketConnection GetIncomingConnection(ExecutionContext context, byte[] pubKey, ConnectionState? state = null)
+        {
+            var connection = new IncomingWebSocketConnection(context, new FakeWebSocket(), "127.0.0.1")
+            {
+                Account = context.AccountStorage.GetAccount(pubKey)
+            };
+
+            connection.SetPubKey(pubKey);
+            if (state != null)
+                connection.ConnectionState = state.Value;
+            return connection;
+        }
+
+        protected OutgoingWebSocketConnection GetOutgoingConnection(ExecutionContext context, ConnectionState? state = null)
+        {
+            var connection = GetOutgoingConnection(context);
+            if (state != null)
+                connection.ConnectionState = state.Value;
+            return connection;
         }
     }
 }

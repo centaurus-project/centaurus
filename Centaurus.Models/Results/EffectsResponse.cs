@@ -21,10 +21,10 @@ namespace Centaurus.Models
         [XdrField(3)]
         public string PrevPageToken { get; set; }
 
-        [XdrField(2)]
+        [XdrField(4)]
         public string Order { get; set; }
 
-        [XdrField(3)]
+        [XdrField(5)]
         public int Limit { get; set; }
     }
 
@@ -36,5 +36,8 @@ namespace Centaurus.Models
 
         [XdrField(1)]
         public List<Effect> Items { get; set; }
+
+        [XdrField(2)]
+        public EffectsProof Proof { get; set; }
     }
 }
