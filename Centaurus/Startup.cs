@@ -1,49 +1,57 @@
-﻿using Centaurus.DAL.Mongo;
+﻿using Centaurus.Alpha;
+using Centaurus.Client;
 using Centaurus.Domain;
-using Centaurus.Stellar;
+using Centaurus.Models;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net.WebSockets;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace Centaurus
 {
-    public abstract class StartupBase
+    public abstract class StartupBase : ContextualBase
     {
         public StartupBase(Domain.ExecutionContext context)
+            : base(context)
         {
-            Context = context ?? throw new ArgumentNullException(nameof(context));
         }
 
         public abstract Task Run(ManualResetEvent resetEvent);
         public abstract Task Shutdown();
-        public Domain.ExecutionContext Context { get; }
-
-        public static StartupBase GetStartup(BaseSettings settings)
-        {
-            var startup = default(StartupBase);
-            var storage = new MongoStorage();
-            var stellarDataProvider = new StellarDataProvider(settings.NetworkPassphrase, settings.HorizonUrl);
-            if (settings is AlphaSettings alphaSettings)
-                startup = new AlphaStartup(new AlphaContext(alphaSettings, storage, stellarDataProvider));
-            else if (settings is AuditorSettings auditorSettings)
-                startup = new AuditorStartup(new AuditorContext(auditorSettings, storage, stellarDataProvider), () => new ClientConnectionWrapper(new ClientWebSocket()));
-            else
-                throw new NotSupportedException("Unknown settings type.");
-            return startup;
-        }
     }
 
-    public abstract class StartupBase<TContext>: StartupBase
-        where TContext: Domain.ExecutionContext
+    public class StartupMain : StartupBase
     {
-        public StartupBase(TContext context)
-            :base(context)
+        public StartupMain(Domain.ExecutionContext context, ClientConnectionFactoryBase auditorConnectionFactory, AlphaHostFactoryBase alphaHostFactory)
+            : base(context)
         {
+            if (auditorConnectionFactory == null)
+                throw new ArgumentNullException(nameof(auditorConnectionFactory));
+
+            if (alphaHostFactory == null)
+                throw new ArgumentNullException(nameof(alphaHostFactory));
+
+            AuditorStartup = new AuditorStartup(context, auditorConnectionFactory);
+            if (context.RoleManager.ParticipationLevel == CentaurusNodeParticipationLevel.Prime)
+                AlphaStartup = new AlphaStartup(context, alphaHostFactory);
         }
 
-        public new TContext Context => (TContext)base.Context;
+        public AlphaStartup AlphaStartup { get; }
+
+        public AuditorStartup AuditorStartup { get; }
+
+        public override async Task Run(ManualResetEvent resetEvent)
+        {
+            await AuditorStartup.Run(resetEvent);
+            if (AlphaStartup != null)
+                await AlphaStartup.Run(resetEvent);
+        }
+
+        public override async Task Shutdown()
+        {
+            Context.AppState.State = ApplicationState.Stopped;
+            await AuditorStartup.Shutdown();
+            if (AlphaStartup != null)
+                await AlphaStartup.Shutdown();
+        }
     }
 }

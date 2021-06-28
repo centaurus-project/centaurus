@@ -8,26 +8,33 @@ using Centaurus.DAL;
 using Centaurus.DAL.Mongo;
 using Centaurus.Exchange.Analytics;
 using Centaurus.Models;
-using Centaurus.Stellar;
-using Centaurus.Xdr;
+using Centaurus.PaymentProvider;
 using NLog;
 
 namespace Centaurus.Domain
 {
-    public abstract class ExecutionContext: IDisposable
+    public partial class ExecutionContext : IDisposable
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
         /// <param name="settings">Application config</param>
         /// <param name="storage">Permanent storage object</param>
         /// <param name="useLegacyOrderbook"></param>
-        public ExecutionContext(BaseSettings settings, IStorage storage, StellarDataProviderBase stellarDataProvider, bool useLegacyOrderbook = false)
+        public ExecutionContext(Settings settings, IStorage storage, PaymentProviderFactoryBase paymentProviderFactory, bool useLegacyOrderbook = false)
         {
             PermanentStorage = storage ?? throw new ArgumentNullException(nameof(storage));
             Settings = settings ?? throw new ArgumentNullException(nameof(settings));
-            StellarDataProvider = stellarDataProvider ?? throw new ArgumentNullException(nameof(settings));
+            PaymentProviderFactory = paymentProviderFactory ?? throw new ArgumentNullException(nameof(paymentProviderFactory));
 
-            ExtensionsManager = new ExtensionsManager(settings.ExtensionsConfigFilePath);
+            PaymentParsersManager = new PaymentParsersManager();
+
+            RoleManager = new RoleManager(
+                (CentaurusNodeParticipationLevel)Settings.ParticipationLevel,
+                Settings.AlphaPubKey == Settings.KeyPair.AccountId
+                ? CentaurusNodeRole.Alpha
+                : CentaurusNodeRole.Beta);
+
+            ExtensionsManager = new ExtensionsManager(Settings.ExtensionsConfigFilePath);
 
             PersistenceManager = new PersistenceManager(PermanentStorage);
             QuantumProcessor = new QuantumProcessorsStorage();
@@ -36,6 +43,26 @@ namespace Centaurus.Domain
             PendingUpdatesManager.OnBatchSaved += PendingUpdatesManager_OnBatchSaved;
 
             QuantumStorage = new QuantumStorage();
+
+            MessageHandlers = new MessageHandlers(this);
+
+            InfoCommandsHandlers = new InfoCommandsHandlers(this);
+
+            OutgoingMessageStorage = new OutgoingMessageStorage();
+
+            OutgoingResultsStorage = new OutgoingResultsStorage(this);
+
+            AppState = new StateManager(this);
+            AppState.StateChanged += AppState_StateChanged;
+
+            QuantumHandler = new QuantumHandler(this);
+
+            ConnectionManager = new ConnectionManager(this);
+
+            SubscriptionsManager = new SubscriptionsManager();
+            InfoConnectionManager = new InfoConnectionManager(this);
+
+            Catchup = new Catchup(this);
 
             this.useLegacyOrderbook = useLegacyOrderbook;
         }
@@ -47,7 +74,7 @@ namespace Centaurus.Domain
 
         readonly bool useLegacyOrderbook;
 
-        public virtual async Task Init()
+        public async Task Init()
         {
             DynamicSerializersInitializer.Init();
 
@@ -61,7 +88,7 @@ namespace Centaurus.Domain
                 var lastQuantum = await PersistenceManager.GetQuantum(lastApex);
 
                 lastHash = lastQuantum.Message.ComputeHash();
-                var snapshot = await PersistenceManager.GetSnapshot(lastApex);
+                var snapshot = await PersistenceManager.GetSnapshot(PaymentParsersManager, lastApex);
                 await Setup(snapshot);
                 if (IsAlpha)
                     AppState.State = ApplicationState.Rising;//Alpha should ensure that it has all quanta from auditors
@@ -77,33 +104,62 @@ namespace Centaurus.Domain
             QuantumHandler.Start();
         }
 
-        public virtual Task Setup(Snapshot snapshot)
+        public async Task Setup(Snapshot snapshot)
         {
+            if (Exchange != null)
+                Exchange.OnUpdates -= Exchange_OnUpdates;
+
             Constellation = snapshot.Settings;
 
             AccountStorage = new AccountStorage(snapshot.Accounts);
 
             Exchange?.Dispose(); Exchange = Exchange.RestoreExchange(snapshot.Settings.Assets, snapshot.Orders, IsAlpha, useLegacyOrderbook);
 
-            WithdrawalStorage?.Dispose(); WithdrawalStorage = new WithdrawalStorage(snapshot.Withdrawals);
+            PaymentProvidersManager?.Dispose(); PaymentProvidersManager = new PaymentProvidersManager(PaymentParsersManager, PaymentProviderFactory, Constellation.Providers, snapshot.Withdrawals);
 
-            TxCursorManager = new TxCursorManager(snapshot.TxCursor);
+            AuditResultManager?.Dispose(); AuditResultManager = new ResultManager(this);
 
-            return Task.CompletedTask;
+            await DisposeAnalyticsManager();
+
+            AnalyticsManager = new AnalyticsManager(
+                PermanentStorage,
+                DepthsSubscription.Precisions.ToList(),
+                Constellation.Assets.Where(a => a.Id > 0).Select(a => a.Id).ToList(), //all but base asset
+                snapshot.Orders.Select(o => o.Order.ToOrderInfo()).ToList()
+            );
+
+            await AnalyticsManager.Restore(DateTime.UtcNow);
+            AnalyticsManager.StartTimers();
+
+            AnalyticsManager.OnError += AnalyticsManager_OnError;
+            AnalyticsManager.OnUpdate += AnalyticsManager_OnUpdate;
+            Exchange.OnUpdates += Exchange_OnUpdates;
+
+            PerformanceStatisticsManager?.Dispose(); PerformanceStatisticsManager = new PerformanceStatisticsManager(this);
         }
 
-        public virtual void Dispose()
+
+        public void Dispose()
         {
             PendingUpdatesManager?.Stop(TimeSpan.FromMilliseconds(0)); PendingUpdatesManager?.Dispose();
 
             ExtensionsManager?.Dispose();
-            WithdrawalStorage?.Dispose();
-            TxListener?.Dispose();
+            PaymentProvidersManager?.Dispose();
+
+            QuantumHandler.Dispose();
+            AuditResultManager?.Dispose();
+            DisposeAnalyticsManager().Wait(); 
+            PerformanceStatisticsManager?.Dispose();
         }
 
-        protected virtual void AppState_StateChanged(StateChangedEventArgs stateChangedEventArgs)
+        protected void AppState_StateChanged(StateChangedEventArgs stateChangedEventArgs)
         {
+
             var state = stateChangedEventArgs.State;
+            var prevState = stateChangedEventArgs.PrevState;
+            if (state != ApplicationState.Ready && prevState == ApplicationState.Ready) //close all connections (except auditors)
+                ConnectionManager.CloseAllConnections(false).Wait();
+
             if (!(PendingUpdatesManager?.IsRunning ?? true) &&
                 (state == ApplicationState.Running
                 || state == ApplicationState.Ready
@@ -142,19 +198,7 @@ namespace Centaurus.Domain
             }
         }
 
-        public Exchange Exchange { get; protected set; }
-
-        public AccountStorage AccountStorage { get; protected set; }
-
-        public WithdrawalStorage WithdrawalStorage { get; protected set; }
-
-        public TxListenerBase TxListener { get; protected set; }
-
-        public TxCursorManager TxCursorManager { get; protected set; }
-
-        public PerformanceStatisticsManager PerformanceStatisticsManager { get; protected set; }
-
-        public HashSet<int> AssetIds { get; protected set; }
+        public bool IsAlpha => RoleManager.Role == CentaurusNodeRole.Alpha;
 
         public ExtensionsManager ExtensionsManager { get; }
 
@@ -162,30 +206,48 @@ namespace Centaurus.Domain
 
         public QuantumStorage QuantumStorage { get; }
 
+        public RoleManager RoleManager { get; }
+
         public IStorage PermanentStorage { get; }
 
-        public BaseSettings Settings { get; }
+        public Settings Settings { get; }
+        public PaymentProviderFactoryBase PaymentProviderFactory { get; }
 
-        public StellarDataProviderBase StellarDataProvider { get; }
+        public StateManager AppState { get; }
 
-        public virtual bool IsAlpha { get; } = false;
+        public QuantumHandler QuantumHandler { get; }
 
-        public abstract StateManager AppState { get; }
+        public ConnectionManager ConnectionManager { get; }
 
-        public virtual QuantumHandler QuantumHandler { get; }
+        public SubscriptionsManager SubscriptionsManager { get; }
 
-        public virtual MessageHandlers MessageHandlers { get; }
-    }
+        public InfoConnectionManager InfoConnectionManager { get; }
 
-    public abstract class ExecutionContext<TContext, TSettings> : ExecutionContext
-        where TContext: ExecutionContext
-        where TSettings: BaseSettings
-    {
-        public ExecutionContext(TSettings settings, IStorage storage, StellarDataProviderBase stellarDataProvider, bool useLegacyOrderbook = false)
-            :base(settings, storage, stellarDataProvider, useLegacyOrderbook)
-        {
-        }
+        public Catchup Catchup { get; }
 
-        public new TSettings Settings => (TSettings)base.Settings;
+        public InfoCommandsHandlers InfoCommandsHandlers { get; }
+
+        public MessageHandlers MessageHandlers { get; }
+
+        public OutgoingMessageStorage OutgoingMessageStorage { get; }
+
+        public OutgoingResultsStorage OutgoingResultsStorage { get; }
+
+        public PaymentParsersManager PaymentParsersManager { get; }
+
+        public Exchange Exchange { get; private set; }
+
+        public AccountStorage AccountStorage { get; private set; }
+
+        public PaymentProvidersManager PaymentProvidersManager { get; private set; }
+
+        public PerformanceStatisticsManager PerformanceStatisticsManager { get; private set; }
+
+        public HashSet<int> AssetIds { get; private set; }
+
+        public ResultManager AuditResultManager { get; private set; }
+
+        public AnalyticsManager AnalyticsManager { get; private set; }
+
     }
 }

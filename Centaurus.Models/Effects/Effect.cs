@@ -12,7 +12,7 @@ namespace Centaurus.Models
     [XdrUnion((int)EffectTypes.OrderPlaced, typeof(OrderPlacedEffect))]
     [XdrUnion((int)EffectTypes.OrderRemoved, typeof(OrderRemovedEffect))]
     [XdrUnion((int)EffectTypes.Trade, typeof(TradeEffect))]
-    [XdrUnion((int)EffectTypes.TxCursorUpdate, typeof(TxCursorUpdateEffect))]
+    [XdrUnion((int)EffectTypes.TxCursorUpdate, typeof(CursorUpdateEffect))]
     [XdrUnion((int)EffectTypes.ConstellationInit, typeof(ConstellationInitEffect))]
     [XdrUnion((int)EffectTypes.ConstellationUpdate, typeof(ConstellationUpdateEffect))]
     [XdrUnion((int)EffectTypes.WithdrawalCreate, typeof(WithdrawalCreateEffect))]
@@ -21,9 +21,6 @@ namespace Centaurus.Models
     public abstract class Effect
     {
         public abstract EffectTypes EffectType { get; }
-
-        //ignore it during the serialization - we need it only to decide which effects to send back to a particular user
-        public AccountWrapper AccountWrapper { get; set; }
 
         public long Apex { get; set; }
 

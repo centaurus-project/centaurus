@@ -9,7 +9,7 @@ namespace Centaurus.Domain
 {
     public class UnsubscribeCommandHandler : BaseCommandHandler<UnsubscribeCommand>
     {
-        public UnsubscribeCommandHandler(AlphaContext context)
+        public UnsubscribeCommandHandler(ExecutionContext context)
             :base(context)
         {
 

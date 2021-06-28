@@ -10,11 +10,11 @@ using System.Threading.Tasks;
 
 namespace Centaurus
 {
-    public class QuantumSyncWorker : ContextualBase<AlphaContext>, IDisposable
+    public class QuantumSyncWorker : ContextualBase, IDisposable
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public QuantumSyncWorker(AlphaContext context, long apexCursor, AlphaWebSocketConnection auditor)
+        public QuantumSyncWorker(Domain.ExecutionContext context, long apexCursor, BaseWebSocketConnection auditor)
             :base(context)
         {
             this.auditor = auditor ?? throw new ArgumentNullException(nameof(auditor));
@@ -24,7 +24,7 @@ namespace Centaurus
             Task.Factory.StartNew(SendQuantums, TaskCreationOptions.LongRunning);
         }
 
-        private readonly AlphaWebSocketConnection auditor;
+        private readonly BaseWebSocketConnection auditor;
 
         private CancellationTokenSource cancellationTokenSource;
         private CancellationToken cancellationToken;
@@ -39,7 +39,7 @@ namespace Centaurus
                 var apexDiff = Context.QuantumStorage.CurrentApex - CurrentApexCursor;
                 if (apexDiff < 0)
                 {
-                    logger.Error($"Auditor {((KeyPair)auditor.ClientPubKey).AccountId} is above current constellation state.");
+                    logger.Error($"Auditor {((KeyPair)auditor.PubKey).AccountId} is above current constellation state.");
                     await auditor.CloseConnection(System.Net.WebSockets.WebSocketCloseStatus.ProtocolError, "Auditor is above all constellation.");
                     return;
                 }

@@ -1,4 +1,5 @@
-﻿using Centaurus.Models;
+﻿using Centaurus.Domain.Models;
+using Centaurus.Models;
 using NLog;
 using System;
 using System.Collections;
@@ -12,7 +13,7 @@ namespace Centaurus.Domain
 {
     public class OrderbookBinary : OrderbookBase
     {
-        public List<Order> sortedOrders = new List<Order>();
+        public List<OrderWrapper> sortedOrders = new List<OrderWrapper>();
         OrderComparer comparer;
 
         public OrderbookBinary(OrderMap orderMap, int market, OrderSide side)
@@ -25,10 +26,10 @@ namespace Centaurus.Domain
         /// Add new order to the orderbook.
         /// </summary>
         /// <param name="order">An order to add</param>
-        public override void InsertOrder(Order order)
+        public override void InsertOrder(OrderWrapper order)
         {
             var i = ~sortedOrders.BinarySearch(order, comparer);
-            var cursor = default(Order);
+            var cursor = default(OrderWrapper);
             if (i == 0)
                 cursor = sortedOrders.FirstOrDefault();
             else if (sortedOrders.Count > i)
@@ -44,7 +45,7 @@ namespace Centaurus.Domain
         /// </summary>
         /// <param name="orderId"></param>
         /// <returns>Removal result.</returns>
-        public override bool RemoveOrder(ulong orderId, out Order order)
+        public override bool RemoveOrder(ulong orderId, out OrderWrapper order)
         {
             var isHead = orderId == Head?.OrderId;
             if (!base.RemoveOrder(orderId, out order))
@@ -61,7 +62,7 @@ namespace Centaurus.Domain
         }
     }
 
-    public class OrderComparer : IComparer<Order>
+    public class OrderComparer : IComparer<OrderWrapper>
     {
         private OrderSide side;
 
@@ -70,9 +71,9 @@ namespace Centaurus.Domain
             this.side = side;
         }
 
-        public int Compare([NotNull] Order x, [NotNull] Order y)
+        public int Compare([NotNull] OrderWrapper x, [NotNull] OrderWrapper y)
         {
-            var priceCompareRes = side == OrderSide.Sell ? x.Price.CompareTo(y.Price) : y.Price.CompareTo(x.Price);
+            var priceCompareRes = side == OrderSide.Sell ? x.Order.Price.CompareTo(y.Order.Price) : y.Order.Price.CompareTo(x.Order.Price);
             if (priceCompareRes == 0)
                 return x.OrderId.CompareTo(y.OrderId);
             return priceCompareRes;

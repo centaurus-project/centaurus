@@ -14,11 +14,9 @@ namespace Centaurus.SDK
                 : (int)Math.Ceiling(totalAuditorsCount / 2.0);
         }
 
-        public static bool HasMajority(this MessageEnvelope envelope, int totalAuditorsCount)
+        public static bool HasMajority(int signaturesCount, int totalAuditorsCount)
         {
-            //imply that signatures are unique and were validated beforehand
-            var auditorsSignaturesCount = envelope.Signatures.Count - 1; //1 signature belongs to Alpha
-            return auditorsSignaturesCount >= GetMajorityCount(totalAuditorsCount);
+            return signaturesCount >= GetMajorityCount(totalAuditorsCount);
         }
     }
 }

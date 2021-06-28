@@ -4,8 +4,8 @@ using System.Text;
 
 namespace Centaurus.Models
 {
-    public class ConstellationUpgradeQuantum : ConstellationSettingsQuantum
+    public class ConstellationUpgradeQuantum : ConstellationSettingsRequestBase
     {
-        public override MessageTypes MessageType => MessageTypes.ConstellationUpgradeQuantum;
+        public override MessageTypes MessageType => MessageTypes.ConstellationUpgradeRequest;
     }
 }

@@ -25,7 +25,7 @@ namespace Centaurus.Test
             new object[] { TestEnvironment.Client1KeyPair, false },
             new object[] { TestEnvironment.Client2KeyPair, true }
         };
-        private AlphaContext context;
+        private ExecutionContext context;
 
         [Test]
         [TestCaseSource(nameof(EffectsLoadTestCases))]

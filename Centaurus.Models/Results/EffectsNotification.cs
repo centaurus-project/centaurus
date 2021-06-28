@@ -10,6 +10,9 @@ namespace Centaurus.Models
         public override MessageTypes MessageType => MessageTypes.EffectsNotification;
 
         [XdrField(0)]
-        public List<Effect> Effects { get; set; }
+        public List<Effect> ClientEffects { get; set; }
+
+        [XdrField(1)]
+        public EffectsProof Effects { get; set; }
     }
 }

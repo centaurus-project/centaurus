@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public class OrderCancellationProcessor : QuantumRequestProcessor<OrderCancellationProcessorContext>
+    public class OrderCancellationProcessor : QuantumProcessor<OrderCancellationProcessorContext>
     {
         public override MessageTypes SupportedMessageType => MessageTypes.OrderCancellationRequest;
 
@@ -17,16 +17,16 @@ namespace Centaurus.Domain
             return new OrderCancellationProcessorContext(effectProcessors);
         }
 
-        public override Task<ResultMessage> Process(OrderCancellationProcessorContext context)
+        public override Task<QuantumResultMessage> Process(OrderCancellationProcessorContext context)
         {
             var quantum = (RequestQuantum)context.Envelope.Message;
 
             context.UpdateNonce();
 
-            context.CentaurusContext.Exchange.RemoveOrder(context.EffectProcessors, context.Orderbook, context.Order);
+            context.CentaurusContext.Exchange.RemoveOrder(context.EffectProcessors, context.Orderbook, context.OrderWrapper);
 
-            var resultMessage = context.Envelope.CreateResult(ResultStatusCodes.Success, context.EffectProcessors.Effects);
-            return Task.FromResult(resultMessage);
+            var resultMessage = context.Envelope.CreateResult(ResultStatusCodes.Success);
+            return Task.FromResult((QuantumResultMessage)resultMessage);
         }
 
 
@@ -43,27 +43,27 @@ namespace Centaurus.Domain
 
             context.Orderbook = context.CentaurusContext.Exchange.GetOrderbook(orderData.Asset, orderData.Side);
 
-            context.Order = context.Orderbook.GetOrder(orderRequest.OrderId);
+            context.OrderWrapper = context.Orderbook.GetOrder(orderRequest.OrderId);
 
-            if (context.Order is null)
+            if (context.OrderWrapper is null)
                 throw new BadRequestException($"Order {orderRequest.OrderId} is not found.{(quantum.Apex != default ? $" Apex {quantum.Apex}" : "")}");
 
             //TODO: check that lot size is greater than minimum allowed lot
-            if (context.Order.AccountWrapper.Account.Id != orderRequest.Account)
+            if (context.OrderWrapper.AccountWrapper.Account.Id != orderRequest.Account)
                 throw new ForbiddenException();
 
             if (context.OrderSide == OrderSide.Buy)
             {
-                var balance = orderRequest.AccountWrapper.Account.GetBalance(0);
-                if (balance.Liabilities < context.Order.QuoteAmount)
+                var balance = context.SourceAccount.Account.GetBalance(0);
+                if (balance.Liabilities < context.OrderWrapper.Order.QuoteAmount)
                     throw new BadRequestException("Quote liabilities is less than order size.");
             }
             else
             {
-                var balance = orderRequest.AccountWrapper.Account.GetBalance(orderData.Asset);
+                var balance = context.SourceAccount.Account.GetBalance(orderData.Asset);
                 if (balance == null)
                     throw new BadRequestException("Balance for asset not found.");
-                if (balance.Liabilities < context.Order.Amount)
+                if (balance.Liabilities < context.OrderWrapper.Order.Amount)
                     throw new BadRequestException("Asset liabilities is less than order size.");
             }
 

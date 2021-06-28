@@ -1,6 +1,7 @@
-﻿using Centaurus.Models;
+﻿using Centaurus.Client;
+using Centaurus.Models;
+using Centaurus.PaymentProvider;
 using Centaurus.SDK.Models;
-using Centaurus.Stellar;
 using Centaurus.Xdr;
 using NLog;
 using NSec.Cryptography;
@@ -33,24 +34,26 @@ namespace Centaurus.SDK
                   alphaWebSocketAddress,
                   keyPair,
                   constellation,
-                  new StellarDataProvider(constellation.StellarNetwork.Passphrase, constellation.StellarNetwork.Horizon),
-                  () => new ClientConnectionWrapper(new ClientWebSocket())
+                  PaymentProviderFactoryBase.Default,
+                  ClientConnectionFactoryBase.Default
             )
         {
         }
 
-        public CentaurusClient(Uri alphaWebSocketAddress, KeyPair keyPair, ConstellationInfo constellation, StellarDataProviderBase stellarDataProvider, Func<ClientConnectionWrapperBase> connectionFactory)
+        public CentaurusClient(Uri alphaWebSocketAddress, KeyPair keyPair, ConstellationInfo constellation, PaymentProviderFactoryBase providerFactory, ClientConnectionFactoryBase connectionFactory)
         {
+            KeyPair = keyPair ?? throw new ArgumentNullException(nameof(keyPair));
+
             this.alphaWebSocketAddress = alphaWebSocketAddress ?? throw new ArgumentNullException(nameof(alphaWebSocketAddress));
-            this.KeyPair = keyPair ?? throw new ArgumentNullException(nameof(keyPair));
             this.constellation = constellation ?? throw new ArgumentNullException(nameof(constellation));
 
-            this.stellarDataProvider = stellarDataProvider ?? throw new ArgumentNullException(nameof(stellarDataProvider));
+            paymentProviderFactory = providerFactory ?? throw new ArgumentNullException(nameof(providerFactory));
 
             this.connectionFactory = connectionFactory ?? throw new ArgumentNullException(nameof(connectionFactory));
 
             Network.Use(new Network(this.constellation.StellarNetwork.Passphrase));
         }
+
         public KeyPair KeyPair { get; }
 
         public async Task Connect()
@@ -64,7 +67,7 @@ namespace Centaurus.SDK
 
                 handshakeResult = new TaskCompletionSource<int>();
 
-                connection = new CentaurusConnection(alphaWebSocketAddress, KeyPair, connectionFactory(), constellation);
+                connection = new CentaurusConnection(alphaWebSocketAddress, KeyPair, connectionFactory.GetConnection(), constellation);
                 SubscribeToEvents(connection);
                 await connection.EstablishConnection();
 
@@ -137,9 +140,9 @@ namespace Centaurus.SDK
         public async Task<MessageEnvelope> Withdrawal(KeyPair destination, string amount, ConstellationInfo.Asset asset, bool waitForFinalize = true)
         {
             var paymentMessage = new WithdrawalRequest();
-            var tx = await stellarDataProvider.GetWithdrawalTx(KeyPair, constellation.VaultPubKey, destination, amount, asset);
+            var tx = await stellarDataProvider.GetWithdrawalTx(KeyPair, constellation.Vaults, destination, amount, asset);
 
-            paymentMessage.TransactionXdr = tx.ToArray();
+            paymentMessage.Transaction = tx.ToArray();
 
             var response = (CentaurusResponse)await connection.SendMessage(paymentMessage.CreateEnvelope());
             var result = await (waitForFinalize ? response.ResponseTask : response.AcknowledgmentTask);
@@ -243,8 +246,7 @@ namespace Centaurus.SDK
         private CentaurusConnection connection;
         private Uri alphaWebSocketAddress;
         private ConstellationInfo constellation;
-        private StellarDataProviderBase stellarDataProvider;
-        private Func<ClientConnectionWrapperBase> connectionFactory;
+        private ClientConnectionFactoryBase connectionFactory;
         private TaskCompletionSource<int> handshakeResult;
 
         private List<long> processedEffectsMessages = new List<long>();
@@ -269,7 +271,7 @@ namespace Centaurus.SDK
                 RegisterNewEffectsMessage(envelope.Message.MessageId);
                 try
                 {
-                    foreach (var effect in effectsMessage.Effects)
+                    foreach (var effect in effectsMessage.ClientEffects)
                     {
                         switch (effect)
                         {
@@ -370,16 +372,17 @@ namespace Centaurus.SDK
 
         private bool HandleHandshake(MessageEnvelope envelope)
         {
-            if (envelope.Message is HandshakeInit)
+            if (envelope.Message is HandshakeRequest)
             {
                 logger.Trace("Handshake: started.");
                 isConnecting = true;
                 logger.Trace("Handshake: isConnecting is set to true.");
                 try
                 {
-                    var responseTask = (CentaurusResponse)connection.SendMessage(envelope.Message.CreateEnvelope()).Result;
+                    var handshakeRequest = (HandshakeRequest)envelope.Message;
+                    var responseTask = (CentaurusResponse)connection.SendMessage(new HandshakeResponse { HandshakeData = handshakeRequest.HandshakeData }.CreateEnvelope()).Result;
                     logger.Trace("Handshake: message is sent.");
-                    var result = (HandshakeResult)responseTask.ResponseTask.Result.Message;
+                    var result = (ClientConnectionSuccess)responseTask.ResponseTask.Result.Message;
                     logger.Trace("Handshake: response awaited.");
                     if (result.Status != ResultStatusCodes.Success)
                         throw new Exception();
@@ -644,7 +647,9 @@ namespace Centaurus.SDK
                 lock (Requests)
                 {
                     var messageId = envelope.Message.MessageId;
-                    var response = envelope.Message is SequentialRequestMessage ? new CentaurusQuantumResponse(constellationInfo.VaultPubKey, constellationInfo.AuditorPubKeys, timeout) : new CentaurusResponse(constellationInfo.VaultPubKey, constellationInfo.AuditorPubKeys, timeout);
+                    var response = envelope.Message is SequentialRequestMessage 
+                        ? new CentaurusQuantumResponse(constellationInfo.AlphaPubKey, constellationInfo.AuditorPubKeys, timeout) 
+                        : new CentaurusResponse(constellationInfo.AlphaPubKey, constellationInfo.AuditorPubKeys, timeout);
                     if (!Requests.TryAdd(messageId, response))
                         throw new Exception("Unable to add request to pending requests.");
                     return response;
@@ -659,9 +664,10 @@ namespace Centaurus.SDK
                 {
                     lock (Requests)
                     {
-                        var messageId = resultMessage.OriginalMessage.Message is RequestQuantum ?
-                            ((RequestQuantum)resultMessage.OriginalMessage.Message).RequestMessage.MessageId :
-                            resultMessage.OriginalMessage.Message.MessageId;
+                        var messageId = resultMessage.OriginalMessage.Message is RequestQuantum 
+                            ? ((RequestQuantum)resultMessage.OriginalMessage.Message).RequestMessage.MessageId 
+                            : resultMessage.OriginalMessage.Message.MessageId;
+
                         if (Requests.TryGetValue(messageId, out var task))
                         {
                             task.AssignResponse(envelope);

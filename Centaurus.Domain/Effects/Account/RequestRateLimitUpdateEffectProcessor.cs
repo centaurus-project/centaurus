@@ -1,4 +1,5 @@
-﻿using Centaurus.Models;
+﻿using Centaurus.Domain.Models;
+using Centaurus.Models;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -9,8 +10,8 @@ namespace Centaurus.Domain
     {
         private RequestRateLimits globalRateLimits;
 
-        public RequestRateLimitUpdateEffectProcessor(RequestRateLimitUpdateEffect effect, RequestRateLimits globalRateLimits)
-            : base(effect)
+        public RequestRateLimitUpdateEffectProcessor(RequestRateLimitUpdateEffect effect, AccountWrapper account, RequestRateLimits globalRateLimits)
+            : base(effect, account)
         {
             this.globalRateLimits = globalRateLimits ?? throw new ArgumentNullException(nameof(globalRateLimits)); 
         }
@@ -19,17 +20,17 @@ namespace Centaurus.Domain
         {
             if (newValue == null)
             {
-                Account.RequestRateLimits = null;
-                Account.RequestRateLimits.Update(globalRateLimits);
+                AccountWrapper.Account.RequestRateLimits = null;
+                AccountWrapper.Account.RequestRateLimits.Update(globalRateLimits);
                 return;
             }
-            if (Account.RequestRateLimits == null)
+            if (AccountWrapper.Account.RequestRateLimits == null)
             {
-                Account.RequestRateLimits = new RequestRateLimits();
-                Effect.AccountWrapper.RequestCounter.SetLimits(Account.RequestRateLimits); //update reference
+                AccountWrapper.Account.RequestRateLimits = new RequestRateLimits();
+                AccountWrapper.RequestCounter.SetLimits(AccountWrapper.Account.RequestRateLimits); //update reference
             }
             //update values
-            Account.RequestRateLimits.Update(newValue);
+            AccountWrapper.Account.RequestRateLimits.Update(newValue);
         }
 
         public override void CommitEffect()

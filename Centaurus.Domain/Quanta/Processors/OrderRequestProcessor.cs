@@ -7,27 +7,24 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public class OrderRequestProcessor : QuantumRequestProcessor
+    public class OrderRequestProcessor : RequestQuantumProcessor
     {
         public override MessageTypes SupportedMessageType => MessageTypes.OrderRequest;
 
-        public override Task<ResultMessage> Process(ProcessorContext context)
+        public override Task<QuantumResultMessage> Process(RequestContext context)
         {
             var quantum = (RequestQuantum)context.Envelope.Message;
-            var requestMessage = quantum.RequestMessage;
 
             context.UpdateNonce();
 
             context.CentaurusContext.Exchange.ExecuteOrder(context.EffectProcessors);
 
-            var accountEffects = context.EffectProcessors.GetEffects(requestMessage.Account).ToList();
-
-            return Task.FromResult(context.Envelope.CreateResult(ResultStatusCodes.Success, accountEffects));
+            return Task.FromResult((QuantumResultMessage)context.Envelope.CreateResult(ResultStatusCodes.Success));
         }
 
         private int MaxCrossOrdersCount = 100;
 
-        public override Task Validate(ProcessorContext context)
+        public override Task Validate(RequestContext context)
         {
             context.ValidateNonce();
 
@@ -44,19 +41,16 @@ namespace Centaurus.Domain
             if (quoteAmount < context.CentaurusContext.Constellation.MinAllowedLotSize)
                 throw new BadRequestException("Lot size is smaller than the minimum allowed lot.");
 
-            //fetch user's account record
-            var account = orderRequest.AccountWrapper.Account;
-
             //check required balances
             if (orderRequest.Side == OrderSide.Sell)
             {
-                var balance = account.GetBalance(orderRequest.Asset);
+                var balance = context.SourceAccount.Account.GetBalance(orderRequest.Asset);
                 if (!balance.HasSufficientBalance(orderRequest.Amount))
                     throw new BadRequestException("Insufficient funds");
             }
             else
             {
-                var balance = account.GetBalance(0);
+                var balance = context.SourceAccount.Account.GetBalance(0);
                 if (!balance.HasSufficientBalance(quoteAmount))
                     throw new BadRequestException("Insufficient funds");
             }
@@ -77,7 +71,7 @@ namespace Centaurus.Domain
             var counterOrdersCount = 0;
             foreach (var order in orderbook)
             {
-                counterOrdersSum += order.Amount;
+                counterOrdersSum += order.Order.Amount;
                 counterOrdersCount++;
                 if (counterOrdersSum >= orderRequest.Amount)
                     break;

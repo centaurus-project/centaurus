@@ -6,12 +6,12 @@ namespace Centaurus.Domain
 {
     public static class BatchSavedInfoExtensions
     {
-        public static Models.BatchSavedInfo ToBatchSavedInfoModel(this BatchSavedInfo batchSavedInfo)
+        public static Centaurus.Models.BatchSavedInfo ToBatchSavedInfoModel(this BatchSavedInfo batchSavedInfo)
         {
             if (batchSavedInfo == null)
                 throw new ArgumentNullException(nameof(batchSavedInfo));
 
-            return new Models.BatchSavedInfo
+            return new Centaurus.Models.BatchSavedInfo
             {
                 EffectsCount = batchSavedInfo.EffectsCount,
                 QuantaCount = batchSavedInfo.QuantaCount,
@@ -21,7 +21,7 @@ namespace Centaurus.Domain
             };
         }
 
-        public static BatchSavedInfo FromModel(this Models.BatchSavedInfo batchSavedInfo)
+        public static BatchSavedInfo FromModel(this Centaurus.Models.BatchSavedInfo batchSavedInfo)
         {
             if (batchSavedInfo == null)
                 throw new ArgumentNullException(nameof(batchSavedInfo));

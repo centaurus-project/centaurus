@@ -9,7 +9,7 @@ namespace Centaurus.Models
     public abstract class ConstellationEffect : Effect
     {
         [XdrField(0)]
-        public RawPubKey Vault { get; set; }
+        public List<ProviderSettings> Providers { get; set; }
 
         [XdrField(1)]
         public List<RawPubKey> Auditors { get; set; }

@@ -5,7 +5,7 @@ using System.Text;
 
 namespace Centaurus.Models
 {
-    public class AccountDataResponse: ResultMessage
+    public class AccountDataResponse: QuantumResultMessage
     {
         public override MessageTypes MessageType => MessageTypes.AccountDataResponse;
 

@@ -12,20 +12,20 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Centaurus
+namespace Centaurus.Client
 {
-    public class AuditorStartup : StartupBase<AuditorContext>
+    public class AuditorStartup : StartupBase
     {
-        private AuditorWebSocketConnection auditor;
+        private OutgoingWebSocketConnection auditor;
 
         private bool isAborted = false;
 
         private Logger logger = LogManager.GetCurrentClassLogger();
         private ManualResetEvent resetEvent;
 
-        private Func<ClientConnectionWrapperBase> connectionFactory;
+        private ClientConnectionFactoryBase connectionFactory;
 
-        public AuditorStartup(AuditorContext context, Func<ClientConnectionWrapperBase> connectionFactory)
+        public AuditorStartup(Domain.ExecutionContext context, ClientConnectionFactoryBase connectionFactory)
             : base(context)
         {
             this.connectionFactory = connectionFactory;
@@ -61,7 +61,7 @@ namespace Centaurus
                 {
                     while (!isAborted)
                     {
-                        var _auditor = new AuditorWebSocketConnection(Context, connectionFactory());
+                        var _auditor = new OutgoingWebSocketConnection(Context, connectionFactory.GetConnection());
                         try
                         {
                             Subscribe(_auditor);
@@ -106,7 +106,6 @@ namespace Centaurus
                 isAborted = true;
                 Unsubscribe(auditor);
                 await CloseConnection(auditor);
-                Context.Dispose();
                 syncRoot.Dispose();
             }
             catch
@@ -115,7 +114,7 @@ namespace Centaurus
             }
         }
 
-        private void Subscribe(AuditorWebSocketConnection _auditor)
+        private void Subscribe(OutgoingWebSocketConnection _auditor)
         {
             if (_auditor != null)
             {
@@ -123,7 +122,7 @@ namespace Centaurus
             }
         }
 
-        private void Unsubscribe(AuditorWebSocketConnection _auditor)
+        private void Unsubscribe(OutgoingWebSocketConnection _auditor)
         {
             if (_auditor != null)
             {
@@ -146,7 +145,7 @@ namespace Centaurus
             }
         }
 
-        private async Task CloseConnection(AuditorWebSocketConnection _auditor)
+        private async Task CloseConnection(OutgoingWebSocketConnection _auditor)
         {
             if (_auditor != null)
             {

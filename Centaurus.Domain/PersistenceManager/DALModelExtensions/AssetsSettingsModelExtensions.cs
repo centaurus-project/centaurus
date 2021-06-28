@@ -10,12 +10,12 @@ namespace Centaurus.Domain
     {
         public static AssetSettings ToAssetSettings(this AssetModel asset)
         {
-            return new AssetSettings { Code = asset.Code, Id = asset.Id, Issuer = asset.Issuer };
+            return new AssetSettings { Code = asset.Code, Id = asset.Id, IsSuspended = asset.IsSuspended };
         }
 
         public static AssetModel ToAssetModel(this AssetSettings asset)
         {
-            return new AssetModel { Code = asset.Code, Id = asset.Id, Issuer = asset.Issuer };
+            return new AssetModel { Code = asset.Code, Id = asset.Id, IsSuspended = asset.IsSuspended };
         }
     }
 }

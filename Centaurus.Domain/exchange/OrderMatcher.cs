@@ -1,4 +1,5 @@
 ﻿using System;
+using Centaurus.Domain.Models;
 using Centaurus.Models;
 
 namespace Centaurus.Domain
@@ -9,13 +10,15 @@ namespace Centaurus.Domain
         {
             resultEffects = effectsContainer;
 
-            takerOrder = new Order
-            {
-                OrderId = OrderIdConverter.FromRequest(orderRequest, effectsContainer.Apex),
-                AccountWrapper = orderRequest.AccountWrapper,
-                Amount = orderRequest.Amount,
-                Price = orderRequest.Price
-            };
+            takerOrder = new OrderWrapper(
+                new Order
+                {
+                    OrderId = OrderIdConverter.FromRequest(orderRequest, effectsContainer.Apex),
+                    Amount = orderRequest.Amount,
+                    Price = orderRequest.Price
+                },
+                effectsContainer.AccountWrapper
+            );
             timeInForce = orderRequest.TimeInForce;
 
             //parse data from the ID of the newly arrived order 
@@ -27,10 +30,10 @@ namespace Centaurus.Domain
             orderbook = market.GetOrderbook(side.Inverse());
             //fetch balances
             if (!takerOrder.AccountWrapper.Account.HasBalance(asset))
-                resultEffects.AddBalanceCreate(orderRequest.AccountWrapper, asset);
+                resultEffects.AddBalanceCreate(effectsContainer.AccountWrapper, asset);
         }
 
-        private readonly Order takerOrder;
+        private readonly OrderWrapper takerOrder;
 
         private readonly TimeInForce timeInForce;
 
@@ -52,7 +55,7 @@ namespace Centaurus.Domain
         public ExchangeUpdate Match()
         {
             var counterOrder = orderbook.Head;
-            var nextOrder = default(Order);
+            var nextOrder = default(OrderWrapper);
 
             var updates = new ExchangeUpdate(asset, new DateTime(resultEffects.Quantum.Timestamp, DateTimeKind.Utc));
 
@@ -64,11 +67,11 @@ namespace Centaurus.Domain
                 //we need get next order here, otherwise Next will be null after the counter order removed
                 nextOrder = counterOrder?.Next;
                 //check that counter order price matches our order
-                if (side == OrderSide.Sell && counterOrder.Price < takerOrder.Price
-                    || side == OrderSide.Buy && counterOrder.Price > takerOrder.Price)
+                if (side == OrderSide.Sell && counterOrder.Order.Price < takerOrder.Order.Price
+                    || side == OrderSide.Buy && counterOrder.Order.Price > takerOrder.Order.Price)
                     break;
 
-                var availableOrderAmount = takerOrder.Amount - tradeAssetAmount;
+                var availableOrderAmount = takerOrder.Order.Amount - tradeAssetAmount;
                 var match = new OrderMatch(this, availableOrderAmount, counterOrder);
                 var matchUpdates = match.ProcessOrderMatch();
                 updates.Trades.Add(matchUpdates.trade);
@@ -78,7 +81,7 @@ namespace Centaurus.Domain
                 tradeQuoteAmount += matchUpdates.trade.QuoteAmount;
 
                 //stop if incoming order has been executed in full
-                if (tradeAssetAmount == takerOrder.Amount)
+                if (tradeAssetAmount == takerOrder.Order.Amount)
                     break;
                 counterOrder = nextOrder;
             }
@@ -86,7 +89,7 @@ namespace Centaurus.Domain
             RecordTrade(tradeAssetAmount, tradeQuoteAmount);
 
             if (timeInForce == TimeInForce.GoodTillExpire && PlaceReminderOrder())
-                updates.OrderUpdates.Add(takerOrder.ToOrderInfo());
+                updates.OrderUpdates.Add(takerOrder.Order.ToOrderInfo());
             return updates;
         }
 
@@ -126,12 +129,12 @@ namespace Centaurus.Domain
 
         private bool PlaceReminderOrder()
         {
-            if (takerOrder.Amount <= 0)
+            if (takerOrder.Order.Amount <= 0)
                 return false;
-            var remainingQuoteAmount = EstimateQuoteAmount(takerOrder.Amount, takerOrder.Price, side);
+            var remainingQuoteAmount = EstimateQuoteAmount(takerOrder.Order.Amount, takerOrder.Order.Price, side);
             if (remainingQuoteAmount <= 0)
                 return false;
-            takerOrder.QuoteAmount = remainingQuoteAmount;
+            takerOrder.Order.QuoteAmount = remainingQuoteAmount;
 
             //select the market to add new order
             var reminderOrderbook = market.GetOrderbook(side);
@@ -151,13 +154,13 @@ namespace Centaurus.Domain
             /// <param name="matcher">Parent OrderMatcher instance</param>
             /// <param name="takerOrderAmount">Taker order current amount</param>
             /// <param name="makerOrder">Crossed order from the orderbook</param>
-            public OrderMatch(OrderMatcher matcher, long takerOrderAmount, Order makerOrder)
+            public OrderMatch(OrderMatcher matcher, long takerOrderAmount, OrderWrapper makerOrder)
             {
                 this.matcher = matcher;
                 this.makerOrder = makerOrder;
                 //amount of asset we are going to buy/sell
-                AssetAmount = Math.Min(takerOrderAmount, makerOrder.Amount);
-                QuoteAmount = EstimateQuoteAmount(AssetAmount, makerOrder.Price, matcher.side);
+                AssetAmount = Math.Min(takerOrderAmount, makerOrder.Order.Amount);
+                QuoteAmount = EstimateQuoteAmount(AssetAmount, makerOrder.Order.Price, matcher.side);
             }
 
             public long AssetAmount { get; }
@@ -166,7 +169,7 @@ namespace Centaurus.Domain
 
             private OrderMatcher matcher;
 
-            private Order makerOrder;
+            private OrderWrapper makerOrder;
 
             /// <summary>
             /// Process matching.
@@ -175,8 +178,8 @@ namespace Centaurus.Domain
             {
                 //record trade effects
                 var trade = RecordTrade();
-                var counterOrder = makerOrder.ToOrderInfo();
-                if (makerOrder.Amount == 0)
+                var counterOrder = makerOrder.Order.ToOrderInfo();
+                if (makerOrder.Order.Amount == 0)
                 { //schedule removal for the fully executed counter order
                     RecordOrderRemoved();
                     counterOrder.State = OrderState.Deleted;
@@ -206,7 +209,7 @@ namespace Centaurus.Domain
                     Amount = AssetAmount,
                     QuoteAmount = QuoteAmount,
                     Asset = matcher.asset,
-                    Price = makerOrder.Price,
+                    Price = makerOrder.Order.Price,
                     TradeDate = new DateTime(matcher.resultEffects.Quantum.Timestamp, DateTimeKind.Utc)
                 };
             }

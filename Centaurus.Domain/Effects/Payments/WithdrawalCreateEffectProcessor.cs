@@ -1,40 +1,42 @@
-﻿using Centaurus.Models;
+﻿using Centaurus.Domain.Models;
+using Centaurus.Models;
+using Centaurus.PaymentProvider;
 using System;
 using System.Collections.Generic;
 using System.Text;
 
 namespace Centaurus.Domain
 {
-    public class WithdrawalCreateEffectProcessor : EffectProcessor<WithdrawalCreateEffect>
+    public class WithdrawalCreateEffectProcessor : ClientEffectProcessor<WithdrawalCreateEffect>
     {
-        private WithdrawalStorage withdrawalStorage;
+        private WithdrawalStorage withdrawalsStorage;
         private WithdrawalWrapper withdrawal;
 
-        public WithdrawalCreateEffectProcessor(WithdrawalCreateEffect effect, WithdrawalWrapper withdrawal, WithdrawalStorage withdrawalStorage)
-            :base(effect)
+        public WithdrawalCreateEffectProcessor(WithdrawalCreateEffect effect, AccountWrapper account, WithdrawalWrapper withdrawal, WithdrawalStorage withdrawalsStorage)
+            :base(effect, account)
         {
-            this.withdrawalStorage = withdrawalStorage ?? throw new ArgumentNullException(nameof(withdrawalStorage));
+            this.withdrawalsStorage = withdrawalsStorage ?? throw new ArgumentNullException(nameof(withdrawalsStorage));
             this.withdrawal = withdrawal ?? throw new ArgumentNullException(nameof(withdrawal));
         }
 
         public override void CommitEffect()
         {
             MarkAsProcessed();
-            withdrawalStorage.Add(withdrawal);
-            withdrawal.Source.Withdrawal = withdrawal;
-            withdrawal.Source.Account.Withdrawal = withdrawal.Apex;
+            withdrawalsStorage.Add(withdrawal);
+            AccountWrapper.Withdrawal = withdrawal;
+            AccountWrapper.Account.Withdrawal = withdrawal.Apex;
             foreach (var withdrawalItem in Effect.Items)
-                Effect.AccountWrapper.Account.GetBalance(withdrawalItem.Asset).UpdateLiabilities(withdrawalItem.Amount);
+                AccountWrapper.Account.GetBalance(withdrawalItem.Asset).UpdateLiabilities(withdrawalItem.Amount);
         }
 
         public override void RevertEffect()
         {
             MarkAsProcessed();
-            withdrawal.Source.Account.Withdrawal = 0;
-            withdrawal.Source.Withdrawal = null;
-            withdrawalStorage.Remove(withdrawal.Hash);
+            AccountWrapper.Account.Withdrawal = 0;
+            AccountWrapper.Withdrawal = null;
+            withdrawalsStorage.Remove(withdrawal.Hash);
             foreach (var withdrawalItem in Effect.Items)
-                Effect.AccountWrapper.Account.GetBalance(withdrawalItem.Asset).UpdateLiabilities(-withdrawalItem.Amount);
+                AccountWrapper.Account.GetBalance(withdrawalItem.Asset).UpdateLiabilities(-withdrawalItem.Amount);
         }
     }
 }

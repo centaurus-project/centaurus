@@ -1,5 +1,6 @@
 ﻿using Centaurus.DAL;
 using Centaurus.DAL.Models;
+using Centaurus.Domain.Models;
 using Centaurus.Models;
 using System;
 using System.Collections.Generic;
@@ -10,11 +11,12 @@ namespace Centaurus.Domain
 {
     public class EffectProcessorsContainer: ContextualBase
     {
-        public EffectProcessorsContainer(ExecutionContext context, MessageEnvelope quantum, DiffObject pendingDiffObject)
+        public EffectProcessorsContainer(ExecutionContext context, MessageEnvelope quantum, DiffObject pendingDiffObject, AccountWrapper account)
             :base(context)
         {
             Envelope = quantum ?? throw new ArgumentNullException(nameof(quantum));
             PendingDiffObject = pendingDiffObject ?? throw new ArgumentNullException(nameof(pendingDiffObject));
+            AccountWrapper = account;
         }
 
         public MessageEnvelope Envelope { get; }
@@ -30,6 +32,8 @@ namespace Centaurus.Domain
         public long Apex => Quantum.Apex;
 
         public RequestQuantum RequestQuantum => (RequestQuantum)Envelope.Message;
+
+        public AccountWrapper AccountWrapper { get; }
 
         /// <summary>
         /// Adds effect processor to container
@@ -58,11 +62,12 @@ namespace Centaurus.Domain
         /// Sends envelope and all effects to specified callback
         /// </summary>
         /// <param name="buffer">Buffer to use for serialization</param>
-        public void Complete(byte[] buffer)
+        public void Complete(EffectsProof effectsProof, byte[] buffer)
         {
             var quantumModel = QuantumContainerExtensions.FromQuantumContainer(
                 Envelope,
-                Effects, 
+                Effects,
+                effectsProof,
                 AffectedAccounts.ToArray(), 
                 buffer);
             PendingDiffObject.Quanta.Add(quantumModel);
@@ -87,10 +92,10 @@ namespace Centaurus.Domain
                     continue;
                 if (!result.TryGetValue(effect.Account, out var effectsNotification))
                 {
-                    effectsNotification = new EffectsNotification { Effects = new List<Effect>() };
+                    effectsNotification = new EffectsNotification { ClientEffects = new List<Effect>() };
                     result.Add(effect.Account, effectsNotification);
                 }
-                effectsNotification.Effects.Add(effect);
+                effectsNotification.ClientEffects.Add(effect);
             }
             return result.ToDictionary(k => k.Key, v => (Message)v.Value);
         }

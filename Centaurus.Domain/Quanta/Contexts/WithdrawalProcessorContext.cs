@@ -1,4 +1,6 @@
-﻿using Centaurus.Models;
+﻿using Centaurus.Domain.Models;
+using Centaurus.Models;
+using Centaurus.PaymentProvider;
 using stellar_dotnet_sdk;
 using System;
 using System.Collections.Generic;
@@ -12,26 +14,24 @@ namespace Centaurus.Domain
             : base(effectProcessorsContainer)
         {
             WithdrawalRequest = (WithdrawalRequest)Request.RequestEnvelope.Message;
+
+            if (!CentaurusContext.PaymentProvidersManager.TryGetManager(WithdrawalRequest.PaymentProvider, out var paymentsManager))
+                throw new BadRequestException($"Provider {WithdrawalRequest.PaymentProvider} is not supported.");
+
+            PaymentProvider = paymentsManager;
+
+            if (!PaymentProvider.Parser.TryDeserializeTransaction(WithdrawalRequest.Transaction, out var transaction))
+                throw new BadRequestException($"Invalid transaction data.");
+
+            Transaction = transaction;
         }
 
-        public List<WithdrawalWrapperItem> WithdrawalItems { get; set; } = new List<WithdrawalWrapperItem>();
+        public WithdrawalWrapper Withdrawal { get; set; }
 
         public WithdrawalRequest WithdrawalRequest { get; }
 
-        private Transaction transaction;
-        public Transaction Transaction
-        {
-            get => transaction;
-            set
-            {
-                if (value != null && value != transaction)
-                {
-                    transaction = value;
-                    TransactionHash = transaction.Hash();
-                }
-            }
-        }
+        public TransactionWrapper Transaction { get; }
 
-        public byte[] TransactionHash { get; set; }
+        public PaymentProviderBase PaymentProvider { get; }
     }
 }

@@ -10,6 +10,8 @@ using Centaurus.Models;
 using Centaurus.Xdr;
 using System.Diagnostics;
 using Centaurus.DAL.Mongo;
+using Centaurus.PaymentProvider;
+using Centaurus.Domain.Models;
 
 namespace Centaurus.Domain
 {
@@ -34,27 +36,31 @@ namespace Centaurus.Domain
                 rawCursor = "0";
             if (!long.TryParse(rawCursor, out var apex))
                 throw new ArgumentException("Cursor is invalid.");
-            var accountQuanta = (await storage.LoadEffects(apex, isDesc, limit, account));
-            var effectModels = accountQuanta
-                .OrderBy(e => e.Apex)
-                .Select(ae => new ApexEffects
+            var accountQuanta = await storage.LoadEffects(apex, isDesc, limit, account);
+            var accountEffects = new List<ApexEffects>();
+            foreach (var quantum in accountQuanta.OrderBy(e => e.Apex))
+            {
+                var quantumContainer = quantum.ToQuantumContainer();
+                accountEffects.Add(new ApexEffects
                 {
-                    Apex = ae.Apex,
-                    Items = ae.ToQuantumContainer().Effects.Where(a => a.Account == account).ToList()
-                })
-                .ToList();
+                    Apex = ((Quantum)quantumContainer.Quantum.Message).Apex,
+                    Items = quantumContainer.Effects.Where(a => a.Account == account).ToList(),
+                    Proof = quantumContainer.EffectsProof
+                });
+            }
+
             if (isDesc)
             {
-                effectModels.Reverse();
-                effectModels.ForEach(ae => ae.Items.Reverse());
+                accountEffects.Reverse();
+                accountEffects.ForEach(ae => ae.Items.Reverse());
             }
             return new EffectsResponse
             {
                 CurrentPagingToken = rawCursor,
                 Order = isDesc ? EffectsRequest.Desc : EffectsRequest.Asc,
-                Items = effectModels,
-                NextPageToken = effectModels.LastOrDefault()?.Apex.ToString(),
-                PrevPageToken = effectModels.FirstOrDefault()?.Apex.ToString(),
+                Items = accountEffects,
+                NextPageToken = accountEffects.LastOrDefault()?.Apex.ToString(),
+                PrevPageToken = accountEffects.FirstOrDefault()?.Apex.ToString(),
                 Limit = limit
             };
         }
@@ -96,43 +102,27 @@ namespace Centaurus.Domain
         }
 
         /// <summary>
-        /// Fetches current snapshot
-        /// </summary>
-        /// <returns></returns>
-        public async Task<Snapshot> GetSnapshot()
-        {
-            var lastApex = await GetLastApex();
-            if (lastApex < 0)
-                return null;
-            return await GetSnapshot(lastApex);
-        }
-
-        /// <summary>
         /// Creates snapshot from effect
         /// </summary>
         /// <returns></returns>
         public static Snapshot GetSnapshot(ConstellationInitEffect constellationInitEffect, byte[] quantumHash)
         {
-            var assets = new List<AssetSettings> { new AssetSettings() };
-            assets.AddRange(constellationInitEffect.Assets);
-
             var snapshot = new Snapshot
             {
                 Apex = constellationInitEffect.Apex,
                 Accounts = new List<AccountWrapper>(),
-                Orders = new List<Order>(),
-                Withdrawals = new List<WithdrawalWrapper>(),
+                Orders = new List<OrderWrapper>(),
+                Withdrawals = new Dictionary<string, WithdrawalStorage>(),
                 Settings = new ConstellationSettings
                 {
                     Apex = constellationInitEffect.Apex,
-                    Assets = assets,
+                    Assets = constellationInitEffect.Assets,
                     Auditors = constellationInitEffect.Auditors,
                     MinAccountBalance = constellationInitEffect.MinAccountBalance,
                     MinAllowedLotSize = constellationInitEffect.MinAllowedLotSize,
-                    Vault = constellationInitEffect.Vault,
+                    Providers = constellationInitEffect.Providers,
                     RequestRateLimits = constellationInitEffect.RequestRateLimits
                 },
-                TxCursor = constellationInitEffect.TxCursor,
                 LastHash = quantumHash
             };
             return snapshot;
@@ -157,7 +147,7 @@ namespace Centaurus.Domain
         /// </summary>
         /// <param name="apex"></param>
         /// <returns></returns>
-        public async Task<Snapshot> GetSnapshot(long apex)
+        public async Task<Snapshot> GetSnapshot(PaymentParsersManager paymentParsersManager, long apex)
         {
             if (apex < 0)
                 throw new ArgumentException("Apex cannot be less than zero.");
@@ -175,26 +165,24 @@ namespace Centaurus.Domain
             if (settings == null)
                 return null;
 
-            var stellarData = await storage.LoadConstellationState();
+            var cursors = await storage.LoadCursors();
 
             var accounts = (await GetAccounts()).Select(a => new AccountWrapper(a, settings.RequestRateLimits));
 
             var accountStorage = new AccountStorage(accounts);
 
-            var withdrawals = await GetWithdrawals(accountStorage, settings);
+            var withdrawals = await GetWithdrawals(paymentParsersManager, accountStorage, settings);
 
             var orders = await GetOrders(accountStorage);
 
             var exchange = await GetRestoredExchange(orders);
-
-            var withdrawalsStorage = new WithdrawalStorage(withdrawals);
 
             var batchSize = 1000;
             var effects = new List<Effect>();
             while (true)
             {
                 var quanta = await storage.LoadQuantaAboveApex(apex, batchSize);
-                effects.AddRange(quanta.SelectMany(q => q.ToQuantumContainer(accountStorage).Effects));
+                effects.AddRange(quanta.SelectMany(q => q.ToQuantumContainer().Effects));
                 if (quanta.Count < batchSize)
                     break;
             }
@@ -202,7 +190,8 @@ namespace Centaurus.Domain
             for (var i = effects.Count - 1; i >= 0; i--)
             {
                 var currentEffect = effects[i];
-                var account = currentEffect.AccountWrapper;
+
+                var account = accountStorage.GetAccount(currentEffect.Account);
                 IEffectProcessor<Effect> processor = null;
                 switch (currentEffect)
                 {
@@ -210,28 +199,28 @@ namespace Centaurus.Domain
                         processor = new AccountCreateEffectProcessor(accountCreateEffect, accountStorage, settings.RequestRateLimits);
                         break;
                     case NonceUpdateEffect nonceUpdateEffect:
-                        processor = new NonceUpdateEffectProcessor(nonceUpdateEffect);
+                        processor = new NonceUpdateEffectProcessor(nonceUpdateEffect, account);
                         break;
                     case BalanceCreateEffect balanceCreateEffect:
-                        processor = new BalanceCreateEffectProcessor(balanceCreateEffect);
+                        processor = new BalanceCreateEffectProcessor(balanceCreateEffect, account);
                         break;
                     case BalanceUpdateEffect balanceUpdateEffect:
-                        processor = new BalanceUpdateEffectProcesor(balanceUpdateEffect);
+                        processor = new BalanceUpdateEffectProcesor(balanceUpdateEffect, account);
                         break;
                     case RequestRateLimitUpdateEffect requestRateLimitUpdateEffect:
-                        processor = new RequestRateLimitUpdateEffectProcessor(requestRateLimitUpdateEffect, settings.RequestRateLimits);
+                        processor = new RequestRateLimitUpdateEffectProcessor(requestRateLimitUpdateEffect, account, settings.RequestRateLimits);
                         break;
                     case OrderPlacedEffect orderPlacedEffect:
                         {
                             var orderBook = exchange.GetOrderbook(orderPlacedEffect.OrderId);
                             var order = exchange.OrderMap.GetOrder(orderPlacedEffect.OrderId);
-                            processor = new OrderPlacedEffectProcessor(orderPlacedEffect, orderBook, order);
+                            processor = new OrderPlacedEffectProcessor(orderPlacedEffect, order.AccountWrapper, orderBook, order);
                         }
                         break;
                     case OrderRemovedEffect orderRemovedEffect:
                         {
                             var orderBook = exchange.GetOrderbook(orderRemovedEffect.OrderId);
-                            processor = new OrderRemovedEffectProccessor(orderRemovedEffect, orderBook);
+                            processor = new OrderRemovedEffectProccessor(orderRemovedEffect, accountStorage.GetAccount(orderRemovedEffect.Account), orderBook);
                         }
                         break;
                     case TradeEffect tradeEffect:
@@ -239,19 +228,27 @@ namespace Centaurus.Domain
                             var order = exchange.OrderMap.GetOrder(tradeEffect.OrderId);
                             if (order == null) //no need to revert trade if no order was created
                                 continue;
-                            processor = new TradeEffectProcessor(tradeEffect, order);
+                            processor = new TradeEffectProcessor(tradeEffect, accountStorage.GetAccount(tradeEffect.Account), order);
                         }
                         break;
                     case WithdrawalCreateEffect withdrawalCreate:
                         {
-                            var withdrawal = withdrawalsStorage.GetWithdrawal(withdrawalCreate.Apex);
-                            processor = new WithdrawalCreateEffectProcessor(withdrawalCreate, withdrawal, withdrawalsStorage);
+                            if (!withdrawals.TryGetValue(withdrawalCreate.Provider, out var storage))
+                                throw new Exception($"No storage for provider {withdrawalCreate.Provider}.");
+
+                            var withdrawal = storage.GetWithdrawal(withdrawalCreate.Apex);
+                            processor = new WithdrawalCreateEffectProcessor(withdrawalCreate, withdrawal.AccountWrapper, withdrawal, storage);
                         }
                         break;
                     case WithdrawalRemoveEffect withdrawalRemove:
                         {
-                            var withdrawal = withdrawalsStorage.GetWithdrawal(withdrawalRemove.Apex);
-                            processor = new WithdrawalRemoveEffectProcessor(withdrawalRemove, withdrawal, withdrawalsStorage);
+                            if (!withdrawals.TryGetValue(withdrawalRemove.Provider, out var storage))
+                            {
+                                storage = new WithdrawalStorage();
+                                withdrawals.Add(withdrawalRemove.Provider, storage);
+                            }
+                            var withdrawal = storage.GetWithdrawal(withdrawalRemove.Apex);
+                            processor = new WithdrawalRemoveEffectProcessor(withdrawalRemove, withdrawal.AccountWrapper, withdrawal, storage);
                         }
                         break;
                     default:
@@ -276,10 +273,9 @@ namespace Centaurus.Domain
             {
                 Apex = apex,
                 Accounts = accountStorage.GetAll().OrderBy(a => a.Account.Id).ToList(),
-                TxCursor = stellarData?.TxCursor ?? 0,
                 Orders = allOrders.OrderBy(o => o.OrderId).ToList(),
                 Settings = settings,
-                Withdrawals = withdrawalsStorage.GetAll().OrderBy(w => w.Apex).ToList(),
+                Withdrawals = withdrawals,
                 LastHash = lastQuantumData.Quantum.Message.ComputeHash()
             };
         }
@@ -298,7 +294,7 @@ namespace Centaurus.Domain
             return minApex - 1; //we can revert effect for that apex, so the minimal apex is first effect apex - 1
         }
 
-        private async Task<Exchange> GetRestoredExchange(List<Order> orders)
+        private async Task<Exchange> GetRestoredExchange(List<OrderWrapper> orders)
         {
             var settings = await GetConstellationSettings(long.MaxValue); // load last settings
             return Exchange.RestoreExchange(settings.Assets, orders, false);
@@ -323,34 +319,49 @@ namespace Centaurus.Domain
             return accounts;
         }
 
-        private async Task<List<WithdrawalWrapper>> GetWithdrawals(AccountStorage accountStorage, ConstellationSettings constellationSettings)
+        private async Task<Dictionary<string, WithdrawalStorage>> GetWithdrawals(PaymentParsersManager paymentParsersManager, AccountStorage accountStorage, ConstellationSettings constellationSettings)
         {
+            var result = new Dictionary<string, WithdrawalStorage>();
             var withdrawalApexes = accountStorage.GetAll().Where(a => a.Account.Withdrawal != default).Select(a => a.Account.Withdrawal).ToArray();
             if (withdrawalApexes.Length < 1)
-                return new List<WithdrawalWrapper>();
-            var withdrawalQuanta = await storage.LoadQuanta(withdrawalApexes);
-            var withdrawals = withdrawalQuanta
-                .Select(w =>
-                {
-                    var withdrawalQuantum = XdrConverter.Deserialize<MessageEnvelope>(w.Bin);
-                    var withdrawalRequest = ((WithdrawalRequest)((RequestQuantum)withdrawalQuantum.Message).RequestMessage);
-                    withdrawalQuantum.TryAssignAccountWrapper(accountStorage);
-                    return WithdrawalWrapperExtensions.GetWithdrawal(withdrawalQuantum, constellationSettings);
-                });
+                return result;
 
-            return withdrawals.OrderBy(w => w.Apex).ToList();
+            var withdrawalQuanta = await storage.LoadQuanta(withdrawalApexes);
+
+            foreach (var w in withdrawalQuanta.OrderBy(w => w.Apex))
+            {
+                var withdrawalQuantum = XdrConverter.Deserialize<MessageEnvelope>(w.Bin);
+                var withdrawalRequest = ((WithdrawalRequest)((RequestQuantum)withdrawalQuantum.Message).RequestMessage);
+
+                if (!paymentParsersManager.TryGetParser(withdrawalRequest.PaymentProvider, out var parser))
+                    throw new Exception($"Unable to find parser for {withdrawalRequest.PaymentProvider} provider.");
+
+                if (!parser.TryDeserializeTransaction(withdrawalRequest.Transaction, out var transactionWrapper))
+                    throw new Exception($"Invalid {withdrawalRequest.PaymentProvider} withdrawal bin.");
+
+
+
+                var providerSettings = constellationSettings.Providers.FirstOrDefault(v => PaymentProviderBase.GetProviderId(v.Provider, v.Name) == withdrawalRequest.PaymentProvider);
+                if (providerSettings == null)
+                    throw new Exception($"Unable to find vault for {withdrawalRequest.PaymentProvider} provider.");
+
+                var account = accountStorage.GetAccount(withdrawalRequest.Account);
+                var withdrawal = parser.GetWithdrawal(withdrawalQuantum, account, transactionWrapper, providerSettings);
+
+                if (!result.TryGetValue(withdrawalRequest.PaymentProvider, out var storage))
+                    storage.Add(withdrawal);
+            }
+
+            return result;
         }
 
-        private async Task<List<Order>> GetOrders(AccountStorage accountStorage)
+        private async Task<List<OrderWrapper>> GetOrders(AccountStorage accountStorage)
         {
             var orderModels = await storage.LoadOrders();
 
-            var orders = new List<Order>();
-            var orderLength = orderModels.Count;
-            for (int i = 0; i < orderLength; i++)
-            {
-                orders.Add(orderModels[i].ToOrder(accountStorage));
-            }
+            var orders = new List<OrderWrapper>();
+            foreach (var order in orderModels)
+                orders.Add(order.ToOrder(accountStorage.GetAccount(order.Account)));
 
             return orders;
         }

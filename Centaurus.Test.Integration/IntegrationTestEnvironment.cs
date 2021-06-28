@@ -3,6 +3,7 @@ using Centaurus.DAL;
 using Centaurus.DAL.Models;
 using Centaurus.DAL.Mongo;
 using Centaurus.Domain;
+using Centaurus.Models;
 using Centaurus.Stellar;
 using Microsoft.AspNetCore.Mvc;
 using stellar_dotnet_sdk;
@@ -32,35 +33,43 @@ namespace Centaurus.Test
 
         public KeyPair Issuer { get; } = KeyPair.Random();
 
+        public Vault Vault { get; } = new Vault { AccountId = KeyPair.Random().AccountId, Provider = PaymentProvider.Stellar };
+
         public MockStellarDataProvider StellarProvider { get; }
         public ManualResetEvent Reset { get; }
 
         public AlphaStartupWrapper AlphaWrapper { get; private set; }
 
-        public List<AuditorStartupWrapper> AuditorWrappers { get; private set; }
+        public List<AuditorStartupWrapper> AuditorWrappers { get; private set; } = new List<AuditorStartupWrapper>();
         public List<KeyPair> Clients { get; } = new List<KeyPair>();
 
         public void Init(int auditorsCount)
         {
             if (isInited)
                 throw new InvalidOperationException("Already inited");
-            GenerateAlpha();
-            GenerateAuditors(auditorsCount);
+
+            var keyPairs = Enumerable.Range(0, auditorsCount).Select(_ => KeyPair.Random()).ToArray();
+            var genesisQuorum = keyPairs.Select(k => k.AccountId).ToArray();
+
+            GenerateAuditors(keyPairs, genesisQuorum);
             isInited = true;
         }
 
-        private void GenerateAlpha()
+        private void GenerateAuditors(KeyPair[] keyPairs, string[] genesisQuorum)
         {
-            var alphaSettings = GetAlphaSettings();
-            RegisterStellarAccount(alphaSettings.KeyPair);
-            AlphaWrapper = new AlphaStartupWrapper(alphaSettings, StellarProvider, Reset);
-        }
-
-        private void GenerateAuditors(int auditorsCount)
-        {
-            var keyPairs = Enumerable.Range(0, auditorsCount).Select(_ => KeyPair.Random()).ToArray();
-            var genesisQuorum = keyPairs.Select(k => k.AccountId);
-            AuditorWrappers = keyPairs.Select(kp => new AuditorStartupWrapper(GetAuditorSettings(kp, genesisQuorum), StellarProvider, Reset, GetClientConnectionWrapper)).ToList();
+            foreach (var kp in keyPairs)
+            {
+                if (AlphaWrapper == null)
+                {
+                    var alphaSettings = GetSettings(kp, genesisQuorum, kp);
+                    RegisterStellarAccount(alphaSettings.KeyPair);
+                    AlphaWrapper = new AlphaStartupWrapper(alphaSettings, StellarProvider, Reset);
+                }
+                else
+                {
+                    AuditorWrappers.Add(new AuditorStartupWrapper(GetSettings(kp, genesisQuorum, keyPairs.First()), StellarProvider, Reset, GetClientConnectionWrapper));
+                }
+            }
         }
 
         public void GenerateCliens(int clientsCount)
@@ -69,7 +78,8 @@ namespace Centaurus.Test
             var clients = Enumerable.Range(0, clientsCount).Select(_ => KeyPair.Random()).ToList();
             var info = AlphaWrapper.ConstellationController.Info();
             var assets = info.Assets;
-            var vault = KeyPair.FromAccountId(info.Vault);
+            info.Vaults.TryGetValue(PaymentProvider.Stellar.ToString(), out var rawVault);
+            var vault = KeyPair.FromAccountId(rawVault);
             foreach (var client in clients)
             {
                 var accountModel = RegisterStellarAccount(client);
@@ -108,19 +118,21 @@ namespace Centaurus.Test
             }
         }
 
-        private AlphaSettings GetAlphaSettings()
+        private Settings GetSettings(KeyPair keyPair, string[] genesisQuorum, KeyPair alpha)
         {
-            var kp = KeyPair.Random();
-            var alphaSettings = new AlphaSettings
+            var settings = new Settings
             {
                 AlphaPort = 5000,
                 HorizonUrl = HorizonUrl,
                 NetworkPassphrase = NetworkPassphrase,
-                Secret = kp.SecretSeed,
-                SyncBatchSize = 500
+                Secret = keyPair.SecretSeed,
+                SyncBatchSize = 500,
+                AlphaPubKey = alpha.AccountId,
+                AuditorAddressBook = new string[] { "http://localhost" },
+                ParticipationLevel = 1
             };
-            alphaSettings.Build();
-            return alphaSettings;
+            settings.Build();
+            return settings;
         }
 
         public async Task RunAlpha()
@@ -139,21 +151,6 @@ namespace Centaurus.Test
             };
             StellarProvider.RegisterAccount(accountModel);
             return accountModel;
-        }
-
-        private AuditorSettings GetAuditorSettings(KeyPair keyPair, IEnumerable<string> genesisQuorum)
-        {
-            var settings = new AuditorSettings
-            {
-                AlphaPubKey = AlphaWrapper.Settings.KeyPair.AccountId,
-                Secret = keyPair.SecretSeed,
-                NetworkPassphrase = NetworkPassphrase,
-                HorizonUrl = HorizonUrl,
-                GenesisQuorum = genesisQuorum,
-                AlphaAddress = AlphaAddress
-            };
-            settings.Build();
-            return settings;
         }
 
         public async Task RunAuditors()

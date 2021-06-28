@@ -21,19 +21,19 @@ using Microsoft.AspNetCore.Server.Kestrel.Https;
 
 namespace Centaurus.Alpha
 {
-    public class AlphaHostBuilder : ContextualBase<AlphaContext>
+    public class AlphaHostBuilder : ContextualBase
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public AlphaHostBuilder(AlphaContext context)
+        public AlphaHostBuilder(ExecutionContext context)
             : base(context)
         {
 
         }
 
-        public IHost CreateHost(AlphaSettings settings)
+        public IHost CreateHost()
         {
-            SetupCertificate(settings);
+            SetupCertificate(Context.Settings);
             return Host.CreateDefaultBuilder()
                 .ConfigureLogging(logging =>
                 {
@@ -41,9 +41,9 @@ namespace Centaurus.Alpha
                     logging.ClearProviders();
                     logging.AddConsole();
 
-                    if (settings.Verbose)
+                    if (Context.Settings.Verbose)
                         logging.SetMinimumLevel(Microsoft.Extensions.Logging.LogLevel.Trace);
-                    else if (settings.Silent)
+                    else if (Context.Settings.Silent)
                         logging.SetMinimumLevel(Microsoft.Extensions.Logging.LogLevel.Error);
                     else
                         logging.SetMinimumLevel(Microsoft.Extensions.Logging.LogLevel.Information);
@@ -52,13 +52,13 @@ namespace Centaurus.Alpha
                 .UseNLog()
                 .ConfigureWebHostDefaults(webBuilder =>
                 {
-                    webBuilder.ConfigureServices(s => s.AddSingleton(Context))
+                    webBuilder
                         .UseStartup<HostStartup>()
                         .UseKestrel(options =>
                         {
                             if (Certificate != null)
                             {
-                                options.ListenAnyIP(settings.AlphaPort,
+                                options.ListenAnyIP(Context.Settings.AlphaPort,
                                 listenOptions =>
                                 {
                                     var httpsOptions = new HttpsConnectionAdapterOptions();
@@ -67,7 +67,7 @@ namespace Centaurus.Alpha
                                 });
                             }
                             else
-                                options.ListenAnyIP(settings.AlphaPort);
+                                options.ListenAnyIP(Context.Settings.AlphaPort);
                         });
                 }).Build();
         }
@@ -77,7 +77,7 @@ namespace Centaurus.Alpha
         public const string centaurusWebSocketEndPoint = "/centaurus";
         public const string infoWebSocketEndPoint = "/info";
 
-        private void SetupCertificate(AlphaSettings alphaSettings)
+        private void SetupCertificate(Settings alphaSettings)
         {
             if (alphaSettings.TlsCertificatePath == null)
                 return;
@@ -147,7 +147,10 @@ namespace Centaurus.Alpha
             public void ConfigureServices(IServiceCollection services)
             {
                 services
-                    .AddMvc(options => options.EnableEndpointRouting = false);
+                    .AddMvc(options => options.EnableEndpointRouting = false)
+                    .AddControllersAsServices() 
+                    .SetCompatibilityVersion(CompatibilityVersion.Version_3_0);
+
                 services.Add(
                     new ServiceDescriptor(
                         typeof(IActionResultExecutor<JsonResult>),
@@ -155,11 +158,16 @@ namespace Centaurus.Alpha
                         ServiceLifetime.Singleton)
                 );
                 services.AddOptions<HostOptions>().Configure(opts => opts.ShutdownTimeout = TimeSpan.FromDays(365));
+
+                services.AddControllers(opts =>
+                {
+                    opts.ModelBinderProviders.Insert(0, new XdrModelBinderProvider());
+                });
             }
 
             static async Task CentaurusWebSocketHandler(HttpContext context, Func<Task> next)
             {
-                var centaurusContext = context.RequestServices.GetService<AlphaContext>();
+                var centaurusContext = context.RequestServices.GetService<ExecutionContext>();
                 if (centaurusContext.AppState == null || ValidApplicationStates.Contains(centaurusContext.AppState.State))
                 {
                     using (var webSocket = await context.WebSockets.AcceptWebSocketAsync())
@@ -173,7 +181,7 @@ namespace Centaurus.Alpha
 
             static async Task InfoWebSocketHandler(HttpContext context, Func<Task> next)
             {
-                var centaurusContext = context.RequestServices.GetService<AlphaContext>();
+                var centaurusContext = context.RequestServices.GetService<ExecutionContext>();
                 var webSocket = await context.WebSockets.AcceptWebSocketAsync();
                 await centaurusContext.InfoConnectionManager.OnNewConnection(webSocket, context.Connection.Id, context.Connection.RemoteIpAddress.ToString());
             }

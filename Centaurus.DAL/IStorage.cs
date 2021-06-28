@@ -68,7 +68,7 @@ namespace Centaurus.DAL
         //returns sorted by id orders
         public Task<List<OrderModel>> LoadOrders();
 
-        public Task<ConstellationState> LoadConstellationState();
+        public Task<List<PaymentCursorModel>> LoadCursors();
 
         /// <summary>
         /// 

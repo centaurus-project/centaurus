@@ -7,7 +7,7 @@ namespace Centaurus.Domain.WebSockets.Alpha.Info.CommandHandlers
 {
     public class SubscribeCommandHandler : BaseCommandHandler<SubscribeCommand>
     {
-        public SubscribeCommandHandler(AlphaContext context)
+        public SubscribeCommandHandler(ExecutionContext context)
             : base(context)
         {
 

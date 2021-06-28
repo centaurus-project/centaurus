@@ -1,16 +1,17 @@
-﻿using Centaurus.Models;
+﻿using Centaurus.Domain.Models;
+using Centaurus.Models;
 using System;
 using System.Collections.Generic;
 using System.Text;
 
 namespace Centaurus.Domain
 {
-    public class TradeEffectProcessor : EffectProcessor<TradeEffect>
+    public class TradeEffectProcessor : ClientEffectProcessor<TradeEffect>
     {
-        private Order order;
+        private OrderWrapper order;
 
-        public TradeEffectProcessor(TradeEffect effect, Order order)
-            : base(effect)
+        public TradeEffectProcessor(TradeEffect effect, AccountWrapper account, OrderWrapper order)
+            : base(effect, account)
         {
             this.order = order ?? throw new ArgumentNullException(nameof(order));
         }
@@ -18,13 +19,13 @@ namespace Centaurus.Domain
         public override void CommitEffect()
         {
             MarkAsProcessed();
-            order.Amount += -Effect.AssetAmount;
+            order.Order.Amount += -Effect.AssetAmount;
             if (!Effect.IsNewOrder) //new order doesn't have this value yet
-                order.QuoteAmount += -Effect.QuoteAmount;
+                order.Order.QuoteAmount += -Effect.QuoteAmount;
 
             var decodedId = OrderIdConverter.Decode(Effect.OrderId);
-            var quoteBalance = Effect.AccountWrapper.Account.GetBalance(0);
-            var assetBalance = Effect.AccountWrapper.Account.GetBalance(decodedId.Asset);
+            var quoteBalance = AccountWrapper.Account.GetBalance(0);
+            var assetBalance = AccountWrapper.Account.GetBalance(decodedId.Asset);
             if (decodedId.Side == OrderSide.Buy)
             {
                 if (!Effect.IsNewOrder) //liabilities wasn't locked for new order yet
@@ -46,8 +47,8 @@ namespace Centaurus.Domain
             MarkAsProcessed();
 
             var decodedId = OrderIdConverter.Decode(Effect.OrderId);
-            var quoteBalance = Effect.AccountWrapper.Account.GetBalance(0);
-            var assetBalance = Effect.AccountWrapper.Account.GetBalance(decodedId.Asset);
+            var quoteBalance = AccountWrapper.Account.GetBalance(0);
+            var assetBalance = AccountWrapper.Account.GetBalance(decodedId.Asset);
             if (decodedId.Side == OrderSide.Buy)
             {
                 if (!Effect.IsNewOrder)
@@ -63,9 +64,9 @@ namespace Centaurus.Domain
                 quoteBalance.UpdateBalance(-Effect.QuoteAmount);
             }
 
-            order.Amount += Effect.AssetAmount; 
+            order.Order.Amount += Effect.AssetAmount; 
             if (!Effect.IsNewOrder)
-                order.QuoteAmount += Effect.QuoteAmount;
+                order.Order.QuoteAmount += Effect.QuoteAmount;
         }
     }
 }

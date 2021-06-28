@@ -36,7 +36,7 @@ namespace Centaurus.Models
         /// </summary>
         RequestQuantum = 48,
         /// <summary>
-        /// Quantum created by Alpha server that contains aggregated ledger updates provided by <see cref="TxNotification"/>.
+        /// Quantum created by Alpha server that contains aggregated ledger updates provided by <see cref="PaymentNotification"/>.
         /// </summary>
         TxCommitQuantum = 49,
         /// <summary>
@@ -50,27 +50,27 @@ namespace Centaurus.Models
         /// <summary>
         /// Initiate connection handshake.
         /// </summary>
-        HandshakeInit = 100,
+        HandshakeRequest = 100,
         /// <summary>
-        /// Handshake result.
+        /// Signed handshake data.
         /// </summary>
-        HandshakeResult = 101,
+        HandshakeResponse = 101,
         /// <summary>
-        /// Operation result, containing original quantum and processing status.
+        /// Operation result, containing original message and processing status.
         /// </summary>
         ResultMessage = 102,
         /// <summary>
+        /// Operation result, containing original quantum and processing status.
+        /// </summary>
+        QuantumResultMessage = 103,
+        /// <summary>
         /// ITransaction operation result, containing transaction signature, original quantum and processing status.
         /// </summary>
-        ITransactionResultMessage = 103,
+        ITransactionResultMessage = 104,
         /// <summary>
         /// Message from Alpha to a client with all effects that affects the client, and wasn't triggered by the client (Trade for example).
         /// </summary>
-        EffectsNotification = 104,
-        /// <summary>
-        /// Message from auditor to Alpha server that contains Stellar payments (obtained from the Horizon).
-        /// </summary>
-        TxNotification = 105,
+        EffectsNotification = 105,
         /// <summary>
         /// Auditor current state (the last snapshot, and all quanta after the last snapshot).
         /// </summary>
@@ -84,21 +84,25 @@ namespace Centaurus.Models
         /// </summary>
         SetApexCursor = 110,
         /// <summary>
+        /// The message is send after success handshake. Contains account id.
+        /// </summary>
+        ClientConnectionSuccess = 150,
+        /// <summary>
         /// Account data request result.
         /// </summary>
-        AccountDataResponse = 150,
+        AccountDataResponse = 151,
         /// <summary>
         /// Account's effects request result.
         /// </summary>
-        EffectsResponse = 151,
+        EffectsResponse = 152,
         /// <summary>
         /// Contains data for init. It will be created by alpha on init.
         /// </summary>
-        ConstellationInitQuantum = 200,
+        ConstellationInitRequest = 200,
         /// <summary>
         /// Upgrade quorum, add/remove auditors, apply new settings etc.
         /// </summary>
-        ConstellationUpgradeQuantum = 201,
+        ConstellationUpgradeRequest = 201,
         /// <summary>
         /// Alpha state message. It contains Alpha state and last snapshot.
         /// </summary>
@@ -111,6 +115,10 @@ namespace Centaurus.Models
         /// Contains batch of quanta
         /// </summary>
         QuantaBatch = 204,
+        /// <summary>
+        /// Wrapper for constellation requests.
+        /// </summary>
+        ConstellationQuantum = 205,
         /// <summary>
         /// Contains array of auditor's quantum processing results
         /// </summary>

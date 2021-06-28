@@ -9,27 +9,17 @@ using stellar_dotnet_sdk;
 namespace Centaurus.Domain
 {
 
-    public class WithdrawalProcessor : QuantumRequestProcessor<WithdrawalProcessorContext>
+    public class WithdrawalProcessor : QuantumProcessor<WithdrawalProcessorContext>
     {
         public override MessageTypes SupportedMessageType => MessageTypes.WithdrawalRequest;
 
-        public override Task<ResultMessage> Process(WithdrawalProcessorContext context)
+        public override Task<QuantumResultMessage> Process(WithdrawalProcessorContext context)
         {
             context.UpdateNonce();
 
-            var withdrawal = new WithdrawalWrapper
-            {
-                Envelope = context.Envelope,
-                Hash = context.TransactionHash,
-                Withdrawals = context.WithdrawalItems,
-                MaxTime = context.Transaction.TimeBounds.MaxTime
-            };
-            context.EffectProcessors.AddWithdrawalCreate(withdrawal, context.CentaurusContext.WithdrawalStorage);
+            context.EffectProcessors.AddWithdrawalCreate(context.Withdrawal, context.PaymentProvider.WithdrawalStorage);
 
-            var effects = context.EffectProcessors.Effects;
-
-            var accountEffects = effects.Where(e => e.AccountWrapper?.Account.Id == context.WithdrawalRequest.Account).ToList();
-            return Task.FromResult(context.Envelope.CreateResult(ResultStatusCodes.Success, accountEffects));
+            return Task.FromResult((QuantumResultMessage)context.Envelope.CreateResult(ResultStatusCodes.Success));
         }
 
         public override Task Validate(WithdrawalProcessorContext context)
@@ -42,36 +32,25 @@ namespace Centaurus.Domain
 
         private void ValidateWithdrawal(WithdrawalProcessorContext context)
         {
-            if (context.Request.RequestMessage.AccountWrapper.HasPendingWithdrawal)
+            if (context.SourceAccount.HasPendingWithdrawal)
                 throw new BadRequestException("Withdrawal already exists.");
 
-            context.Transaction = context.WithdrawalRequest.DeserializeTransaction();
-            ValidateTransaction(context);
+            context.PaymentProvider.ValidateTransaction(context.Transaction);
+            context.Withdrawal = context.PaymentProvider.GetWithdrawal(context.Envelope, context.SourceAccount, context.Transaction);
 
-            context.WithdrawalItems = context.Transaction.GetWithdrawals(context.WithdrawalRequest.AccountWrapper.Account, context.CentaurusContext.Constellation);
-            if (context.WithdrawalItems.Count() < 1)
-                throw new BadRequestException("No payment operations.");
-        }
+            var sourceAccount = context.SourceAccount.Account;
 
-        private void ValidateTransaction(WithdrawalProcessorContext context)
-        {
-            var transaction = context.Transaction;
-            var txSourceAccount = transaction.SourceAccount;
-            if (ByteArrayPrimitives.Equals(context.CentaurusContext.Constellation.Vault.Data, txSourceAccount.PublicKey))
-                throw new BadRequestException("Vault account cannot be used as transaction source.");
+            foreach (var withdrawalItem in context.Withdrawal.Items)
+            {
+                var centaurusAsset = context.CentaurusContext.Constellation.Assets.FirstOrDefault(a => a.Id == withdrawalItem.Asset);
+                if (withdrawalItem.Asset == 0 && withdrawalItem.Amount < context.CentaurusContext.Constellation.MinAccountBalance)
+                    throw new BadRequestException($"Min account balance is {context.CentaurusContext.Constellation.MinAccountBalance}.");
 
-            if (transaction.TimeBounds == null || transaction.TimeBounds.MaxTime <= 0)
-                throw new BadRequestException("Max time must be set.");
-
-            var currentTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            if (transaction.TimeBounds.MaxTime - currentTime > 1000)
-                throw new BadRequestException("Transaction expiration time is to far.");
-
-            if (transaction.Operations.Any(o => !(o is PaymentOperation)))
-                throw new BadRequestException("Only payment operations are allowed.");
-
-            if (transaction.Operations.Length > 100)
-                throw new BadRequestException("Too many operations.");
+                if (!(sourceAccount.GetBalance(withdrawalItem.Asset)?.HasSufficientBalance(withdrawalItem.Amount) ?? false))
+                    throw new BadRequestException($"Insufficient balance.");
+                if (context.Withdrawal.Items.Count() < 1)
+                    throw new BadRequestException("No payment operations.");
+            }
         }
 
         public override WithdrawalProcessorContext GetContext(EffectProcessorsContainer container)

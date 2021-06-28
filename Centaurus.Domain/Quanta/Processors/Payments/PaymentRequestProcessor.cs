@@ -11,7 +11,7 @@ using stellar_dotnet_sdk;
 
 namespace Centaurus.Domain
 {
-    public class PaymentRequestProcessor : QuantumRequestProcessor<PaymentProcessorContext>
+    public class PaymentRequestProcessor : QuantumProcessor<PaymentProcessorContext>
     {
         public override MessageTypes SupportedMessageType { get; } = MessageTypes.PaymentRequest;
 
@@ -20,7 +20,7 @@ namespace Centaurus.Domain
             return new PaymentProcessorContext(container);
         }
 
-        public override Task<ResultMessage> Process(PaymentProcessorContext context)
+        public override Task<QuantumResultMessage> Process(PaymentProcessorContext context)
         {
             context.UpdateNonce();
 
@@ -37,12 +37,10 @@ namespace Centaurus.Domain
             context.EffectProcessors.AddBalanceUpdate(context.DestinationAccount, payment.Asset, payment.Amount);
 
             context.EffectProcessors.AddBalanceUpdate(context.SourceAccount, payment.Asset, -payment.Amount);
-            var effects = context.EffectProcessors.Effects;
 
-            var accountEffects = effects.Where(e => e.Account == payment.Account).ToList();
-            var result = context.Envelope.CreateResult(ResultStatusCodes.Success, accountEffects);
+            var result = context.Envelope.CreateResult(ResultStatusCodes.Success);
 
-            return Task.FromResult(result);
+            return Task.FromResult((QuantumResultMessage)result);
         }
 
         public override Task Validate(PaymentProcessorContext context)
@@ -62,7 +60,7 @@ namespace Centaurus.Domain
                     throw new BadRequestException($"Min payment amount is {Amount.FromXdr(context.CentaurusContext.Constellation.MinAccountBalance)} XLM for this account.");
             }
 
-            if (payment.Destination.Equals(payment.AccountWrapper.Account.Pubkey))
+            if (payment.Destination.Equals(context.SourceAccount.Account.Pubkey))
                 throw new BadRequestException("Source and destination must be different public keys");
 
             if (payment.Amount <= 0)
@@ -71,7 +69,7 @@ namespace Centaurus.Domain
             if (!context.CentaurusContext.AssetIds.Contains(payment.Asset))
                 throw new BadRequestException($"Asset {payment.Asset} is not supported");
 
-            var balance = payment.AccountWrapper.Account.Balances.Find(b => b.Asset == payment.Asset);
+            var balance = context.SourceAccount.Account.Balances.Find(b => b.Asset == payment.Asset);
             if (balance == null || !balance.HasSufficientBalance(payment.Amount))
                 throw new BadRequestException("Insufficient funds");
 

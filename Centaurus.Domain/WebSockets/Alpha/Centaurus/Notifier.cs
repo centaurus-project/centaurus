@@ -14,12 +14,12 @@ namespace Centaurus.Domain
         /// </summary>
         /// <param name="account">Target account</param>
         /// <param name="envelope">Message to send</param>
-        public static void Notify(this AlphaContext context, RawPubKey account, MessageEnvelope envelope)
+        public static void Notify(this ExecutionContext context, RawPubKey account, MessageEnvelope envelope)
         {
             if (context == null)
                 throw new ArgumentNullException(nameof(context));
             context.ExtensionsManager.BeforeNotify(account, envelope);
-            if (context.ConnectionManager.TryGetConnection(account, out AlphaWebSocketConnection connection))
+            if (context.ConnectionManager.TryGetConnection(account, out IncomingWebSocketConnection connection))
                 Task.Factory.StartNew(async () => await connection.SendMessage(envelope)).Unwrap();
         }
 
@@ -27,7 +27,7 @@ namespace Centaurus.Domain
         /// Sends the message to all connected auditors
         /// </summary>
         /// <param name="envelope">Message to send</param>
-        public static void NotifyAuditors(this AlphaContext context, MessageEnvelope envelope)
+        public static void NotifyAuditors(this ExecutionContext context, MessageEnvelope envelope)
         {
             if (context == null)
                 throw new ArgumentNullException(nameof(context));
@@ -44,7 +44,7 @@ namespace Centaurus.Domain
         /// Notifies message author(s) about message processing result
         /// </summary>
         /// <param name="result">Result message</param>
-        public static void OnMessageProcessResult(this AlphaContext context, ResultMessage result)
+        public static void OnMessageProcessResult(this ExecutionContext context, ResultMessage result)
         {
             if (result == null)
                 return;

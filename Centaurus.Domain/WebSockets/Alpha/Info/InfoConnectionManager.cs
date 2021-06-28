@@ -11,11 +11,11 @@ namespace Centaurus.Domain
     /// <summary>
     /// Manages all client websocket connections
     /// </summary>
-    public class InfoConnectionManager: ContextualBase<AlphaContext>
+    public class InfoConnectionManager: ContextualBase
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public InfoConnectionManager(AlphaContext context)
+        public InfoConnectionManager(ExecutionContext context)
             :base(context)
         {
         }

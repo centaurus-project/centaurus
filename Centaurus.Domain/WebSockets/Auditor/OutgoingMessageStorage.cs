@@ -16,11 +16,6 @@ namespace Centaurus.Domain
     {
         private readonly Queue<MessageEnvelope> outgoingMessages = new Queue<MessageEnvelope>();
 
-        public void OnTransaction(TxNotification tx)
-        {
-            EnqueueMessage(tx);
-        }
-
         public void EnqueueMessage(Message message)
         {
             if (message == null)
@@ -49,7 +44,7 @@ namespace Centaurus.Domain
         }
     }
 
-    public class OutgoingResultsStorage: ContextualBase<AuditorContext>
+    public class OutgoingResultsStorage: ContextualBase
     {
         const int MaxMessageBatchSize = 50;
 
@@ -57,7 +52,7 @@ namespace Centaurus.Domain
 
         readonly List<AuditorResultMessage> results = new List<AuditorResultMessage>();
 
-        public OutgoingResultsStorage(AuditorContext context)
+        public OutgoingResultsStorage(ExecutionContext context)
             :base(context)
         {
             _ = Task.Factory.StartNew(RunWorker, TaskCreationOptions.LongRunning);
@@ -98,7 +93,7 @@ namespace Centaurus.Domain
         /// </summary>
         /// <param name="result"></param>
         /// <param name="buffer">Buffer to use for serialization</param>
-        public void EnqueueResult(ResultMessage result, byte[] buffer)
+        public void EnqueueResult(long apex, QuantumResultMessage result)
         {
             if (result == null)
                 throw new ArgumentNullException(nameof(result));
@@ -114,14 +109,11 @@ namespace Centaurus.Domain
                 txResult.TxSignatures.Clear();
             }
 
-            var resultHash = result.ComputeHash(buffer);
-            var signature = Context.Settings.KeyPair.Sign(resultHash);
-
             lock (results)
                 results.Add(new AuditorResultMessage
                 {
-                    Apex = result.MessageId,
-                    Signature = signature,
+                    Apex = apex,
+                    Signature = result.Effects.Signatures[0].Signature,
                     TxSignature = txSignature
                 });
         }

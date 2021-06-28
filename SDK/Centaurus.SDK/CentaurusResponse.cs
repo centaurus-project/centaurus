@@ -23,9 +23,9 @@ namespace Centaurus.SDK
 
     public class CentaurusResponse : CentaurusResponseBase
     {
-        public CentaurusResponse(RawPubKey alphaPubKey, RawPubKey[] auditors, int requestTimeout)
+        public CentaurusResponse(RawPubKey serverKey, List<RawPubKey> auditors, int requestTimeout)
         {
-            AlphaPubkey = alphaPubKey;
+            ServerPubkey = serverKey;
             Auditors = auditors;
             _ = StartRequestTimer(requestTimeout);
         }
@@ -37,8 +37,8 @@ namespace Centaurus.SDK
             SetException(new TimeoutException("Request timed out."));
         }
 
-        protected RawPubKey AlphaPubkey { get; }
-        protected RawPubKey[] Auditors { get; }
+        protected RawPubKey ServerPubkey { get; }
+        protected List<RawPubKey> Auditors { get; }
 
         protected TaskCompletionSource<MessageEnvelope> acknowledgmentSource = new TaskCompletionSource<MessageEnvelope>();
 
@@ -51,16 +51,29 @@ namespace Centaurus.SDK
                 SetException(new RequestException(envelope, resultMessage.Status.ToString()));
         }
 
+
+        protected void ValidateSignatures(MessageEnvelope envelope)
+        {
+            if (envelope.Signatures.Count == 0 || !envelope.Signatures[0].Signer.Equals(ServerPubkey) || !envelope.AreSignaturesValid())
+                throw new RequestException(envelope, "Invalid signature.");
+        }
+
+
         public Task<MessageEnvelope> AcknowledgmentTask => acknowledgmentSource.Task;
 
         public override Task<MessageEnvelope> ResponseTask => AcknowledgmentTask;
 
         public virtual void AssignResponse(MessageEnvelope envelope)
         {
-            if (envelope.Signatures.Count == 1 && envelope.Signatures.All(s => ByteArrayPrimitives.Equals(s.Signer, AlphaPubkey)))
+            try
+            {
+                ValidateSignatures(envelope);
                 AssignResponseToSource(acknowledgmentSource, envelope);
-            else
-                SetException(new RequestException(envelope, "Unknown result"));
+            }
+            catch (Exception exc)
+            {
+                SetException(exc);
+            }
         }
 
         public virtual void SetException(Exception exc)
@@ -73,7 +86,7 @@ namespace Centaurus.SDK
 
     public class CentaurusQuantumResponse : CentaurusResponse
     {
-        public CentaurusQuantumResponse(RawPubKey alphaPubKey, RawPubKey[] auditors, int requestTimeout)
+        public CentaurusQuantumResponse(RawPubKey alphaPubKey, List<RawPubKey> auditors, int requestTimeout)
             : base(alphaPubKey, auditors, requestTimeout)
         {
         }
@@ -88,19 +101,22 @@ namespace Centaurus.SDK
         {
             try
             {
-                var resultMessage = (ResultMessage)envelope.Message;
-                if (envelope.Signatures.Count < 1)
+
+                ValidateSignatures(envelope);
+
+                var resultMessage = (QuantumResultMessage)envelope.Message;
+
+                var effectsProof = resultMessage.Effects;
+                if (effectsProof.Signatures.Count < 1)
                     throw new RequestException(envelope, "Result message has no signatures.");
-                if (envelope.Signatures.Distinct().Count() != envelope.Signatures.Count)
+                if (effectsProof.Signatures.Distinct().Count() != envelope.Signatures.Count)
                     throw new RequestException(envelope, "Duplicate signatures.");
-                if (!envelope.Signatures.Any(s => s.Signer.Equals(AlphaPubkey)))
-                    throw new RequestException(envelope, "Result signature was not signed by Alpha.");
-                if (!envelope.Signatures.All(s => Auditors.Any(a => s.Signer.Equals(a)) || s.Signer.Equals(AlphaPubkey)))
+                if (!effectsProof.Signatures.All(s => Auditors.Any(a => s.Signer.Equals(a))))
                     throw new RequestException(envelope, "Unknown signer.");
-                if (!(resultMessage is ITransactionResultMessage || envelope.AreSignaturesValid()))//TODO: remove it after ITransactionResultMessage refactoring
+                if (!(resultMessage is ITransactionResultMessage || effectsProof.Signatures.AreSignaturesValid(effectsProof.Hashes.ComputeHash())))//TODO: remove it after ITransactionResultMessage refactoring
                     throw new RequestException(envelope, "At least one signature is invalid.");
 
-                if (envelope.HasMajority(Auditors.Length))
+                if (MajorityHelper.HasMajority(effectsProof.Signatures.Count, Auditors.Count))
                 {
                     if (finalizeSource.Task.IsCompleted)
                         throw new RequestException(envelope, "Finalize result message was already received.");

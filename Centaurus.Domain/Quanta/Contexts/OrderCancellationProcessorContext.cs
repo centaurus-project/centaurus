@@ -1,4 +1,5 @@
-﻿using Centaurus.Models;
+﻿using Centaurus.Domain.Models;
+using Centaurus.Models;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -6,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain.Quanta.Contexts
 {
-    public class OrderCancellationProcessorContext : ProcessorContext
+    public class OrderCancellationProcessorContext : RequestContext
     {
         public OrderCancellationProcessorContext(EffectProcessorsContainer effectProcessors) 
             : base(effectProcessors)
@@ -15,19 +16,19 @@ namespace Centaurus.Domain.Quanta.Contexts
 
         public OrderbookBase Orderbook { get; set; }
 
-        private Order order;
-        public Order Order 
+        private OrderWrapper orderWrapper;
+        public OrderWrapper OrderWrapper 
         { 
             get
             {
-                return order;
+                return orderWrapper;
             }
             set
             {
-                order = value;
-                if (order != null)
+                orderWrapper = value;
+                if (orderWrapper != null)
                 {
-                    var decodedId = OrderIdConverter.Decode(order.OrderId);
+                    var decodedId = OrderIdConverter.Decode(orderWrapper.OrderId);
                     OrderSide = decodedId.Side;
                     Asset = decodedId.Asset;
                 }

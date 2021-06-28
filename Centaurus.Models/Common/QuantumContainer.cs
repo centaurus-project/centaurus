@@ -13,5 +13,8 @@ namespace Centaurus.Models
 
         [XdrField(1)]
         public List<Effect> Effects { get; set; }
+
+        [XdrField(2)]
+        public EffectsProof EffectsProof { get; set; }
     }
 }

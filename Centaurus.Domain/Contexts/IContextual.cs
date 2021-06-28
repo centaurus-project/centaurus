@@ -9,12 +9,6 @@ namespace Centaurus.Domain
         public ExecutionContext Context { get; }
     }
 
-    public interface IContextual<TContext>
-        where TContext: ExecutionContext
-    { 
-        public TContext Context { get; }
-    }
-
     public abstract class ContextualBase : IContextual
     {
         public ContextualBase(ExecutionContext context)
@@ -23,17 +17,5 @@ namespace Centaurus.Domain
         }
 
         public ExecutionContext Context { get; }
-    }
-
-    public abstract class ContextualBase<TContext> : ContextualBase, IContextual<TContext>
-        where TContext : ExecutionContext
-    {
-        public ContextualBase(TContext context)
-            :base(context)
-        {
-            Context = context ?? throw new ArgumentNullException(nameof(context));
-        }
-
-        public new TContext Context { get; }
     }
 }

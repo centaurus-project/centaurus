@@ -13,11 +13,11 @@ namespace Centaurus.Domain
     /// <summary>
     /// Manages all client websocket connections
     /// </summary>
-    public class ConnectionManager: ContextualBase<AlphaContext>
+    public class ConnectionManager: ContextualBase
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public ConnectionManager(AlphaContext context)
+        public ConnectionManager(ExecutionContext context)
             :base(context)
         {
         }
@@ -28,7 +28,7 @@ namespace Centaurus.Domain
         /// <param name="pubKey">Account public key</param>
         /// <param name="connection">Current account connection</param>
         /// <returns>True if connection is found, otherwise false</returns>
-        public bool TryGetConnection(RawPubKey pubKey, out AlphaWebSocketConnection connection)
+        public bool TryGetConnection(RawPubKey pubKey, out IncomingWebSocketConnection connection)
         {
             return connections.TryGetValue(pubKey, out connection);
         }
@@ -38,13 +38,13 @@ namespace Centaurus.Domain
         /// Gets all auditor connections
         /// </summary>
         /// <returns>The list of current auditor connections</returns>
-        public List<AlphaWebSocketConnection> GetAuditorConnections()
+        public List<IncomingWebSocketConnection> GetAuditorConnections()
         {
-            var auditorConnections = new List<AlphaWebSocketConnection>();
+            var auditorConnections = new List<IncomingWebSocketConnection>();
             var auditors = Context.Constellation.Auditors;
             for (var i = 0; i < Context.Constellation.Auditors.Count; i++)
             {
-                if (connections.TryGetValue(auditors[i], out AlphaWebSocketConnection auditorConnection))
+                if (connections.TryGetValue(auditors[i], out IncomingWebSocketConnection auditorConnection))
                     auditorConnections.Add(auditorConnection);
             }
             return auditorConnections;
@@ -59,7 +59,7 @@ namespace Centaurus.Domain
             Context.ExtensionsManager.BeforeNewConnection(webSocket, ip);
             if (webSocket == null)
                 throw new ArgumentNullException(nameof(webSocket));
-            using (var connection = new AlphaWebSocketConnection(Context, webSocket, ip))
+            using (var connection = new IncomingWebSocketConnection(Context, webSocket, ip))
             {
                 Subscribe(connection);
                 await connection.Listen();
@@ -90,49 +90,41 @@ namespace Centaurus.Domain
 
         #region Private members
 
-        AlphaStateManager AlphaStateManager
-        {
-            get
-            {
-                return (AlphaStateManager)Context.AppState;
-            }
-        }
+        ConcurrentDictionary<RawPubKey, IncomingWebSocketConnection> connections = new ConcurrentDictionary<RawPubKey, IncomingWebSocketConnection>();
 
-        ConcurrentDictionary<RawPubKey, AlphaWebSocketConnection> connections = new ConcurrentDictionary<RawPubKey, AlphaWebSocketConnection>();
-
-        void Subscribe(AlphaWebSocketConnection connection)
+        void Subscribe(IncomingWebSocketConnection connection)
         {
             connection.OnConnectionStateChanged += OnConnectionStateChanged;
         }
 
-        void Unsubscribe(AlphaWebSocketConnection connection)
+        void Unsubscribe(IncomingWebSocketConnection connection)
         {
             connection.OnConnectionStateChanged -= OnConnectionStateChanged;
         }
 
-        async Task UnsubscribeAndClose(AlphaWebSocketConnection connection)
+        async Task UnsubscribeAndClose(IncomingWebSocketConnection connection)
         {
             Unsubscribe(connection);
             await connection.CloseConnection();
-            logger.Trace($"{connection.ClientPubKey} is disconnected.");
+            logger.Trace($"{connection.PubKey} is disconnected.");
         }
 
-        void AddConnection(AlphaWebSocketConnection connection)
+        void AddConnection(IncomingWebSocketConnection connection)
         {
             lock (connection)
             {
-                connections.AddOrUpdate(connection.ClientPubKey, connection, (key, oldConnection) =>
+                connections.AddOrUpdate(connection.PubKey, connection, (key, oldConnection) =>
                 {
                     RemoveConnection(oldConnection);
                     return connection;
                 });
-                logger.Trace($"{connection.ClientPubKey} is connected.");
+                logger.Trace($"{connection.PubKey} is connected.");
             }
         }
 
         void OnConnectionStateChanged((BaseWebSocketConnection connection, ConnectionState prev, ConnectionState current) args)
         {
-            var connection = (AlphaWebSocketConnection)args.connection;
+            var connection = (IncomingWebSocketConnection)args.connection;
             switch (args.current)
             {
                 case ConnectionState.Validated:
@@ -152,28 +144,28 @@ namespace Centaurus.Domain
             }
         }
 
-        void TrySetAuditorState(AlphaWebSocketConnection connection, ConnectionState state)
+        void TrySetAuditorState(IncomingWebSocketConnection connection, ConnectionState state)
         {
-            if (Context.Constellation.Auditors.Contains(connection.ClientPubKey))
+            if (connection.IsAuditor)
             {
-                AlphaStateManager.RegisterAuditorState(connection.ClientPubKey, state);
-                logger.Trace($"Auditor {connection.ClientPubKey} is connected.");
+                Context.AppState.RegisterAuditorState(connection.PubKey, state);
+                logger.Trace($"Auditor {connection.PubKey} is connected.");
             }
         }
 
-        void RemoveConnection(AlphaWebSocketConnection connection)
+        void RemoveConnection(IncomingWebSocketConnection connection)
         {
             lock (connection)
             {
                 _ = UnsubscribeAndClose(connection);
 
-                if (connection.ClientPubKey != null)
+                if (connection.PubKey != null)
                 {
-                    connections.TryRemove(connection.ClientPubKey, out _);
-                    if (Context.Constellation.Auditors.Contains(connection.ClientPubKey))
+                    connections.TryRemove(connection.PubKey, out _);
+                    if (connection.IsAuditor)
                     {
-                        AlphaStateManager.AuditorConnectionClosed(connection.ClientPubKey);
-                        Context.Catchup.RemoveState(connection.ClientPubKey);
+                        Context.AppState.AuditorConnectionClosed(connection.PubKey);
+                        Context.Catchup.RemoveState(connection.PubKey);
                     }
                 }
             }
@@ -184,7 +176,7 @@ namespace Centaurus.Domain
             lock (baseConnection)
             {
                 Context.ExtensionsManager.ConnectionValidated(baseConnection);
-                var connection = (AlphaWebSocketConnection)baseConnection;
+                var connection = (IncomingWebSocketConnection)baseConnection;
                 AddConnection(connection);
             }
         }

@@ -1,4 +1,5 @@
-﻿using Centaurus.Models;
+﻿using Centaurus.Domain.Models;
+using Centaurus.Models;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -19,9 +20,7 @@ namespace Centaurus.Domain
     {
         public EffectProcessor(T effect)
         {
-            if (effect == null)
-                throw new ArgumentNullException(nameof(effect));
-            Effect = effect;
+            Effect = effect ?? throw new ArgumentNullException(nameof(effect));
         }
 
         public T Effect { get; }
@@ -38,5 +37,17 @@ namespace Centaurus.Domain
         public abstract void CommitEffect();
 
         public abstract void RevertEffect();
+    }
+
+    public abstract class ClientEffectProcessor<T> : EffectProcessor<T>
+        where T : Effect
+    {
+        public ClientEffectProcessor(T effect, AccountWrapper accountWrapper)
+            :base(effect)
+        {
+            AccountWrapper = accountWrapper ?? throw new ArgumentNullException(nameof(accountWrapper));
+        }
+
+        public AccountWrapper AccountWrapper { get; }
     }
 }
