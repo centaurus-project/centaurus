@@ -1,21 +1,25 @@
-﻿using Centaurus.Xdr;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Text;
+using Centaurus.Xdr;
 
 namespace Centaurus.Models
-{    
-    public class Deposit: PaymentBase
+{
+    [XdrContract]
+    public class Deposit
     {
-        public override PaymentTypes Type => PaymentTypes.Deposit;
+        [XdrField(0)]
+        public PaymentResults PaymentResult { get; set; }
 
         [XdrField(1)]
-        public int Asset { get; set; }
+        public byte[] TransactionHash { get; set; }
 
         [XdrField(2)]
-        public long Amount { get; set; }
+        public int Asset { get; set; }
 
         [XdrField(3)]
+        public long Amount { get; set; }
+
+        [XdrField(4)]
         public RawPubKey Destination { get; set; }
     }
 }

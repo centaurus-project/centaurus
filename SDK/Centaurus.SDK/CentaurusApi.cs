@@ -1,9 +1,7 @@
 ﻿using Centaurus.SDK.Models;
-using Newtonsoft.Json;
 using System;
-using System.Collections.Generic;
 using System.Net.Http;
-using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace Centaurus.SDK
@@ -20,7 +18,7 @@ namespace Centaurus.SDK
 
                 var rawJson = await res.Content.ReadAsStringAsync();
 
-                return JsonConvert.DeserializeObject<ConstellationInfo>(rawJson);
+                return JsonSerializer.Deserialize<ConstellationInfo>(rawJson);
             }
         }
     }

@@ -1,13 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Text.Json;
-using System.Text.Json.Serialization;
+﻿using Centaurus.Models;
 using System.Threading.Tasks;
-using Centaurus.Models;
-using NLog;
-using stellar_dotnet_sdk;
 
 namespace Centaurus.Domain
 {
@@ -57,7 +49,7 @@ namespace Centaurus.Domain
                 if (payment.Asset != 0)
                     throw new BadRequestException("Account excepts only XLM asset.");
                 if (payment.Amount < context.CentaurusContext.Constellation.MinAccountBalance)
-                    throw new BadRequestException($"Min payment amount is {Amount.FromXdr(context.CentaurusContext.Constellation.MinAccountBalance)} XLM for this account.");
+                    throw new BadRequestException($"Min payment amount is {context.CentaurusContext.Constellation.MinAccountBalance} for this account.");
             }
 
             if (payment.Destination.Equals(context.SourceAccount.Account.Pubkey))
@@ -69,8 +61,8 @@ namespace Centaurus.Domain
             if (!context.CentaurusContext.AssetIds.Contains(payment.Asset))
                 throw new BadRequestException($"Asset {payment.Asset} is not supported");
 
-            var balance = context.SourceAccount.Account.Balances.Find(b => b.Asset == payment.Asset);
-            if (balance == null || !balance.HasSufficientBalance(payment.Amount))
+            var minBalance = payment.Asset == 0 ? context.CentaurusContext.Constellation.MinAccountBalance : 0;
+            if (context.SourceAccount.Account.GetBalance(payment.Asset)?.HasSufficientBalance(payment.Amount, minBalance) ?? false)
                 throw new BadRequestException("Insufficient funds");
 
             return Task.CompletedTask;

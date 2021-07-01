@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using Centaurus.Domain;
 using Centaurus.Models;
 using Microsoft.AspNetCore.Mvc;
-using stellar_dotnet_sdk;
+using NSec.Cryptography;
 
 namespace Centaurus.Controllers
 {

@@ -14,12 +14,6 @@ namespace Centaurus.Models
         [XdrField(0)]
         public MessageEnvelope RequestEnvelope { get; set; }
 
-        public SequentialRequestMessage RequestMessage
-        {
-            get
-            {
-                return (SequentialRequestMessage)RequestEnvelope.Message;
-            }
-        }
+        public SequentialRequestMessage RequestMessage => (SequentialRequestMessage)RequestEnvelope.Message;
     }
 }

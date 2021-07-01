@@ -19,11 +19,6 @@ namespace Centaurus.Models
         OrderRemoved = 11,
         Trade = 12,
 
-        AssetSent = 21,
-        AssetReceived = 22,
-        WithdrawalCreate = 23,
-        WithdrawalRemove = 24,
-
         ConstellationInit = 31,
         ConstellationUpdate = 32,
 

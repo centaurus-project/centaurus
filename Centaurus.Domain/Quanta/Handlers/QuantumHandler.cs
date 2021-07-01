@@ -49,7 +49,12 @@ namespace Centaurus.Domain
         {
             var quantumEnvelope = envelope;
             if (envelope.Message is SequentialRequestMessage)//we need to wrap client request
-                quantumEnvelope = new RequestQuantum { RequestEnvelope = envelope }.CreateEnvelope();
+            {
+                if (envelope.Message is WithdrawalRequest)
+                    quantumEnvelope = new RequestTransactionQuantum { RequestEnvelope = envelope }.CreateEnvelope();
+                else
+                    quantumEnvelope = new RequestQuantum { RequestEnvelope = envelope }.CreateEnvelope();
+            }
             else if (envelope.Message is ConstellationRequestMessage)
                 quantumEnvelope = new ConstellationQuantum { RequestEnvelope = envelope }.CreateEnvelope();
             return quantumEnvelope;

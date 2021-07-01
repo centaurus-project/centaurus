@@ -20,16 +20,6 @@ namespace Centaurus.Test
             return;
         }
 
-        public override WithdrawalWrapper GetWithdrawal(MessageEnvelope envelope, AccountWrapper account, TransactionWrapper transactionWrapper)
-        {
-
-        }
-
-        public override TxSignature SignTransaction(TransactionWrapper transaction)
-        {
-
-        }
-
         public override void ValidateTransaction(TransactionWrapper transaction)
         {
             return;

@@ -26,8 +26,6 @@ namespace Centaurus.Domain
             Settings = settings ?? throw new ArgumentNullException(nameof(settings));
             PaymentProviderFactory = paymentProviderFactory ?? throw new ArgumentNullException(nameof(paymentProviderFactory));
 
-            PaymentParsersManager = new PaymentParsersManager();
-
             RoleManager = new RoleManager(
                 (CentaurusNodeParticipationLevel)Settings.ParticipationLevel,
                 Settings.AlphaPubKey == Settings.KeyPair.AccountId
@@ -88,7 +86,7 @@ namespace Centaurus.Domain
                 var lastQuantum = await PersistenceManager.GetQuantum(lastApex);
 
                 lastHash = lastQuantum.Message.ComputeHash();
-                var snapshot = await PersistenceManager.GetSnapshot(PaymentParsersManager, lastApex);
+                var snapshot = await PersistenceManager.GetSnapshot(lastApex);
                 await Setup(snapshot);
                 if (IsAlpha)
                     AppState.State = ApplicationState.Rising;//Alpha should ensure that it has all quanta from auditors
@@ -115,7 +113,7 @@ namespace Centaurus.Domain
 
             Exchange?.Dispose(); Exchange = Exchange.RestoreExchange(snapshot.Settings.Assets, snapshot.Orders, IsAlpha, useLegacyOrderbook);
 
-            PaymentProvidersManager?.Dispose(); PaymentProvidersManager = new PaymentProvidersManager(PaymentParsersManager, PaymentProviderFactory, Constellation.Providers, snapshot.Withdrawals);
+            PaymentProvidersManager?.Dispose(); PaymentProvidersManager = new PaymentProvidersManager(PaymentProviderFactory, Constellation.Providers);
 
             AuditResultManager?.Dispose(); AuditResultManager = new ResultManager(this);
 
@@ -233,13 +231,11 @@ namespace Centaurus.Domain
 
         public OutgoingResultsStorage OutgoingResultsStorage { get; }
 
-        public PaymentParsersManager PaymentParsersManager { get; }
+        public PaymentProvidersManager PaymentProvidersManager { get; private set; }
 
         public Exchange Exchange { get; private set; }
 
         public AccountStorage AccountStorage { get; private set; }
-
-        public PaymentProvidersManager PaymentProvidersManager { get; private set; }
 
         public PerformanceStatisticsManager PerformanceStatisticsManager { get; private set; }
 

@@ -1,12 +1,9 @@
 ﻿using Centaurus.Domain;
 using Centaurus.Models;
 using Centaurus.Xdr;
-using stellar_dotnet_sdk;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
-using System.Text;
 
 namespace Centaurus
 {

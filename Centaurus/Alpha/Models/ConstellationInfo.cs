@@ -1,6 +1,4 @@
 ﻿using Centaurus.Models;
-using stellar_dotnet_sdk;
-using System.Collections.Generic;
 
 namespace Centaurus
 {

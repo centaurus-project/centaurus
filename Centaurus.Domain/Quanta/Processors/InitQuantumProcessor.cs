@@ -1,11 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
+﻿using Centaurus.Models;
+using System;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
-using Centaurus.Models;
-using stellar_dotnet_sdk;
 
 namespace Centaurus.Domain
 {

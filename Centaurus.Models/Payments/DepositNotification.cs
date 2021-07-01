@@ -8,7 +8,7 @@ namespace Centaurus.Models
     /// Contains info about external payment.
     /// </summary>
     [XdrContract]
-    public class PaymentNotification
+    public class DepositNotification
     {
         [XdrField(0)]
         public string ProviderId { get; set; }
@@ -23,6 +23,6 @@ namespace Centaurus.Models
         /// List of payments witnessed by an auditor.
         /// </summary>
         [XdrField(2)]
-        public List<PaymentBase> Items { get; set; } = new List<PaymentBase>();
+        public List<Deposit> Items { get; set; } = new List<Deposit>();
     }
 }

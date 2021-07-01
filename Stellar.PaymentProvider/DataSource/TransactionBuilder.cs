@@ -29,7 +29,7 @@ namespace Centaurus
 
     public static class TransactionHelper
     {
-        public static Transaction BuildPaymentTransaction(TransactionBuilderOptions options, KeyPair destination, Asset asset, long amount)
+        public static Transaction BuildPaymentTransaction(TransactionBuilderOptions options, stellar_dotnet_sdk.KeyPair destination, Asset asset, long amount)
         {
             var paymentOperation = new PaymentOperation.Builder(destination, asset, Amount.FromXdr(amount)).Build();
 

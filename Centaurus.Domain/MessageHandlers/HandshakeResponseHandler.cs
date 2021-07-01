@@ -49,7 +49,6 @@ namespace Centaurus.Domain
             if (connection.Context.AppState.State != ApplicationState.Ready)
                 throw new ConnectionCloseException(WebSocketCloseStatus.ProtocolError, "Alpha is not in Ready state.");
             var result = (ClientConnectionSuccess)envelope.CreateResult(ResultStatusCodes.Success);
-            result.AccountId = connection.Account.Account.Id;
             await connection.SendMessage(result);
         }
     }

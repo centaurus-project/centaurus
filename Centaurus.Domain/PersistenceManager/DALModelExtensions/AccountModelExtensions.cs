@@ -13,10 +13,8 @@ namespace Centaurus.Domain
         {
             var acc = new Account
             {
-                Id = accountModel.Id,
                 Nonce = accountModel.Nonce,
-                Pubkey = new RawPubKey { Data = accountModel.PubKey },
-                Withdrawal = accountModel.Withdrawal
+                Pubkey = accountModel.PubKey,
             };
 
             if (accountModel.RequestRateLimits != null)

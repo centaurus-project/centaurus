@@ -18,7 +18,5 @@ namespace Centaurus.Domain
         public List<AccountWrapper> Accounts { get; set; }
 
         public List<OrderWrapper> Orders { get; set; }
-
-        public Dictionary<string, WithdrawalStorage> Withdrawals { get; set; }
     }
 }

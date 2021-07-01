@@ -20,8 +20,5 @@ namespace Centaurus.Models
 
         [XdrField(4, Optional = true)]
         public RequestRateLimits RequestRateLimits { get; set; }
-
-        [XdrField(5)]
-        public long Withdrawal { get; set; }
     }
 }

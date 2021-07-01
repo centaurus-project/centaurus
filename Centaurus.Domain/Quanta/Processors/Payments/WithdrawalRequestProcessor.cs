@@ -1,10 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using Centaurus.Models;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
-using Centaurus.Models;
-using stellar_dotnet_sdk;
 
 namespace Centaurus.Domain
 {
@@ -17,7 +13,7 @@ namespace Centaurus.Domain
         {
             context.UpdateNonce();
 
-            context.EffectProcessors.AddWithdrawalCreate(context.Withdrawal, context.PaymentProvider.WithdrawalStorage);
+            context.EffectProcessors.AddBalanceUpdate(context.SourceAccount, context.WithdrawalRequest.Asset, -context.WithdrawalRequest.Amount);
 
             return Task.FromResult((QuantumResultMessage)context.Envelope.CreateResult(ResultStatusCodes.Success));
         }
@@ -25,32 +21,27 @@ namespace Centaurus.Domain
         public override Task Validate(WithdrawalProcessorContext context)
         {
             context.ValidateNonce();
-            ValidateWithdrawal(context);
-
-            return Task.CompletedTask;
-        }
-
-        private void ValidateWithdrawal(WithdrawalProcessorContext context)
-        {
-            if (context.SourceAccount.HasPendingWithdrawal)
-                throw new BadRequestException("Withdrawal already exists.");
-
-            context.PaymentProvider.ValidateTransaction(context.Transaction);
-            context.Withdrawal = context.PaymentProvider.GetWithdrawal(context.Envelope, context.SourceAccount, context.Transaction);
 
             var sourceAccount = context.SourceAccount.Account;
 
-            foreach (var withdrawalItem in context.Withdrawal.Items)
-            {
-                var centaurusAsset = context.CentaurusContext.Constellation.Assets.FirstOrDefault(a => a.Id == withdrawalItem.Asset);
-                if (withdrawalItem.Asset == 0 && withdrawalItem.Amount < context.CentaurusContext.Constellation.MinAccountBalance)
-                    throw new BadRequestException($"Min account balance is {context.CentaurusContext.Constellation.MinAccountBalance}.");
+            var centaurusAsset = context.CentaurusContext.Constellation.Assets.FirstOrDefault(a => a.Id == context.WithdrawalRequest.Asset);
+            if (centaurusAsset == null || centaurusAsset.IsSuspended)
+                throw new BadRequestException($"Constellation doesn't support asset '{context.WithdrawalRequest.Asset}'.");
 
-                if (!(sourceAccount.GetBalance(withdrawalItem.Asset)?.HasSufficientBalance(withdrawalItem.Amount) ?? false))
-                    throw new BadRequestException($"Insufficient balance.");
-                if (context.Withdrawal.Items.Count() < 1)
-                    throw new BadRequestException("No payment operations.");
-            }
+            var providerAsset = context.PaymentProvider.Settings.Assets.FirstOrDefault(a => a.CentaurusAsset == context.WithdrawalRequest.Asset);
+            if (providerAsset == null)
+                throw new BadRequestException($"Current provider doesn't support withdrawal of asset {centaurusAsset.Code}.");
+
+            var minBalance = centaurusAsset.Id == 0 ? context.CentaurusContext.Constellation.MinAccountBalance : 0;
+            if (!(sourceAccount.GetBalance(centaurusAsset.Id)?.HasSufficientBalance(context.WithdrawalRequest.Amount, minBalance) ?? false))
+                throw new BadRequestException($"Insufficient balance.");
+
+            if (context.CentaurusContext.IsAlpha) //if it's Alpha than we need to build transaction
+                context.TransactionQuantum.Transaction = context.PaymentProvider.BuildTransaction(context.WithdrawalRequest);
+            else
+                context.PaymentProvider.ValidateTransaction(context.TransactionQuantum.Transaction, context.WithdrawalRequest);
+
+            return Task.CompletedTask;
         }
 
         public override WithdrawalProcessorContext GetContext(EffectProcessorsContainer container)

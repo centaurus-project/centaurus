@@ -8,9 +8,9 @@ namespace Centaurus.Domain
 {
     public class TxCursorUpdateEffectProcessor : EffectProcessor<CursorUpdateEffect>
     {
-        private PaymentNotificationManager notificationManager;
+        private DepositNotificationManager notificationManager;
 
-        public TxCursorUpdateEffectProcessor(CursorUpdateEffect effect, PaymentNotificationManager notificationManager)
+        public TxCursorUpdateEffectProcessor(CursorUpdateEffect effect, DepositNotificationManager notificationManager)
             : base(effect)
         {
             this.notificationManager = notificationManager;

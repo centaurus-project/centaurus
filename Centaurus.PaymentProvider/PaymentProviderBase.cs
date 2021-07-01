@@ -10,21 +10,19 @@ namespace Centaurus.PaymentProvider
     /// <summary>
     /// Every child class should follow next naming convention "<Name>PaymentProvider"
     /// </summary>
-    public abstract class PaymentProviderBase : IDisposable
+    public abstract class PaymentProviderBase : ICursorComparer, IDisposable
     {
-        public PaymentProviderBase(PaymentParserBase parser, ProviderSettings settings, dynamic config, WithdrawalStorage withdrawalStorage)
+        public PaymentProviderBase(ProviderSettings settings, dynamic config)
         {
             if (config == null)
                 throw new ArgumentNullException(nameof(config));
 
 
             Settings = settings ?? throw new ArgumentNullException(nameof(settings));
-            Parser = parser ?? throw new ArgumentNullException(nameof(parser));
             Id = GetProviderId(settings.Provider, settings.Name);
             Secret = config.Secret ?? throw new ArgumentNullException(nameof(config.Secret));
             MaxTxSubmitDelay = ((long?)config.MaxTxSubmitDelay) ?? throw new ArgumentNullException(config.MaxTxSubmitDelay);
-            WithdrawalStorage = withdrawalStorage ?? throw new ArgumentNullException(nameof(withdrawalStorage));
-            NotificationsManager = new PaymentNotificationManager(settings.Cursor, Parser);
+            NotificationsManager = new DepositNotificationManager(settings.Cursor, this);
         }
 
         public event Action<MessageEnvelope> OnPaymentCommit;
@@ -60,21 +58,26 @@ namespace Centaurus.PaymentProvider
 
         public long MaxTxSubmitDelay { get; }
 
-        public PaymentParserBase Parser { get; }
-
-        public WithdrawalStorage WithdrawalStorage { get; }
-
-        public PaymentNotificationManager NotificationsManager { get; }
+        public DepositNotificationManager NotificationsManager { get; }
 
         public string Cursor => NotificationsManager?.Cursor;
 
         public string LastRegisteredCursor => NotificationsManager?.LastRegisteredCursor;
 
-        public abstract TxSignature SignTransaction(TransactionWrapper transaction);
+        public abstract byte[] BuildTransaction(WithdrawalRequest withdrawalRequest);
 
-        public abstract void ValidateTransaction(TransactionWrapper transaction);
+        /// <summary>
+        /// Should throw error if transaction is not valid
+        /// </summary>
+        /// <param name="transaction"></param>
+        /// <param name="withdrawalRequest"></param>
+        public abstract void ValidateTransaction(byte[] transaction, WithdrawalRequest withdrawalRequest);
 
-        public abstract WithdrawalWrapper GetWithdrawal(MessageEnvelope envelope, AccountWrapper account, TransactionWrapper transactionWrapper);
+        public abstract TxSignature SignTransaction(byte[] transaction);
+
+        public abstract void SubmitTransaction(byte[] transaction, List<TxSignature> signatures);
+
+        public abstract int CompareCursors(string left, string right);
 
         public abstract void Dispose();
 

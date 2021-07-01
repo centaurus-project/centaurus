@@ -10,29 +10,6 @@ namespace Centaurus.Domain
 {
     public static class EffectProcessorsContainerExtensions
     {
-        public static void AddWithdrawalCreate(this EffectProcessorsContainer effectProcessors, WithdrawalWrapper withdrawal, WithdrawalStorage withdrawalStorage)
-        {
-            var effect = new WithdrawalCreateEffect
-            {
-                Apex = effectProcessors.Apex,
-                Account = withdrawal.AccountWrapper.Account.Id,
-                Items = withdrawal.Items.Select(w => new WithdrawalEffectItem { Asset = w.Asset, Amount = w.Amount }).OrderBy(a => a.Asset).ToList()
-            };
-            effectProcessors.Add(new WithdrawalCreateEffectProcessor(effect, withdrawal.AccountWrapper, withdrawal, withdrawalStorage));
-        }
-
-        public static void AddWithdrawalRemove(this EffectProcessorsContainer effectProcessors, WithdrawalWrapper withdrawal, bool isSuccessful, WithdrawalStorage withdrawalStorage)
-        {
-            var effect = new WithdrawalRemoveEffect
-            {
-                Apex = effectProcessors.Apex,
-                Account = withdrawal.AccountWrapper.Account.Id,
-                IsSuccessful = isSuccessful,
-                Items = withdrawal.Items.Select(w => new WithdrawalEffectItem { Asset = w.Asset, Amount = w.Amount }).OrderBy(a => a.Asset).ToList()
-            };
-            effectProcessors.Add(new WithdrawalRemoveEffectProcessor(effect, withdrawal.AccountWrapper, withdrawal, withdrawalStorage));
-        }
-
         public static void AddAccountCreate(this EffectProcessorsContainer effectProcessors, AccountStorage accountStorage, int accountId, RawPubKey publicKey)
         {
             effectProcessors.Add(new AccountCreateEffectProcessor(
@@ -141,7 +118,7 @@ namespace Centaurus.Domain
             ));
         }
 
-        public static void AddCursorUpdate(this EffectProcessorsContainer effectProcessors, PaymentNotificationManager notificationManager, string newCursor, string prevCursor)
+        public static void AddCursorUpdate(this EffectProcessorsContainer effectProcessors, DepositNotificationManager notificationManager, string newCursor, string prevCursor)
         {
             effectProcessors.Add(new TxCursorUpdateEffectProcessor(
                 new CursorUpdateEffect

@@ -1,15 +1,9 @@
 ﻿using Centaurus.Domain;
 using Centaurus.Models;
 using NUnit.Framework;
-using stellar_dotnet_sdk;
-using stellar_dotnet_sdk.responses;
-using stellar_dotnet_sdk.xdr;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
-using System.Reflection;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace Centaurus.Test
@@ -41,30 +35,15 @@ namespace Centaurus.Test
             {
                 client1StartBalanceAmount = clientAccountBalance.Amount;
 
-                context.Constellation.TryFindAssetSettings(asset, out var assetSettings);
-
-                var account = new stellar_dotnet_sdk.Account(TestEnvironment.Client1KeyPair.AccountId, 1);
-                var txBuilder = new TransactionBuilder(account);
-                txBuilder.SetFee(10_000);
-                txBuilder.AddTimeBounds(new stellar_dotnet_sdk.TimeBounds(DateTimeOffset.UtcNow, new TimeSpan(0, 5, 0)));
-                txBuilder.AddOperation(
-                    new PaymentOperation.Builder(withdrawalDest, assetSettings.ToAsset(), Amount.FromXdr(amount).ToString())
-                        .SetSourceAccount(KeyPair.FromAccountId(context.Constellation.Vaults.Find(v => v.Provider == PaymentProvider.Stellar).AccountId))
-                        .Build()
-                    );
-                var tx = txBuilder.Build();
-                txHash = tx.Hash();
-
-                var txV1 = tx.ToXdrV1();
-                var txStream = new XdrDataOutputStream();
-                stellar_dotnet_sdk.xdr.Transaction.Encode(txStream, txV1);
-
                 var accountWrapper = context.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
 
                 var withdrawal = new WithdrawalRequest
                 {
                     Account = accountWrapper.Account.Id,
-                    Transaction = txStream.ToArray(),
+                    Amount = amount,
+                    Asset = asset,
+                    Destination = TestEnvironment.Client1KeyPair.AccountId,
+                    Fee = 10_000,
                     RequestId = DateTime.UtcNow.Ticks,
                     PaymentProvider = "Stellar"
                 };
@@ -82,10 +61,10 @@ namespace Centaurus.Test
 
             var depositAmount = new Random().Next(10, 1000);
 
-            var paymentNotification = new PaymentNotification
+            var paymentNotification = new DepositNotification
             {
                 Cursor = cursor.ToString(),
-                Items = new List<PaymentBase>
+                Items = new List<Deposit>
                     {
                         new Deposit
                         {
@@ -105,14 +84,14 @@ namespace Centaurus.Test
             context.PaymentProvidersManager.TryGetManager(PaymentProvider.Stellar, out var provider);
             provider.NotificationsManager.RegisterNotification(paymentNotification);
 
-            var ledgerCommitEnv = new PaymentCommitQuantum
+            var ledgerCommitEnv = new DepositQuantum
             {
                 Source = paymentNotification,
                 Apex = ++apex
             }.CreateEnvelope();
             if (!context.IsAlpha)
             {
-                var msg = ((PaymentCommitQuantum)ledgerCommitEnv.Message);
+                var msg = ((DepositQuantum)ledgerCommitEnv.Message);
                 msg.Timestamp = DateTime.UtcNow.Ticks;
                 ledgerCommitEnv = msg.CreateEnvelope().Sign(TestEnvironment.AlphaKeyPair);
             }
@@ -275,63 +254,6 @@ namespace Centaurus.Test
                 Assert.IsTrue(account.HasPendingWithdrawal);
 
                 Assert.IsTrue(account.Account.GetBalance(0).Liabilities == amount);
-            }
-        }
-
-
-        [Test]
-        [TestCase(100, true, typeof(InvalidOperationException))]
-        [TestCase(100, false, null)]
-        public async Task WithdrawalCleanupQuantumTest(double amount, bool useFakeHash, Type excpectedException)
-        {
-            var outputStream = new XdrDataOutputStream();
-            var txBuilder = new TransactionBuilder(new AccountResponse(TestEnvironment.Client1KeyPair.AccountId, 1));
-            txBuilder.SetFee(10_000);
-
-            var vault = KeyPair.FromAccountId(context.Constellation.Vaults.GetVault(PaymentProvider.Stellar).AccountId);
-
-            txBuilder.AddOperation(new PaymentOperation.Builder(TestEnvironment.Client1KeyPair, new AssetTypeNative(), (amount / AssetsHelper.StroopsPerAsset).ToString("0.##########", CultureInfo.InvariantCulture)).SetSourceAccount(vault).Build());
-            txBuilder.AddTimeBounds(new stellar_dotnet_sdk.TimeBounds(maxTime: DateTimeOffset.UtcNow.AddSeconds(60)));
-            var tx = txBuilder.Build();
-            stellar_dotnet_sdk.xdr.Transaction.Encode(outputStream, tx.ToXdrV1());
-
-            var account = context.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
-
-            var acc = context.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
-            var withdrawal = new WithdrawalRequest
-            {
-                Account = acc.Account.Id,
-                RequestId = 1,
-                Transaction = outputStream.ToArray(),
-                AccountWrapper = account,
-                PaymentProvider = PaymentProvider.Stellar
-            };
-
-            var envelope = withdrawal
-                .CreateEnvelope()
-                .Sign(TestEnvironment.Client1KeyPair);
-
-            var result = await AssertQuantumHandling(new RequestQuantum { Apex = context.QuantumStorage.CurrentApex + 1, RequestEnvelope = envelope }.CreateEnvelope());
-
-            if (result.Status != ResultStatusCodes.Success)
-                throw new Exception("Withdrawal creation failed.");
-
-            var cleanup = new WithrawalsCleanupQuantum
-            {
-                ExpiredWithdrawal = useFakeHash ? new byte[] { } : tx.Hash(),
-                Apex = context.QuantumStorage.CurrentApex + 1,
-                ProviderId = PaymentProvider.Stellar
-            };
-
-            envelope = cleanup.CreateEnvelope();
-
-            await AssertQuantumHandling(envelope, excpectedException);
-
-            if (excpectedException == null)
-            {
-                Assert.IsTrue(!account.HasPendingWithdrawal);
-
-                Assert.AreEqual(account.Account.GetBalance(0).Liabilities, 0);
             }
         }
 

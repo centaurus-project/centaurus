@@ -8,10 +8,6 @@ namespace Centaurus.Models
     public enum MessageTypes
     {
         /// <summary>
-        /// A client requested funds deposit.
-        /// </summary>
-        DepositRequest = 1,
-        /// <summary>
         /// A client requested funds withdrawal.
         /// </summary>
         WithdrawalRequest = 2,
@@ -32,21 +28,21 @@ namespace Centaurus.Models
         /// </summary>
         AccountDataRequest = 10,
         /// <summary>
+        /// Wrapper for client request messages that contains transaction. Created by Alpha.
+        /// </summary>
+        RequestTransactionQuantum = 47,
+        /// <summary>
         /// Wrapper for client request messages. Created by Alpha.
         /// </summary>
         RequestQuantum = 48,
         /// <summary>
-        /// Quantum created by Alpha server that contains aggregated ledger updates provided by <see cref="PaymentNotification"/>.
+        /// Quantum created by Alpha server that contains aggregated deposits provided by <see cref="DepositNotification"/>.
         /// </summary>
-        TxCommitQuantum = 49,
+        DepositQuantum = 49,
         /// <summary>
         /// A client requested account's effects.
         /// </summary>
         EffectsRequest = 50,
-        /// <summary>
-        /// Quantum created by Alpha server that contains all withdrawal transaction hashes that are expired.
-        /// </summary>
-        WithrawalsCleanup = 51,
         /// <summary>
         /// Initiate connection handshake.
         /// </summary>

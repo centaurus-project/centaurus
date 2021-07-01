@@ -32,12 +32,24 @@ namespace Centaurus.Domain
         /// <param name="balance">Asset balance</param>
         /// <param name="amount">Required amount</param>
         /// <returns></returns>
-        public static bool HasSufficientBalance(this Balance balance, long amount)
+        public static bool HasSufficientBalance(this Balance balance, long amount, long minBalance)
         {
             if (amount <= 0) throw new ArgumentException("Invalid operation amount: " + amount);
             if (balance == null)
                 return false;
-            return balance.Amount - balance.Liabilities >= amount;
+            return balance.GetAvailableBalance() - amount >= minBalance;
+        }
+
+        /// <summary>
+        /// Returns balance amount minus liabilities
+        /// </summary>
+        /// <param name="balance">Asset balance</param>
+        /// <returns></returns>
+        public static long GetAvailableBalance(this Balance balance)
+        {
+            if (balance == null)
+                return 0;
+            return balance.Amount - balance.Liabilities;
         }
     }
 }

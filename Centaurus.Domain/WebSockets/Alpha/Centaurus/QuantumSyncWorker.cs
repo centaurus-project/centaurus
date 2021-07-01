@@ -1,7 +1,6 @@
 ﻿using Centaurus.Domain;
 using Centaurus.Models;
 using NLog;
-using stellar_dotnet_sdk;
 using System;
 using System.Collections.Generic;
 using System.Linq;

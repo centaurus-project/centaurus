@@ -1,11 +1,7 @@
 ﻿using CommandLine;
-using Newtonsoft.Json;
-using stellar_dotnet_sdk;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Text;
 
 namespace Centaurus
 {

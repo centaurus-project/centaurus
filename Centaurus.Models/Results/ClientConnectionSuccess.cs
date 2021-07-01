@@ -6,8 +6,5 @@ namespace Centaurus.Models
     public class ClientConnectionSuccess : ResultMessage
     {
         public override MessageTypes MessageType => MessageTypes.ClientConnectionSuccess;
-
-        [XdrField(0)]
-        public int AccountId { get; set; }
     }
 }

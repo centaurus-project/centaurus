@@ -11,11 +11,10 @@ namespace Centaurus.Domain
         public RequestContext(EffectProcessorsContainer effectProcessors) 
             : base(effectProcessors)
         {
-            Request = (RequestQuantum)Envelope.Message;
             SourceAccount = effectProcessors.AccountWrapper ?? throw new ArgumentNullException(nameof(effectProcessors.AccountWrapper));
         }
 
-        public RequestQuantum Request { get; }
+        public RequestQuantum Request => (RequestQuantum)Envelope.Message;
 
         public AccountWrapper SourceAccount { get; }
     }

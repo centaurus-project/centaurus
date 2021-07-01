@@ -1,14 +1,7 @@
-﻿using Centaurus.DAL.Mongo;
-using Centaurus.Domain;
+﻿using Centaurus.Domain;
 using Centaurus.Models;
 using NLog;
-using stellar_dotnet_sdk;
 using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
-using System.Net.WebSockets;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 

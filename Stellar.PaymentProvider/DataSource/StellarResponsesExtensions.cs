@@ -28,15 +28,20 @@ namespace Centaurus.Stellar
         {
             if (accountResponse == null)
                 return null;
+
             return new AccountModel
             {
                 KeyPair = accountResponse.KeyPair,
                 SequenceNumber = accountResponse.SequenceNumber,
+                Signers = accountResponse.Signers
+                    .Select(s => new AccountModel.Signer { PubKey = KeyPair.FromAccountId(s.Key).PublicKey, Weight = s.Weight })
+                    .ToList(),
                 ExistingTrustLines = accountResponse
                     .Balances
                     .Where(b => b.AssetIssuer != null)
                     .Select(b => AssetsHelper.GetCode(b.AssetCode, b.AssetIssuer))
-                    .ToList()
+                    .ToList(),
+                Thresholds = new AccountModel.ThresholdsSettings { High = accountResponse.Thresholds.HighThreshold, Low = accountResponse.Thresholds.LowThreshold, Medium = accountResponse.Thresholds.MedThreshold }
             };
         }
 

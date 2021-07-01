@@ -12,13 +12,11 @@ namespace Centaurus.Domain
         public PaymentCommitProcessorContext(EffectProcessorsContainer effectProcessors) 
             : base(effectProcessors)
         {
-            var payment = (PaymentCommitQuantum)effectProcessors.Envelope.Message;
+            var payment = (DepositQuantum)effectProcessors.Envelope.Message;
             if (!CentaurusContext.PaymentProvidersManager.TryGetManager(payment.Source.ProviderId, out var paymentProvider))
                 throw new Exception($"Unable to find payment provider {payment.Source.ProviderId}");
             PaymentProvider = paymentProvider;
         }
-
-        public Dictionary<Withdrawal, WithdrawalWrapper> Withdrawals { get; } = new Dictionary<Withdrawal, WithdrawalWrapper>();
 
         public PaymentProviderBase PaymentProvider { get; }
     }

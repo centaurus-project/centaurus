@@ -11,60 +11,53 @@ namespace Centaurus.Stellar.PaymentProvider
 {
     public static class StellarTransactionExtensions
     {
-        public static List<WithdrawalWrapperItem> GetWithdrawals(this ProviderSettings providerSettings, stellar_dotnet_sdk.Transaction transaction)
-        {
-            if (providerSettings == null)
-                throw new ArgumentNullException(nameof(providerSettings));
+        public static stellar_dotnet_sdk.AssetTypeNative NativeAsset = new stellar_dotnet_sdk.AssetTypeNative();
 
-            if (transaction == null)
-                throw new ArgumentNullException(nameof(transaction));
-
-            var payments = transaction.Operations
-                .Where(o => o is stellar_dotnet_sdk.PaymentOperation)
-                .Cast<stellar_dotnet_sdk.PaymentOperation>();
-
-            var withdrawals = new List<WithdrawalWrapperItem>();
-            foreach (var payment in payments)
-            {
-                if (providerSettings.TryGetAsset(payment.Asset, out var asset))
-                    throw new BadRequestException("Asset is not allowed by constellation.");
-
-                if (payment.SourceAccount?.AccountId != providerSettings.Vault)
-                    throw new BadRequestException("Only vault account can be used as payment source.");
-
-                var amount = stellar_dotnet_sdk.Amount.ToXdr(payment.Amount);
-                withdrawals.Add(new WithdrawalWrapperItem
-                {
-                    Asset = asset.CentaurusAsset,
-                    Amount = amount,
-                    Destination = payment.Destination.PublicKey
-                });
-            }
-            if (withdrawals.GroupBy(w => w.Asset).Any(g => g.Count() > 1))
-                throw new BadRequestException("Multiple payments for the same asset.");
-
-            return withdrawals;
-        }
-
-        private static bool TryGetAsset(this ProviderSettings providerSettings, Asset xdrAsset, out ProviderAsset asset)
+        public static bool TryGetAsset(this ProviderSettings providerSettings, Asset xdrAsset, out ProviderAsset asset)
         {
             var sdkAsset = stellar_dotnet_sdk.Asset.FromXdr(xdrAsset);
             return providerSettings.TryGetAsset(sdkAsset, out asset);
         }
 
-        private static bool TryGetAsset(this ProviderSettings providerSettings, stellar_dotnet_sdk.Asset xdrAsset, out ProviderAsset asset)
+        public static bool TryGetAssetByCanonicalName(string name, out stellar_dotnet_sdk.Asset asset)
+        {
+            asset = null;
+            if (string.IsNullOrWhiteSpace(name))
+                return false;
+
+            if (name == NativeAsset.CanonicalName())
+                asset = NativeAsset;
+            else
+            {
+                var splitted = name.Split(':');
+                if (splitted.Length != 2)
+                    return false;
+                asset = stellar_dotnet_sdk.Asset.CreateNonNativeAsset(splitted[0], splitted[1]);
+            }
+            return asset != null;
+        }
+
+        public static bool TryGetAsset(this ProviderSettings providerSettings, stellar_dotnet_sdk.Asset xdrAsset, out ProviderAsset asset)
         {
             if (providerSettings == null)
                 throw new ArgumentNullException(nameof(providerSettings));
 
-            var name = xdrAsset is stellar_dotnet_sdk.AssetTypeCreditAlphaNum creditAsset ? creditAsset.CanonicalName() : "XLM";
-            asset = providerSettings.Assets.FirstOrDefault(a => a.Token == name);
+            asset = providerSettings.Assets.FirstOrDefault(a => a.Token == xdrAsset.CanonicalName());
             return asset != null;
+        }
+
+        public static bool TryGetAsset(this ProviderSettings providerSettings, int asset, out stellar_dotnet_sdk.Asset stellarAsset)
+        {
+            if (providerSettings == null)
+                throw new ArgumentNullException(nameof(providerSettings));
+
+            var providerAsset = providerSettings.Assets.FirstOrDefault(a => a.CentaurusAsset == asset);
+            return TryGetAssetByCanonicalName(providerAsset.Token, out stellarAsset);
         }
 
         public static OperationTypeEnum[] SupportedDepositOperations = new OperationTypeEnum[] { OperationTypeEnum.PAYMENT };
 
-        public static bool TryGetPayment(this ProviderSettings providerSettings, Operation.OperationBody operation, stellar_dotnet_sdk.KeyPair source, PaymentResults pResult, byte[] transactionHash, out PaymentBase payment)
+        public static bool TryGetDeposit(this ProviderSettings providerSettings, Operation.OperationBody operation, stellar_dotnet_sdk.KeyPair source, PaymentResults pResult, byte[] transactionHash, out Deposit payment)
         {
             if (providerSettings == null)
                 throw new ArgumentNullException(nameof(providerSettings));
@@ -92,8 +85,6 @@ namespace Centaurus.Stellar.PaymentProvider
                             Asset = asset.CentaurusAsset,
                             TransactionHash = transactionHash
                         };
-                    else if (vault.Equals((RawPubKey)source.PublicKey))
-                        payment = new Withdrawal { TransactionHash = transactionHash };
                     if (payment != null)
                     {
                         payment.PaymentResult = pResult;
@@ -109,6 +100,29 @@ namespace Centaurus.Stellar.PaymentProvider
                     break;
             }
             return result;
+        }
+
+        public static bool TryDeserializeTransaction(byte[] rawTransaction, out stellar_dotnet_sdk.Transaction transaction)
+        {
+            transaction = null;
+            try
+            {
+                if (rawTransaction == null)
+                    throw new ArgumentNullException(nameof(rawTransaction));
+
+                var inputStream = new XdrDataInputStream(rawTransaction);
+                var txXdr = Transaction.Decode(inputStream);
+
+                //there is no methods to convert stellar_dotnet_sdk.xdr.Transaction to stellar_dotnet_sdk.Transaction, so we need wrap it first
+                var txXdrEnvelope = new TransactionV1Envelope { Tx = txXdr, Signatures = new DecoratedSignature[] { } };
+
+                transaction = stellar_dotnet_sdk.Transaction.FromEnvelopeXdrV1(txXdrEnvelope);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
     }
 }

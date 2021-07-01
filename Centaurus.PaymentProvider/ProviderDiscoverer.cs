@@ -9,11 +9,6 @@ namespace Centaurus.PaymentProvider
 {
     public class ProviderDiscoverer
     {
-        public static Type DiscoverParser(string providerName)
-        {
-            return DiscoverType(providerName, typeof(PaymentParserBase));
-        }
-
         public static Type DiscoverProvider(string providerName)
         {
             return DiscoverType(providerName, typeof(PaymentProviderBase));

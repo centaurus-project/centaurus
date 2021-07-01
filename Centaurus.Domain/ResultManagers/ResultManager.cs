@@ -228,6 +228,29 @@ namespace Centaurus.Domain
                 }
             }
 
+            public void SubmitTransaction()
+            {
+                try
+                {
+                    if (ResultMessageItem.Result.OriginalMessage.Message is RequestTransactionQuantum transactionQuantum)
+                    {
+                        //TODO: Refactor it now!!
+                        var paymentProviderId = ((WithdrawalRequest)transactionQuantum.RequestMessage).PaymentProvider;
+
+
+                        if (!ResultManager.Context.PaymentProvidersManager.TryGetManager(paymentProviderId, out var paymentProvider))
+                            throw new Exception($"Unable to find manager {paymentProviderId}");
+                        paymentProvider.SubmitTransaction(transactionQuantum.Transaction, ((ITransactionResultMessage)ResultMessageItem.Result).TxSignatures);
+                    }
+                }
+                catch (Exception exc)
+                {
+                    logger.Error(new Exception("Error on submit", exc));
+                    ResultManager.Context.AppState.State = ApplicationState.Failed;
+                    throw exc;
+                }
+            }
+
             private void OnResult(MajorityResults majorityResult)
             {
                 if (majorityResult == MajorityResults.Unreachable)
@@ -249,7 +272,7 @@ namespace Centaurus.Domain
                     ResultManager.Context.AppState.State = ApplicationState.Failed;
                     throw exc;
                 }
-
+                SubmitTransaction();
                 SendResult();
             }
 

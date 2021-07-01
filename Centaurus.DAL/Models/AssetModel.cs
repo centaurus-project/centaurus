@@ -11,7 +11,6 @@ namespace Centaurus.DAL.Models
 
         public string Code { get; set; }
 
-        public byte[] Issuer { get; set; }
-        public long IsSuspended { get; set; }
+        public bool IsSuspended { get; set; }
     }
 }

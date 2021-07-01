@@ -23,21 +23,75 @@ namespace Centaurus.Stellar.PaymentProvider
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public StellarPaymentProvider(PaymentParserBase parser, ProviderSettings settings, dynamic config, WithdrawalStorage withdrawalStorage)
-            : base(parser, settings, (object)config, withdrawalStorage)
+        public StellarPaymentProvider(ProviderSettings settings, dynamic config)
+            : base(settings, (object)config)
         {
             commitDelay = TimeSpan.FromTicks(settings.PaymentSubmitDelay);
             submitTimerInterval = TimeSpan.FromSeconds(5).TotalMilliseconds;
             maxTxSubmitDelay = config.MaxTxSubmitDelay;
             dataSource = new DataSource(settings.Name, config.Horizon);
 
+            VaultKeyPair = stellar_dotnet_sdk.KeyPair.FromSecretSeed(Secret);
+
             Task.Factory.StartNew(ListenTransactions, TaskCreationOptions.LongRunning);
             InitTimer();
         }
 
-        public override void ValidateTransaction(TransactionWrapper transactionWrapper)
+        public override void ValidateTransaction(byte[] rawTransaction, WithdrawalRequest withdrawalRequest)
         {
-            var transaction = (stellar_dotnet_sdk.Transaction)transactionWrapper.Transaction;
+            if (rawTransaction == null)
+                throw new ArgumentNullException(nameof(rawTransaction));
+
+            if (withdrawalRequest == null)
+                throw new ArgumentNullException(nameof(withdrawalRequest));
+
+            if (!ByteArrayComparer.Default.Equals(rawTransaction.ComputeHash(), BuildTransaction(withdrawalRequest).ComputeHash()))
+                throw new BadRequestException($"Transaction is not equal to expected one.");
+        }
+
+        private bool ValidateFee(uint fee)
+        {
+            return true;
+        }
+
+        private stellar_dotnet_sdk.Account GetSourceAccount()
+        {
+            return null;
+        }
+
+        private SemaphoreSlim syncRoot = new SemaphoreSlim(1);
+        private AccountModel vaultAccount;
+        private async Task<AccountModel> GetVaultAccount()
+        {
+            if (vaultAccount != null)
+                return vaultAccount;
+
+            await syncRoot.WaitAsync();
+            try
+            {
+                if (vaultAccount != null)
+                    return vaultAccount;
+                vaultAccount = await dataSource.GetAccountData(Vault);
+                return vaultAccount;
+            }
+            finally
+            {
+                syncRoot.Release();
+            }
+        }
+
+        public override byte[] BuildTransaction(WithdrawalRequest withdrawalRequest)
+        {
+            if (withdrawalRequest == null)
+                throw new ArgumentNullException(nameof(withdrawalRequest));
+
+            if (!ValidateFee((uint)withdrawalRequest.Fee))
+                throw new BadRequestException($"Not fair fee {withdrawalRequest.Fee}.");
+            var options = new TransactionBuilderOptions(GetSourceAccount(), (uint)withdrawalRequest.Fee);
+            if (!Settings.TryGetAsset(withdrawalRequest.Asset, out var stellarAsset))
+                throw new BadRequestException($"Asset {withdrawalRequest.Asset} is not supported by provider.");
+
+            var transaction = TransactionHelper.BuildPaymentTransaction(options, stellar_dotnet_sdk.KeyPair.FromAccountId(withdrawalRequest.Destination), stellarAsset, withdrawalRequest.Amount);
             var txSourceAccount = transaction.SourceAccount;
             if (Vault == txSourceAccount.AccountId)
                 throw new BadRequestException("Vault account cannot be used as transaction source.");
@@ -54,25 +108,59 @@ namespace Centaurus.Stellar.PaymentProvider
 
             if (transaction.Operations.Length > 100)
                 throw new BadRequestException("Too many operations.");
+            
+            var stream = new XdrDataOutputStream();
+            stellar_dotnet_sdk.xdr.Transaction.Encode(stream, transaction.ToXdrV1());
+            return stream.ToArray();
         }
 
-        object timerSyncRoot = new { };
-
-        List<PaymentBase> GetVaultPayments(stellar_dotnet_sdk.Transaction transaction, bool isSuccess)
+        public override TxSignature SignTransaction(byte[] transaction)
         {
-            var ledgerPayments = new List<PaymentBase>();
+            if (!StellarTransactionExtensions.TryDeserializeTransaction(transaction, out var tx))
+                throw new Exception("Unable to deserialize transaction.");
+
+            if (tx.Signatures.Count > 0)
+                throw new ArgumentException("Transaction contains signatures.");
+
+            tx.Sign(VaultKeyPair, dataSource.Network);
+            var signature = tx.Signatures.First();
+            return new TxSignature { Signer = VaultKeyPair.PublicKey, Signature = signature.Signature.InnerValue };
+        }
+
+        public override void SubmitTransaction(byte[] transaction, List<TxSignature> signatures)
+        {
+            if (!StellarTransactionExtensions.TryDeserializeTransaction(transaction, out var tx))
+                throw new Exception("Unable to deserialize transaction.");
+
+            if (tx.Signatures.Count > 0)
+                throw new ArgumentException("Transaction contains signatures.");
+
+            var accountModel = GetVaultAccount().Result;
+            var currentWeight = 0;
+            foreach (var signature in signatures)
+            {
+                var signerKey = stellar_dotnet_sdk.KeyPair.FromPublicKey(signature.Signer);
+                tx.Signatures.Add(new DecoratedSignature { Hint = signerKey.SignatureHint, Signature = new Signature(signature.Signature) });
+                var currentSigner = accountModel.Signers.FirstOrDefault();
+                if (currentSigner == null)
+                    throw new Exception($"Unknown signer {signerKey.AccountId}");
+                currentWeight += currentSigner.Weight;
+                if (currentWeight >= accountModel.Thresholds.High)
+                    break;
+            }
+            dataSource.SubmitTransaction(tx).Wait();
+        }
+
+        List<Deposit> GetVaultPayments(stellar_dotnet_sdk.Transaction transaction, bool isSuccess)
+        {
+            var ledgerPayments = new List<Deposit>();
             var res = isSuccess ? PaymentResults.Success : PaymentResults.Failed;
             var txHash = transaction.Hash();
             for (var i = 0; i < transaction.Operations.Length; i++)
             {
                 var source = transaction.Operations[i].SourceAccount?.SigningKey ?? transaction.SourceAccount.SigningKey;
-                if (Settings.TryGetPayment(transaction.Operations[i].ToOperationBody(), source, res, txHash, out PaymentBase payment))
-                {
-                    //withdrawals are grouped by tx hash. If one withdrawal item already in list, then we can skip this one
-                    if (ledgerPayments.Any(p => p is Withdrawal))
-                        continue;
+                if (Settings.TryGetDeposit(transaction.Operations[i].ToOperationBody(), source, res, txHash, out Deposit payment))
                     ledgerPayments.Add(payment);
-                }
             }
             return ledgerPayments;
         }
@@ -82,7 +170,7 @@ namespace Centaurus.Stellar.PaymentProvider
             try
             {
                 var payments = GetVaultPayments(stellar_dotnet_sdk.Transaction.FromEnvelopeXdr(tx.EnvelopeXdr), tx.IsSuccess);
-                var payment = new PaymentNotification
+                var payment = new DepositNotification
                 {
                     ProviderId = Id,
                     Cursor = tx.PagingToken.ToString(),
@@ -148,6 +236,12 @@ namespace Centaurus.Stellar.PaymentProvider
                 }
             }
         }
+        public override int CompareCursors(string left, string right)
+        {
+            if (!(long.TryParse(left, out var leftLong) && long.TryParse(right, out var rightLong)))
+                throw new Exception("Unable to convert cursor to long.");
+            return Comparer<long>.Default.Compare(leftLong, rightLong);
+        }
 
         public override void Dispose()
         {
@@ -156,7 +250,7 @@ namespace Centaurus.Stellar.PaymentProvider
                 cancellationTokenSource.Cancel();
                 cancellationTokenSource.Dispose();
 
-                lock (timerSyncRoot)
+                lock (submitTimer)
                 {
                     submitTimer.Stop();
                     submitTimer.Dispose();
@@ -166,16 +260,18 @@ namespace Centaurus.Stellar.PaymentProvider
 
 
         CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
-        System.Timers.Timer submitTimer = new System.Timers.Timer();
+        readonly System.Timers.Timer submitTimer = new System.Timers.Timer();
 
         readonly TimeSpan commitDelay;
         readonly double submitTimerInterval;
         private readonly long maxTxSubmitDelay;
         private readonly DataSource dataSource;
 
+        public stellar_dotnet_sdk.KeyPair VaultKeyPair { get; }
+
         void InitTimer()
         {
-            lock (timerSyncRoot)
+            lock (submitTimer)
             {
                 submitTimer.Interval = submitTimerInterval;
                 submitTimer.AutoReset = false;
@@ -184,11 +280,9 @@ namespace Centaurus.Stellar.PaymentProvider
             }
         }
 
-        async void SubmitTimer_Elapsed(object sender, ElapsedEventArgs e)
+        void SubmitTimer_Elapsed(object sender, ElapsedEventArgs e)
         {
             CommitPayments();
-
-            await CleanupWithdrawals();
 
             StartTimer();
         }
@@ -196,7 +290,7 @@ namespace Centaurus.Stellar.PaymentProvider
         void StartTimer()
         {
 
-            lock (timerSyncRoot)
+            lock (submitTimer)
             {
                 if (!cancellationTokenSource.IsCancellationRequested)
                     submitTimer.Start();
@@ -207,70 +301,10 @@ namespace Centaurus.Stellar.PaymentProvider
         {
             foreach (var payment in NotificationsManager.GetAll())
             {
-                if (DateTime.UtcNow - payment.PaymentTime < commitDelay)
+                if (DateTime.UtcNow - payment.DepositTime < commitDelay)
                     break;
-                RaiseOnPaymentCommit(new PaymentCommitQuantum { Source = payment.Payment }.CreateEnvelope());
+                RaiseOnPaymentCommit(new DepositQuantum { Source = payment.Deposite }.CreateEnvelope());
             }
         }
-
-        #region Withdrawals
-
-        async Task CleanupWithdrawals()
-        {
-            var currentTimeSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            var expiredTransactions = WithdrawalStorage.GetAll().Where(w => w.IsExpired(currentTimeSeconds, maxTxSubmitDelay)).Select(w => w.Hash).ToArray();
-
-            if (expiredTransactions.Length < 1)
-                return;
-
-            //we must ignore all transactions that was submitted. TxListener will handle submitted transactions.
-            var unhandledTxs = await GetUnhandledTx();
-            foreach (var expiredTransaction in expiredTransactions.Where(tx => !unhandledTxs.Contains(tx, ByteArrayComparer.Default)))
-                RaiseOnCleanup(new WithrawalsCleanupQuantum { ExpiredWithdrawal = expiredTransaction }.CreateEnvelope());
-        }
-
-        async Task<List<byte[]>> GetUnhandledTx()
-        {
-            var retries = 1;
-            while (true)
-            {
-                try
-                {
-                    var limit = 200;
-                    var unhandledTxs = new List<byte[]>();
-                    var result = await dataSource.GetTransactions(Vault, long.Parse(Cursor), limit);
-                    while (result.Count > 0)
-                    {
-                        unhandledTxs.AddRange(result.Select(r => ByteArrayExtensions.FromHexString(r.Hash)));
-                        if (result.Count != limit)
-                            break;
-                        result = await dataSource.GetTransactions(Vault, result.Last().PagingToken, limit);
-                    }
-                    return unhandledTxs;
-                }
-                catch
-                {
-                    if (retries == 5)
-                        throw;
-                    await Task.Delay(retries * 1000);
-                    retries++;
-                }
-            }
-        }
-
-        public override TxSignature SignTransaction(TransactionWrapper transaction)
-        {
-            if (transaction == null)
-                throw new ArgumentNullException(nameof(transaction));
-            var signature = transaction.Hash.Sign(KeyPair.FromSecretSeed(Secret));
-            return new TxSignature { Signature = signature.Signature, Signer = signature.Signer };
-        }
-
-        public override WithdrawalWrapper GetWithdrawal(MessageEnvelope envelope, AccountWrapper account, TransactionWrapper transactionWrapper)
-        {
-            return Parser.GetWithdrawal(envelope, account, transactionWrapper, Settings);
-        }
-
-        #endregion
     }
 }

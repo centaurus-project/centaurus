@@ -1,17 +1,12 @@
-﻿using NLog;
+﻿using Centaurus.Domain;
+using Centaurus.Domain.Models;
+using Centaurus.Models;
+using Centaurus.Xdr;
+using NLog;
 using System;
-using System.Collections.Generic;
 using System.Net.WebSockets;
 using System.Threading;
 using System.Threading.Tasks;
-using Centaurus.Domain;
-using Centaurus.Models;
-using Centaurus.Xdr;
-using System.Reflection;
-using System.Diagnostics;
-using stellar_dotnet_sdk;
-using System.Linq;
-using Centaurus.Domain.Models;
 
 namespace Centaurus
 {

@@ -45,13 +45,13 @@ namespace Centaurus.Domain
             if (orderRequest.Side == OrderSide.Sell)
             {
                 var balance = context.SourceAccount.Account.GetBalance(orderRequest.Asset);
-                if (!balance.HasSufficientBalance(orderRequest.Amount))
+                if (!balance.HasSufficientBalance(orderRequest.Amount, 0))
                     throw new BadRequestException("Insufficient funds");
             }
             else
             {
                 var balance = context.SourceAccount.Account.GetBalance(0);
-                if (!balance.HasSufficientBalance(quoteAmount))
+                if (!balance.HasSufficientBalance(quoteAmount, context.CentaurusContext.Constellation.MinAccountBalance))
                     throw new BadRequestException("Insufficient funds");
             }
 

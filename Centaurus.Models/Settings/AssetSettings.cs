@@ -26,6 +26,6 @@ namespace Centaurus.Models
         /// Is native asset or not.
         /// </summary>
         [XdrField(2)]
-        public long IsSuspended { get; set; }
+        public bool IsSuspended { get; set; }
     }
 }

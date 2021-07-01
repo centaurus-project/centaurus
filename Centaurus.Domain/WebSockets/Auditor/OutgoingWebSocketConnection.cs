@@ -1,17 +1,10 @@
-using Centaurus.Domain;
+using Centaurus.Client;
 using Centaurus.Models;
 using NLog;
-using stellar_dotnet_sdk;
 using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
-using System.Net.WebSockets;
 using System.Threading;
 using System.Threading.Tasks;
-using Centaurus.Xdr;
-using Centaurus.Client;
 
 namespace Centaurus.Domain
 {

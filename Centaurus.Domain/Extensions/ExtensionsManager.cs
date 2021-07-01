@@ -1,12 +1,9 @@
 ﻿using Centaurus.Models;
-using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.WebSockets;
-using System.Text;
-using System.Text.Json.Serialization;
-using System.Threading.Tasks;
+using System.Text.Json;
 
 namespace Centaurus.Domain
 {
@@ -21,7 +18,7 @@ namespace Centaurus.Domain
             if (!File.Exists(configFilePath))
                 throw new Exception("Extensions config file is not found.");
 
-            var extensionConfig = JsonConvert.DeserializeObject<ExtensionConfig>(File.ReadAllText(configFilePath));
+            var extensionConfig = JsonSerializer.Deserialize<ExtensionConfig>(File.ReadAllText(configFilePath));
             var extensionsDirectory = Path.GetDirectoryName(extensionsConfigFilePath);
             foreach (var configItem in extensionConfig.Extensions)
             {

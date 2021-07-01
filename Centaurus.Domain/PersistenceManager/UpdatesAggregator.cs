@@ -151,27 +151,6 @@ namespace Centaurus.Domain
                         paymentCursor.Cursor = cursorUpdateEffect.Cursor;
                     }
                     break;
-                case WithdrawalCreateEffect withdrawalCreateEffect:
-                    {
-                        var accId = withdrawalCreateEffect.Account;
-                        GetAccount(pendingDiffObject.Accounts, accId).Withdrawal = withdrawalCreateEffect.Apex;
-                        foreach (var withdrawalItem in withdrawalCreateEffect.Items)
-                            GetBalance(pendingDiffObject.Balances, BalanceModelIdConverter.EncodeId(accId, withdrawalItem.Asset)).LiabilitiesDiff += withdrawalItem.Amount;
-                    }
-                    break;
-                case WithdrawalRemoveEffect withdrawalRemoveEffect:
-                    {
-                        var accId = withdrawalRemoveEffect.Account;
-                        GetAccount(pendingDiffObject.Accounts, accId).Withdrawal = 0;
-                        foreach (var withdrawalItem in withdrawalRemoveEffect.Items)
-                        {
-                            var balance = GetBalance(pendingDiffObject.Balances, BalanceModelIdConverter.EncodeId(accId, withdrawalItem.Asset));
-                            if (withdrawalRemoveEffect.IsSuccessful)
-                                balance.AmountDiff += -withdrawalItem.Amount;
-                            balance.LiabilitiesDiff += -withdrawalItem.Amount;
-                        }
-                    }
-                    break;
                 default:
                     break;
             }

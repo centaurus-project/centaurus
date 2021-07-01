@@ -1,9 +1,4 @@
-﻿using stellar_dotnet_sdk;
-using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace Centaurus.Models
+﻿namespace Centaurus.Models
 {
     public class RawPubKey : BinaryData
     {

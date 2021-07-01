@@ -47,8 +47,6 @@ namespace Centaurus.SDK
             this.alphaWebSocketAddress = alphaWebSocketAddress ?? throw new ArgumentNullException(nameof(alphaWebSocketAddress));
             this.constellation = constellation ?? throw new ArgumentNullException(nameof(constellation));
 
-            paymentProviderFactory = providerFactory ?? throw new ArgumentNullException(nameof(providerFactory));
-
             this.connectionFactory = connectionFactory ?? throw new ArgumentNullException(nameof(connectionFactory));
 
             Network.Use(new Network(this.constellation.StellarNetwork.Passphrase));

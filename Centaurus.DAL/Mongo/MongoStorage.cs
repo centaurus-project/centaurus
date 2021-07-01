@@ -97,7 +97,6 @@ namespace Centaurus.DAL.Mongo
         {
             return await accountsCollection
                 .Find(FilterDefinition<AccountModel>.Empty)
-                .SortBy(a => a.Id)
                 .ToListAsync();
         }
 
@@ -330,15 +329,13 @@ namespace Centaurus.DAL.Mongo
             Parallel.For(0, accLength, (i) =>
             {
                 var acc = accounts[i];
-                var currentAccFilter = filter.Eq(a => a.Id, acc.Id);
+                var currentAccFilter = filter.Eq(a => a.PubKey, acc.PubKey);
                 if (acc.IsInserted)
                     updates[i] = new InsertOneModel<AccountModel>(new AccountModel
                     {
-                        Id = acc.Id,
                         Nonce = acc.Nonce,
                         PubKey = acc.PubKey,
-                        RequestRateLimits = acc.RequestRateLimits,
-                        Withdrawal = (acc.Withdrawal ?? 0)
+                        RequestRateLimits = acc.RequestRateLimits
                     });
                 else if (acc.IsDeleted)
                     updates[i] = new DeleteOneModel<AccountModel>(currentAccFilter);
@@ -350,9 +347,6 @@ namespace Centaurus.DAL.Mongo
 
                     if (acc.RequestRateLimits != null)
                         updateDefs.Add(update.Set(a => a.RequestRateLimits, acc.RequestRateLimits));
-
-                    if (acc.Withdrawal.HasValue)
-                        updateDefs.Add(update.Set(a => a.Withdrawal, acc.Withdrawal.Value));
 
                     updates[i] = new UpdateOneModel<AccountModel>(currentAccFilter, update.Combine(updateDefs));
                 }

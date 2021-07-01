@@ -136,7 +136,7 @@ namespace Centaurus.Test
 
             await context.QuantumHandler.HandleAsync(new ConstellationQuantum { Apex = 1, RequestEnvelope = initRequest }.CreateEnvelope());
 
-            var deposits = new List<PaymentBase>();
+            var deposits = new List<Deposit>();
             Action<byte[], int> addAssetsFn = (acc, asset) =>
             {
                 deposits.Add(new Deposit
@@ -158,7 +158,7 @@ namespace Centaurus.Test
 
             var providerId = PaymentProviderBase.GetProviderId(stellarProviderSettings.Provider, stellarProviderSettings.Name);
 
-            var txNotification = new PaymentNotification
+            var txNotification = new DepositNotification
             {
                 Cursor = "2",
                 Items = deposits,
@@ -168,7 +168,7 @@ namespace Centaurus.Test
             context.PaymentProvidersManager.TryGetManager(providerId, out var paymentProvider);
             paymentProvider.NotificationsManager.RegisterNotification(txNotification);
 
-            var depositQuantum = new PaymentCommitQuantum
+            var depositQuantum = new DepositQuantum
             {
                 Apex = 2,
                 PrevHash = context.QuantumStorage.LastQuantumHash,
