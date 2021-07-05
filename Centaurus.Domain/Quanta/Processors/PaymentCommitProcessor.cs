@@ -10,15 +10,15 @@ namespace Centaurus.Domain
 
         public override Task<QuantumResultMessage> Process(PaymentCommitProcessorContext context)
         {
-            var paymentQuantum = (DepositQuantum)context.Envelope.Message;
-            var ledgerNotification = paymentQuantum.Source;
+            var depositQuantum = (DepositQuantum)context.Envelope.Message;
+            var depositNotification = depositQuantum.Source;
 
-            context.EffectProcessors.AddCursorUpdate(context.PaymentProvider.NotificationsManager, ledgerNotification.Cursor, context.PaymentProvider.Cursor);
+            context.EffectProcessors.AddCursorUpdate(context.PaymentProvider.NotificationsManager, depositNotification.ProviderId, depositNotification.Cursor, context.PaymentProvider.Cursor);
 
-            foreach (var payment in ledgerNotification.Items)
+            foreach (var payment in depositNotification.Items)
                 ProcessDeposit(payment, context);
 
-            context.PaymentProvider.NotificationsManager.RemovePayment(ledgerNotification.Cursor);
+            context.PaymentProvider.NotificationsManager.RemovePayment(depositNotification.Cursor);
 
             return Task.FromResult((QuantumResultMessage)context.Envelope.CreateResult(ResultStatusCodes.Success));
         }

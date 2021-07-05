@@ -16,8 +16,7 @@ namespace Centaurus.Domain
             return new Balance
             {
                 Asset = decodedAssetId.asset,
-                Amount = balance.Amount,
-                Liabilities = balance.Liabilities
+                Amount = balance.Amount
             };
         }
     }

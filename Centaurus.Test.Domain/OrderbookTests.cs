@@ -1,15 +1,10 @@
 ﻿using Centaurus.DAL;
-using Centaurus.DAL.Mongo;
 using Centaurus.Domain;
+using Centaurus.Domain.Models;
 using Centaurus.Models;
-using Centaurus.Xdr;
 using NUnit.Framework;
-using stellar_dotnet_sdk;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Text;
 
 namespace Centaurus.Test
 {
@@ -33,9 +28,7 @@ namespace Centaurus.Test
             EnvironmentHelper.SetTestEnvironmentVariable();
             var settings = GlobalInitHelper.GetAlphaSettings();
 
-            var stellarProvider = new MockStellarDataProvider(settings.NetworkPassphrase, settings.HorizonUrl);
-
-            context = new ExecutionContext(settings, new MockStorage(), stellarProvider, useLegacyOrderbook);
+            context = new ExecutionContext(settings, new MockStorage(), new MockPaymentProviderFactory(), useLegacyOrderbook);
             context.Init().Wait();
 
             var requestRateLimits = new RequestRateLimits { HourLimit = 1000, MinuteLimit = 100 };
@@ -68,15 +61,28 @@ namespace Centaurus.Test
             {
                 Accounts = new List<AccountWrapper> { account1, account2 },
                 Apex = 0,
-                Cursors = new List<PaymentCursor> { new PaymentCursor { Cursor = "1", Provider = PaymentProvider.Stellar } },
-                Orders = new List<Order>(),
+                Orders = new List<OrderWrapper>(),
                 Settings = new ConstellationSettings
                 {
-                    Vaults = new List<Vault> { new Vault { AccountId = KeyPair.Random().AccountId, Provider = PaymentProvider.Stellar } },
-                    Assets = new List<AssetSettings> { new AssetSettings { Id = 1, Code = "X", Issuer = new RawPubKey() } },
+                    Providers = new List<ProviderSettings> {
+                        new ProviderSettings {
+                            Assets = new List<ProviderAsset> { new ProviderAsset {  CentaurusAsset = 0, Token = "native" } },
+                            Cursor = "0",
+                            Name = "Stellar",
+                            PaymentSubmitDelay = 0,
+                            Provider = "Stellar",
+                            Vault = KeyPair.Random().AccountId
+                        }
+                    },
+                    Assets = new List<AssetSettings> {
+                        new AssetSettings { Id = 0, Code = "XLM" },
+                        new AssetSettings { Id = 1, Code = "X" }
+                    },
+                    Auditors = new List<RawPubKey> { TestEnvironment.AlphaKeyPair, TestEnvironment.Auditor1KeyPair },
+                    MinAccountBalance = 1,
+                    MinAllowedLotSize = 1,
                     RequestRateLimits = requestRateLimits
-                },
-                Withdrawals = new Dictionary<PaymentProvider, WithdrawalStorage>()
+                }
             }).Wait();
 
             this.account1 = context.AccountStorage.GetAccount(account1.Id);
@@ -107,16 +113,17 @@ namespace Centaurus.Test
                     Asset = 1,
                     Price = Math.Round(price * 27) / 13
                 };
+                var initiator = default(AccountWrapper);
                 if (rnd.NextDouble() >= 0.5)
                 {
+                    initiator = account1;
                     request.Account = account1.Id;
-                    request.AccountWrapper = account1;
                     request.Side = OrderSide.Buy;
                 }
                 else
                 {
+                    initiator = account2;
                     request.Account = account2.Id;
-                    request.AccountWrapper = account2;
                     request.Side = OrderSide.Sell;
                 }
 
@@ -131,7 +138,7 @@ namespace Centaurus.Test
                     Timestamp = DateTime.UtcNow.Ticks
                 };
                 var diffObject = new DiffObject();
-                var conterOrderEffectsContainer = new EffectProcessorsContainer(context, trade.CreateEnvelope(), diffObject);
+                var conterOrderEffectsContainer = new EffectProcessorsContainer(context, trade.CreateEnvelope(), diffObject, initiator);
                 testTradeResults.Add(trade, conterOrderEffectsContainer);
             }
 
@@ -158,12 +165,11 @@ namespace Centaurus.Test
                     {
                         Account = account.Id,
                         OrderId = order.OrderId,
-                        Amount = order.Amount,
-                        QuoteAmount = order.QuoteAmount,
-                        Price = order.Price,
-                        Asset = decodedOrderId.Asset,
-                        AccountWrapper = account
-                    }, market.GetOrderbook(decodedOrderId.Side)).CommitEffect();
+                        Amount = order.Order.Amount,
+                        QuoteAmount = order.Order.QuoteAmount,
+                        Price = order.Order.Price,
+                        Asset = decodedOrderId.Asset
+                    }, account, market.GetOrderbook(decodedOrderId.Side)).CommitEffect();
                 }
             }
             Assert.AreEqual(xlmStartBalance, account1.Account.GetBalance(0).Amount + account2.Account.GetBalance(0).Amount);
@@ -199,7 +205,7 @@ namespace Centaurus.Test
         [TestCase(false)]
         public void OrderbookRemoveTest(bool isOrderedByPrice)
         {
-            var orders = new List<Order>();
+            var orders = new List<OrderWrapper>();
             var random = new Random();
             var price = 1D;
             var side = OrderSide.Buy;
@@ -207,6 +213,7 @@ namespace Centaurus.Test
 
             var orderbook = context.Exchange.GetOrderbook(asset, side);
             var ordersCount = 1000;
+            var fakeAccountWrapper = new AccountWrapper(new Account(), new RequestRateLimits());
             for (var i = 1; i <= ordersCount; i++)
             {
                 if (isOrderedByPrice)
@@ -215,7 +222,7 @@ namespace Centaurus.Test
                     price = 1 + random.NextDouble();
                 var orderId = OrderIdConverter.Encode((ulong)i, asset, side);
                 var amount = 1000;
-                var order = new Order { OrderId = orderId, Amount = 1000, Price = price, QuoteAmount = OrderMatcher.EstimateQuoteAmount(amount, price, side) };
+                var order = new OrderWrapper(new Order { OrderId = orderId, Amount = 1000, Price = price, QuoteAmount = OrderMatcher.EstimateQuoteAmount(amount, price, side) }, fakeAccountWrapper);
                 orders.Add(order);
                 orderbook.InsertOrder(order);
             }

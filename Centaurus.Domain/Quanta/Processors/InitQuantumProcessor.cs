@@ -58,8 +58,8 @@ namespace Centaurus.Domain
             if (constellationInit.MinAllowedLotSize < 1)
                 throw new ArgumentException("Minimal allowed lot size is less then 0");
 
-            if (constellationInit.Assets.GroupBy(a => a.ToString()).Any(g => g.Count() > 1))
-                throw new ArgumentException("All asset values should be unique");
+            if (constellationInit.Assets.GroupBy(a => a.Code).Any(g => g.Count() > 1) || constellationInit.Assets.GroupBy(a => a.Id).Any(g => g.Count() > 1))
+                throw new ArgumentException("All asset values must be unique");
 
             if (constellationInit.RequestRateLimits == null || constellationInit.RequestRateLimits.HourLimit < 1 || constellationInit.RequestRateLimits.MinuteLimit < 1)
                 throw new ArgumentException("Request rate limit values should be greater than 0");

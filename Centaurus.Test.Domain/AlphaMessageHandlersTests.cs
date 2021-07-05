@@ -2,11 +2,8 @@
 using Centaurus.Models;
 using Centaurus.Xdr;
 using NUnit.Framework;
-using stellar_dotnet_sdk;
 using System;
 using System.Collections.Generic;
-using System.Net.WebSockets;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace Centaurus.Test
@@ -228,14 +225,13 @@ namespace Centaurus.Test
                 var effect = new RequestRateLimitUpdateEffect
                 {
                     Account = account.Id,
-                    AccountWrapper = account,
                     RequestRateLimits = new RequestRateLimits
                     {
                         HourLimit = (uint)requestLimit.Value,
                         MinuteLimit = (uint)requestLimit.Value
                     }
                 };
-                var effectProcessor = new RequestRateLimitUpdateEffectProcessor(effect, context.Constellation.RequestRateLimits);
+                var effectProcessor = new RequestRateLimitUpdateEffectProcessor(effect, account, context.Constellation.RequestRateLimits);
                 effectProcessor.CommitEffect();
             }
             var clientConnection = GetIncomingConnection(context, clientKeyPair.PublicKey, ConnectionState.Ready);
@@ -277,7 +273,7 @@ namespace Centaurus.Test
 
             var clientConnection = GetIncomingConnection(context, client.PublicKey, state);
 
-            var envelope = new EffectsRequest { Account = account.Account.Id, AccountWrapper = account }.CreateEnvelope();
+            var envelope = new EffectsRequest { Account = account.Account.Id }.CreateEnvelope();
             envelope.Sign(client);
 
             using var writer = new XdrBufferWriter();

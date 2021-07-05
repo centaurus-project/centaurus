@@ -95,17 +95,11 @@ namespace Centaurus.Domain
                             Price = orderPlacedEffect.Price,
                             Account = accId
                         };
-                        UpdateLiabilities(pendingDiffObject.Accounts, pendingDiffObject.Balances, accId, orderId, orderPlacedEffect.QuoteAmount, orderPlacedEffect.Amount);
                     }
                     break;
                 case OrderRemovedEffect orderRemovedEffect:
                     {
-                        var accId = orderRemovedEffect.Account;
-                        var orderId = orderRemovedEffect.OrderId;
-                        var quoteAmount = -orderRemovedEffect.QuoteAmount;
-                        var assetAmount = -orderRemovedEffect.Amount;
-                        GetOrder(pendingDiffObject.Orders, orderId).IsDeleted = true;
-                        UpdateLiabilities(pendingDiffObject.Accounts, pendingDiffObject.Balances, accId, orderId, quoteAmount, assetAmount);
+                        GetOrder(pendingDiffObject.Orders, orderRemovedEffect.OrderId).IsDeleted = true;
                     }
                     break;
                 case TradeEffect tradeEffect:
@@ -120,16 +114,12 @@ namespace Centaurus.Domain
                         var assetBalance = GetBalance(pendingDiffObject.Balances, BalanceModelIdConverter.EncodeId(accId, decodedId.Asset));
                         if (decodedId.Side == OrderSide.Buy)
                         {
-                            if (!tradeEffect.IsNewOrder)
-                                quoteBalance.LiabilitiesDiff += -quoteAmount;
                             quoteBalance.AmountDiff += -quoteAmount;
                             assetBalance.AmountDiff += assetAmount;
 
                         }
                         else
                         {
-                            if (!tradeEffect.IsNewOrder)
-                                assetBalance.LiabilitiesDiff += -assetAmount;
                             assetBalance.AmountDiff += -assetAmount;
                             quoteBalance.AmountDiff += quoteAmount;
                         }
@@ -154,15 +144,6 @@ namespace Centaurus.Domain
                 default:
                     break;
             }
-        }
-
-        private static void UpdateLiabilities(Dictionary<int, DiffObject.Account> accounts, Dictionary<BsonObjectId, DiffObject.Balance> balances, int accountId, ulong orderId, long quoteAmount, long assetAmount)
-        {
-            var decodedId = OrderIdConverter.Decode(orderId);
-            if (decodedId.Side == OrderSide.Buy)
-                GetBalance(balances, BalanceModelIdConverter.EncodeId(accountId, 0)).LiabilitiesDiff += quoteAmount;
-            else
-                GetBalance(balances, BalanceModelIdConverter.EncodeId(accountId, decodedId.Asset)).LiabilitiesDiff += assetAmount;
         }
 
         private static DiffObject.Account GetAccount(Dictionary<int, DiffObject.Account> accounts, int accountId)
@@ -202,17 +183,23 @@ namespace Centaurus.Domain
                 Auditors = constellationInit.Auditors.Select(a => a.Data).ToArray(),
                 MinAccountBalance = constellationInit.MinAccountBalance,
                 MinAllowedLotSize = constellationInit.MinAllowedLotSize,
-                Providers = constellationInit.Providers.Select(p => new ProviderSettingsModel
+                Providers = constellationInit.Providers.Select(p =>
                 {
-                    ProviderId = p.ProviderId,
-                    Provider = p.Provider,
-                    Vault = p.Vault,
-                    Name = p.Name,
-                    Cursor = p.Cursor,
-                    PaymentSubmitDelay = p.PaymentSubmitDelay,
-                    Assets = p.Assets
-                        .Select(pa => new ProviderAssetModel { CentaurusAsset = pa.CentaurusAsset, Token = pa.Token, IsVirtual = pa.IsVirtual })
-                        .ToList()
+                    return new ProviderSettingsModel
+                    {
+                        ProviderId = p.ProviderId,
+                        Provider = p.Provider,
+                        Vault = p.Vault,
+                        Name = p.Name,
+                        Cursor = p.Cursor,
+                        PaymentSubmitDelay = p.PaymentSubmitDelay,
+                        Assets = p.Assets
+                          .Select(pa =>
+                          {
+                              return new ProviderAssetModel { CentaurusAsset = pa.CentaurusAsset, Token = pa.Token, IsVirtual = pa.IsVirtual };
+                          })
+                          .ToList()
+                    };
                 }).ToList(),
                 Assets = constellationInit.Assets.Select(a => a.ToAssetModel()).ToList()
             };

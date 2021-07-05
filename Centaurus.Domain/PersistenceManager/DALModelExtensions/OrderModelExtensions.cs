@@ -11,7 +11,7 @@ namespace Centaurus.Domain
     {
         public static OrderWrapper ToOrder(this OrderModel order, AccountWrapper account)
         {
-            return new OrderWrapper(
+            var orderWrapper = new OrderWrapper(
                 new Order
                 {
                     Amount = order.Amount,
@@ -21,6 +21,14 @@ namespace Centaurus.Domain
                 },
                 account
             );
+
+            var decodedId = OrderIdConverter.Decode(orderWrapper.Order.OrderId);
+            if (decodedId.Side == OrderSide.Buy)
+                account.Account.GetBalance(0).UpdateLiabilities(orderWrapper.Order.QuoteAmount);
+            else
+                account.Account.GetBalance(decodedId.Asset).UpdateLiabilities(orderWrapper.Order.Amount);
+
+            return orderWrapper;
         }
     }
 }

@@ -1,15 +1,11 @@
 ﻿using Centaurus.DAL;
 using Centaurus.Domain;
-using Centaurus.Exchange.Analytics;
+using Centaurus.Domain.Models;
 using Centaurus.Models;
 using NUnit.Framework;
-using stellar_dotnet_sdk;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
-using System.Text;
-using System.Text.Json;
 
 namespace Centaurus.Test.Exchange.Analytics
 {
@@ -25,9 +21,7 @@ namespace Centaurus.Test.Exchange.Analytics
             EnvironmentHelper.SetTestEnvironmentVariable();
             var settings = GlobalInitHelper.GetAlphaSettings();
 
-            var stellarProvider = new MockStellarDataProvider(settings.NetworkPassphrase, settings.HorizonUrl);
-
-            context = new ExecutionContext(settings, new MockStorage(), stellarProvider);
+            context = new ExecutionContext(settings, new MockStorage(), new MockPaymentProviderFactory());
             context.Init().Wait();
             var requestsLimit = new RequestRateLimits();
 
@@ -65,8 +59,8 @@ namespace Centaurus.Test.Exchange.Analytics
                 Vault = stellarPaymentProviderVault,
                 Assets = new List<ProviderAsset>
                 {
-                    new ProviderAsset { CentaurusAsset = 0},
-                    new ProviderAsset { CentaurusAsset = 1, IsVirtual = true, Token = $"USD-{stellarPaymentProviderVault}-1" }
+                    new ProviderAsset { CentaurusAsset = 0, Token = "native"},
+                    new ProviderAsset { CentaurusAsset = 1, IsVirtual = true, Token = $"USD-{stellarPaymentProviderVault}" }
                 },
                 Cursor = "1",
                 PaymentSubmitDelay = 0
@@ -76,14 +70,13 @@ namespace Centaurus.Test.Exchange.Analytics
             {
                 Accounts = new List<AccountWrapper> { account1, account2 },
                 Apex = 0,
-                Orders = new List<Order>(),
+                Orders = new List<OrderWrapper>(),
                 Settings = new ConstellationSettings
                 {
                     Providers = new List<ProviderSettings> { stellarPaymentProvider },
-                    Assets = new List<AssetSettings> { new AssetSettings { Id = 0, Code = "XLM", MinDeposit = 1 }, new AssetSettings { Id = 1, Code = "USD", MinDeposit = -1 } },
+                    Assets = new List<AssetSettings> { new AssetSettings { Id = 0, Code = "XLM" }, new AssetSettings { Id = 1, Code = "USD" } },
                     RequestRateLimits = new RequestRateLimits { HourLimit = 1000, MinuteLimit = 100 }
-                },
-                Withdrawals = new Dictionary<string, WithdrawalStorage>()
+                }
             }).Wait();
         }
 
@@ -108,15 +101,14 @@ namespace Centaurus.Test.Exchange.Analytics
                             Amount = rnd.Next(1, 20),
                             Asset = 1,
                             Price = Math.Round(price * 10) / 10,
-                            Side = rnd.NextDouble() >= 0.5 ? OrderSide.Buy : OrderSide.Sell,
-                            AccountWrapper = context.AccountStorage.GetAccount(account1.Account.Pubkey)
+                            Side = rnd.NextDouble() >= 0.5 ? OrderSide.Buy : OrderSide.Sell
                         },
                         Signatures = new List<Ed25519Signature>()
                     },
                     Timestamp = DateTime.UtcNow.Ticks
                 };
                 var diffObject = new DiffObject();
-                var conterOrderEffectsContainer = new EffectProcessorsContainer(context, trade.CreateEnvelope(), diffObject);
+                var conterOrderEffectsContainer = new EffectProcessorsContainer(context, trade.CreateEnvelope(), diffObject, context.AccountStorage.GetAccount(account1.Account.Pubkey));
                 testTradeResults.Add(trade, conterOrderEffectsContainer);
             }
 

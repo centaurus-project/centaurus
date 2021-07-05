@@ -76,8 +76,6 @@ namespace Centaurus.DAL
             public BsonObjectId Id { get; set; }
 
             public long AmountDiff { get; set; }
-
-            public long LiabilitiesDiff { get; set; }
         }
 
         public class Order : BaseDiffModel

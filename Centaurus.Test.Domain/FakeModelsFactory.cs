@@ -1,8 +1,4 @@
 ﻿using Centaurus.Models;
-using System;
-using System.Collections.Generic;
-using System.Text;
-using stellar_dotnet_sdk;
 
 namespace Centaurus.Test
 {

@@ -118,14 +118,15 @@ namespace Centaurus.Domain
             ));
         }
 
-        public static void AddCursorUpdate(this EffectProcessorsContainer effectProcessors, DepositNotificationManager notificationManager, string newCursor, string prevCursor)
+        public static void AddCursorUpdate(this EffectProcessorsContainer effectProcessors, DepositNotificationManager notificationManager, string providerId, string newCursor, string prevCursor)
         {
             effectProcessors.Add(new TxCursorUpdateEffectProcessor(
                 new CursorUpdateEffect
                 {
                     Apex = effectProcessors.Apex,
                     Cursor = newCursor,
-                    PrevCursor = prevCursor
+                    PrevCursor = prevCursor,
+                    ProviderId = providerId
                 },
                 notificationManager
             ));

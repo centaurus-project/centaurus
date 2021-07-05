@@ -29,6 +29,6 @@ namespace Centaurus.Models
         [XdrField(5)]
         public int PaymentSubmitDelay { get; set; }
 
-        public string ProviderId => $"{Provider}-{ProviderId}";
+        public string ProviderId => $"{Provider}-{Name}";
     }
 }

@@ -17,47 +17,17 @@ namespace Centaurus.Test
         [TestCase(1, 0, 0, typeof(InvalidOperationException))]
         [TestCase(10, 1000, 10, typeof(InvalidOperationException))]
         [TestCase(10, 1000, 0, null)]
-        public async Task TxCommitQuantumTest(int cursor, int amount, int asset, Type excpectedException)
+        public async Task TxCommitQuantumTest(int cursor, int asset, Type excpectedException)
         {
             context.AppState.State = ApplicationState.Ready;
 
             long apex = context.QuantumStorage.CurrentApex;
 
-            var client1StartBalanceAmount = (long)0;
-
             var account1 = context.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair).Account;
 
             var clientAccountBalance = account1.GetBalance(asset);
 
-            var withdrawalDest = KeyPair.Random();
-            var txHash = new byte[] { };
-            if (clientAccountBalance != null && amount > 0)
-            {
-                client1StartBalanceAmount = clientAccountBalance.Amount;
-
-                var accountWrapper = context.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
-
-                var withdrawal = new WithdrawalRequest
-                {
-                    Account = accountWrapper.Account.Id,
-                    Amount = amount,
-                    Asset = asset,
-                    Destination = TestEnvironment.Client1KeyPair.AccountId,
-                    Fee = 10_000,
-                    RequestId = DateTime.UtcNow.Ticks,
-                    PaymentProvider = "Stellar"
-                };
-
-                MessageEnvelope quantum = withdrawal.CreateEnvelope();
-                quantum.Sign(TestEnvironment.Client1KeyPair);
-                if (!context.IsAlpha)
-                {
-                    quantum = new RequestQuantum { Apex = ++apex, RequestEnvelope = quantum, Timestamp = DateTime.UtcNow.Ticks }.CreateEnvelope();
-                    quantum.Sign(TestEnvironment.AlphaKeyPair);
-                }
-                //create withdrawal
-                await context.QuantumHandler.HandleAsync(quantum);
-            }
+            var client1StartBalanceAmount = clientAccountBalance.Amount;
 
             var depositAmount = new Random().Next(10, 1000);
 
@@ -71,17 +41,12 @@ namespace Centaurus.Test
                             Amount = depositAmount,
                             Destination = TestEnvironment.Client1KeyPair,
                             Asset = asset
-                        },
-                        new Withdrawal
-                        {
-                            TransactionHash = txHash,
-                            PaymentResult = PaymentResults.Success
                         }
                     },
                 ProviderId = "Stellar"
             };
 
-            context.PaymentProvidersManager.TryGetManager(PaymentProvider.Stellar, out var provider);
+            context.PaymentProvidersManager.TryGetManager(paymentNotification.ProviderId, out var provider);
             provider.NotificationsManager.RegisterNotification(paymentNotification);
 
             var ledgerCommitEnv = new DepositQuantum
@@ -99,11 +64,10 @@ namespace Centaurus.Test
             await AssertQuantumHandling(ledgerCommitEnv, excpectedException);
             if (excpectedException == null)
             {
-                context.PaymentProvidersManager.TryGetManager(PaymentProvider.Stellar, out var paymentProvider);
+                context.PaymentProvidersManager.TryGetManager(paymentNotification.ProviderId, out var paymentProvider);
                 Assert.AreEqual(paymentProvider.Cursor, paymentNotification.Cursor);
 
-                Assert.AreEqual(account1.GetBalance(asset).Liabilities, 0);
-                Assert.AreEqual(account1.GetBalance(asset).Amount, client1StartBalanceAmount - amount + depositAmount); //acc balance + deposit - withdrawal
+                Assert.AreEqual(account1.GetBalance(asset).Amount, client1StartBalanceAmount + depositAmount);
             }
         }
 
@@ -125,8 +89,7 @@ namespace Centaurus.Test
                 Amount = amount,
                 Asset = asset,
                 Price = 100,
-                Side = side,
-                AccountWrapper = accountWrapper
+                Side = side
             };
 
             var envelope = order.CreateEnvelope();
@@ -167,8 +130,7 @@ namespace Centaurus.Test
                 Amount = amount,
                 Asset = asset,
                 Price = 100,
-                Side = side,
-                AccountWrapper = acc
+                Side = side
             };
 
             var envelope = order.CreateEnvelope().Sign(useFakeSigner ? TestEnvironment.Client2KeyPair : TestEnvironment.Client1KeyPair);
@@ -189,8 +151,7 @@ namespace Centaurus.Test
             {
                 Account = acc.Account.Id,
                 RequestId = 2,
-                OrderId = OrderIdConverter.Encode((ulong)apex, asset, side),
-                AccountWrapper = context.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair)
+                OrderId = OrderIdConverter.Encode((ulong)apex, asset, side)
             };
 
             envelope = orderCancellation.CreateEnvelope().Sign(TestEnvironment.Client1KeyPair);
@@ -220,41 +181,24 @@ namespace Centaurus.Test
         [TestCase(1000000000000, false, false, typeof(BadRequestException))]
         [TestCase(100, true, false, typeof(BadRequestException))]
         [TestCase(100, false, false, null)]
-        public async Task WithdrawalQuantumTest(double amount, bool hasWithdrawal, bool useFakeSigner, Type excpectedException)
+        public async Task WithdrawalQuantumTest(long amount, bool useFakeSigner, Type excpectedException)
         {
-            var outputStream = new XdrDataOutputStream();
-            var txBuilder = new TransactionBuilder(new AccountResponse(TestEnvironment.Client1KeyPair.AccountId, 1));
-            txBuilder.SetFee(10_000);
-
-            var vault = KeyPair.FromAccountId(context.Constellation.Vaults.GetVault(PaymentProvider.Stellar).AccountId);
-
-            txBuilder.AddOperation(new PaymentOperation.Builder(TestEnvironment.Client1KeyPair, new AssetTypeNative(), (amount / AssetsHelper.StroopsPerAsset).ToString("0.##########", CultureInfo.InvariantCulture)).SetSourceAccount(vault).Build());
-            txBuilder.AddTimeBounds(new stellar_dotnet_sdk.TimeBounds(maxTime: DateTimeOffset.UtcNow.AddSeconds(60)));
-            var tx = txBuilder.Build();
-            stellar_dotnet_sdk.xdr.Transaction.Encode(outputStream, tx.ToXdrV1());
-
             var account = context.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
             var withdrawal = new WithdrawalRequest
             {
                 Account = account.Account.Id,
                 RequestId = 1,
-                Transaction = outputStream.ToArray(),
-                AccountWrapper = account,
-                PaymentProvider = PaymentProvider.Stellar
+                Amount = amount,
+                Asset = 0,
+                Destination = "some_address",
+                PaymentProvider = "Stellar"
             };
 
             var envelope = withdrawal
                 .CreateEnvelope()
                 .Sign(useFakeSigner ? TestEnvironment.Client2KeyPair : TestEnvironment.Client1KeyPair);
 
-            var result = await AssertQuantumHandling(new RequestQuantum { RequestEnvelope = envelope, Apex = context.QuantumStorage.CurrentApex + 1 }.CreateEnvelope(), excpectedException);
-
-            if (excpectedException == null)
-            {
-                Assert.IsTrue(account.HasPendingWithdrawal);
-
-                Assert.IsTrue(account.Account.GetBalance(0).Liabilities == amount);
-            }
+            await AssertQuantumHandling(new RequestQuantum { RequestEnvelope = envelope, Apex = context.QuantumStorage.CurrentApex + 1 }.CreateEnvelope(), excpectedException);
         }
 
         [Test]
@@ -273,8 +217,7 @@ namespace Centaurus.Test
                 RequestId = 1,
                 Asset = 0,
                 Destination = TestEnvironment.Client2KeyPair,
-                Amount = amount,
-                AccountWrapper = account
+                Amount = amount
             };
 
             var envelope = withdrawal.CreateEnvelope();

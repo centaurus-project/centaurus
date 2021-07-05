@@ -1,12 +1,7 @@
-﻿using Centaurus.DAL;
-using Centaurus.Domain;
+﻿using Centaurus.Domain;
 using Centaurus.Models;
 using NUnit.Framework;
-using stellar_dotnet_sdk;
-using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace Centaurus.Test

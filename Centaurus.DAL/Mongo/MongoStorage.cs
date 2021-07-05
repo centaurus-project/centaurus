@@ -374,8 +374,7 @@ namespace Centaurus.DAL.Mongo
                     updates[i] = new InsertOneModel<BalanceModel>(new BalanceModel
                     {
                         Id = balance.Id,
-                        Amount = balance.AmountDiff,
-                        Liabilities = balance.LiabilitiesDiff
+                        Amount = balance.AmountDiff
                     });
                 else if (balance.IsDeleted)
                     updates[i] = new DeleteOneModel<BalanceModel>(currentBalanceFilter);
@@ -385,7 +384,6 @@ namespace Centaurus.DAL.Mongo
                         currentBalanceFilter,
                         update
                             .Inc(b => b.Amount, balance.AmountDiff)
-                            .Inc(b => b.Liabilities, balance.LiabilitiesDiff)
                     );
                 }
             });

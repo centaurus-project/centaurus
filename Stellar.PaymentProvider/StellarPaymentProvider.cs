@@ -13,6 +13,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Timers;
@@ -23,15 +24,18 @@ namespace Centaurus.Stellar.PaymentProvider
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public StellarPaymentProvider(ProviderSettings settings, dynamic config)
-            : base(settings, (object)config)
+        public StellarPaymentProvider(ProviderSettings settings, string config)
+            : base(settings, config)
         {
             commitDelay = TimeSpan.FromTicks(settings.PaymentSubmitDelay);
             submitTimerInterval = TimeSpan.FromSeconds(5).TotalMilliseconds;
-            maxTxSubmitDelay = config.MaxTxSubmitDelay;
-            dataSource = new DataSource(settings.Name, config.Horizon);
 
-            VaultKeyPair = stellar_dotnet_sdk.KeyPair.FromSecretSeed(Secret);
+            var configObject = JsonSerializer.Deserialize<Config>(config);
+
+            maxTxSubmitDelay = configObject.MaxTxSubmitDelay;
+            dataSource = new DataSource(configObject.PassPhrase, configObject.Horizon);
+
+            secret = stellar_dotnet_sdk.KeyPair.FromSecretSeed(configObject.Secret);
 
             Task.Factory.StartNew(ListenTransactions, TaskCreationOptions.LongRunning);
             InitTimer();
@@ -122,9 +126,9 @@ namespace Centaurus.Stellar.PaymentProvider
             if (tx.Signatures.Count > 0)
                 throw new ArgumentException("Transaction contains signatures.");
 
-            tx.Sign(VaultKeyPair, dataSource.Network);
+            tx.Sign(secret, dataSource.Network);
             var signature = tx.Signatures.First();
-            return new TxSignature { Signer = VaultKeyPair.PublicKey, Signature = signature.Signature.InnerValue };
+            return new TxSignature { Signer = secret.PublicKey, Signature = signature.Signature.InnerValue };
         }
 
         public override void SubmitTransaction(byte[] transaction, List<TxSignature> signatures)
@@ -264,10 +268,11 @@ namespace Centaurus.Stellar.PaymentProvider
 
         readonly TimeSpan commitDelay;
         readonly double submitTimerInterval;
+
         private readonly long maxTxSubmitDelay;
         private readonly DataSource dataSource;
 
-        public stellar_dotnet_sdk.KeyPair VaultKeyPair { get; }
+        private readonly stellar_dotnet_sdk.KeyPair secret;
 
         void InitTimer()
         {
@@ -306,5 +311,16 @@ namespace Centaurus.Stellar.PaymentProvider
                 RaiseOnPaymentCommit(new DepositQuantum { Source = payment.Deposite }.CreateEnvelope());
             }
         }
+    }
+
+    class Config
+    {
+        public long MaxTxSubmitDelay { get; set; }
+
+        public string Horizon { get; set; }
+
+        public string Secret { get; set; }
+
+        public string PassPhrase { get; set; }
     }
 }

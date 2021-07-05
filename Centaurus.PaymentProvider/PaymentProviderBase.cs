@@ -12,16 +12,10 @@ namespace Centaurus.PaymentProvider
     /// </summary>
     public abstract class PaymentProviderBase : ICursorComparer, IDisposable
     {
-        public PaymentProviderBase(ProviderSettings settings, dynamic config)
+        public PaymentProviderBase(ProviderSettings settings, string rawConfig)
         {
-            if (config == null)
-                throw new ArgumentNullException(nameof(config));
-
-
             Settings = settings ?? throw new ArgumentNullException(nameof(settings));
             Id = GetProviderId(settings.Provider, settings.Name);
-            Secret = config.Secret ?? throw new ArgumentNullException(nameof(config.Secret));
-            MaxTxSubmitDelay = ((long?)config.MaxTxSubmitDelay) ?? throw new ArgumentNullException(config.MaxTxSubmitDelay);
             NotificationsManager = new DepositNotificationManager(settings.Cursor, this);
         }
 
@@ -53,10 +47,6 @@ namespace Centaurus.PaymentProvider
         public string Vault => Settings.Vault;
 
         public string Id { get; }
-
-        public string Secret { get; }
-
-        public long MaxTxSubmitDelay { get; }
 
         public DepositNotificationManager NotificationsManager { get; }
 

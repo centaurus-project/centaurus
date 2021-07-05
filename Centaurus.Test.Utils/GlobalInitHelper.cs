@@ -1,12 +1,10 @@
 ﻿using Centaurus.DAL;
-using Centaurus.DAL.Mongo;
 using Centaurus.Domain;
 using Centaurus.Models;
-using stellar_dotnet_sdk;
+using Centaurus.PaymentProvider;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace Centaurus.Test
@@ -98,13 +96,11 @@ namespace Centaurus.Test
         /// <param name="settings">Settings that will be used to init Global</param>
         public static async Task<ExecutionContext> Setup(List<KeyPair> clients, List<KeyPair> auditors, Settings settings, IStorage storage)
         {
-            var stellarProvider = new MockStellarDataProvider(settings.NetworkPassphrase, settings.HorizonUrl);
-
-            var context = new ExecutionContext(settings, storage, stellarProvider);
+            var context = new ExecutionContext(settings, storage, new MockPaymentProviderFactory());
 
             await context.Init();
 
-            var assets = new List<AssetSettings> { new AssetSettings { Id = 0, Code = "XLM", MinDeposit = 1 }, new AssetSettings { Id = 1, Code = "USD", MinDeposit = -1 } };
+            var assets = new List<AssetSettings> { new AssetSettings { Id = 0, Code = "XLM" }, new AssetSettings { Id = 1, Code = "USD" } };
 
             var stellarProviderVault = KeyPair.Random().AccountId;
 
@@ -115,8 +111,8 @@ namespace Centaurus.Test
                 Vault = stellarProviderVault,
                 Assets = new List<ProviderAsset>
                         {
-                            new ProviderAsset { CentaurusAsset = 0 },
-                            new ProviderAsset { CentaurusAsset = 1, Token = $"USD-{stellarProviderVault}-1", IsVirtual = true }
+                            new ProviderAsset { CentaurusAsset = 0, Token = "native" },
+                            new ProviderAsset { CentaurusAsset = 1, Token = $"USD-{stellarProviderVault}", IsVirtual = true }
                         },
                 Name = "Test SDF Network ; September 2015",
                 PaymentSubmitDelay = 0
