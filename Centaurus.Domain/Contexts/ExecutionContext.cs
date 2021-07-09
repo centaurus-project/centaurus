@@ -1,15 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Timers;
-using Centaurus.DAL;
-using Centaurus.DAL.Mongo;
-using Centaurus.Exchange.Analytics;
+﻿using Centaurus.Exchange.Analytics;
 using Centaurus.Models;
 using Centaurus.PaymentProvider;
+using Centaurus.PersistentStorage.Abstraction;
 using NLog;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
@@ -20,7 +17,7 @@ namespace Centaurus.Domain
         /// <param name="settings">Application config</param>
         /// <param name="storage">Permanent storage object</param>
         /// <param name="useLegacyOrderbook"></param>
-        public ExecutionContext(Settings settings, IStorage storage, PaymentProviderFactoryBase paymentProviderFactory, bool useLegacyOrderbook = false)
+        public ExecutionContext(Settings settings, IPersistentStorage storage, PaymentProviderFactoryBase paymentProviderFactory, bool useLegacyOrderbook = false)
         {
             PermanentStorage = storage ?? throw new ArgumentNullException(nameof(storage));
             Settings = settings ?? throw new ArgumentNullException(nameof(settings));
@@ -34,7 +31,7 @@ namespace Centaurus.Domain
 
             ExtensionsManager = new ExtensionsManager(Settings.ExtensionsConfigFilePath);
 
-            PersistenceManager = new PersistenceManager(PermanentStorage);
+            PersistenceManager = new PersistenceManager(this);
             QuantumProcessor = new QuantumProcessorsStorage();
 
             PendingUpdatesManager = new PendingUpdatesManager(this);
@@ -63,6 +60,8 @@ namespace Centaurus.Domain
             Catchup = new Catchup(this);
 
             this.useLegacyOrderbook = useLegacyOrderbook;
+
+
         }
 
         /// <summary>
@@ -72,22 +71,20 @@ namespace Centaurus.Domain
 
         readonly bool useLegacyOrderbook;
 
-        public async Task Init()
+        private void Init()
         {
             DynamicSerializersInitializer.Init();
 
-            await PermanentStorage.OpenConnection(Settings.ConnectionString);
-
             //try to load last settings, we need it to know current auditors
             var lastHash = new byte[] { };
-            var lastApex = await PersistenceManager.GetLastApex();
+            var lastApex = PersistenceManager.GetLastApex();
             if (lastApex >= 0)
             {
-                var lastQuantum = await PersistenceManager.GetQuantum(lastApex);
+                var lastQuantum = PersistenceManager.GetQuantum(lastApex);
 
                 lastHash = lastQuantum.Message.ComputeHash();
-                var snapshot = await PersistenceManager.GetSnapshot(lastApex);
-                await Setup(snapshot);
+                var snapshot = PersistenceManager.GetSnapshot(lastApex);
+                Setup(snapshot);
                 if (IsAlpha)
                     AppState.State = ApplicationState.Rising;//Alpha should ensure that it has all quanta from auditors
                 else
@@ -102,7 +99,7 @@ namespace Centaurus.Domain
             QuantumHandler.Start();
         }
 
-        public async Task Setup(Snapshot snapshot)
+        public void Setup(Snapshot snapshot)
         {
             if (Exchange != null)
                 Exchange.OnUpdates -= Exchange_OnUpdates;
@@ -117,16 +114,16 @@ namespace Centaurus.Domain
 
             AuditResultManager?.Dispose(); AuditResultManager = new ResultManager(this);
 
-            await DisposeAnalyticsManager();
+            DisposeAnalyticsManager();
 
             AnalyticsManager = new AnalyticsManager(
                 PermanentStorage,
                 DepthsSubscription.Precisions.ToList(),
-                Constellation.Assets.Where(a => a.Id > 0).Select(a => a.Id).ToList(), //all but base asset
+                Constellation.Assets.Skip(0).Select(a => a.Code).ToList(), //all but base asset
                 snapshot.Orders.Select(o => o.Order.ToOrderInfo()).ToList()
             );
 
-            await AnalyticsManager.Restore(DateTime.UtcNow);
+            AnalyticsManager.Restore(DateTime.UtcNow);
             AnalyticsManager.StartTimers();
 
             AnalyticsManager.OnError += AnalyticsManager_OnError;
@@ -139,39 +136,26 @@ namespace Centaurus.Domain
 
         public void Dispose()
         {
-            PendingUpdatesManager?.Stop(TimeSpan.FromMilliseconds(0)); PendingUpdatesManager?.Dispose();
-
             ExtensionsManager?.Dispose();
             PaymentProvidersManager?.Dispose();
 
             QuantumHandler.Dispose();
             AuditResultManager?.Dispose();
-            DisposeAnalyticsManager().Wait(); 
+            DisposeAnalyticsManager(); 
             PerformanceStatisticsManager?.Dispose();
         }
 
-        protected void AppState_StateChanged(StateChangedEventArgs stateChangedEventArgs)
+        private void AppState_StateChanged(StateChangedEventArgs stateChangedEventArgs)
         {
 
             var state = stateChangedEventArgs.State;
             var prevState = stateChangedEventArgs.PrevState;
             if (state != ApplicationState.Ready && prevState == ApplicationState.Ready) //close all connections (except auditors)
                 ConnectionManager.CloseAllConnections(false).Wait();
-
-            if (!(PendingUpdatesManager?.IsRunning ?? true) &&
-                (state == ApplicationState.Running
-                || state == ApplicationState.Ready
-                || state == ApplicationState.WaitingForInit))
-                PendingUpdatesManager?.Start();
         }
 
         private void PendingUpdatesManager_OnBatchSaved(BatchSavedInfo batchInfo)
         {
-            var message = $"Batch saved on the {batchInfo.Retries} try. Quanta count: {batchInfo.QuantaCount}; effects count: {batchInfo.EffectsCount}.";
-            if (batchInfo.Retries > 1)
-                logger.Warn(message);
-            else
-                logger.Trace(message);
             PerformanceStatisticsManager?.OnBatchSaved(batchInfo);
         }
 
@@ -179,22 +163,6 @@ namespace Centaurus.Domain
         public PersistenceManager PersistenceManager { get; }
 
         public PendingUpdatesManager PendingUpdatesManager { get; }
-
-        private ConstellationSettings constellation;
-        public ConstellationSettings Constellation
-        {
-            get
-            {
-                return constellation;
-            }
-            private set
-            {
-                constellation = value;
-                AssetIds = constellation != null
-                    ? new HashSet<int>(constellation.Assets.Select(a => a.Id).Concat(new int[] { 0 }))
-                    : new HashSet<int>();
-            }
-        }
 
         public bool IsAlpha => RoleManager.Role == CentaurusNodeRole.Alpha;
 
@@ -206,7 +174,7 @@ namespace Centaurus.Domain
 
         public RoleManager RoleManager { get; }
 
-        public IStorage PermanentStorage { get; }
+        public IPersistentStorage PermanentStorage { get; }
 
         public Settings Settings { get; }
         public PaymentProviderFactoryBase PaymentProviderFactory { get; }
@@ -244,6 +212,8 @@ namespace Centaurus.Domain
         public ResultManager AuditResultManager { get; private set; }
 
         public AnalyticsManager AnalyticsManager { get; private set; }
+
+        public ConstellationSettings Constellation { get; private set; }
 
     }
 }

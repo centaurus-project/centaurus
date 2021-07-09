@@ -13,15 +13,15 @@ namespace Centaurus.Test
         protected Domain.ExecutionContext context;
 
         [Test]
-        [TestCase(0, 0, 0, typeof(InvalidOperationException))]
-        [TestCase(1, 0, 0, typeof(InvalidOperationException))]
-        [TestCase(10, 1000, 10, typeof(InvalidOperationException))]
-        [TestCase(10, 1000, 0, null)]
-        public async Task TxCommitQuantumTest(int cursor, int asset, Type excpectedException)
+        [TestCase(0, "XLM", 0, typeof(InvalidOperationException))]
+        [TestCase(1, "XLM", 0, typeof(InvalidOperationException))]
+        [TestCase(10, "1000", 10, typeof(InvalidOperationException))]
+        [TestCase(10, "1000", 0, null)]
+        public async Task TxCommitQuantumTest(int cursor, string asset, Type excpectedException)
         {
             context.AppState.State = ApplicationState.Ready;
 
-            long apex = context.QuantumStorage.CurrentApex;
+            var apex = context.QuantumStorage.CurrentApex;
 
             var account1 = context.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair).Account;
 
@@ -29,7 +29,7 @@ namespace Centaurus.Test
 
             var client1StartBalanceAmount = clientAccountBalance.Amount;
 
-            var depositAmount = new Random().Next(10, 1000);
+            var depositAmount = (ulong)new Random().Next(10, 1000);
 
             var paymentNotification = new DepositNotification
             {
@@ -72,14 +72,14 @@ namespace Centaurus.Test
         }
 
         [Test]
-        [TestCase(0, 0, 0, OrderSide.Sell, typeof(UnauthorizedException))]
-        [TestCase(1, 0, 0, OrderSide.Sell, typeof(InvalidOperationException))]
-        [TestCase(1, 1, 0, OrderSide.Sell, typeof(BadRequestException))]
-        [TestCase(1, 1, 1000000000, OrderSide.Sell, typeof(BadRequestException))]
-        [TestCase(1, 1, 100, OrderSide.Sell, null)]
-        [TestCase(1, 1, 100, OrderSide.Buy, typeof(BadRequestException))]
-        [TestCase(1, 1, 98, OrderSide.Buy, null)]
-        public async Task OrderQuantumTest(int nonce, int asset, int amount, OrderSide side, Type excpectedException)
+        [TestCase(0, "XLM", 0, OrderSide.Sell, typeof(UnauthorizedException))]
+        [TestCase(1, "XLM", 0, OrderSide.Sell, typeof(InvalidOperationException))]
+        [TestCase(1, "USD", 0, OrderSide.Sell, typeof(BadRequestException))]
+        [TestCase(1, "USD", 1000000000, OrderSide.Sell, typeof(BadRequestException))]
+        [TestCase(1, "USD", 100, OrderSide.Sell, null)]
+        [TestCase(1, "USD", 100, OrderSide.Buy, typeof(BadRequestException))]
+        [TestCase(1, "USD", 98, OrderSide.Buy, null)]
+        public async Task OrderQuantumTest(int nonce, string asset, ulong amount, OrderSide side, Type excpectedException)
         {
             var accountWrapper = context.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
             var order = new OrderRequest
@@ -114,12 +114,12 @@ namespace Centaurus.Test
         }
 
         [Test]
-        [TestCase(1, 100, OrderSide.Sell, 111, false, typeof(BadRequestException))]
-        [TestCase(1, 98, OrderSide.Buy, 111, false, typeof(BadRequestException))]
-        [TestCase(1, 100, OrderSide.Sell, 0, true, typeof(UnauthorizedAccessException))]
-        [TestCase(1, 100, OrderSide.Sell, 0, false, null)]
-        [TestCase(1, 98, OrderSide.Buy, 0, false, null)]
-        public async Task OrderCancellationQuantumTest(int asset, int amount, OrderSide side, int apexMod, bool useFakeSigner, Type excpectedException)
+        [TestCase("USD", 100, OrderSide.Sell, 111, false, typeof(BadRequestException))]
+        [TestCase("USD", 98, OrderSide.Buy, 111, false, typeof(BadRequestException))]
+        [TestCase("USD", 100, OrderSide.Sell, 0, true, typeof(UnauthorizedAccessException))]
+        [TestCase("USD", 100, OrderSide.Sell, 0, false, null)]
+        [TestCase("USD", 98, OrderSide.Buy, 0, false, null)]
+        public async Task OrderCancellationQuantumTest(string asset, ulong amount, OrderSide side, ulong apexMod, bool useFakeSigner, Type excpectedException)
         {
             var acc = context.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
 
@@ -151,7 +151,7 @@ namespace Centaurus.Test
             {
                 Account = acc.Account.Id,
                 RequestId = 2,
-                OrderId = OrderIdConverter.Encode((ulong)apex, asset, side)
+                OrderId = apex
             };
 
             envelope = orderCancellation.CreateEnvelope().Sign(TestEnvironment.Client1KeyPair);
@@ -181,7 +181,7 @@ namespace Centaurus.Test
         [TestCase(1000000000000, false, false, typeof(BadRequestException))]
         [TestCase(100, true, false, typeof(BadRequestException))]
         [TestCase(100, false, false, null)]
-        public async Task WithdrawalQuantumTest(long amount, bool useFakeSigner, Type excpectedException)
+        public async Task WithdrawalQuantumTest(ulong amount, bool useFakeSigner, Type excpectedException)
         {
             var account = context.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
             var withdrawal = new WithdrawalRequest
@@ -189,7 +189,7 @@ namespace Centaurus.Test
                 Account = account.Account.Id,
                 RequestId = 1,
                 Amount = amount,
-                Asset = 0,
+                Asset = context.Constellation.GetBaseAsset(),
                 Destination = "some_address",
                 PaymentProvider = "Stellar"
             };
@@ -207,7 +207,7 @@ namespace Centaurus.Test
         [TestCase(1000000000000, false, typeof(BadRequestException))]
         [TestCase(100, true, typeof(UnauthorizedAccessException))]
         [TestCase(100, false, null)]
-        public async Task PaymentQuantumTest(long amount, bool useFakeSigner, Type excpectedException)
+        public async Task PaymentQuantumTest(ulong amount, bool useFakeSigner, Type excpectedException)
         {
             var account = context.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
 
@@ -215,7 +215,7 @@ namespace Centaurus.Test
             {
                 Account = account.Account.Id,
                 RequestId = 1,
-                Asset = 0,
+                Asset = context.Constellation.GetBaseAsset(),
                 Destination = TestEnvironment.Client2KeyPair,
                 Amount = amount
             };
@@ -230,13 +230,14 @@ namespace Centaurus.Test
                 envelope.Sign(TestEnvironment.AlphaKeyPair);
             }
 
-            var expextedBalance = account.Account.GetBalance(0).Amount - amount;
+            var baseAsset = context.Constellation.GetBaseAsset();
+            var expextedBalance = account.Account.GetBalance(baseAsset).Amount - amount;
 
             await AssertQuantumHandling(envelope, excpectedException);
 
             if (excpectedException == null)
             {
-                Assert.AreEqual(account.Account.GetBalance(0).Amount, expextedBalance);
+                Assert.AreEqual(account.Account.GetBalance(baseAsset).Amount, expextedBalance);
             }
         }
 
@@ -311,7 +312,7 @@ namespace Centaurus.Test
                 await ContextHelpers.ApplyUpdates(context);
 
                 //check that processed quanta is saved to the storage
-                var lastApex = await context.PermanentStorage.GetLastApex();
+                var lastApex = context.PermanentStorage.GetLastApex();
                 Assert.AreEqual(context.QuantumStorage.CurrentApex, lastApex);
 
                 return result;

@@ -15,15 +15,14 @@ namespace Centaurus.PaymentProvider
             var providers = new Dictionary<string, PaymentProviderBase>();
             foreach (var provider in settings)
             {
-                var providerId = PaymentProviderBase.GetProviderId(provider.Provider, provider.Name);
-                if (providers.ContainsKey(providerId))
-                    throw new Exception($"Payments manager for provider {providerId} is already registered.");
+                if (providers.ContainsKey(provider.ProviderId))
+                    throw new Exception($"Payments manager for provider {provider.ProviderId} is already registered.");
 
                 var currentProviderRawConfig = default(string);
-                if (config != null && config.RootElement.TryGetProperty(providerId, out var currentProviderElement))
+                if (config != null && config.RootElement.TryGetProperty(provider.ProviderId, out var currentProviderElement))
                     currentProviderRawConfig = currentProviderElement.GetRawText();
 
-                providers.Add(providerId, paymentProviderFactory.GetProvider(provider, currentProviderRawConfig));
+                providers.Add(provider.ProviderId, paymentProviderFactory.GetProvider(provider, currentProviderRawConfig));
             }
 
             paymentProviders = providers.ToImmutableDictionary();
@@ -34,6 +33,13 @@ namespace Centaurus.PaymentProvider
         public bool TryGetManager(string provider, out PaymentProviderBase paymentProvider)
         {
             return paymentProviders.TryGetValue(provider, out paymentProvider);
+        }
+
+        public PaymentProviderBase GetManager(string provider)
+        {
+            if (TryGetManager(provider, out var paymentProvider))
+                return paymentProvider;
+            throw new Exception($"Unable to find provider {provider}.");
         }
 
         const string configFileName = "payment-providers.config";

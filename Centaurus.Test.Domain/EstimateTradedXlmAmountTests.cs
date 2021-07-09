@@ -15,7 +15,7 @@ namespace Centaurus.Test
         [TestCase(1L, 0.5, OrderSide.Buy, 1L)]
         [TestCase(1000L, 0.003, OrderSide.Buy, 4L)]
         [TestCase(1000L, 0.003, OrderSide.Sell, 2L)]
-        public void EstimateTradedXlmAmountTest(long assetAmount, double price, OrderSide side, long estimatedQuoteAmount)
+        public void EstimateTradedXlmAmountTest(ulong assetAmount, double price, OrderSide side, long estimatedQuoteAmount)
         {
             Assert.AreEqual(estimatedQuoteAmount, OrderMatcher.EstimateQuoteAmount(assetAmount, price, side));
         }

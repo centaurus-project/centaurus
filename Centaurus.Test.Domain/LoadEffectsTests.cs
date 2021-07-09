@@ -29,9 +29,9 @@ namespace Centaurus.Test
             var account = context.AccountStorage.GetAccount(accountKey);
 
             var allLimit = 1000;
-            var allEffectsResult = (await context.PersistenceManager.LoadEffects(null, isDesc, allLimit, account.Account.Id)).Items;
+            var allEffectsResult = context.PersistenceManager.LoadEffects(null, isDesc, allLimit, account.Id).Items;
 
-            var opositeOrderedResult = (await context.PersistenceManager.LoadEffects(null, !isDesc, allLimit, account.Account.Id)).Items;
+            var opositeOrderedResult = context.PersistenceManager.LoadEffects(null, !isDesc, allLimit, account.Id).Items;
 
             //check ordering
             for (int i = 0, opI = allEffectsResult.Count - 1; i < allEffectsResult.Count; i++, opI--)
@@ -49,21 +49,21 @@ namespace Centaurus.Test
             var zeroCursor = "0";
             //check fetching
             var limit = 1;
-            await TestFetching(allEffectsResult, zeroCursor, isDesc, limit, account.Account.Id);
+            TestFetching(allEffectsResult, zeroCursor, isDesc, limit, account.Id);
 
             //check reverse fetching
             allEffectsResult.Reverse();
             allEffectsResult.ForEach(ae => ae.Items.Reverse());
-            await TestFetching(allEffectsResult, zeroCursor, !isDesc, limit, account.Account.Id, true);
+            TestFetching(allEffectsResult, zeroCursor, !isDesc, limit, account.Account.Id, true);
         }
 
-        private async Task TestFetching(List<ApexEffects> allEffects, string cursor, bool isDesc, int limit, int account, bool isReverseDirection = false)
+        private void TestFetching(List<ApexEffects> allEffects, string cursor, bool isDesc, int limit, ulong account, bool isReverseDirection = false)
         {
             var nextCursor = cursor;
             var totalCount = 0;
             while (nextCursor != null)
             {
-                var currentEffectsResult = await context.PersistenceManager.LoadEffects(nextCursor, isDesc, limit, account);
+                var currentEffectsResult = context.PersistenceManager.LoadEffects(nextCursor, isDesc, limit, account);
                 if (totalCount == allEffects.Count)
                 {
                     Assert.AreEqual(0, currentEffectsResult.Items.Count, "Some extra effects were loaded.");

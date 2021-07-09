@@ -90,7 +90,7 @@ namespace Centaurus.Domain
         /// </summary>
         /// <param name="result"></param>
         /// <param name="buffer">Buffer to use for serialization</param>
-        public void EnqueueResult(long apex, QuantumResultMessage result)
+        public void EnqueueResult(ulong apex, QuantumResultMessage result)
         {
             if (result == null)
                 throw new ArgumentNullException(nameof(result));

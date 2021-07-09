@@ -1,51 +1,50 @@
 ﻿using Centaurus.DAL;
-using Centaurus.DAL.Models;
+using Centaurus.Domain.Models;
+using Centaurus.Models;
+using Centaurus.PersistentStorage;
+using Centaurus.PersistentStorage.Abstraction;
+using Centaurus.Xdr;
 using NLog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Centaurus.Models;
-using Centaurus.Xdr;
-using System.Diagnostics;
-using Centaurus.DAL.Mongo;
-using Centaurus.PaymentProvider;
-using Centaurus.Domain.Models;
 
 namespace Centaurus.Domain
 {
     //TODO: rename and separate it.
-    public class PersistenceManager
+    public class PersistenceManager : ContextualBase
     {
         private static Logger logger = LogManager.GetCurrentClassLogger();
 
         private SemaphoreSlim saveSnapshotSemaphore = new SemaphoreSlim(1);
-        private IStorage storage;
 
-        public PersistenceManager(IStorage storage)
+        public PersistenceManager(ExecutionContext context)
+            : base(context)
         {
-            this.storage = storage ?? throw new ArgumentNullException(nameof(storage));
         }
 
-        public async Task<EffectsResponse> LoadEffects(string rawCursor, bool isDesc, int limit, int account)
+        public EffectsResponse LoadEffects(string rawCursor, bool isDesc, int limit, ulong account)
         {
-            if (account == default)
-                throw new ArgumentNullException(nameof(account));
             if (string.IsNullOrEmpty(rawCursor))
                 rawCursor = "0";
-            if (!long.TryParse(rawCursor, out var apex))
+            if (!ulong.TryParse(rawCursor, out var apex))
                 throw new ArgumentException("Cursor is invalid.");
-            var accountQuanta = await storage.LoadEffects(apex, isDesc, limit, account);
+            var order = isDesc ? PersistentStorage.QueryResultsOrder.Desc : PersistentStorage.QueryResultsOrder.Asc;
+            var accountQuanta = Context.PermanentStorage.LoadQuantaForAccount(account, apex, limit, order);
             var accountEffects = new List<ApexEffects>();
-            foreach (var quantum in accountQuanta.OrderBy(e => e.Apex))
+            foreach (var quantum in accountQuanta)
             {
-                var quantumContainer = quantum.ToQuantumContainer();
                 accountEffects.Add(new ApexEffects
                 {
-                    Apex = ((Quantum)quantumContainer.Quantum.Message).Apex,
-                    Items = quantumContainer.Effects.Where(a => a.Account == account).ToList(),
-                    Proof = quantumContainer.EffectsProof
+                    Apex = quantum.Apex,
+                    Items = quantum.Effects.Select(e => XdrConverter.Deserialize<Effect>(e)).Where(a => a.Account == account).ToList(),
+                    Proof = new EffectsProof
+                    {
+                        Hashes = new EffectHashes { Hashes = quantum.Proof.EffectHashes.Select(h => new Hash { Data = h }).ToList() },
+                        Signatures = quantum.Proof.Signatures.Select(s => new Ed25519Signature { Signer = s.Signer, Signature = s.Data }).ToList()
+                    }
                 });
             }
 
@@ -65,12 +64,19 @@ namespace Centaurus.Domain
             };
         }
 
-        public async Task<int> ApplyUpdates(DiffObject updates)
+        public void ApplyUpdates(DiffObject updates)
         {
-            await saveSnapshotSemaphore.WaitAsync();
+            saveSnapshotSemaphore.Wait();
             try
             {
-                return await storage.Update(updates);
+                var updateModels = updates.Batch.ToList();
+                updateModels.AddRange(
+                    updates.Accounts.Select(a => Context.AccountStorage.GetAccount(a).Account.ToPersistentModel()).Cast<IPersistentModel>().ToList()
+                );
+                updateModels.AddRange(
+                    updates.Cursors.Select(p => Context.PaymentProvidersManager.GetManager(p).ToPersistentModel()).Cast<IPersistentModel>().ToList()
+                );
+                Context.PermanentStorage.SaveBatch(updateModels);
             }
             finally
             {
@@ -84,21 +90,24 @@ namespace Centaurus.Domain
         /// <param name="apex"></param>
         /// <param name="count">Count of quanta to load. Loads all if equal or less than 0</param>
         /// <returns></returns>
-        public async Task<List<MessageEnvelope>> GetQuantaAboveApex(long apex, int count = 0)
+        public List<MessageEnvelope> GetQuantaAboveApex(ulong apex, int count = 0)
         {
-            var quantaModels = await storage.LoadQuantaAboveApex(apex, count);
-            return quantaModels.OrderBy(q => q.Apex).Select(q => XdrConverter.Deserialize<MessageEnvelope>(q.Bin)).ToList();
+            var quantaModels = Context.PermanentStorage.LoadQuantaAboveApex(apex);
+            var query = (IEnumerable<QuantumPersistentModel>)quantaModels.OrderBy(q => q.Apex);
+            if (count > 0)
+                query = query.Take(count);
+            return query.Select(q => XdrConverter.Deserialize<MessageEnvelope>(q.RawQuantum)).ToList();
         }
 
-        public async Task<long> GetLastApex()
+        public ulong GetLastApex()
         {
-            return await storage.GetLastApex();
+            return Context.PermanentStorage.GetLastApex();
         }
 
-        public async Task<MessageEnvelope> GetQuantum(long apex)
+        public MessageEnvelope GetQuantum(ulong apex)
         {
-            var quantumModel = await storage.LoadQuantum(apex);
-            return XdrConverter.Deserialize<MessageEnvelope>(quantumModel.Bin);
+            var quantumModel = Context.PermanentStorage.LoadQuantum(apex);
+            return XdrConverter.Deserialize<MessageEnvelope>(quantumModel.RawQuantum);
         }
 
         /// <summary>
@@ -122,6 +131,7 @@ namespace Centaurus.Domain
                     Providers = constellationInitEffect.Providers,
                     RequestRateLimits = constellationInitEffect.RequestRateLimits
                 },
+                Cursors = constellationInitEffect.Providers.ToDictionary(k => k.ProviderId, v => v.InitCursor),
                 LastHash = quantumHash
             };
             return snapshot;
@@ -132,13 +142,13 @@ namespace Centaurus.Domain
         /// </summary>
         /// <param name="apex"></param>
         /// <returns></returns>
-        public async Task<ConstellationSettings> GetConstellationSettings(long apex)
+        public ConstellationSettings GetConstellationSettings(ulong apex)
         {
-            var settingsModel = await storage.LoadSettings(apex);
+            var settingsModel = Context.PermanentStorage.LoadSettings(apex);
             if (settingsModel == null)
                 return null;
 
-            return settingsModel.ToSettings();
+            return settingsModel.ToDomainModel();
         }
 
         /// <summary>
@@ -146,43 +156,36 @@ namespace Centaurus.Domain
         /// </summary>
         /// <param name="apex"></param>
         /// <returns></returns>
-        public async Task<Snapshot> GetSnapshot(long apex)
+        public Snapshot GetSnapshot(ulong apex)
         {
             if (apex < 0)
                 throw new ArgumentException("Apex cannot be less than zero.");
 
-            var lastApex = await GetLastApex();
+            var lastApex = GetLastApex();
             if (lastApex < apex)
                 throw new InvalidOperationException("Requested apex is greater than the last known one.");
 
             //some auditors can have capped db
-            var minRevertApex = await GetMinRevertApex();
-            if (minRevertApex == -1 && apex != lastApex || apex < minRevertApex)
+            var minRevertApex = GetMinRevertApex();
+            if (minRevertApex == 0 && apex != lastApex || apex < minRevertApex)
                 throw new InvalidOperationException($"Lack of data to revert to {apex} apex.");
 
-            var settings = await GetConstellationSettings(apex);
+            var settings = GetConstellationSettings(apex);
             if (settings == null)
                 return null;
 
-            var cursors = await storage.LoadCursors();
+            var cursors = Context.PermanentStorage.LoadCursors();
 
-            var accounts = (await GetAccounts()).Select(a => new AccountWrapper(a, settings.RequestRateLimits));
+            var accounts = (GetAccounts(settings.GetBaseAsset())).Select(a => new AccountWrapper(a, settings.RequestRateLimits));
 
             var accountStorage = new AccountStorage(accounts);
 
-            var orders = await GetOrders(accountStorage);
+            var orders = accounts.SelectMany(a => a.Account.Orders.Select(o => new OrderWrapper(o, a))).OrderBy(o => o.Order.Apex).ToList();
+            var exchange = GetRestoredExchange(orders);
 
-            var exchange = await GetRestoredExchange(orders);
+            var quanta = Context.PermanentStorage.LoadQuantaAboveApex(apex);
 
-            var batchSize = 1000;
-            var effects = new List<Effect>();
-            while (true)
-            {
-                var quanta = await storage.LoadQuantaAboveApex(apex, batchSize);
-                effects.AddRange(quanta.SelectMany(q => q.ToQuantumContainer().Effects));
-                if (quanta.Count < batchSize)
-                    break;
-            }
+            var effects = quanta.SelectMany(q => q.Effects.Select(e => XdrConverter.Deserialize<Effect>(e))).ToList();
 
             for (var i = effects.Count - 1; i >= 0; i--)
             {
@@ -202,30 +205,30 @@ namespace Centaurus.Domain
                         processor = new BalanceCreateEffectProcessor(balanceCreateEffect, account);
                         break;
                     case BalanceUpdateEffect balanceUpdateEffect:
-                        processor = new BalanceUpdateEffectProcesor(balanceUpdateEffect, account);
+                        processor = new BalanceUpdateEffectProcesor(balanceUpdateEffect, account, balanceUpdateEffect.Sign);
                         break;
                     case RequestRateLimitUpdateEffect requestRateLimitUpdateEffect:
                         processor = new RequestRateLimitUpdateEffectProcessor(requestRateLimitUpdateEffect, account, settings.RequestRateLimits);
                         break;
                     case OrderPlacedEffect orderPlacedEffect:
                         {
-                            var orderBook = exchange.GetOrderbook(orderPlacedEffect.OrderId);
-                            var order = exchange.OrderMap.GetOrder(orderPlacedEffect.OrderId);
-                            processor = new OrderPlacedEffectProcessor(orderPlacedEffect, order.AccountWrapper, orderBook, order);
+                            var orderBook = exchange.GetOrderbook(orderPlacedEffect.Asset, orderPlacedEffect.Side);
+                            var order = exchange.OrderMap.GetOrder(orderPlacedEffect.Apex);
+                            processor = new OrderPlacedEffectProcessor(orderPlacedEffect, order.AccountWrapper, orderBook, order, settings.GetBaseAsset());
                         }
                         break;
                     case OrderRemovedEffect orderRemovedEffect:
                         {
-                            var orderBook = exchange.GetOrderbook(orderRemovedEffect.OrderId);
-                            processor = new OrderRemovedEffectProccessor(orderRemovedEffect, accountStorage.GetAccount(orderRemovedEffect.Account), orderBook);
+                            var orderBook = exchange.GetOrderbook(orderRemovedEffect.Asset, orderRemovedEffect.Side);
+                            processor = new OrderRemovedEffectProccessor(orderRemovedEffect, accountStorage.GetAccount(orderRemovedEffect.Account), orderBook, settings.GetBaseAsset());
                         }
                         break;
                     case TradeEffect tradeEffect:
                         {
-                            var order = exchange.OrderMap.GetOrder(tradeEffect.OrderId);
+                            var order = exchange.OrderMap.GetOrder(tradeEffect.Apex);
                             if (order == null) //no need to revert trade if no order was created
                                 continue;
-                            processor = new TradeEffectProcessor(tradeEffect, accountStorage.GetAccount(tradeEffect.Account), order);
+                            processor = new TradeEffectProcessor(tradeEffect, order.AccountWrapper, order, settings.GetBaseAsset());
                         }
                         break;
                     default:
@@ -235,7 +238,7 @@ namespace Centaurus.Domain
                 processor.RevertEffect();
             }
 
-            var lastQuantumData = (await storage.LoadQuantum(apex)).ToQuantumContainer();
+            var lastQuantumData = XdrConverter.Deserialize<MessageEnvelope>(Context.PermanentStorage.LoadQuantum(apex).RawQuantum);
 
             //TODO: refactor restore exchange
             //we need to clean all order links to be able to restore exchange
@@ -250,9 +253,9 @@ namespace Centaurus.Domain
             {
                 Apex = apex,
                 Accounts = accountStorage.GetAll().OrderBy(a => a.Account.Id).ToList(),
-                Orders = allOrders.OrderBy(o => o.OrderId).ToList(),
+                Orders = allOrders.OrderBy(o => o.Apex).ToList(),
                 Settings = settings,
-                LastHash = lastQuantumData.Quantum.Message.ComputeHash()
+                LastHash = lastQuantumData.Message.ComputeHash()
             };
         }
 
@@ -260,50 +263,27 @@ namespace Centaurus.Domain
         /// Returns minimal apex a snapshot can be reverted to
         /// </summary>
         /// <returns></returns>
-        public async Task<long> GetMinRevertApex()
+        public ulong GetMinRevertApex()
         {
             //obtain min apex we can revert to
-            var minApex = await storage.GetFirstApex();
-            if (minApex == -1) //we can't revert at all
-                return -1;
+            var minApex = Context.PermanentStorage.LoadQuanta().FirstOrDefault()?.Apex ?? 0;
+            if (minApex == 0) //we can't revert at all
+                return 0;
 
             return minApex - 1; //we can revert effect for that apex, so the minimal apex is first effect apex - 1
         }
 
-        private async Task<Exchange> GetRestoredExchange(List<OrderWrapper> orders)
+        private Exchange GetRestoredExchange(List<OrderWrapper> orders)
         {
-            var settings = await GetConstellationSettings(long.MaxValue); // load last settings
+            var settings = GetConstellationSettings(ulong.MaxValue); // load last settings
             return Exchange.RestoreExchange(settings.Assets, orders, false);
         }
 
-        private async Task<List<Account>> GetAccounts()
+        private List<Account> GetAccounts(string baseAsset)
         {
-            var accountModels = await storage.LoadAccounts();
-            var balanceModels = await storage.LoadBalances();
-
-            var accountsCount = accountModels.Count;
-            var accounts = new List<Account>();
-            foreach (var account in accountModels)
-            {
-                var currentAccountBalanceFromCursor = BalanceModelIdConverter.EncodeId(account.Id, 0);
-                var currentAccountBalanceToCursor = BalanceModelIdConverter.EncodeId(account.Id + 1, 0);
-                var balances = balanceModels
-                    .SkipWhile(b => b.Id < currentAccountBalanceFromCursor)
-                    .TakeWhile(b => b.Id < currentAccountBalanceToCursor).ToArray();
-                accounts.Add(account.ToAccount(balances));
-            }
-            return accounts;
-        }
-
-        private async Task<List<OrderWrapper>> GetOrders(AccountStorage accountStorage)
-        {
-            var orderModels = await storage.LoadOrders();
-
-            var orders = new List<OrderWrapper>();
-            foreach (var order in orderModels)
-                orders.Add(order.ToOrder(accountStorage.GetAccount(order.Account)));
-
-            return orders;
+            return Context.PermanentStorage.LoadAccounts()
+                .Select(a => a.ToDomainModel(baseAsset))
+                .ToList();
         }
     }
 }

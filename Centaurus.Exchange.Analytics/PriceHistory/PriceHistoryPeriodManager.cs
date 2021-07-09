@@ -10,6 +10,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Centaurus.PersistentStorage.Abstraction;
 
 namespace Centaurus.Exchange.Analytics
 {
@@ -18,7 +19,7 @@ namespace Centaurus.Exchange.Analytics
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public PriceHistoryPeriodManager(PriceHistoryPeriod period, int market, IAnalyticsStorage analyticsStorage)
+        public PriceHistoryPeriodManager(PriceHistoryPeriod period, string market, IPersistentStorage analyticsStorage)
         {
             this.analyticsStorage = analyticsStorage ?? throw new ArgumentNullException(nameof(analyticsStorage));
             Market = market;
@@ -28,22 +29,22 @@ namespace Centaurus.Exchange.Analytics
             {
                 EvictionCallback = (subkey, subValue, reason, state) =>
                 {
-                    if (!locks.TryRemove((DateTime)subkey, out _))
+                    if (!syncRoots.TryRemove((DateTime)subkey, out _))
                         logger.Error($"Unable to remove lock for key \"{(DateTime)subkey}\"");
                 }
             };
         }
-        public int Market { get; }
+        public string Market { get; }
 
-        public async Task Restore(DateTime dateTime)
+        public void Restore(DateTime dateTime)
         {
             CurrentFramesUnitDate = GetFramesUnitDate(dateTime);
-            var frames = await GetUnit(CurrentFramesUnitDate, true);
+            var frames = GetUnit(CurrentFramesUnitDate, true);
             LastAddedFrame = frames.FirstOrDefault();
 
-            var firstFramesDate = (await analyticsStorage.GetFirstPriceHistoryFrameDate(Market, Period));
-            if (firstFramesDate != 0)
-                firstFramesUnitDate = GetFramesUnitDate(DateTimeOffset.FromUnixTimeSeconds(firstFramesDate).DateTime);
+            var firstFrame = analyticsStorage.GetPriceHistory(0, int.MaxValue, (int)Period, Market).First();
+            if (firstFrame != null)
+                firstFramesUnitDate = GetFramesUnitDate(DateTimeOffset.FromUnixTimeSeconds(firstFrame.Timestamp).DateTime);
         }
 
         public PriceHistoryFrame LastAddedFrame { get; private set; }
@@ -54,9 +55,8 @@ namespace Centaurus.Exchange.Analytics
         {
             var unitDate = GetFramesUnitDate(frame.StartTime); //get current frames unit start date
 
-            var semaphore = locks.GetOrAdd(unitDate, (d) => new SemaphoreSlim(1));
-            semaphore.Wait();
-            try
+            var syncRoot = GetSyncRoot(unitDate);
+            lock(syncRoot)
             {
                 if (!framesUnit.TryGetValue<List<PriceHistoryFrame>>(unitDate, out var frames)) //if no unit for the frame, we need to register new one
                 {
@@ -78,16 +78,12 @@ namespace Centaurus.Exchange.Analytics
                 updates.AddUpdate(frame.StartTime, frame);
                 LastAddedFrame = frame;
             }
-            finally
-            {
-                semaphore.Release();
-            }
         }
 
-        public async Task OnTrade(ExchangeUpdate exchangeUpdate)
+        public void OnTrade(ExchangeUpdate exchangeUpdate)
         {
             var tradeDate = exchangeUpdate.UpdateDate.Trim(Period);
-            var frame = await GetFrame(tradeDate);
+            var frame = GetFrame(tradeDate);
             if (frame == null)
                 throw new Exception($"Unable to find frame for date time {tradeDate}.");
 
@@ -103,7 +99,7 @@ namespace Centaurus.Exchange.Analytics
             return updates.PullUpdates();
         }
 
-        public async Task<(List<PriceHistoryFrame> frames, DateTime nextCursor)> GetPriceHistoryForDate(DateTime cursor)
+        public (List<PriceHistoryFrame> frames, DateTime nextCursor) GetPriceHistoryForDate(DateTime cursor)
         {
             if (cursor == default)
                 cursor = LastAddedFrame?.StartTime ?? default;
@@ -112,7 +108,7 @@ namespace Centaurus.Exchange.Analytics
             if (fromPeriod > CurrentFramesUnitDate && CurrentFramesUnitDate != default)
                 fromPeriod = CurrentFramesUnitDate;
 
-            var frames = await GetUnit(fromPeriod);
+            var frames = GetUnit(fromPeriod);
             return (
                 frames,
                 nextCursor: (HasMore(fromPeriod) ? GetFramesNextUnitStart(fromPeriod, true) : default)
@@ -122,8 +118,6 @@ namespace Centaurus.Exchange.Analytics
         public void Dispose()
         {
             framesUnit.Dispose();
-            foreach (var @lock in locks)
-                @lock.Value.Dispose();
         }
 
         private UpdateContainer<DateTime, PriceHistoryFrame> updates = new UpdateContainer<DateTime, PriceHistoryFrame>();
@@ -154,11 +148,15 @@ namespace Centaurus.Exchange.Analytics
         private DateTime CurrentFramesUnitDate;
         private MemoryCache framesUnit;
 
-        private readonly IAnalyticsStorage analyticsStorage;
+        private readonly IPersistentStorage analyticsStorage;
 
         private DateTime firstFramesUnitDate;
 
-        private readonly ConcurrentDictionary<DateTime, SemaphoreSlim> locks = new ConcurrentDictionary<DateTime, SemaphoreSlim>();
+        private readonly ConcurrentDictionary<DateTime, object> syncRoots = new ConcurrentDictionary<DateTime, object>();
+        private object GetSyncRoot(DateTime unitDate)
+        {
+            return syncRoots.GetOrAdd(unitDate, (d) => new {});
+        }
 
         private int FramesPerUnit
         {
@@ -217,22 +215,21 @@ namespace Centaurus.Exchange.Analytics
         public PriceHistoryPeriod Period { get; }
         private long TicksPerPeriod => PriceHistoryPeriodHelper.TicksPerPeriod(Period);
 
-        private async Task<List<PriceHistoryFrame>> GetUnit(DateTime unitDate, bool isCurrentFrame = false)
+        private List<PriceHistoryFrame> GetUnit(DateTime unitDate, bool isCurrentFrame = false)
         {
             if (!framesUnit.TryGetValue<List<PriceHistoryFrame>>(unitDate, out var frames))
             {
-                var semaphore = locks.GetOrAdd(unitDate, (d) => new SemaphoreSlim(1));
-                await semaphore.WaitAsync();
-                try
-                {
+                var syncRoot = GetSyncRoot(unitDate);
+                lock(syncRoot)
+                { 
                     if (!framesUnit.TryGetValue(unitDate, out frames))
                     {
                         var nextUnitDate = GetFramesNextUnitStart(unitDate);
                         var toTimeStamp = (int)((DateTimeOffset)nextUnitDate).ToUnixTimeSeconds();
                         var unixTimeStamp = (int)((DateTimeOffset)unitDate).ToUnixTimeSeconds();
-                        var rawFrames = await analyticsStorage.GetPriceHistory(unixTimeStamp, toTimeStamp, Market, Period);
+                        var rawFrames = analyticsStorage.GetPriceHistory(unixTimeStamp, toTimeStamp, (int)Period, Market);
 
-                        frames = rawFrames.Select(f => f.FromModel()).OrderByDescending(f => f.StartTime).ToList();
+                        frames = rawFrames.Select(f => f.FromFramePersistentModel()).OrderByDescending(f => f.StartTime).ToList();
 
 
                         foreach (var f in frames)
@@ -243,18 +240,14 @@ namespace Centaurus.Exchange.Analytics
                         framesUnit.Set(unitDate, frames, GetMemoryCacheEntryOptions(isCurrentFrame, frames.Count));
                     }
                 }
-                finally
-                {
-                    semaphore.Release();
-                }
             }
             return frames;
         }
 
-        private async Task<PriceHistoryFrame> GetFrame(DateTime dateTime)
+        private PriceHistoryFrame GetFrame(DateTime dateTime)
         {
             var unitDate = GetFramesUnitDate(dateTime);
-            var unit = await GetUnit(unitDate);
+            var unit = GetUnit(unitDate);
             var currentDateFrame = unit?.FirstOrDefault(f => f.StartTime == dateTime);
             return currentDateFrame;
         }

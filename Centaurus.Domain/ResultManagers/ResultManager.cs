@@ -16,7 +16,7 @@ namespace Centaurus.Domain
             InitTimers();
         }
 
-        public void Add(long apex, QuantumResultMessage resultMessage, byte[] effectsHash, Dictionary<int, Message> notifications)
+        public void Add(ulong apex, QuantumResultMessage resultMessage, byte[] effectsHash, Dictionary<ulong, Message> notifications)
         {
             var aggregate = default(ResultConsensusAggregate);
             lock (pendingAggregatesSyncRoot)
@@ -51,7 +51,7 @@ namespace Centaurus.Domain
         /// Remove an aggregate by message id.
         /// </summary>
         /// <param name="messageId">Message id key.</param>
-        public void Remove(long id)
+        public void Remove(ulong id)
         {
             lock (pendingAggregatesSyncRoot)
             {
@@ -106,7 +106,7 @@ namespace Centaurus.Domain
         private void Cleanup()
         {
             var now = DateTime.UtcNow;
-            var itemsToRemove = default(List<long>);
+            var itemsToRemove = default(List<ulong>);
             lock (pendingAggregatesSyncRoot)
             {
                 itemsToRemove = pendingAggregates
@@ -126,7 +126,7 @@ namespace Centaurus.Domain
         protected static Logger logger = LogManager.GetCurrentClassLogger();
 
         private object pendingAggregatesSyncRoot = new { };
-        private Dictionary<long, ResultConsensusAggregate> pendingAggregates = new Dictionary<long, ResultConsensusAggregate>();
+        private Dictionary<ulong, ResultConsensusAggregate> pendingAggregates = new Dictionary<ulong, ResultConsensusAggregate>();
 
         class ResultConsensusAggregate
         {
@@ -136,7 +136,7 @@ namespace Centaurus.Domain
                 CreatedAt = DateTime.UtcNow;
             }
 
-            public ResultConsensusAggregate(QuantumResultMessage result, byte[] messageHash, Dictionary<int, Message> notifications, ResultManager resultManager)
+            public ResultConsensusAggregate(QuantumResultMessage result, byte[] messageHash, Dictionary<ulong, Message> notifications, ResultManager resultManager)
                 : this(resultManager)
             {
                 ResultMessageItem = new ResultMessageItem(result, messageHash, notifications, this);
@@ -197,7 +197,7 @@ namespace Centaurus.Domain
                 }
             }
 
-            public void Add(QuantumResultMessage result, byte[] messageHash, Dictionary<int, Message> notifications)
+            public void Add(QuantumResultMessage result, byte[] messageHash, Dictionary<ulong, Message> notifications)
             {
                 lock (syncRoot)
                 {
@@ -305,13 +305,13 @@ namespace Centaurus.Domain
                 AddResultMessage(result, auditor);
             }
 
-            public ResultMessageItem(QuantumResultMessage result, byte[] messageHash, Dictionary<int, Message> notifications, ResultConsensusAggregate aggregate)
+            public ResultMessageItem(QuantumResultMessage result, byte[] messageHash, Dictionary<ulong, Message> notifications, ResultConsensusAggregate aggregate)
             {
                 AssignResult(result, messageHash, notifications, aggregate);
                 Apex = ((Quantum)result.OriginalMessage.Message).Apex;
             }
 
-            public void AssignResult(QuantumResultMessage result, byte[] messageHash, Dictionary<int, Message> notifications, ResultConsensusAggregate aggregate)
+            public void AssignResult(QuantumResultMessage result, byte[] messageHash, Dictionary<ulong, Message> notifications, ResultConsensusAggregate aggregate)
             {
                 Result = result ?? throw new ArgumentNullException(nameof(result));
                 Hash = messageHash;
@@ -327,7 +327,7 @@ namespace Centaurus.Domain
                 OutrunSignatures.Add(auditor, result);
             }
 
-            public long Apex { get; }
+            public ulong Apex { get; }
 
             public QuantumResultMessage Result { get; private set; }
 
@@ -339,7 +339,7 @@ namespace Centaurus.Domain
 
             public byte[] Hash { get; private set; }
 
-            public Dictionary<int, Message> Notifications { get; private set; }
+            public Dictionary<ulong, Message> Notifications { get; private set; }
 
             public RawPubKey AccountPubKey { get; private set; }
 

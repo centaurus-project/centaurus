@@ -10,12 +10,12 @@ namespace Centaurus.Exchange.Analytics
         public const int LowValueIndex = 2;
         public const int CloseValueIndex = 3;
 
-        public MarketTicker(int market)
+        public MarketTicker(string market)
         {
             Market = market;
         }
 
-        public int Market { get; }
+        public string Market { get; }
 
         public double[] OHLC { get; set; } = new double[4];
 

@@ -7,13 +7,13 @@ namespace Centaurus.Domain
 {
     public interface IBaseCommandHandler
     {
-        public abstract Task<BaseResponse> Handle(InfoWebSocketConnection infoWebSocket, object command);
+        public abstract BaseResponse Handle(InfoWebSocketConnection infoWebSocket, object command);
     }
 
     public interface IBaseCommandHandler<T>
         where T : BaseCommand
     {
-        public abstract Task<BaseResponse> Handle(InfoWebSocketConnection infoWebSocket, T command);
+        public abstract BaseResponse Handle(InfoWebSocketConnection infoWebSocket, T command);
     }
 
     public abstract class BaseCommandHandler<T>: ContextualBase, IBaseCommandHandler<T>, IBaseCommandHandler
@@ -25,9 +25,9 @@ namespace Centaurus.Domain
 
         }
 
-        public abstract Task<BaseResponse> Handle(InfoWebSocketConnection infoWebSocket, T command);
+        public abstract BaseResponse Handle(InfoWebSocketConnection infoWebSocket, T command);
 
-        Task<BaseResponse> IBaseCommandHandler.Handle(InfoWebSocketConnection infoWebSocket, object command)
+        BaseResponse IBaseCommandHandler.Handle(InfoWebSocketConnection infoWebSocket, object command)
         {
             return Handle(infoWebSocket, (T)command);
         }

@@ -20,9 +20,9 @@ namespace Centaurus.Models
     {
         public abstract EffectTypes EffectType { get; }
 
-        public long Apex { get; set; }
+        public ulong Apex { get; set; }
 
         [XdrField(0)]
-        public int Account { get; set; }
+        public ulong Account { get; set; }
     }
 }

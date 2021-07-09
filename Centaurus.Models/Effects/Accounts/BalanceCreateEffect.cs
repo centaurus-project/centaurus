@@ -11,6 +11,6 @@ namespace Centaurus.Models
         public override EffectTypes EffectType => EffectTypes.BalanceCreate;
 
         [XdrField(0)]
-        public int Asset { get; set; }
+        public string Asset { get; set; }
     }
 }

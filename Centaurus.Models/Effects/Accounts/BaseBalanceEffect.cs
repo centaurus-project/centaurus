@@ -8,9 +8,9 @@ namespace Centaurus.Models
     public abstract class BaseBalanceEffect: Effect
     {
         [XdrField(0)]
-        public long Amount { get; set; }
+        public ulong Amount { get; set; }
 
         [XdrField(1)]
-        public int Asset { get; set; }
+        public string Asset { get; set; }
     }
 }

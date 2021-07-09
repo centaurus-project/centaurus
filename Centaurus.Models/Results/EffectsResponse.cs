@@ -32,7 +32,7 @@ namespace Centaurus.Models
     public class ApexEffects
     {
         [XdrField(0)]
-        public long Apex { get; set; }
+        public ulong Apex { get; set; }
 
         [XdrField(1)]
         public List<Effect> Items { get; set; }

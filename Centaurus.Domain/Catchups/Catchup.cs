@@ -105,12 +105,12 @@ namespace Centaurus.Domain
                 return false;
             }
             currentState.HasMorePendingQuanta = newAuditorState.HasMorePendingQuanta;
-            var lastAddedApex = currentState.PendingQuanta.LastOrDefault()?.Message.MessageId ?? -1;
+            var lastAddedApex = (ulong)(currentState.PendingQuanta.LastOrDefault()?.Message.MessageId ?? 0);
             var alphaPubkey = (RawPubKey)Context.Settings.KeyPair.PublicKey;
             foreach (var envelope in newAuditorState.PendingQuanta)
             {
                 var currentQuantum = (Quantum)envelope.Message;
-                if (lastAddedApex != -1 && currentQuantum.Apex != lastAddedApex + 1)
+                if (lastAddedApex != 0 && currentQuantum.Apex != lastAddedApex + 1)
                     return false;
                 lastAddedApex = currentQuantum.Apex;
                 if (envelope.Signatures.All(s => !s.Signer.Equals(alphaPubkey)) || !envelope.AreSignaturesValid())
@@ -180,7 +180,7 @@ namespace Centaurus.Domain
 
         private async Task ApplyAuditorsData()
         {
-            var validQuanta = await GetValidQuanta();
+            var validQuanta = GetValidQuanta();
 
             await ApplyQuanta(validQuanta);
 
@@ -211,7 +211,7 @@ namespace Centaurus.Domain
             }
         }
 
-        private async Task<List<MessageEnvelope>> GetValidQuanta()
+        private List<MessageEnvelope> GetValidQuanta()
         {
             //group all quanta by their apex
             var quanta = validAuditorStates.Values
@@ -222,7 +222,7 @@ namespace Centaurus.Domain
             if (quanta.Count() == 0)
                 return new List<MessageEnvelope>();
 
-            var lastQuantumApex = await Context.PersistenceManager.GetLastApex();
+            var lastQuantumApex = Context.PersistenceManager.GetLastApex();
             var validQuanta = new List<MessageEnvelope>();
 
             foreach (var currentQuantaGroup in quanta)

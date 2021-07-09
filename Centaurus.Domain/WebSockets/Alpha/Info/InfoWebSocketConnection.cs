@@ -146,7 +146,7 @@ namespace Centaurus.Domain
                             try
                             {
                                 command = BaseCommand.Deserialize(incomingBuffer.AsSpan());
-                                var handlerResult = await Context.InfoCommandsHandlers.HandleCommand(this, command);
+                                var handlerResult = Context.InfoCommandsHandlers.HandleCommand(this, command);
                                 await SendMessage(handlerResult);
                             }
                             catch (Exception exc)

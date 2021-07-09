@@ -1,17 +1,16 @@
 ﻿using Centaurus.Models;
+using System;
 using System.Linq;
 
 namespace Centaurus
 {
     public static class ConstellationSettingsExtensions
     {
-        public static bool TryFindAssetSettings(this ConstellationSettings constellationSettings, int assetId, out AssetSettings assetSettings)
+        public static string GetBaseAsset(this ConstellationSettings constellationSettings)
         {
-            assetSettings = null;
             if (constellationSettings == null)
-                return false;
-            assetSettings = constellationSettings.Assets.FirstOrDefault(a => a.Id == assetId);
-            return assetSettings != null;
+                throw new ArgumentNullException(nameof(constellationSettings));
+            return constellationSettings.Assets.First().Code;
         }
     }
 }

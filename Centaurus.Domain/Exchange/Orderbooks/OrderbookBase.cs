@@ -14,7 +14,7 @@ namespace Centaurus.Domain
     {
         private OrderMap orderMap;
 
-        public OrderbookBase(OrderMap orderMap, int market, OrderSide side)
+        public OrderbookBase(OrderMap orderMap, string market, OrderSide side)
         {
             this.orderMap = orderMap;
             Side = side;
@@ -23,7 +23,7 @@ namespace Centaurus.Domain
 
         public OrderSide Side { get; }
 
-        public int Market { get; }
+        public string Market { get; }
         public OrderWrapper Head { get; set; }
 
         public OrderWrapper Tail { get; set; }

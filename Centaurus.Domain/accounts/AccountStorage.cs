@@ -15,12 +15,12 @@ namespace Centaurus.Domain
             if (accounts == null)
                 accounts = new AccountWrapper[] { };
 
-            this.accounts = new Dictionary<int, AccountWrapper>(accounts.ToDictionary(m => m.Account.Id));
-            this.accountIds = new Dictionary<RawPubKey, int>(accounts.ToDictionary(m => m.Account.Pubkey, v => v.Account.Id));
+            this.accounts = new Dictionary<ulong, AccountWrapper>(accounts.ToDictionary(m => m.Account.Id));
+            this.accountIds = new Dictionary<RawPubKey, ulong>(accounts.ToDictionary(m => m.Account.Pubkey, v => v.Account.Id));
         }
         
-        readonly Dictionary<RawPubKey, int> accountIds = new Dictionary<RawPubKey, int>();
-        readonly Dictionary<int, AccountWrapper> accounts = new Dictionary<int, AccountWrapper>();
+        readonly Dictionary<RawPubKey, ulong> accountIds = new Dictionary<RawPubKey, ulong>();
+        readonly Dictionary<ulong, AccountWrapper> accounts = new Dictionary<ulong, AccountWrapper>();
 
         /// <summary>
         /// Retrieve account record by its public key.
@@ -42,14 +42,14 @@ namespace Centaurus.Domain
         /// </summary>
         /// <param name="id">Account id</param>
         /// <returns>Account record, or null if not found</returns>
-        public AccountWrapper GetAccount(int id)
+        public AccountWrapper GetAccount(ulong id)
         {
             if (id == default)
                 throw new ArgumentNullException(nameof(id));
             return accounts.GetValueOrDefault(id);
         }
 
-        public AccountWrapper CreateAccount(int id, RawPubKey pubkey, RequestRateLimits rateLimits)
+        public AccountWrapper CreateAccount(ulong id, RawPubKey pubkey, RequestRateLimits rateLimits)
         {
             if (pubkey == null)
                 throw new ArgumentNullException(nameof(pubkey));
@@ -71,9 +71,9 @@ namespace Centaurus.Domain
             return acc;
         }
 
-        public int NextAccountId => LastAccountId + 1;
+        public ulong NextAccountId => LastAccountId + 1;
 
-        public int LastAccountId => accountIds.Values.LastOrDefault();
+        public ulong LastAccountId => accountIds.Values.LastOrDefault();
 
         public int Count => accountIds.Count;
 

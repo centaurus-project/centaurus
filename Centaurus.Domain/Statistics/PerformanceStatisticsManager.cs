@@ -75,7 +75,7 @@ namespace Centaurus.Domain
                     var accountId = auditorConnection?.PubKeyAddress;
                     if (!auditorsStatistics.TryGetValue(accountId, out var statistics))
                         continue;
-                    var auditorApex = auditorConnection?.QuantumWorker?.CurrentApexCursor ?? -1;
+                    var auditorApex = (ulong)(auditorConnection?.QuantumWorker?.CurrentApexCursor ?? 0);
                     if (auditorApex >= 0)
                         statistics.Delay = (int)(Context.QuantumStorage.CurrentApex - auditorApex);
                 }
@@ -152,7 +152,7 @@ namespace Centaurus.Domain
 
         class Apex
         {
-            public long CurrentApex { get; set; }
+            public ulong CurrentApex { get; set; }
 
             public DateTime UpdatedAt { get; set; }
         }

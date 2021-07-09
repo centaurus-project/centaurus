@@ -15,15 +15,15 @@ namespace Centaurus.Models
     {
         public ulong OrderId { get; set; }
 
-        public int Market { get; set; }
+        public string Market { get; set; }
 
         public OrderSide Side { get; set; }
 
         public double Price { get; set; }
 
-        public long AmountDiff { get; set; }
+        public ulong AmountDiff { get; set; }
 
-        public long QuoteAmountDiff { get; set; }
+        public ulong QuoteAmountDiff { get; set; }
 
         public OrderState State { get; set; }
     }

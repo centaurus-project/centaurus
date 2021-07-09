@@ -8,15 +8,21 @@ namespace Centaurus.Models
     public class Order
     {
         [XdrField(0)]
-        public ulong OrderId { get; set; }
+        public string Asset { get; set; }
 
         [XdrField(1)]
-        public double Price { get; set; }
+        public OrderSide Side { get; set; }
 
         [XdrField(2)]
-        public long Amount { get; set; }
+        public double Price { get; set; }
 
         [XdrField(3)]
-        public long QuoteAmount { get; set; }
+        public ulong Amount { get; set; }
+
+        [XdrField(4)]
+        public ulong QuoteAmount { get; set; }
+
+        [XdrField(5)]
+        public ulong Apex { get; set; }
     }
 }

@@ -46,8 +46,6 @@ namespace Centaurus.Domain
 
         public int EffectsCount { get; set; }
 
-        public int Retries { get; set; }
-
         public long ElapsedMilliseconds { get; set; }
 
         public DateTime SavedAt { get; set; }

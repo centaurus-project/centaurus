@@ -8,14 +8,14 @@ namespace Centaurus.Exchange.Analytics
 {
     public class TradesHistoryManager
     {
-        public TradesHistoryManager(List<int> markets, int historySize = 100)
+        public TradesHistoryManager(List<string> markets, int historySize = 100)
         {
             HistorySize = historySize;
             foreach (var market in markets)
                 managers.Add(market, new MarketTradesHistoryManager(market, historySize));
         }
 
-        private Dictionary<int, MarketTradesHistoryManager> managers = new Dictionary<int, MarketTradesHistoryManager>();
+        private Dictionary<string, MarketTradesHistoryManager> managers = new Dictionary<string, MarketTradesHistoryManager>();
 
         public int HistorySize { get; }
 
@@ -38,7 +38,7 @@ namespace Centaurus.Exchange.Analytics
             }
         }
 
-        public List<Trade> GetTrades(int market)
+        public List<Trade> GetTrades(string market)
         {
             lock (managers)
             {

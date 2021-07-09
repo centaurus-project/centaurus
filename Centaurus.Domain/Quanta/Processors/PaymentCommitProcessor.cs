@@ -63,8 +63,9 @@ namespace Centaurus.Domain
             var account = context.CentaurusContext.AccountStorage.GetAccount(deposit.Destination);
             if (account == null)
             {
+                var baseAsset = context.CentaurusContext.Constellation.GetBaseAsset();
                 //ignore registration with non-base asset or with amount that is less than MinAccountBalance
-                if (deposit.Asset != 0 || deposit.Amount < context.CentaurusContext.Constellation.MinAccountBalance)
+                if (deposit.Asset != baseAsset || deposit.Amount < context.CentaurusContext.Constellation.MinAccountBalance)
                     return;
                 var accId = context.CentaurusContext.AccountStorage.NextAccountId;
                 context.EffectProcessors.AddAccountCreate(context.CentaurusContext.AccountStorage, accId, deposit.Destination);
@@ -74,7 +75,7 @@ namespace Centaurus.Domain
             if (!account.Account.HasBalance(deposit.Asset))
                 context.EffectProcessors.AddBalanceCreate(account, deposit.Asset);
 
-            context.EffectProcessors.AddBalanceUpdate(account, deposit.Asset, deposit.Amount);
+            context.EffectProcessors.AddBalanceUpdate(account, deposit.Asset, deposit.Amount, UpdateSign.Plus);
         }
 
         public override PaymentCommitProcessorContext GetContext(EffectProcessorsContainer container)

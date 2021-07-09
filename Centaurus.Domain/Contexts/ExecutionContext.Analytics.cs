@@ -8,12 +8,11 @@ namespace Centaurus.Domain
 {
     public partial class ExecutionContext : IDisposable
     {
-        private System.Threading.SemaphoreSlim analyticsUpdateSyncRoot = new System.Threading.SemaphoreSlim(1);
+        private object syncRoot = new { };
 
-        private async void AnalyticsManager_OnUpdate()
+        private void AnalyticsManager_OnUpdate()
         {
-            await analyticsUpdateSyncRoot.WaitAsync();
-            try
+            lock(syncRoot)
             {
                 var updates = new Dictionary<BaseSubscription, SubscriptionUpdateBase>();
                 foreach (var subscription in InfoConnectionManager.GetActiveSubscriptions())
@@ -29,7 +28,7 @@ namespace Centaurus.Domain
                             break;
                         case PriceHistorySubscription priceHistorySubscription:
                             {
-                                var priceFrames = await AnalyticsManager.PriceHistoryManager.GetPriceHistory(0, priceHistorySubscription.Market, priceHistorySubscription.FramePeriod);
+                                var priceFrames = AnalyticsManager.PriceHistoryManager.GetPriceHistory(0, priceHistorySubscription.Market, priceHistorySubscription.FramePeriod);
                                 update = PriceHistoryUpdate.Generate(priceFrames.frames, priceHistorySubscription.Name);
                             }
                             break;
@@ -57,19 +56,15 @@ namespace Centaurus.Domain
                 }
                 InfoConnectionManager.SendSubscriptionUpdates(updates);
             }
-            finally
-            {
-                analyticsUpdateSyncRoot.Release();
-            }
         }
 
-        private async Task DisposeAnalyticsManager()
+        private void DisposeAnalyticsManager()
         {
             if (AnalyticsManager != null)
             {
                 try
                 {
-                    await AnalyticsManager.SaveUpdates(PermanentStorage);
+                    AnalyticsManager.SaveUpdates(PermanentStorage);
                 }
                 catch
                 {
@@ -87,12 +82,11 @@ namespace Centaurus.Domain
             AppState.State = ApplicationState.Failed;
         }
 
-        private async void Exchange_OnUpdates(ExchangeUpdate updates)
+        private void Exchange_OnUpdates(ExchangeUpdate updates)
         {
             if (updates == null)
                 return;
-            if (AnalyticsManager != null)
-                await AnalyticsManager.OnUpdates(updates);
+            AnalyticsManager?.OnUpdates(updates);
         }
 
     }

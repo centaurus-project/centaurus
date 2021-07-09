@@ -13,7 +13,7 @@ namespace Centaurus
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public QuantumSyncWorker(Domain.ExecutionContext context, long apexCursor, BaseWebSocketConnection auditor)
+        public QuantumSyncWorker(Domain.ExecutionContext context, ulong apexCursor, BaseWebSocketConnection auditor)
             :base(context)
         {
             this.auditor = auditor ?? throw new ArgumentNullException(nameof(auditor));
@@ -28,7 +28,7 @@ namespace Centaurus
         private CancellationTokenSource cancellationTokenSource;
         private CancellationToken cancellationToken;
 
-        public long CurrentApexCursor { get; private set; }
+        public ulong CurrentApexCursor { get; private set; }
 
         private async Task SendQuantums()
         {
@@ -62,7 +62,7 @@ namespace Centaurus
                     List<MessageEnvelope> quanta = null;
                     if (!Context.QuantumStorage.GetQuantaBacth(CurrentApexCursor + 1, batchSize, out quanta))
                     {
-                        quanta = await Context.PersistenceManager.GetQuantaAboveApex(CurrentApexCursor, batchSize); //quanta are not found in the in-memory storage
+                        quanta = Context.PersistenceManager.GetQuantaAboveApex(CurrentApexCursor, batchSize); //quanta are not found in the in-memory storage
                         if (quanta.Count < 1)
                             throw new Exception("No quanta from database.");
                     }

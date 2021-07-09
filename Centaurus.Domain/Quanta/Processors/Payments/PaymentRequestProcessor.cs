@@ -1,4 +1,5 @@
 ﻿using Centaurus.Models;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace Centaurus.Domain
@@ -26,9 +27,9 @@ namespace Centaurus.Domain
 
             if (!context.DestinationAccount.Account.HasBalance(payment.Asset))
                 context.EffectProcessors.AddBalanceCreate(context.DestinationAccount, payment.Asset);
-            context.EffectProcessors.AddBalanceUpdate(context.DestinationAccount, payment.Asset, payment.Amount);
+            context.EffectProcessors.AddBalanceUpdate(context.DestinationAccount, payment.Asset, payment.Amount, UpdateSign.Plus);
 
-            context.EffectProcessors.AddBalanceUpdate(context.SourceAccount, payment.Asset, -payment.Amount);
+            context.EffectProcessors.AddBalanceUpdate(context.SourceAccount, payment.Asset, payment.Amount, UpdateSign.Minus);
 
             var result = context.Envelope.CreateResult(ResultStatusCodes.Success);
 
@@ -44,9 +45,10 @@ namespace Centaurus.Domain
             if (payment.Destination == null || payment.Destination.IsZero())
                 throw new BadRequestException("Destination should be valid public key");
 
+            var baseAsset = context.CentaurusContext.Constellation.GetBaseAsset();
             if (context.DestinationAccount == null)
             {
-                if (payment.Asset != 0)
+                if (payment.Asset != baseAsset)
                     throw new BadRequestException("Account excepts only XLM asset.");
                 if (payment.Amount < context.CentaurusContext.Constellation.MinAccountBalance)
                     throw new BadRequestException($"Min payment amount is {context.CentaurusContext.Constellation.MinAccountBalance} for this account.");
@@ -58,10 +60,10 @@ namespace Centaurus.Domain
             if (payment.Amount <= 0)
                 throw new BadRequestException("Amount should be greater than 0");
 
-            if (!context.CentaurusContext.AssetIds.Contains(payment.Asset))
+            if (!context.CentaurusContext.Constellation.Assets.Any(a => a.Code == payment.Asset))
                 throw new BadRequestException($"Asset {payment.Asset} is not supported");
 
-            var minBalance = payment.Asset == 0 ? context.CentaurusContext.Constellation.MinAccountBalance : 0;
+            var minBalance = payment.Asset == baseAsset ? context.CentaurusContext.Constellation.MinAccountBalance : 0;
             if (context.SourceAccount.Account.GetBalance(payment.Asset)?.HasSufficientBalance(payment.Amount, minBalance) ?? false)
                 throw new BadRequestException("Insufficient funds");
 

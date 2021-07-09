@@ -15,10 +15,10 @@ namespace Centaurus.Models
         public List<RawPubKey> Auditors { get; set; }
 
         [XdrField(2)]
-        public long MinAccountBalance { get; set; }
+        public ulong MinAccountBalance { get; set; }
 
         [XdrField(3)]
-        public long MinAllowedLotSize { get; set; }
+        public ulong MinAllowedLotSize { get; set; }
 
         [XdrField(4)]
         public List<AssetSettings> Assets { get; set; }

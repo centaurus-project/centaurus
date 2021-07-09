@@ -29,7 +29,7 @@ namespace Centaurus.Domain
                 if (!Context.QuantumStorage.GetQuantaBacth(aboveApex + 1, batchSize, out var currentBatch) 
                     && (aboveApex + 1 < Context.QuantumStorage.CurrentApex))
                 {
-                    currentBatch = await Context.PersistenceManager.GetQuantaAboveApex(aboveApex, batchSize); //quanta are not found in the in-memory storage
+                    currentBatch = Context.PersistenceManager.GetQuantaAboveApex(aboveApex, batchSize); //quanta are not found in the in-memory storage
                     if (currentBatch.Count < 1)
                         throw new Exception("No quanta from database.");
                 }
@@ -46,7 +46,7 @@ namespace Centaurus.Domain
                 };
                 await connection.SendMessage(state);
                 var lastQuantum = currentBatch.LastOrDefault();
-                aboveApex = lastQuantum?.Message.MessageId ?? 0;
+                aboveApex = (ulong)(lastQuantum?.Message.MessageId ?? 0);
             };
         }
     }

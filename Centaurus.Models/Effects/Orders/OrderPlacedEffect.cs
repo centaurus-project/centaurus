@@ -5,7 +5,7 @@ using Centaurus.Xdr;
 namespace Centaurus.Models
 {
     [XdrContract]
-    public class OrderPlacedEffect: BaseOrderEffect
+    public class OrderPlacedEffect: Effect
     {
         public override EffectTypes EffectType => EffectTypes.OrderPlaced;
 
@@ -13,15 +13,15 @@ namespace Centaurus.Models
         public double Price { get; set; }
 
         [XdrField(1)]
-        public OrderSide OrderSide { get; set; }
+        public OrderSide Side { get; set; }
 
         [XdrField(2)]
-        public long Amount { get; set; }
+        public ulong Amount { get; set; }
 
         [XdrField(3)]
-        public long QuoteAmount { get; set; }
+        public ulong QuoteAmount { get; set; }
 
         [XdrField(4)]
-        public long Asset { get; set; }
+        public string Asset { get; set; }
     }
 }

@@ -43,7 +43,7 @@ namespace Centaurus.Domain
             }
         }
 
-        private Dictionary<int, ExchangeMarket> Markets = new Dictionary<int, ExchangeMarket>();
+        private Dictionary<string, ExchangeMarket> Markets = new Dictionary<string, ExchangeMarket>();
 
         private BlockingCollection<ExchangeUpdate> awaitedUpdates;
 
@@ -64,7 +64,7 @@ namespace Centaurus.Domain
 
         public void RemoveOrder(EffectProcessorsContainer effectsContainer, OrderbookBase orderbook, OrderWrapper order)
         {
-            effectsContainer.AddOrderRemoved(orderbook, order);
+            effectsContainer.AddOrderRemoved(orderbook, order, effectsContainer.Context.Constellation.GetBaseAsset());
             if (awaitedUpdates != null)
             {
                 var updateTime = new DateTime(((Quantum)effectsContainer.Envelope.Message).Timestamp, DateTimeKind.Utc);
@@ -76,13 +76,13 @@ namespace Centaurus.Domain
 
         public event Action<ExchangeUpdate> OnUpdates;
 
-        public ExchangeMarket GetMarket(int asset)
+        public ExchangeMarket GetMarket(string asset)
         {
             if (Markets.TryGetValue(asset, out ExchangeMarket market)) return market;
             throw new InvalidOperationException($"Asset {asset} is not supported");
         }
 
-        public bool HasMarket(int asset)
+        public bool HasMarket(string asset)
         {
             return Markets.ContainsKey(asset);
         }
@@ -90,7 +90,7 @@ namespace Centaurus.Domain
         public ExchangeMarket AddMarket(AssetSettings asset, bool useLegacyOrderbook = false)
         {
             var market = asset.CreateMarket(OrderMap, useLegacyOrderbook);
-            Markets.Add(asset.Id, market);
+            Markets.Add(asset.Code, market);
             return market;
         }
 
@@ -100,13 +100,7 @@ namespace Centaurus.Domain
             OrderMap.Clear();
         }
 
-        public OrderbookBase GetOrderbook(ulong offerId)
-        {
-            var parts = OrderIdConverter.Decode(offerId);
-            return GetOrderbook(parts.Asset, parts.Side);
-        }
-
-        public OrderbookBase GetOrderbook(int asset, OrderSide side)
+        public OrderbookBase GetOrderbook(string asset, OrderSide side)
         {
             return GetMarket(asset).GetOrderbook(side);
         }
@@ -119,9 +113,7 @@ namespace Centaurus.Domain
 
             foreach (var order in orders)
             {
-                var orderData = OrderIdConverter.Decode(order.OrderId);
-                var market = exchange.GetMarket(orderData.Asset);
-                var orderbook = market.GetOrderbook(orderData.Side);
+                var orderbook = exchange.GetOrderbook(order.Order.Asset, order.Order.Side);
                 orderbook.InsertOrder(order);
             }
             return exchange;

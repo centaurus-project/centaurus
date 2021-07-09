@@ -9,5 +9,22 @@ namespace Centaurus.Models
     public class BalanceUpdateEffect: BaseBalanceEffect
     {
         public override EffectTypes EffectType => EffectTypes.BalanceUpdate;
+
+        [XdrField(0)]
+        public UpdateSign Sign { get; set; }
+    }
+
+    public enum UpdateSign
+    {
+        Plus,
+        Minus
+    }
+
+    public static class UpdateSignExtensions
+    {
+        public static UpdateSign Revert(this UpdateSign sign)
+        {
+            return sign == UpdateSign.Plus ? UpdateSign.Minus : UpdateSign.Plus;
+        }
     }
 }

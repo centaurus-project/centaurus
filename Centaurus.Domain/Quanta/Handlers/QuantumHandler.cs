@@ -76,7 +76,7 @@ namespace Centaurus.Domain
             return newHandleItem.HandlingTaskSource.Task;
         }
 
-        public long LastAddedQuantumApex { get; private set; }
+        public ulong LastAddedQuantumApex { get; private set; }
 
         public int QuantaQueueLenght => awaitedQuanta?.Count ?? 0;
 
@@ -132,15 +132,8 @@ namespace Centaurus.Domain
 
         async Task<ResultMessage> HandleQuantumInternal(MessageEnvelope quantumEnvelope, long timestamp)
         {
-            await Context.PendingUpdatesManager.UpdatesSyncRoot.WaitAsync();
-            try
-            {
-                return await HandleQuantum(quantumEnvelope, timestamp);
-            }
-            finally
-            {
-                Context.PendingUpdatesManager.UpdatesSyncRoot.Release();
-            }
+            Context.PendingUpdatesManager.ApplyUpdates(Context.PendingUpdatesManager.Current);
+            return await HandleQuantum(quantumEnvelope, timestamp);
         }
 
         void ValidateQuantum(MessageEnvelope envelope, AccountWrapper account, long timestamp)
@@ -206,7 +199,7 @@ namespace Centaurus.Domain
             return result.ResultMessage;
         }
 
-        void EnsureOutgoingResult(long apex, QuantumResultMessage result)
+        void EnsureOutgoingResult(ulong apex, QuantumResultMessage result)
         {
             Context.OutgoingResultsStorage.EnqueueResult(apex, result);
         }

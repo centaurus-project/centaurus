@@ -18,7 +18,7 @@ namespace Centaurus.Models
         public string Vault { get; set; }
 
         [XdrField(3)]
-        public string Cursor { get; set; }
+        public string InitCursor { get; set; }
 
         [XdrField(4)]
         public List<ProviderAsset> Assets { get; set; }

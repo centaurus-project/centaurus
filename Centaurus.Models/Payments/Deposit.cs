@@ -14,10 +14,10 @@ namespace Centaurus.Models
         public byte[] TransactionHash { get; set; }
 
         [XdrField(2)]
-        public int Asset { get; set; }
+        public string Asset { get; set; }
 
         [XdrField(3)]
-        public long Amount { get; set; }
+        public ulong Amount { get; set; }
 
         [XdrField(4)]
         public RawPubKey Destination { get; set; }

@@ -9,7 +9,7 @@ namespace Centaurus.Models
     public class AuditorResultMessage
     {
         [XdrField(0)]
-        public long Apex { get; set; }
+        public ulong Apex { get; set; }
 
         [XdrField(1)]
         public byte[] Signature { get; set; }

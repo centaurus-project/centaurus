@@ -10,7 +10,7 @@ namespace Centaurus.Domain
 {
     public static class EffectProcessorsContainerExtensions
     {
-        public static void AddAccountCreate(this EffectProcessorsContainer effectProcessors, AccountStorage accountStorage, int accountId, RawPubKey publicKey)
+        public static void AddAccountCreate(this EffectProcessorsContainer effectProcessors, AccountStorage accountStorage, ulong accountId, RawPubKey publicKey)
         {
             effectProcessors.Add(new AccountCreateEffectProcessor(
                 new AccountCreateEffect
@@ -24,7 +24,7 @@ namespace Centaurus.Domain
             ));
         }
 
-        public static void AddBalanceCreate(this EffectProcessorsContainer effectProcessors, AccountWrapper account, int asset)
+        public static void AddBalanceCreate(this EffectProcessorsContainer effectProcessors, AccountWrapper account, string asset)
         {
             effectProcessors.Add(new BalanceCreateEffectProcessor(
                 new BalanceCreateEffect
@@ -37,7 +37,7 @@ namespace Centaurus.Domain
             ));
         }
 
-        public static void AddBalanceUpdate(this EffectProcessorsContainer effectProcessors, AccountWrapper account, int asset, long amount)
+        public static void AddBalanceUpdate(this EffectProcessorsContainer effectProcessors, AccountWrapper account, string asset, ulong amount, UpdateSign sign)
         {
             effectProcessors.Add(new BalanceUpdateEffectProcesor(
                 new BalanceUpdateEffect
@@ -47,29 +47,28 @@ namespace Centaurus.Domain
                     Asset = asset,
                     Apex = effectProcessors.Apex
                 },
-                account
+                account,
+                sign
             ));
         }
 
-        public static void AddOrderPlaced(this EffectProcessorsContainer effectProcessors, OrderbookBase orderBook, OrderWrapper order)
+        public static void AddOrderPlaced(this EffectProcessorsContainer effectProcessors, OrderbookBase orderBook, OrderWrapper order, string baseAsset)
         {
-            var decodedOrderId = OrderIdConverter.Decode(order.OrderId);
             var effect = new OrderPlacedEffect
             {
                 Apex = effectProcessors.Apex,
                 Account = order.AccountWrapper.Id,
-                Asset = decodedOrderId.Asset,
+                Asset = order.Order.Asset,
                 Amount = order.Order.Amount,
                 QuoteAmount = order.Order.QuoteAmount,
                 Price = order.Order.Price,
-                OrderId = order.OrderId,
-                OrderSide = decodedOrderId.Side
+                Side = order.Order.Side
             };
 
-            effectProcessors.Add(new OrderPlacedEffectProcessor(effect, order.AccountWrapper, orderBook, order));
+            effectProcessors.Add(new OrderPlacedEffectProcessor(effect, order.AccountWrapper, orderBook, order, baseAsset));
         }
 
-        public static void AddTrade(this EffectProcessorsContainer effectProcessors, OrderWrapper order, long assetAmount, long quoteAmount, bool isNewOrder)
+        public static void AddTrade(this EffectProcessorsContainer effectProcessors, OrderWrapper order, ulong assetAmount, ulong quoteAmount, string baseAsset, bool isNewOrder)
         {
             var trade = new TradeEffect
             {
@@ -77,34 +76,34 @@ namespace Centaurus.Domain
                 Account = order.AccountWrapper.Id,
                 AssetAmount = assetAmount,
                 QuoteAmount = quoteAmount,
-                OrderId = order.OrderId,
                 IsNewOrder = isNewOrder
             };
 
-            effectProcessors.Add(new TradeEffectProcessor(trade, order.AccountWrapper, order));
+            effectProcessors.Add(new TradeEffectProcessor(trade, order.AccountWrapper, order, baseAsset));
         }
 
 
-        public static void AddOrderRemoved(this EffectProcessorsContainer effectProcessors, OrderbookBase orderbook, OrderWrapper order)
+        public static void AddOrderRemoved(this EffectProcessorsContainer effectProcessors, OrderbookBase orderbook, OrderWrapper order, string baseAsset)
         {
             effectProcessors.Add(new OrderRemovedEffectProccessor(
                 new OrderRemovedEffect
                 {
                     Apex = effectProcessors.Apex,
-                    OrderId = order.OrderId,
                     Account = order.AccountWrapper.Id,
                     Amount = order.Order.Amount,
                     QuoteAmount = order.Order.QuoteAmount,
-                    Price = order.Order.Price
+                    Price = order.Order.Price,
+                    Side = order.Order.Side
                 },
                 order.AccountWrapper,
-                orderbook
+                orderbook,
+                baseAsset
             ));
         }
 
 
 
-        public static void AddNonceUpdate(this EffectProcessorsContainer effectProcessors, AccountWrapper account, long newNonce, long currentNonce)
+        public static void AddNonceUpdate(this EffectProcessorsContainer effectProcessors, AccountWrapper account, ulong newNonce, ulong currentNonce)
         {
             effectProcessors.Add(new NonceUpdateEffectProcessor(
                 new NonceUpdateEffect

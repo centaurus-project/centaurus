@@ -38,7 +38,7 @@ namespace Centaurus.Domain
         {
             Message message;
             if (connection.Context.AppState.State == ApplicationState.Rising)
-                message = new AuditorStateRequest { TargetApex = await connection.Context.PersistenceManager.GetLastApex() };
+                message = new AuditorStateRequest { TargetApex = connection.Context.PersistenceManager.GetLastApex() };
             else
                 message = connection.Context.GetCurrentState();
             await connection.SendMessage(message);

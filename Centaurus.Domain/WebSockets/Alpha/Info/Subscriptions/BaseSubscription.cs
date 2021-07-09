@@ -52,12 +52,10 @@ namespace Centaurus.Domain
 
     public abstract class BaseMarketSubscription : BaseSubscription
     {
-        public int Market { get; set; }
+        public string Market { get; set; }
 
-        protected void SetMarket(string marketStr)
+        protected void SetMarket(string market)
         {
-            if (!int.TryParse(marketStr, out var market))
-                throw new ArgumentException($"{(string.IsNullOrEmpty(marketStr) ? "null": marketStr)} is not valid market value.");
             Market = market;
         }
     }

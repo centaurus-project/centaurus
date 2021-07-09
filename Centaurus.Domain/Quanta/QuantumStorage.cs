@@ -10,10 +10,10 @@ namespace Centaurus.Domain
 {
     public class QuantumStorage
     {
-        public long CurrentApex { get; protected set; }
+        public ulong CurrentApex { get; protected set; }
         public byte[] LastQuantumHash { get; protected set; }
 
-        public void Init(long currentApex, byte[] lastQuantumHash)
+        public void Init(ulong currentApex, byte[] lastQuantumHash)
         {
             CurrentApex = currentApex;
             LastQuantumHash = lastQuantumHash;
@@ -45,7 +45,7 @@ namespace Centaurus.Domain
         /// <param name="maxCount">Batch max size.</param>
         /// <param name="messageEnvelopes">Batch itself. Can be null.</param>
         /// <returns>True if data presented in the storage, otherwise false.</returns>
-        public bool GetQuantaBacth(long apexFrom, int maxCount, out List<MessageEnvelope> messageEnvelopes)
+        public bool GetQuantaBacth(ulong apexFrom, int maxCount, out List<MessageEnvelope> messageEnvelopes)
         {
             lock (syncRoot)
             {
@@ -58,7 +58,7 @@ namespace Centaurus.Domain
             }
         }
 
-        private List<long> apexes = new List<long>();
+        private List<ulong> apexes = new List<ulong>();
 
         private List<MessageEnvelope> quanta = new List<MessageEnvelope>();
 

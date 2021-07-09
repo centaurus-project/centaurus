@@ -1,22 +1,14 @@
 ﻿using Centaurus.Models;
-using Centaurus.DAL;
-using Centaurus.DAL.Models.Analytics;
-using Microsoft.Extensions.Caching.Memory;
-using NLog;
+using Centaurus.PersistentStorage.Abstraction;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
-using System.Diagnostics;
 
 namespace Centaurus.Exchange.Analytics
 {
     public class PriceHistoryManager : IDisposable
     {
-        public PriceHistoryManager(IAnalyticsStorage storage, List<int> markets)
+        public PriceHistoryManager(IPersistentStorage storage, List<string> markets)
         {
             periods = Enum.GetValues(typeof(PriceHistoryPeriod)).Cast<PriceHistoryPeriod>();
             foreach (var period in periods)
@@ -24,15 +16,15 @@ namespace Centaurus.Exchange.Analytics
                     managers.Add(EncodeAssetTradesResolution(market, period), new PriceHistoryPeriodManager(period, market, storage));
         }
 
-        public async Task Restore(DateTime dateTime)
+        public void Restore(DateTime dateTime)
         {
             foreach (var manager in managers)
             {
-                await manager.Value.Restore(dateTime);
+                manager.Value.Restore(dateTime);
             }
         }
 
-        public async Task OnTrade(ExchangeUpdate exchangeUpdate)
+        public void OnTrade(ExchangeUpdate exchangeUpdate)
         {
             if (exchangeUpdate == null)
                 throw new ArgumentNullException(nameof(exchangeUpdate));
@@ -41,34 +33,22 @@ namespace Centaurus.Exchange.Analytics
             if (trades == null || trades.Count < 1)
                 return;
 
-            syncRoot.Wait();
-            try
+            lock (syncRoot)
             {
                 UpdateManagerFrames(exchangeUpdate.UpdateDate);
                 foreach (var period in periods)
                 {
                     var managerId = EncodeAssetTradesResolution(exchangeUpdate.Market, period);
                     var frameManager = managers[managerId];
-                    await frameManager.OnTrade(exchangeUpdate);
+                    frameManager.OnTrade(exchangeUpdate);
                 }
-            }
-            finally
-            {
-                syncRoot.Release();
             }
         }
 
         public void Update()
         {
-            syncRoot.Wait();
-            try
-            {
+            lock (syncRoot)
                 UpdateManagerFrames(DateTime.UtcNow);
-            }
-            finally
-            {
-                syncRoot.Release();
-            }
         }
 
         private void UpdateManagerFrames(DateTime currentDate)
@@ -76,7 +56,7 @@ namespace Centaurus.Exchange.Analytics
             foreach (var manager in managers.Values)
             {
                 var trimmedDate = currentDate.Trim(manager.Period);
-                while (manager.LastAddedFrame is null 
+                while (manager.LastAddedFrame is null
                     || manager.LastAddedFrame.IsExpired(trimmedDate))
                 {
                     var nextFrameStartDate = manager.LastAddedFrame?.StartTime.GetNextFrameDate(manager.Period) ?? trimmedDate;
@@ -94,11 +74,11 @@ namespace Centaurus.Exchange.Analytics
         /// <param name="market"></param>
         /// <param name="framePeriod"></param>
         /// <returns></returns>
-        public async Task<(List<PriceHistoryFrame> frames, int nextCursor)> GetPriceHistory(int cursor, int market, PriceHistoryPeriod framePeriod)
+        public (List<PriceHistoryFrame> frames, int nextCursor) GetPriceHistory(int cursor, string market, PriceHistoryPeriod framePeriod)
         {
             var managerId = EncodeAssetTradesResolution(market, framePeriod);
             var cursorDate = cursor == 0 ? default : DateTimeOffset.FromUnixTimeSeconds(cursor).UtcDateTime;
-            var res = await managers[managerId].GetPriceHistoryForDate(cursorDate);
+            var res = managers[managerId].GetPriceHistoryForDate(cursorDate);
             return (
                 res.frames,
                 nextCursor: (res.nextCursor == default ? 0 : (int)((DateTimeOffset)res.nextCursor).ToUnixTimeSeconds())
@@ -122,24 +102,26 @@ namespace Centaurus.Exchange.Analytics
         {
             foreach (var m in managers)
                 m.Value.Dispose();
-            syncRoot.Dispose();
         }
 
-        public static long EncodeAssetTradesResolution(int market, PriceHistoryPeriod period)
+        public static string EncodeAssetTradesResolution(string market, PriceHistoryPeriod period)
         {
-            return (uint.MaxValue * (long)market) + (int)period;
+            return $"{market}_{(int)period}";
         }
 
-        public static (int market, PriceHistoryPeriod period) DecodeAssetTradesResolution(long managerId)
+        public static (string market, PriceHistoryPeriod period) DecodeAssetTradesResolution(string managerId)
         {
+            var splitted = managerId.Split('_', StringSplitOptions.RemoveEmptyEntries);
+            if (splitted.Length != 2 || !int.TryParse(splitted[1], out var period))
+                throw new ArgumentException($"{managerId} is invalid format.");
             return (
-                market: (int)Math.Floor(decimal.Divide(managerId, uint.MaxValue)),
-                period: (PriceHistoryPeriod)(int)(managerId % uint.MaxValue)
+                market: splitted[0],
+                period: (PriceHistoryPeriod)period
             );
         }
 
-        private readonly Dictionary<long, PriceHistoryPeriodManager> managers = new Dictionary<long, PriceHistoryPeriodManager>();
+        private readonly Dictionary<string, PriceHistoryPeriodManager> managers = new Dictionary<string, PriceHistoryPeriodManager>();
         private IEnumerable<PriceHistoryPeriod> periods;
-        private readonly SemaphoreSlim syncRoot = new SemaphoreSlim(1);
+        private readonly object syncRoot = new { };
     }
 }

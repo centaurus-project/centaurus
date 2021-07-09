@@ -8,12 +8,22 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Models\**" />
+    <Compile Remove="Mongo\**" />
+    <EmbeddedResource Remove="Models\**" />
+    <EmbeddedResource Remove="Mongo\**" />
+    <None Remove="Models\**" />
+    <None Remove="Mongo\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="MongoDB.Driver" Version="2.12.0" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Centaurus.Common\Centaurus.Common.csproj" />
     <ProjectReference Include="..\Centaurus.Models\Centaurus.Models.csproj" />
+    <ProjectReference Include="..\Centaurus.PersistentStorage\Centaurus.PersistentStorage.csproj" />
   </ItemGroup>
 
 </Project>

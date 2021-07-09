@@ -53,11 +53,11 @@ namespace Centaurus.Domain
                 handlers = processors.ToImmutableDictionary(StringComparer.OrdinalIgnoreCase);
         }
 
-        public async Task<BaseResponse> HandleCommand(InfoWebSocketConnection infoWebSocket, BaseCommand command)
+        public BaseResponse HandleCommand(InfoWebSocketConnection infoWebSocket, BaseCommand command)
         {
             if (!handlers.ContainsKey(command.Command))
                 throw new NotSupportedException($"Command {command.Command} is not supported.");
-            return await handlers[command.Command].Handle(infoWebSocket, command);
+            return handlers[command.Command].Handle(infoWebSocket, command);
         }
     }
 }

@@ -29,7 +29,7 @@ namespace Centaurus.Alpha
 
                 _ = host.RunAsync();
 
-                await ConfigureConstellation();
+                ConfigureConstellation();
             }
             catch (Exception exc)
             {
@@ -53,10 +53,8 @@ namespace Centaurus.Alpha
 
         #region Private Members
 
-        private async Task ConfigureConstellation()
+        private void ConfigureConstellation()
         {
-            await Context.Init();
-
             Context.AppState.StateChanged += Current_StateChanged;
         }
 
@@ -64,7 +62,6 @@ namespace Centaurus.Alpha
         {
             if (eventArgs.State == ApplicationState.Failed)
             {
-                Thread.Sleep(PendingUpdatesManager.SaveInterval);
                 var isSet = resetEvent.WaitOne(0);
                 if (!isSet)
                     resetEvent.Set();

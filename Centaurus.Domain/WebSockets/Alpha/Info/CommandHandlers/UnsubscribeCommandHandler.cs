@@ -15,7 +15,7 @@ namespace Centaurus.Domain
 
         }
 
-        public override Task<BaseResponse> Handle(InfoWebSocketConnection infoWebSocket, UnsubscribeCommand command)
+        public override BaseResponse Handle(InfoWebSocketConnection infoWebSocket, UnsubscribeCommand command)
         {
             if (command.Subscriptions.Count < 0)
                 throw new BadRequestException("At least one subscription must be specified.");
@@ -25,7 +25,7 @@ namespace Centaurus.Domain
                 var subscription = Context.SubscriptionsManager.GetOrAddSubscription(BaseSubscription.GetBySubscriptionName(subs));
                 infoWebSocket.RemoveSubsctioption(subscription);
             }
-            return Task.FromResult((BaseResponse)new SuccesResponse { RequestId = command.RequestId });
+            return new SuccesResponse { RequestId = command.RequestId };
         }
     }
 }

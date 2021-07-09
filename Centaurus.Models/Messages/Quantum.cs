@@ -5,13 +5,13 @@ namespace Centaurus.Models
 {
     public abstract class Quantum : Message
     {
-        public override long MessageId => Apex;
+        public override long MessageId => unchecked((long)Apex);
 
         /// <summary>
         /// Unique sequential quantum id. Assigned by Alpha server.
         /// </summary>
         [XdrField(0)]
-        public long Apex { get; set; }
+        public ulong Apex { get; set; }
 
         /// <summary>
         /// Previous quantum hash.

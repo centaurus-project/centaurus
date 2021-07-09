@@ -13,7 +13,7 @@ namespace Centaurus.Domain.Models
             AccountWrapper = account ?? throw new ArgumentNullException(nameof(account));
         }
 
-        public ulong OrderId => Order.OrderId;
+        public ulong Apex => Order.Apex;
 
         public Order Order { get; }
 
@@ -25,14 +25,14 @@ namespace Centaurus.Domain.Models
 
         public override string ToString()
         {
-            var res = $"Order {OrderId}, amount {Order.Amount}, quote {Order.QuoteAmount}, price {Order.Price}";
+            var res = $"Apex {Apex}, amount {Order.Amount}, quote {Order.QuoteAmount}, price {Order.Price}";
             if (Prev != null)
             {
-                res += $", prev {Prev.OrderId}";
+                res += $", prev {Prev.Apex}";
             }
             if (Next != null)
             {
-                res += $", next {Next.OrderId}";
+                res += $", next {Next.Apex}";
             }
             return res;
         }

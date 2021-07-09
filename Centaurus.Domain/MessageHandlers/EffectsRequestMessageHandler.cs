@@ -30,7 +30,7 @@ namespace Centaurus.Domain
                     try
                     {
                         var request = message.Envelope.Message as EffectsRequest;
-                        var effectsResponse = await connection.Context.PersistenceManager.LoadEffects(request.Cursor, request.IsDesc, request.Limit, request.Account);
+                        var effectsResponse = connection.Context.PersistenceManager.LoadEffects(request.Cursor, request.IsDesc, request.Limit, connection.Account.Id);
                         effectsResponse.OriginalMessage = message.Envelope;
                         effectsResponse.Status = ResultStatusCodes.Success;
                         result = effectsResponse;

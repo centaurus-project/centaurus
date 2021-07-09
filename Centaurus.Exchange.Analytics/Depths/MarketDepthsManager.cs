@@ -8,7 +8,7 @@ namespace Centaurus.Exchange.Analytics
 {
     public class MarketDepthsManager
     {
-        public MarketDepthsManager(List<int> markets, List<double> precisions, AnalyticsOrderMap orders)
+        public MarketDepthsManager(List<string> markets, List<double> precisions, AnalyticsOrderMap orders)
         {
             if (markets == null)
                 throw new ArgumentNullException(nameof(markets));
@@ -19,7 +19,7 @@ namespace Centaurus.Exchange.Analytics
             if (precisions.Count < 1)
                 precisions = new List<double> { 1 };
 
-            var depths = new Dictionary<int, Dictionary<double, MarketDepth>>();
+            var depths = new Dictionary<string, Dictionary<double, MarketDepth>>();
             foreach (var market in markets)
             {
                 depths.Add(market, new Dictionary<double, MarketDepth>());
@@ -29,7 +29,7 @@ namespace Centaurus.Exchange.Analytics
             this.marketDepths = depths.ToImmutableDictionary();
         }
 
-        private ImmutableDictionary<int, Dictionary<double, MarketDepth>> marketDepths;
+        private ImmutableDictionary<string, Dictionary<double, MarketDepth>> marketDepths;
 
         public void Restore(DateTime updateDate)
         {
@@ -54,7 +54,7 @@ namespace Centaurus.Exchange.Analytics
                 depthManager.OnOrderUpdates(orderUpdates, updateDate);
         }
 
-        public MarketDepth GetDepth(int market, double precision)
+        public MarketDepth GetDepth(string market, double precision)
         {
             if (!marketDepths.TryGetValue(market, out var currentMarketDepths))
                 throw new ArgumentException($"Market {market} is not supported.");

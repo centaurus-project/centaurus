@@ -13,56 +13,36 @@ namespace Centaurus.Exchange.Analytics
 
         public void Clear()
         {
-            lock (this)
+            lock (map)
                 map.Clear();
         }
 
         public void AddOrder(OrderInfoWrapper orderWrapper)
         {
-            lock (this)
+            lock (map)
                 map.Add(orderWrapper.Order.OrderId, orderWrapper);
         }
 
         public void RemoveOrder(ulong orderId)
         {
-            lock (this)
+            lock (map)
                 map.Remove(orderId);
         }
 
         public OrderInfoWrapper GetOrder(ulong orderId)
         {
-            lock (this)
+            lock (map)
             {
-                if (!map.TryGetValue(orderId, out OrderInfoWrapper order)) return null;
+                if (!map.TryGetValue(orderId, out OrderInfoWrapper order)) 
+                    return null;
                 return order;
             }
         }
 
-        /// <summary> 
-        /// </summary>
-        /// <param name="currentOrderId">If equal to default, first order will be returned.</param>
-        /// <returns>Next order</returns>
-        public OrderInfo GetNextOrder(ulong currentOrderId)
+        public List<OrderInfoWrapper> All()
         {
-            lock (this)
-            {
-                var currentDecodedOrderId = OrderIdConverter.Decode(currentOrderId);
-                var orderWrapper = currentOrderId > 0 ? GetOrder(currentOrderId)?.Next : map.Values.FirstOrDefault();
-                while (true)
-                {
-                    if (orderWrapper == null)
-                        return null;
-
-                    var decodedOrderId = OrderIdConverter.Decode(orderWrapper.Order.OrderId);
-                    if (decodedOrderId.Side != currentDecodedOrderId.Side)
-                    {
-                        orderWrapper = orderWrapper.Next;
-                        continue;
-                    }
-
-                    return orderWrapper.Order;
-                }
-            }
+            lock (map)
+                return map.Values.OrderBy(o => o.Order.OrderId).ToList();
         }
     }
 }

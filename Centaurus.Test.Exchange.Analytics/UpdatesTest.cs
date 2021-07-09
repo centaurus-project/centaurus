@@ -62,7 +62,7 @@ namespace Centaurus.Test.Exchange.Analytics
                     new ProviderAsset { CentaurusAsset = 0, Token = "native"},
                     new ProviderAsset { CentaurusAsset = 1, IsVirtual = true, Token = $"USD-{stellarPaymentProviderVault}" }
                 },
-                Cursor = "1",
+                InitCursor = "1",
                 PaymentSubmitDelay = 0
             };
 

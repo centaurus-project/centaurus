@@ -15,10 +15,10 @@ namespace Centaurus.Models
         public OrderSide Side { get; set; }
 
         [XdrField(2)]
-        public int Asset { get; set; }
+        public string Asset { get; set; }
 
         [XdrField(3)]
-        public long Amount { get; set; }
+        public ulong Amount { get; set; }
 
         [XdrField(4)]
         public double Price { get; set; }

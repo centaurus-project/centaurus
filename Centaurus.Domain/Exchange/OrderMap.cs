@@ -19,17 +19,17 @@ namespace Centaurus.Domain
 
         public void AddOrder(OrderWrapper order)
         {
-            map.Add(order.OrderId, order);
+            map.Add(order.Apex, order);
         }
 
-        public bool RemoveOrder(ulong orderId, out OrderWrapper order)
+        public bool RemoveOrder(ulong apex, out OrderWrapper order)
         {
-            return map.Remove(orderId, out order);
+            return map.Remove(apex, out order);
         }
 
-        public OrderWrapper GetOrder(ulong orderId)
+        public OrderWrapper GetOrder(ulong apex)
         {
-            if (!map.TryGetValue(orderId, out OrderWrapper order)) return null;
+            if (!map.TryGetValue(apex, out OrderWrapper order)) return null;
             return order;
         }
 

@@ -9,6 +9,6 @@ namespace Centaurus.Models
         /// <summary>
         /// Account nonce.
         /// </summary>
-        public long Nonce => RequestId;
+        public ulong Nonce => (ulong)RequestId;
     }
 }

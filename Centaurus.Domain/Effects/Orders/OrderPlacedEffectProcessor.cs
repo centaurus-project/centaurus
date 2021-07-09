@@ -10,12 +10,14 @@ namespace Centaurus.Domain
     {
         private OrderbookBase orderBook;
         private OrderWrapper order;
+        private string baseAsset;
 
-        public OrderPlacedEffectProcessor(OrderPlacedEffect effect, AccountWrapper account, OrderbookBase orderBook, OrderWrapper order)
+        public OrderPlacedEffectProcessor(OrderPlacedEffect effect, AccountWrapper account, OrderbookBase orderBook, OrderWrapper order, string baseAsset)
             :base(effect, account)
         {
             this.orderBook = orderBook ?? throw new ArgumentNullException(nameof(orderBook));
             this.order = order ?? throw new ArgumentNullException(nameof(order));
+            this.baseAsset = baseAsset ?? throw new ArgumentNullException(nameof(baseAsset));
         }
 
         public override void CommitEffect()
@@ -23,11 +25,10 @@ namespace Centaurus.Domain
             MarkAsProcessed();
 
             //lock order reserve
-            var decodedId = OrderIdConverter.Decode(order.Order.OrderId);
-            if (decodedId.Side == OrderSide.Buy)
-                AccountWrapper.Account.GetBalance(0).UpdateLiabilities(order.Order.QuoteAmount);
+            if (order.Order.Side == OrderSide.Buy)
+                AccountWrapper.Account.GetBalance(baseAsset).UpdateLiabilities(order.Order.QuoteAmount, UpdateSign.Plus);
             else
-                AccountWrapper.Account.GetBalance(decodedId.Asset).UpdateLiabilities(order.Order.Amount);
+                AccountWrapper.Account.GetBalance(order.Order.Asset).UpdateLiabilities(order.Order.Amount, UpdateSign.Plus);
 
             //add order to the orderbook
             orderBook.InsertOrder(order);
@@ -37,13 +38,12 @@ namespace Centaurus.Domain
         {
             MarkAsProcessed();
 
-            orderBook.RemoveOrder(Effect.OrderId, out _);
+            orderBook.RemoveOrder(Effect.Apex, out _);
 
-            var decodedId = OrderIdConverter.Decode(order.OrderId);
-            if (decodedId.Side == OrderSide.Buy)
-                AccountWrapper.Account.GetBalance(0).UpdateLiabilities(-order.Order.QuoteAmount);
+            if (order.Order.Side == OrderSide.Buy)
+                AccountWrapper.Account.GetBalance(baseAsset).UpdateLiabilities(order.Order.QuoteAmount, UpdateSign.Minus);
             else
-                AccountWrapper.Account.GetBalance(decodedId.Asset).UpdateLiabilities(-order.Order.Amount);
+                AccountWrapper.Account.GetBalance(order.Order.Asset).UpdateLiabilities(order.Order.Amount, UpdateSign.Minus);
         }
     }
 }

@@ -18,7 +18,7 @@ namespace Centaurus.Models
         /// Asset to map to.
         /// </summary>
         [XdrField(1)]
-        public int CentaurusAsset { get; set; }
+        public string CentaurusAsset { get; set; }
 
         /// <summary>
         /// Is native asset or not.

@@ -29,7 +29,6 @@ namespace Centaurus.Test
             var settings = GlobalInitHelper.GetAlphaSettings();
 
             context = new ExecutionContext(settings, new MockStorage(), new MockPaymentProviderFactory(), useLegacyOrderbook);
-            context.Init().Wait();
 
             var requestRateLimits = new RequestRateLimits { HourLimit = 1000, MinuteLimit = 100 };
 
@@ -40,10 +39,13 @@ namespace Centaurus.Test
                 Balances = new List<Balance>()
             }, requestRateLimits);
 
-            account1.Account.CreateBalance(0);
-            account1.Account.GetBalance(0).UpdateBalance(10000000000);
-            account1.Account.CreateBalance(1);
-            account1.Account.GetBalance(1).UpdateBalance(10000000000);
+            var baseAsset = context.Constellation.GetBaseAsset();
+            var secondAsset = context.Constellation.Assets[1].Code;
+
+            account1.Account.CreateBalance(baseAsset);
+            account1.Account.GetBalance(baseAsset).UpdateBalance(10000000000, UpdateSign.Plus);
+            account1.Account.CreateBalance(secondAsset);
+            account1.Account.GetBalance(secondAsset).UpdateBalance(10000000000, UpdateSign.Plus);
 
             var account2 = new AccountWrapper(new Models.Account
             {
@@ -52,10 +54,10 @@ namespace Centaurus.Test
                 Balances = new List<Balance>()
             }, requestRateLimits);
 
-            account2.Account.CreateBalance(0);
-            account2.Account.GetBalance(0).UpdateBalance(10000000000);
-            account2.Account.CreateBalance(1);
-            account2.Account.GetBalance(1).UpdateBalance(10000000000);
+            account2.Account.CreateBalance(baseAsset);
+            account2.Account.GetBalance(baseAsset).UpdateBalance(10000000000, UpdateSign.Plus);
+            account2.Account.CreateBalance(secondAsset);
+            account2.Account.GetBalance(secondAsset).UpdateBalance(10000000000, UpdateSign.Plus);
 
             context.Setup(new Snapshot
             {
@@ -66,24 +68,21 @@ namespace Centaurus.Test
                 {
                     Providers = new List<ProviderSettings> {
                         new ProviderSettings {
-                            Assets = new List<ProviderAsset> { new ProviderAsset {  CentaurusAsset = 0, Token = "native" } },
-                            Cursor = "0",
+                            Assets = new List<ProviderAsset> { new ProviderAsset {  CentaurusAsset = "XLM", Token = "native" } },
+                            InitCursor = "0",
                             Name = "Stellar",
                             PaymentSubmitDelay = 0,
                             Provider = "Stellar",
                             Vault = KeyPair.Random().AccountId
                         }
                     },
-                    Assets = new List<AssetSettings> {
-                        new AssetSettings { Id = 0, Code = "XLM" },
-                        new AssetSettings { Id = 1, Code = "X" }
-                    },
+                    Assets = context.Constellation.Assets,
                     Auditors = new List<RawPubKey> { TestEnvironment.AlphaKeyPair, TestEnvironment.Auditor1KeyPair },
                     MinAccountBalance = 1,
                     MinAllowedLotSize = 1,
                     RequestRateLimits = requestRateLimits
                 }
-            }).Wait();
+            });
 
             this.account1 = context.AccountStorage.GetAccount(account1.Id);
             this.account2 = context.AccountStorage.GetAccount(account2.Id);
@@ -99,8 +98,8 @@ namespace Centaurus.Test
         private void ExecuteWithOrderbook(int iterations, bool useNormalDistribution, Action<Action> executor)
         {
             var rnd = new Random();
-
-            var market = context.Exchange.GetMarket(1);
+            var asset = context.Constellation.Assets[1].Code;
+            var market = context.Exchange.GetMarket(asset);
 
             var testTradeResults = new Dictionary<RequestQuantum, EffectProcessorsContainer>();
             for (var i = 1; i < iterations; i++)
@@ -109,8 +108,8 @@ namespace Centaurus.Test
                 var request = new OrderRequest
                 {
                     RequestId = i,
-                    Amount = rnd.Next(1, 20),
-                    Asset = 1,
+                    Amount = (ulong)rnd.Next(1, 20),
+                    Asset = asset,
                     Price = Math.Round(price * 27) / 13
                 };
                 var initiator = default(AccountWrapper);
@@ -129,7 +128,7 @@ namespace Centaurus.Test
 
                 var trade = new RequestQuantum
                 {
-                    Apex = i,
+                    Apex = (ulong)i,
                     RequestEnvelope = new MessageEnvelope
                     {
                         Message = request,
@@ -141,9 +140,9 @@ namespace Centaurus.Test
                 var conterOrderEffectsContainer = new EffectProcessorsContainer(context, trade.CreateEnvelope(), diffObject, initiator);
                 testTradeResults.Add(trade, conterOrderEffectsContainer);
             }
-
-            var xlmStartBalance = account1.Account.GetBalance(0).Amount + account2.Account.GetBalance(0).Amount;
-            var assetStartBalance = account1.Account.GetBalance(1).Amount + account2.Account.GetBalance(1).Amount;
+            var baseAsset = context.Constellation.GetBaseAsset();
+            var xlmStartBalance = account1.Account.GetBalance(baseAsset).Amount + account2.Account.GetBalance(baseAsset).Amount;
+            var assetStartBalance = account1.Account.GetBalance(asset).Amount + account2.Account.GetBalance(asset).Amount;
 
             executor(() =>
             {
@@ -159,25 +158,24 @@ namespace Centaurus.Test
                 var activeOrders = context.Exchange.OrderMap.GetAllAccountOrders(account);
                 foreach (var order in activeOrders)
                 {
-                    var decodedOrderId = OrderIdConverter.Decode(order.OrderId);
-
                     new OrderRemovedEffectProccessor(new OrderRemovedEffect
                     {
                         Account = account.Id,
-                        OrderId = order.OrderId,
+                        Apex = order.Apex,
                         Amount = order.Order.Amount,
                         QuoteAmount = order.Order.QuoteAmount,
                         Price = order.Order.Price,
-                        Asset = decodedOrderId.Asset
-                    }, account, market.GetOrderbook(decodedOrderId.Side)).CommitEffect();
+                        Asset = order.Order.Asset,
+                        Side = order.Order.Side
+                    }, account, market.GetOrderbook(order.Order.Side), baseAsset).CommitEffect();
                 }
             }
-            Assert.AreEqual(xlmStartBalance, account1.Account.GetBalance(0).Amount + account2.Account.GetBalance(0).Amount);
-            Assert.AreEqual(assetStartBalance, account1.Account.GetBalance(1).Amount + account2.Account.GetBalance(1).Amount);
-            Assert.AreEqual(0, account1.Account.GetBalance(0).Liabilities);
-            Assert.AreEqual(0, account1.Account.GetBalance(1).Liabilities);
-            Assert.AreEqual(0, account2.Account.GetBalance(0).Liabilities);
-            Assert.AreEqual(0, account2.Account.GetBalance(1).Liabilities);
+            Assert.AreEqual(xlmStartBalance, account1.Account.GetBalance(baseAsset).Amount + account2.Account.GetBalance(baseAsset).Amount);
+            Assert.AreEqual(assetStartBalance, account1.Account.GetBalance(asset).Amount + account2.Account.GetBalance(asset).Amount);
+            Assert.AreEqual(0, account1.Account.GetBalance(baseAsset).Liabilities);
+            Assert.AreEqual(0, account1.Account.GetBalance(asset).Liabilities);
+            Assert.AreEqual(0, account2.Account.GetBalance(baseAsset).Liabilities);
+            Assert.AreEqual(0, account2.Account.GetBalance(asset).Liabilities);
         }
 
         [Test]
@@ -195,7 +193,7 @@ namespace Centaurus.Test
         {
             ExecuteWithOrderbook(iterations, useNormalDistribution, executeOrders => PerfCounter.MeasureTime(executeOrders, () =>
             {
-                var market = context.Exchange.GetMarket(1);
+                var market = context.Exchange.GetMarket(context.Constellation.Assets[1].Code);
                 return $"Is legacy orderbook: {useLegacyOrderbook}, {iterations} iterations, orderbook size: {market.Bids.Count} bids,  {market.Asks.Count} asks, {market.Bids.GetBestPrice().ToString("G3")}/{market.Asks.GetBestPrice().ToString("G3")} spread.";
             }));
         }
@@ -209,7 +207,7 @@ namespace Centaurus.Test
             var random = new Random();
             var price = 1D;
             var side = OrderSide.Buy;
-            var asset = 1;
+            var asset = context.Constellation.Assets[1].Code;
 
             var orderbook = context.Exchange.GetOrderbook(asset, side);
             var ordersCount = 1000;
@@ -220,9 +218,8 @@ namespace Centaurus.Test
                     price = price * 1.01;
                 else
                     price = 1 + random.NextDouble();
-                var orderId = OrderIdConverter.Encode((ulong)i, asset, side);
-                var amount = 1000;
-                var order = new OrderWrapper(new Order { OrderId = orderId, Amount = 1000, Price = price, QuoteAmount = OrderMatcher.EstimateQuoteAmount(amount, price, side) }, fakeAccountWrapper);
+                var amount = 1000ul;
+                var order = new OrderWrapper(new Order { Apex = (ulong)i, Amount = 1000, Price = price, QuoteAmount = OrderMatcher.EstimateQuoteAmount(amount, price, side) }, fakeAccountWrapper);
                 orders.Add(order);
                 orderbook.InsertOrder(order);
             }
@@ -241,7 +238,7 @@ namespace Centaurus.Test
 
             foreach (var order in orders)
             {
-                orderbook.RemoveOrder(order.OrderId, out _);
+                orderbook.RemoveOrder(order.Apex, out _);
                 ordersCount--;
                 Assert.AreEqual(ordersCount, orderbook.Count);
                 Assert.AreEqual(ordersCount, getOrdersCount());

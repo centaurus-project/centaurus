@@ -7,7 +7,7 @@ namespace Centaurus.Domain
     [Command("GetPriceHistory")]
     public class GetPriceHistoryCommand: BaseCommand
     {
-        public int Market { get; set; }
+        public string Market { get; set; }
 
         public PriceHistoryPeriod Period { get; set; }
 

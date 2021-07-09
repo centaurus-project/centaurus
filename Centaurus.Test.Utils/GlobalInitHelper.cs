@@ -2,6 +2,7 @@
 using Centaurus.Domain;
 using Centaurus.Models;
 using Centaurus.PaymentProvider;
+using Centaurus.PersistentStorage.Abstraction;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -59,12 +60,10 @@ namespace Centaurus.Test
             return new List<KeyPair> { TestEnvironment.AlphaKeyPair, TestEnvironment.Auditor1KeyPair };
         }
 
-        private static async Task<IStorage> GetStorage(string connectionString)
+        private static IPersistentStorage GetStorage(string connectionString)
         {
             var storage = new MockStorage();
-            await storage.OpenConnection(connectionString);
-            await storage.DropDatabase();
-            await storage.CloseConnection();
+            storage.Connect(connectionString);
             return storage;
         }
 
@@ -74,7 +73,7 @@ namespace Centaurus.Test
         public static async Task<ExecutionContext> DefaultAlphaSetup()
         {
             var settings = GetAlphaSettings();
-            var storage = await GetStorage(settings.ConnectionString);
+            var storage = GetStorage(settings.ConnectionString);
             return await Setup(GetPredefinedClients(), GetPredefinedAuditors(), settings, storage);
         }
 
@@ -84,7 +83,7 @@ namespace Centaurus.Test
         public static async Task<ExecutionContext> DefaultAuditorSetup()
         {
             var settings = GetAuditorSettings();
-            var storage = await GetStorage(settings.ConnectionString);
+            var storage = GetStorage(settings.ConnectionString);
             return await Setup(GetPredefinedClients(), GetPredefinedAuditors(), settings, storage);
         }
 
@@ -94,25 +93,23 @@ namespace Centaurus.Test
         /// <param name="clients">Clients to add to constellation</param>
         /// <param name="auditors">Auditors to add to constellation</param>
         /// <param name="settings">Settings that will be used to init Global</param>
-        public static async Task<ExecutionContext> Setup(List<KeyPair> clients, List<KeyPair> auditors, Settings settings, IStorage storage)
+        public static async Task<ExecutionContext> Setup(List<KeyPair> clients, List<KeyPair> auditors, Settings settings, IPersistentStorage storage)
         {
             var context = new ExecutionContext(settings, storage, new MockPaymentProviderFactory());
 
-            await context.Init();
-
-            var assets = new List<AssetSettings> { new AssetSettings { Id = 0, Code = "XLM" }, new AssetSettings { Id = 1, Code = "USD" } };
+            var assets = new List<AssetSettings> { new AssetSettings { Code = "XLM" }, new AssetSettings { Code = "USD" } };
 
             var stellarProviderVault = KeyPair.Random().AccountId;
 
             var stellarProviderSettings = new ProviderSettings
             {
                 Provider = "Stellar",
-                Cursor = "0",
+                InitCursor = "0",
                 Vault = stellarProviderVault,
                 Assets = new List<ProviderAsset>
                         {
-                            new ProviderAsset { CentaurusAsset = 0, Token = "native" },
-                            new ProviderAsset { CentaurusAsset = 1, Token = $"USD-{stellarProviderVault}", IsVirtual = true }
+                            new ProviderAsset { CentaurusAsset = "XLM", Token = "native" },
+                            new ProviderAsset { CentaurusAsset = "USD", Token = $"USD-{stellarProviderVault}", IsVirtual = true }
                         },
                 Name = "Test SDF Network ; September 2015",
                 PaymentSubmitDelay = 0
@@ -133,7 +130,7 @@ namespace Centaurus.Test
             await context.QuantumHandler.HandleAsync(new ConstellationQuantum { Apex = 1, RequestEnvelope = initRequest }.CreateEnvelope());
 
             var deposits = new List<Deposit>();
-            Action<byte[], int> addAssetsFn = (acc, asset) =>
+            Action<byte[], string> addAssetsFn = (acc, asset) =>
             {
                 deposits.Add(new Deposit
                 {
@@ -146,22 +143,18 @@ namespace Centaurus.Test
 
             for (int i = 0; i < clients.Count; i++)
             {
-                //add xlm
-                addAssetsFn(clients[i].PublicKey, 0);
                 for (var c = 0; c < assets.Count; c++)
-                    addAssetsFn(clients[i].PublicKey, assets[c].Id);
+                    addAssetsFn(clients[i].PublicKey, assets[c].Code);
             }
-
-            var providerId = PaymentProviderBase.GetProviderId(stellarProviderSettings.Provider, stellarProviderSettings.Name);
 
             var txNotification = new DepositNotification
             {
                 Cursor = "2",
                 Items = deposits,
-                ProviderId = providerId
+                ProviderId = stellarProviderSettings.ProviderId
             };
 
-            context.PaymentProvidersManager.TryGetManager(providerId, out var paymentProvider);
+            context.PaymentProvidersManager.TryGetManager(stellarProviderSettings.ProviderId, out var paymentProvider);
             paymentProvider.NotificationsManager.RegisterNotification(txNotification);
 
             var depositQuantum = new DepositQuantum

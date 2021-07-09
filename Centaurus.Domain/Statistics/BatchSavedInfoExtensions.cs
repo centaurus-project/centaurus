@@ -16,7 +16,6 @@ namespace Centaurus.Domain
                 EffectsCount = batchSavedInfo.EffectsCount,
                 QuantaCount = batchSavedInfo.QuantaCount,
                 ElapsedMilliseconds = batchSavedInfo.ElapsedMilliseconds,
-                Retries = batchSavedInfo.Retries,
                 SavedAt = batchSavedInfo.SavedAt.Ticks
             };
         }
@@ -31,7 +30,6 @@ namespace Centaurus.Domain
                 EffectsCount = batchSavedInfo.EffectsCount,
                 QuantaCount = batchSavedInfo.QuantaCount,
                 ElapsedMilliseconds = batchSavedInfo.ElapsedMilliseconds,
-                Retries = batchSavedInfo.Retries,
                 SavedAt = new DateTime(batchSavedInfo.SavedAt, DateTimeKind.Utc)
             };
         }

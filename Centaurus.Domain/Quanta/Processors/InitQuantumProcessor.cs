@@ -9,7 +9,7 @@ namespace Centaurus.Domain
     {
         public override MessageTypes SupportedMessageType => MessageTypes.ConstellationInitRequest;
 
-        public override async Task<QuantumResultMessage> Process(ProcessorContext context)
+        public override Task<QuantumResultMessage> Process(ProcessorContext context)
         {
             var initQuantum = (ConstellationInitRequest)((ConstellationQuantum)context.Envelope.Message).RequestMessage;
 
@@ -18,7 +18,7 @@ namespace Centaurus.Domain
                 (ConstellationInitEffect)context.EffectProcessors.Effects[0],
                 context.Envelope.ComputeMessageHash()
             );
-            await context.CentaurusContext.Setup(initSnapshot);
+            context.CentaurusContext.Setup(initSnapshot);
 
             context.CentaurusContext.AppState.State = ApplicationState.Running;
             if (!context.CentaurusContext.IsAlpha) //set auditor to Ready state after init
@@ -28,7 +28,7 @@ namespace Centaurus.Domain
                 context.CentaurusContext.AppState.State = ApplicationState.Ready;
             }
 
-            return (QuantumResultMessage)context.Envelope.CreateResult(ResultStatusCodes.Success);
+            return Task.FromResult((QuantumResultMessage)context.Envelope.CreateResult(ResultStatusCodes.Success));
         }
 
         const int minAuditorsCount = 2;
@@ -58,7 +58,7 @@ namespace Centaurus.Domain
             if (constellationInit.MinAllowedLotSize < 1)
                 throw new ArgumentException("Minimal allowed lot size is less then 0");
 
-            if (constellationInit.Assets.GroupBy(a => a.Code).Any(g => g.Count() > 1) || constellationInit.Assets.GroupBy(a => a.Id).Any(g => g.Count() > 1))
+            if (constellationInit.Assets.GroupBy(a => a.Code).Any(g => g.Count() > 1) || constellationInit.Assets.GroupBy(a => a.Code).Any(g => g.Count() > 1))
                 throw new ArgumentException("All asset values must be unique");
 
             if (constellationInit.RequestRateLimits == null || constellationInit.RequestRateLimits.HourLimit < 1 || constellationInit.RequestRateLimits.MinuteLimit < 1)

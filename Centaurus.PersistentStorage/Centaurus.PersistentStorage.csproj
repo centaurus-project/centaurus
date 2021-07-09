@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MessagePack" Version="2.2.85" />
+    <PackageReference Include="RocksDB" Version="6.17.3.16253" />
+  </ItemGroup>
+
+</Project>

@@ -1,14 +1,11 @@
-using System;
-using System.Diagnostics;
-using System.IO;
-using System.Net.WebSockets;
-using System.Threading;
 using Centaurus.Alpha;
 using Centaurus.Client;
-using Centaurus.DAL;
-using Centaurus.DAL.Mongo;
+using Centaurus.PersistentStorage.Abstraction;
 using CommandLine;
 using NLog;
+using System;
+using System.IO;
+using System.Threading;
 
 namespace Centaurus
 {
@@ -40,7 +37,7 @@ namespace Centaurus
                 LogConfigureHelper.Configure(logsDirectory, settings.Silent, settings.Verbose);
                 isLoggerInited = true;
 
-                var context = new Domain.ExecutionContext(settings, new MongoStorage(), PaymentProvider.PaymentProviderFactoryBase.Default);
+                var context = new Domain.ExecutionContext(settings, new PersistentStorageAbstraction(), PaymentProvider.PaymentProviderFactoryBase.Default);
                 var startup = new StartupMain(context, ClientConnectionFactoryBase.Default, AlphaHostFactoryBase.Default);
 
                 var resetEvent = new ManualResetEvent(false);

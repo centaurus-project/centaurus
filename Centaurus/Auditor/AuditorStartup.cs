@@ -24,13 +24,11 @@ namespace Centaurus.Client
             this.connectionFactory = connectionFactory;
         }
 
-        public override async Task Run(ManualResetEvent resetEvent)
+        public override Task Run(ManualResetEvent resetEvent)
         {
             try
             {
                 this.resetEvent = resetEvent;
-
-                await Context.Init();
                 Context.AppState.StateChanged += StateChanged;
 
                 InternalRun();
@@ -44,6 +42,8 @@ namespace Centaurus.Client
                 if (!isSet)
                     resetEvent.Set();
             }
+
+            return Task.CompletedTask;
         }
 
         private void InternalRun()
@@ -85,8 +85,7 @@ namespace Centaurus.Client
         {
             if (eventArgs.State == ApplicationState.Failed)
             {
-                Console.WriteLine("Application failed. Saving pending updates...");
-                Thread.Sleep(PendingUpdatesManager.SaveInterval);
+                Console.WriteLine("Application failed.");
                 resetEvent.Set();
             }
         }

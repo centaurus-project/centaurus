@@ -10,9 +10,9 @@ namespace Centaurus
 
         public string[] Auditors { get; set; }
 
-        public long MinAccountBalance { get; set; }
+        public ulong MinAccountBalance { get; set; }
 
-        public long MinAllowedLotSize { get; set; }
+        public ulong MinAllowedLotSize { get; set; }
 
         public AssetSettings[] Assets { get; set; }
 

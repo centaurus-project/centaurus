@@ -12,7 +12,7 @@ namespace Centaurus.Domain
 {
     public class Orderbook : OrderbookBase
     {
-        public Orderbook(OrderMap orderMap, int market, OrderSide side)
+        public Orderbook(OrderMap orderMap, string market, OrderSide side)
             : base(orderMap, market, side)
         {
         }

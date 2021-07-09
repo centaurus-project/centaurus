@@ -12,7 +12,7 @@ namespace Centaurus.Domain.WebSockets.Alpha.Info.CommandHandlers
         {
 
         }
-        public override Task<BaseResponse> Handle(InfoWebSocketConnection infoWebSocket, SubscribeCommand command)
+        public override BaseResponse Handle(InfoWebSocketConnection infoWebSocket, SubscribeCommand command)
         {
             if (command.Subscriptions == null || command.Subscriptions.Count < 1)
                 throw new BadRequestException("At least one subscription must be specified.");
@@ -22,7 +22,7 @@ namespace Centaurus.Domain.WebSockets.Alpha.Info.CommandHandlers
 
                 infoWebSocket.AddSubscription(Context.SubscriptionsManager.GetOrAddSubscription(BaseSubscription.GetBySubscriptionName(subsName)));
             }
-            return Task.FromResult((BaseResponse)new SuccesResponse());
+            return new SuccesResponse();
         }
     }
 }

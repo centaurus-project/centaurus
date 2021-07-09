@@ -10,17 +10,17 @@ namespace Centaurus.Exchange.Analytics
 {
     public class AnalyticsExchange
     {
-        private Dictionary<int, AnalyticsMarket> Markets = new Dictionary<int, AnalyticsMarket>();
+        private Dictionary<string, AnalyticsMarket> Markets = new Dictionary<string, AnalyticsMarket>();
 
         public AnalyticsOrderMap OrderMap { get; } = new AnalyticsOrderMap();
 
-        public AnalyticsMarket GetMarket(int asset)
+        public AnalyticsMarket GetMarket(string asset)
         {
             if (Markets.TryGetValue(asset, out AnalyticsMarket market)) return market;
             throw new InvalidOperationException($"Asset {asset} is not supported");
         }
 
-        public AnalyticsMarket AddMarket(int asset)
+        public AnalyticsMarket AddMarket(string asset)
         {
             var market = new AnalyticsMarket(asset, OrderMap);
             Markets.Add(asset, market);
@@ -33,28 +33,25 @@ namespace Centaurus.Exchange.Analytics
             OrderMap.Clear();
         }
 
-        public AnalyticsOrderbook GetOrderbook(ulong offerId)
-        {
-            var parts = OrderIdConverter.Decode(offerId);
-            return GetOrderbook(parts.Asset, parts.Side);
-        }
-
-        public AnalyticsOrderbook GetOrderbook(int asset, OrderSide side)
+        public AnalyticsOrderbook GetOrderbook(string asset, OrderSide side)
         {
             return GetMarket(asset).GetOrderbook(side);
         }
 
         public OrderInfoWrapper GetOrder(ulong offerId)
         {
-            return GetOrderbook(offerId).GetOrder(offerId);
+            return OrderMap.GetOrder(offerId);
         }
 
         public bool RemoveOrder(ulong offerId)
         {
-            return GetOrderbook(offerId).RemoveOrder(offerId);
+            var order = GetOrder(offerId);
+            if (order == null)
+                throw new Exception($"Order {offerId} is not found");
+            return GetOrderbook(order.Order.Market, order.Order.Side).RemoveOrder(offerId);
         }
 
-        public static AnalyticsExchange RestoreExchange(List<int> assets, List<OrderInfo> orders)
+        public static AnalyticsExchange RestoreExchange(List<string> assets, List<OrderInfo> orders)
         {
             var exchange = new AnalyticsExchange();
             foreach (var asset in assets)
@@ -62,9 +59,7 @@ namespace Centaurus.Exchange.Analytics
 
             foreach (var order in orders)
             {
-                var orderData = OrderIdConverter.Decode(order.OrderId);
-                var market = exchange.GetMarket(orderData.Asset);
-                var orderbook = market.GetOrderbook(orderData.Side);
+                var orderbook = exchange.GetOrderbook(order.Market, order.Side);
                 orderbook.InsertOrder(new OrderInfoWrapper { Order = order });
             }
             return exchange;

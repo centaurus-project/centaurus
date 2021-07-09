@@ -7,13 +7,13 @@ namespace Centaurus.Models
     public class Balance
     {
         [XdrField(0)]
-        public int Asset { get; set; }
+        public string Asset { get; set; }
 
         [XdrField(1)]
-        public long Amount { get; set; }
+        public ulong Amount { get; set; }
 
         [XdrField(2)]
-        public long Liabilities { get; set; }
+        public ulong Liabilities { get; set; }
 
         public override string ToString()
         {

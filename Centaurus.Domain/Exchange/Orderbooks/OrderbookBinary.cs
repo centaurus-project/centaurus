@@ -16,7 +16,7 @@ namespace Centaurus.Domain
         public List<OrderWrapper> sortedOrders = new List<OrderWrapper>();
         OrderComparer comparer;
 
-        public OrderbookBinary(OrderMap orderMap, int market, OrderSide side)
+        public OrderbookBinary(OrderMap orderMap, string market, OrderSide side)
             : base(orderMap, market, side)
         {
             comparer = new OrderComparer(side);
@@ -47,7 +47,7 @@ namespace Centaurus.Domain
         /// <returns>Removal result.</returns>
         public override bool RemoveOrder(ulong orderId, out OrderWrapper order)
         {
-            var isHead = orderId == Head?.OrderId;
+            var isHead = orderId == Head?.Apex;
             if (!base.RemoveOrder(orderId, out order))
                 return false;
 
@@ -75,7 +75,7 @@ namespace Centaurus.Domain
         {
             var priceCompareRes = side == OrderSide.Sell ? x.Order.Price.CompareTo(y.Order.Price) : y.Order.Price.CompareTo(x.Order.Price);
             if (priceCompareRes == 0)
-                return x.OrderId.CompareTo(y.OrderId);
+                return x.Apex.CompareTo(y.Apex);
             return priceCompareRes;
         }
     }

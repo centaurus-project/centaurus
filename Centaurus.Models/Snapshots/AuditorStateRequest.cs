@@ -11,6 +11,6 @@ namespace Centaurus.Models
         public override MessageTypes MessageType => MessageTypes.AuditorStateRequest;
 
         [XdrField(0)]
-        public long TargetApex { get; set; }
+        public ulong TargetApex { get; set; }
     }
 }

@@ -9,7 +9,7 @@ namespace Centaurus.Domain
 {
     public class Snapshot
     {
-        public long Apex { get; set; }
+        public ulong Apex { get; set; }
 
         public byte[] LastHash { get; set; }
 
@@ -18,5 +18,7 @@ namespace Centaurus.Domain
         public List<AccountWrapper> Accounts { get; set; }
 
         public List<OrderWrapper> Orders { get; set; }
+
+        public Dictionary<string, string> Cursors { get; set; }
     }
 }

@@ -6,13 +6,13 @@ namespace Centaurus.Models
 {
     public class Trade
     {
-        public int Asset { get; set; }
+        public string Asset { get; set; }
 
-        public long Amount { get; set; }
+        public ulong Amount { get; set; }
 
         public double Price { get; set; }
 
-        public long QuoteAmount { get; set; }
+        public ulong QuoteAmount { get; set; }
 
         public DateTime TradeDate { get; set; } 
     }

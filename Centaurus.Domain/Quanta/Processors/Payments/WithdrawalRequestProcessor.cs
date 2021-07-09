@@ -13,7 +13,7 @@ namespace Centaurus.Domain
         {
             context.UpdateNonce();
 
-            context.EffectProcessors.AddBalanceUpdate(context.SourceAccount, context.WithdrawalRequest.Asset, -context.WithdrawalRequest.Amount);
+            context.EffectProcessors.AddBalanceUpdate(context.SourceAccount, context.WithdrawalRequest.Asset, context.WithdrawalRequest.Amount, UpdateSign.Minus);
 
             return Task.FromResult((QuantumResultMessage)context.Envelope.CreateResult(ResultStatusCodes.Success));
         }
@@ -24,7 +24,7 @@ namespace Centaurus.Domain
 
             var sourceAccount = context.SourceAccount.Account;
 
-            var centaurusAsset = context.CentaurusContext.Constellation.Assets.FirstOrDefault(a => a.Id == context.WithdrawalRequest.Asset);
+            var centaurusAsset = context.CentaurusContext.Constellation.Assets.FirstOrDefault(a => a.Code == context.WithdrawalRequest.Asset);
             if (centaurusAsset == null || centaurusAsset.IsSuspended)
                 throw new BadRequestException($"Constellation doesn't support asset '{context.WithdrawalRequest.Asset}'.");
 
@@ -32,8 +32,10 @@ namespace Centaurus.Domain
             if (providerAsset == null)
                 throw new BadRequestException($"Current provider doesn't support withdrawal of asset {centaurusAsset.Code}.");
 
-            var minBalance = centaurusAsset.Id == 0 ? context.CentaurusContext.Constellation.MinAccountBalance : 0;
-            if (!(sourceAccount.GetBalance(centaurusAsset.Id)?.HasSufficientBalance(context.WithdrawalRequest.Amount, minBalance) ?? false))
+            var baseAsset = context.CentaurusContext.Constellation.GetBaseAsset();
+
+            var minBalance = centaurusAsset.Code == baseAsset ? context.CentaurusContext.Constellation.MinAccountBalance : 0;
+            if (!(sourceAccount.GetBalance(centaurusAsset.Code)?.HasSufficientBalance(context.WithdrawalRequest.Amount, minBalance) ?? false))
                 throw new BadRequestException($"Insufficient balance.");
 
             if (context.CentaurusContext.IsAlpha) //if it's Alpha than we need to build transaction

@@ -58,7 +58,7 @@ namespace Centaurus
         public QuantumSyncWorker QuantumWorker { get; private set; }
         private readonly object apexCursorSyncRoot = new { };
 
-        private void ResetApexCursor(long newApexCursor)
+        private void ResetApexCursor(ulong newApexCursor)
         {
             lock (apexCursorSyncRoot)
             {

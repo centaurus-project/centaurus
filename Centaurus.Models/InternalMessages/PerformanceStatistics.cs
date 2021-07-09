@@ -32,12 +32,9 @@ namespace Centaurus.Models
         public int EffectsCount { get; set; }
 
         [XdrField(2)]
-        public int Retries { get; set; }
-
-        [XdrField(3)]
         public long ElapsedMilliseconds { get; set; }
 
-        [XdrField(4)]
+        [XdrField(3)]
         public long SavedAt { get; set; }
     }
 }

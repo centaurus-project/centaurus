@@ -9,10 +9,10 @@ namespace Centaurus.Models
         public override MessageTypes MessageType => MessageTypes.PaymentRequest;
 
         [XdrField(0)]
-        public int Asset { get; set; }
+        public string Asset { get; set; }
 
         [XdrField(1)]
-        public long Amount { get; set; }
+        public ulong Amount { get; set; }
 
         [XdrField(2)]
         public RawPubKey Destination { get; set; }

@@ -1,11 +1,9 @@
 ﻿using Centaurus.DAL;
-using Centaurus.DAL.Models;
 using Centaurus.Domain.Models;
 using Centaurus.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 
 namespace Centaurus.Domain
 {
@@ -23,15 +21,11 @@ namespace Centaurus.Domain
 
         public List<Effect> Effects { get; } = new List<Effect>();
 
-        public HashSet<int> AffectedAccounts { get; } = new HashSet<int>();
-
         public DiffObject PendingDiffObject { get; }
 
         public Quantum Quantum => (Quantum)Envelope.Message;
 
-        public long Apex => Quantum.Apex;
-
-        public RequestQuantum RequestQuantum => (RequestQuantum)Envelope.Message;
+        public ulong Apex => Quantum.Apex;
 
         public AccountWrapper AccountWrapper { get; }
 
@@ -43,16 +37,13 @@ namespace Centaurus.Domain
         {
             Effects.Add(effectProcessor.Effect);
             effectProcessor.CommitEffect();
-            this.Aggregate(Envelope, effectProcessor.Effect);
-            if (effectProcessor.Effect.Account != 0)
-                AffectedAccounts.Add(effectProcessor.Effect.Account);
         }
 
         /// <summary>
         /// Unwraps and returns effects for specified account.
         /// </summary>
         /// <returns></returns>
-        public Effect[] GetEffects(int account)
+        public Effect[] GetEffects(ulong account)
         {
             return Effects
                 .Where(e => e.Account == account)
@@ -64,31 +55,31 @@ namespace Centaurus.Domain
         /// <param name="buffer">Buffer to use for serialization</param>
         public void Complete(EffectsProof effectsProof, byte[] buffer)
         {
-            var quantumModel = QuantumContainerExtensions.FromQuantumContainer(
+            var quantumModel = QuantumPersistentModelExtensions.ToPersistentModel(
                 Envelope,
                 Effects,
                 effectsProof,
-                AffectedAccounts.ToArray(), 
                 buffer);
-            PendingDiffObject.Quanta.Add(quantumModel);
+            PendingDiffObject.Batch.Add(quantumModel);
+            PendingDiffObject.Batch.AddRange(Effects.Select(e => e.ToPersistentModel()).ToList());
             PendingDiffObject.EffectsCount += Effects.Count;
+            PendingDiffObject.QuantaCount++;
         }
 
         /// <summary>
         /// Creates message notifications for accounts that were affected by quantum
         /// </summary>
         /// <returns></returns>
-        public Dictionary<int, Message> GetNotificationMessages()
+        public Dictionary<ulong, Message> GetNotificationMessages()
         {
-            var requestAccount = 0;
+            var requestAccount = 0ul;
             if (Envelope.Message is RequestQuantum request)
                 requestAccount = request.RequestMessage.Account;
 
-            var result = new Dictionary<int, EffectsNotification>();
+            var result = new Dictionary<ulong, EffectsNotification>();
             foreach (var effect in Effects)
             {
-                if (effect.Account == 0
-                    || effect.Account == requestAccount)
+                if (effect.Account == 0 || effect.Account == requestAccount)
                     continue;
                 if (!result.TryGetValue(effect.Account, out var effectsNotification))
                 {

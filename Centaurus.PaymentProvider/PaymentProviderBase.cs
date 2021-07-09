@@ -15,8 +15,7 @@ namespace Centaurus.PaymentProvider
         public PaymentProviderBase(ProviderSettings settings, string rawConfig)
         {
             Settings = settings ?? throw new ArgumentNullException(nameof(settings));
-            Id = GetProviderId(settings.Provider, settings.Name);
-            NotificationsManager = new DepositNotificationManager(settings.Cursor, this);
+            NotificationsManager = new DepositNotificationManager(settings.InitCursor, this);
         }
 
         public event Action<MessageEnvelope> OnPaymentCommit;
@@ -46,7 +45,7 @@ namespace Centaurus.PaymentProvider
 
         public string Vault => Settings.Vault;
 
-        public string Id { get; }
+        public string Id => Settings.ProviderId;
 
         public DepositNotificationManager NotificationsManager { get; }
 
@@ -70,16 +69,5 @@ namespace Centaurus.PaymentProvider
         public abstract int CompareCursors(string left, string right);
 
         public abstract void Dispose();
-
-        public static string GetProviderId(string provider, string name)
-        {
-            if (string.IsNullOrWhiteSpace(provider))
-                throw new ArgumentNullException(nameof(provider));
-
-            if (string.IsNullOrWhiteSpace(name))
-                throw new ArgumentNullException(nameof(name));
-
-            return $"{provider}-{name}";
-        }
     }
 }

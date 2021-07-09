@@ -11,7 +11,7 @@ namespace Centaurus.Domain.Models
             RequestCounter = new AccountRequestCounter(Account, requestRateLimits);
         }
 
-        public int Id => Account.Id;
+        public ulong Id => Account.Id;
 
         public Account Account { get; }
 

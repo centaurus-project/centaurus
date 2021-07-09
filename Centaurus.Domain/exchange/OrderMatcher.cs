@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using Centaurus.Domain.Models;
 using Centaurus.Models;
 
@@ -8,36 +9,37 @@ namespace Centaurus.Domain
     {
         public OrderMatcher(OrderRequest orderRequest, EffectProcessorsContainer effectsContainer)
         {
-            resultEffects = effectsContainer;
+            this.effectsContainer = effectsContainer;
+            baseAsset = effectsContainer.Context.Constellation.GetBaseAsset();
 
             takerOrder = new OrderWrapper(
                 new Order
                 {
-                    OrderId = OrderIdConverter.FromRequest(orderRequest, effectsContainer.Apex),
+                    Apex = effectsContainer.Apex,
                     Amount = orderRequest.Amount,
-                    Price = orderRequest.Price
+                    Price = orderRequest.Price,
+                    Asset = orderRequest.Asset,
+                    Side = orderRequest.Side
                 },
                 effectsContainer.AccountWrapper
             );
             timeInForce = orderRequest.TimeInForce;
 
-            //parse data from the ID of the newly arrived order 
-            var orderData = OrderIdConverter.Decode(takerOrder.OrderId);
-            asset = orderData.Asset;
-            side = orderData.Side;
+            asset = takerOrder.Order.Asset;
+            side = takerOrder.Order.Side;
             //get asset orderbook
             market = effectsContainer.Context.Exchange.GetMarket(asset);
             orderbook = market.GetOrderbook(side.Inverse());
             //fetch balances
             if (!takerOrder.AccountWrapper.Account.HasBalance(asset))
-                resultEffects.AddBalanceCreate(effectsContainer.AccountWrapper, asset);
+                this.effectsContainer.AddBalanceCreate(effectsContainer.AccountWrapper, asset);
         }
 
         private readonly OrderWrapper takerOrder;
 
         private readonly TimeInForce timeInForce;
 
-        private readonly int asset;
+        private readonly string asset;
 
         private readonly OrderSide side;
 
@@ -45,7 +47,9 @@ namespace Centaurus.Domain
 
         private readonly ExchangeMarket market;
 
-        private readonly EffectProcessorsContainer resultEffects;
+        private readonly EffectProcessorsContainer effectsContainer;
+
+        private readonly string baseAsset;
 
         /// <summary>
         /// Match using specified time-in-force logic.
@@ -57,10 +61,10 @@ namespace Centaurus.Domain
             var counterOrder = orderbook.Head;
             var nextOrder = default(OrderWrapper);
 
-            var updates = new ExchangeUpdate(asset, new DateTime(resultEffects.Quantum.Timestamp, DateTimeKind.Utc));
+            var updates = new ExchangeUpdate(asset, new DateTime(effectsContainer.Quantum.Timestamp, DateTimeKind.Utc));
 
-            var tradeAssetAmount = 0L;
-            var tradeQuoteAmount = 0L;
+            var tradeAssetAmount = 0ul;
+            var tradeQuoteAmount = 0ul;
             //orders in the orderbook are already sorted by price and age, so we can iterate through them in natural order
             while (counterOrder != null)
             {
@@ -93,16 +97,17 @@ namespace Centaurus.Domain
             return updates;
         }
 
-        private void RecordTrade(long tradeAssetAmount, long tradeQuoteAmount)
+        private void RecordTrade(ulong tradeAssetAmount, ulong tradeQuoteAmount)
         {
             if (tradeAssetAmount == 0)
                 return;
 
             //record taker trade effect. AddTrade will update order amount
-            resultEffects.AddTrade(
+            effectsContainer.AddTrade(
                 takerOrder,
                 tradeAssetAmount,
                 tradeQuoteAmount,
+                baseAsset,
                 true
             );
         }
@@ -113,15 +118,15 @@ namespace Centaurus.Domain
         /// <param name="assetAmountToTrade">Amount of an asset to trade</param>
         /// <param name="price">Asset price</param>
         /// <returns></returns>
-        public static long EstimateQuoteAmount(long amount, double price, OrderSide side)
+        public static ulong EstimateQuoteAmount(ulong amount, double price, OrderSide side)
         {
             var amt = price * amount;
             switch (side)
             { //add 0.1% to compensate possible rounding errors
                 case OrderSide.Buy:
-                    return (long)Math.Ceiling(amt * 1.001);
+                    return (ulong)Math.Ceiling(amt * 1.001);
                 case OrderSide.Sell:
-                    return (long)Math.Floor(amt * 0.999);
+                    return (ulong)Math.Floor(amt * 0.999);
                 default:
                     throw new InvalidOperationException();
             }
@@ -139,7 +144,7 @@ namespace Centaurus.Domain
             //select the market to add new order
             var reminderOrderbook = market.GetOrderbook(side);
             //record maker trade effect
-            resultEffects.AddOrderPlaced(reminderOrderbook, takerOrder);
+            effectsContainer.AddOrderPlaced(reminderOrderbook, takerOrder, baseAsset);
             return true;
         }
 
@@ -154,7 +159,7 @@ namespace Centaurus.Domain
             /// <param name="matcher">Parent OrderMatcher instance</param>
             /// <param name="takerOrderAmount">Taker order current amount</param>
             /// <param name="makerOrder">Crossed order from the orderbook</param>
-            public OrderMatch(OrderMatcher matcher, long takerOrderAmount, OrderWrapper makerOrder)
+            public OrderMatch(OrderMatcher matcher, ulong takerOrderAmount, OrderWrapper makerOrder)
             {
                 this.matcher = matcher;
                 this.makerOrder = makerOrder;
@@ -163,9 +168,9 @@ namespace Centaurus.Domain
                 QuoteAmount = EstimateQuoteAmount(AssetAmount, makerOrder.Order.Price, matcher.side);
             }
 
-            public long AssetAmount { get; }
+            public ulong AssetAmount { get; }
 
-            public long QuoteAmount;
+            public ulong QuoteAmount;
 
             private OrderMatcher matcher;
 
@@ -187,8 +192,8 @@ namespace Centaurus.Domain
                 else
                 {
                     counterOrder.State = OrderState.Updated;
-                    counterOrder.AmountDiff = -trade.Amount;
-                    counterOrder.QuoteAmountDiff = -trade.QuoteAmount;
+                    counterOrder.AmountDiff = trade.Amount;
+                    counterOrder.QuoteAmountDiff = trade.QuoteAmount;
                 }
 
                 return (trade, counterOrder);
@@ -197,10 +202,11 @@ namespace Centaurus.Domain
             private Trade RecordTrade()
             {
                 //record maker trade effect
-                matcher.resultEffects.AddTrade(
+                matcher.effectsContainer.AddTrade(
                          makerOrder,
                          AssetAmount,
                          QuoteAmount,
+                         matcher.baseAsset,
                          false
                      );
 
@@ -210,13 +216,13 @@ namespace Centaurus.Domain
                     QuoteAmount = QuoteAmount,
                     Asset = matcher.asset,
                     Price = makerOrder.Order.Price,
-                    TradeDate = new DateTime(matcher.resultEffects.Quantum.Timestamp, DateTimeKind.Utc)
+                    TradeDate = new DateTime(matcher.effectsContainer.Quantum.Timestamp, DateTimeKind.Utc)
                 };
             }
 
             private void RecordOrderRemoved()
             {
-                matcher.resultEffects.AddOrderRemoved(matcher.orderbook, makerOrder);
+                matcher.effectsContainer.AddOrderRemoved(matcher.orderbook, makerOrder, matcher.baseAsset);
             }
         }
     }

@@ -8,13 +8,13 @@ namespace Centaurus.Exchange.Analytics
 {
     public class MarketTradesHistoryManager
     {
-        public MarketTradesHistoryManager(int market, int maxSize = 100)
+        public MarketTradesHistoryManager(string market, int maxSize = 100)
         {
             Market = market;
             this.maxSize = maxSize;
         }
 
-        public int Market { get; }
+        public string Market { get; }
 
         public DateTime LastUpdated { get; private set; }
 

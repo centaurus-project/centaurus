@@ -37,30 +37,25 @@ namespace Centaurus.Domain
             var quantum = context.Envelope.Message as RequestQuantum;
             var orderRequest = (OrderCancellationRequest)quantum.RequestMessage;
 
-            var orderData = OrderIdConverter.Decode(orderRequest.OrderId);
-            if (!context.CentaurusContext.Exchange.HasMarket(orderData.Asset))
-                throw new BadRequestException("Asset is not supported.");
+            context.OrderWrapper = context.CentaurusContext.Exchange.OrderMap.GetOrder(orderRequest.OrderId);
+            if (context.OrderWrapper == null)
+                throw new BadRequestException($"Order {orderRequest.OrderId} is not found.");
 
-            context.Orderbook = context.CentaurusContext.Exchange.GetOrderbook(orderData.Asset, orderData.Side);
-
-            context.OrderWrapper = context.Orderbook.GetOrder(orderRequest.OrderId);
-
-            if (context.OrderWrapper is null)
-                throw new BadRequestException($"Order {orderRequest.OrderId} is not found.{(quantum.Apex != default ? $" Apex {quantum.Apex}" : "")}");
+            context.Orderbook = context.CentaurusContext.Exchange.GetOrderbook(context.OrderWrapper.Order.Asset, context.OrderWrapper.Order.Side);
 
             //TODO: check that lot size is greater than minimum allowed lot
             if (context.OrderWrapper.AccountWrapper.Account.Id != orderRequest.Account)
                 throw new ForbiddenException();
 
-            if (context.OrderSide == OrderSide.Buy)
+            if (context.OrderWrapper.Order.Side == OrderSide.Buy)
             {
-                var balance = context.SourceAccount.Account.GetBalance(0);
+                var balance = context.SourceAccount.Account.GetBalance(context.CentaurusContext.Constellation.GetBaseAsset());
                 if (balance.Liabilities < context.OrderWrapper.Order.QuoteAmount)
                     throw new BadRequestException("Quote liabilities is less than order size.");
             }
             else
             {
-                var balance = context.SourceAccount.Account.GetBalance(orderData.Asset);
+                var balance = context.SourceAccount.Account.GetBalance(context.OrderWrapper.Order.Asset);
                 if (balance == null)
                     throw new BadRequestException("Balance for asset not found.");
                 if (balance.Liabilities < context.OrderWrapper.Order.Amount)

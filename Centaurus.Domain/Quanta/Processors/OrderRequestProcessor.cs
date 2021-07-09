@@ -31,7 +31,7 @@ namespace Centaurus.Domain
             var quantum = context.Envelope.Message as RequestQuantum;
             var orderRequest = quantum.RequestEnvelope.Message as OrderRequest;
 
-            if (orderRequest.Asset <= 0 || !context.CentaurusContext.AssetIds.Contains(orderRequest.Asset))
+            if (!context.CentaurusContext.Constellation.Assets.Any(a => a.Code == orderRequest.Asset))
                 throw new InvalidOperationException("Invalid asset identifier: " + orderRequest.Asset);
 
             //estimate XLM amount
@@ -50,7 +50,8 @@ namespace Centaurus.Domain
             }
             else
             {
-                var balance = context.SourceAccount.Account.GetBalance(0);
+                var baseAsset = context.CentaurusContext.Constellation.Assets.First();
+                var balance = context.SourceAccount.Account.GetBalance(baseAsset.Code);
                 if (!balance.HasSufficientBalance(quoteAmount, context.CentaurusContext.Constellation.MinAccountBalance))
                     throw new BadRequestException("Insufficient funds");
             }
@@ -67,7 +68,7 @@ namespace Centaurus.Domain
         /// </summary>
         private void ValidateCounterOrdersCount(OrderRequest orderRequest, OrderbookBase orderbook)
         {
-            var counterOrdersSum = 0L;
+            var counterOrdersSum = 0ul;
             var counterOrdersCount = 0;
             foreach (var order in orderbook)
             {

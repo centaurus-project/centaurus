@@ -31,9 +31,11 @@ namespace Centaurus.Domain
                         Amount = order.Order.Amount,
                         QuoteAmount = order.Order.QuoteAmount,
                         Price = order.Order.Price,
-                        OrderId = order.OrderId
+                        Apex = order.Apex,
+                        Asset = order.Order.Asset,
+                        Side = order.Order.Side
                     })
-                .OrderBy(order => order.OrderId)
+                .OrderBy(order => order.Apex)
                 .ToList();
 
 

@@ -11,15 +11,14 @@ namespace Centaurus.Domain
         {
             if (order == null)
                 throw new ArgumentNullException(nameof(order));
-            var decodedId = OrderIdConverter.Decode(order.OrderId);
             return new OrderInfo
             {
-                OrderId = order.OrderId,
+                OrderId = order.Apex,
                 AmountDiff = order.Amount,
                 QuoteAmountDiff = order.QuoteAmount,
-                Market = decodedId.Asset,
+                Market = order.Asset,
                 Price = order.Price,
-                Side = decodedId.Side,
+                Side = order.Side,
                 State = state
             };
         }

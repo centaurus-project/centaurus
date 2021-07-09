@@ -7,6 +7,6 @@ namespace Centaurus.Models
         public override MessageTypes MessageType => MessageTypes.SetApexCursor;
         
         [XdrField(0)]
-        public long Apex { get; set; }
+        public ulong Apex { get; set; }
     }
 }

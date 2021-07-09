@@ -11,10 +11,10 @@ namespace Centaurus.Models
         public string PaymentProvider { get; set; }
 
         [XdrField(1)]
-        public int Asset { get; set; }
+        public string Asset { get; set; }
 
         [XdrField(2)]
-        public long Amount { get; set; }
+        public ulong Amount { get; set; }
 
         [XdrField(3)]
         public string Destination { get; set; }

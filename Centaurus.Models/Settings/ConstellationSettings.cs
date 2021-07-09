@@ -8,7 +8,7 @@ namespace Centaurus.Models
     public class ConstellationSettings
     {
         [XdrField(0)]
-        public long Apex { get; set; }
+        public ulong Apex { get; set; }
 
         [XdrField(1)]
         public List<ProviderSettings> Providers { get; set; }
@@ -17,10 +17,10 @@ namespace Centaurus.Models
         public List<RawPubKey> Auditors { get; set; }
 
         [XdrField(3)]
-        public long MinAccountBalance { get; set; }
+        public ulong MinAccountBalance { get; set; }
 
         [XdrField(4)]
-        public long MinAllowedLotSize { get; set; }
+        public ulong MinAllowedLotSize { get; set; }
 
         [XdrField(5)]
         public List<AssetSettings> Assets { get; set; }
