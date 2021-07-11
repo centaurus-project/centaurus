@@ -47,7 +47,7 @@ namespace Centaurus.Domain
         /// <returns>Removal result.</returns>
         public override bool RemoveOrder(ulong orderId, out OrderWrapper order)
         {
-            var isHead = orderId == Head?.Apex;
+            var isHead = orderId == Head?.OrderId;
             if (!base.RemoveOrder(orderId, out order))
                 return false;
 
@@ -75,7 +75,7 @@ namespace Centaurus.Domain
         {
             var priceCompareRes = side == OrderSide.Sell ? x.Order.Price.CompareTo(y.Order.Price) : y.Order.Price.CompareTo(x.Order.Price);
             if (priceCompareRes == 0)
-                return x.Apex.CompareTo(y.Apex);
+                return x.OrderId.CompareTo(y.OrderId);
             return priceCompareRes;
         }
     }

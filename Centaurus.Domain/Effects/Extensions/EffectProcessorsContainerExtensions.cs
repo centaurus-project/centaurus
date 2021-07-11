@@ -93,7 +93,9 @@ namespace Centaurus.Domain
                     Amount = order.Order.Amount,
                     QuoteAmount = order.Order.QuoteAmount,
                     Price = order.Order.Price,
-                    Side = order.Order.Side
+                    Side = order.Order.Side,
+                    Asset = order.Order.Asset,
+                    OrderId = order.OrderId
                 },
                 order.AccountWrapper,
                 orderbook,

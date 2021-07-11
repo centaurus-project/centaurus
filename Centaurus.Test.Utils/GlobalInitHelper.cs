@@ -167,7 +167,7 @@ namespace Centaurus.Test
             await context.QuantumHandler.HandleAsync(depositQuantum.CreateEnvelope());
 
             //save all effects
-            await ContextHelpers.ApplyUpdates(context);
+            context.PendingUpdatesManager.ApplyUpdates(context.PendingUpdatesManager.Current);
             return context;
         }
     }

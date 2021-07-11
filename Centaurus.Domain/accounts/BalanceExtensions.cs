@@ -48,7 +48,10 @@ namespace Centaurus.Domain
             if (amount <= 0) throw new ArgumentException("Invalid operation amount: " + amount);
             if (balance == null)
                 return false;
-            return balance.GetAvailableBalance() - amount >= minBalance;
+            var availableBalance = balance.GetAvailableBalance();
+            if (availableBalance < amount)
+                return false;
+            return availableBalance - amount >= minBalance;
         }
 
         /// <summary>

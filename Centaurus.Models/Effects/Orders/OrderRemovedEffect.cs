@@ -23,5 +23,8 @@ namespace Centaurus.Models
 
         [XdrField(4)]
         public OrderSide Side { get; set; }
+
+        [XdrField(5)]
+        public ulong OrderId { get; set; }
     }
 }

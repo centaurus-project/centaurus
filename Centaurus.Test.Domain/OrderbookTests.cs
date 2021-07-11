@@ -21,6 +21,8 @@ namespace Centaurus.Test
         AccountWrapper account2;
         private bool useLegacyOrderbook;
         private ExecutionContext context;
+        string baseAsset = "XLM";
+        string secondAsset = "USD";
 
         [SetUp]
         public void Setup()
@@ -32,22 +34,19 @@ namespace Centaurus.Test
 
             var requestRateLimits = new RequestRateLimits { HourLimit = 1000, MinuteLimit = 100 };
 
-            var account1 = new AccountWrapper(new Models.Account
+            var account1 = new AccountWrapper(new Account
             {
                 Id = 1,
                 Pubkey = new RawPubKey() { Data = KeyPair.Random().PublicKey },
                 Balances = new List<Balance>()
             }, requestRateLimits);
 
-            var baseAsset = context.Constellation.GetBaseAsset();
-            var secondAsset = context.Constellation.Assets[1].Code;
-
             account1.Account.CreateBalance(baseAsset);
             account1.Account.GetBalance(baseAsset).UpdateBalance(10000000000, UpdateSign.Plus);
             account1.Account.CreateBalance(secondAsset);
             account1.Account.GetBalance(secondAsset).UpdateBalance(10000000000, UpdateSign.Plus);
 
-            var account2 = new AccountWrapper(new Models.Account
+            var account2 = new AccountWrapper(new Account
             {
                 Id = 2,
                 Pubkey = new RawPubKey() { Data = KeyPair.Random().PublicKey },
@@ -68,15 +67,15 @@ namespace Centaurus.Test
                 {
                     Providers = new List<ProviderSettings> {
                         new ProviderSettings {
-                            Assets = new List<ProviderAsset> { new ProviderAsset {  CentaurusAsset = "XLM", Token = "native" } },
+                            Assets = new List<ProviderAsset> { new ProviderAsset {  CentaurusAsset = baseAsset, Token = "native" } },
                             InitCursor = "0",
-                            Name = "Stellar",
+                            Name = "Main",
                             PaymentSubmitDelay = 0,
                             Provider = "Stellar",
                             Vault = KeyPair.Random().AccountId
                         }
                     },
-                    Assets = context.Constellation.Assets,
+                    Assets = new List<AssetSettings> { new AssetSettings { Code = baseAsset }, new AssetSettings { Code = secondAsset } },
                     Auditors = new List<RawPubKey> { TestEnvironment.AlphaKeyPair, TestEnvironment.Auditor1KeyPair },
                     MinAccountBalance = 1,
                     MinAllowedLotSize = 1,
@@ -161,7 +160,7 @@ namespace Centaurus.Test
                     new OrderRemovedEffectProccessor(new OrderRemovedEffect
                     {
                         Account = account.Id,
-                        Apex = order.Apex,
+                        OrderId = order.OrderId,
                         Amount = order.Order.Amount,
                         QuoteAmount = order.Order.QuoteAmount,
                         Price = order.Order.Price,
@@ -219,7 +218,7 @@ namespace Centaurus.Test
                 else
                     price = 1 + random.NextDouble();
                 var amount = 1000ul;
-                var order = new OrderWrapper(new Order { Apex = (ulong)i, Amount = 1000, Price = price, QuoteAmount = OrderMatcher.EstimateQuoteAmount(amount, price, side) }, fakeAccountWrapper);
+                var order = new OrderWrapper(new Order { OrderId = (ulong)i, Amount = 1000, Price = price, QuoteAmount = OrderMatcher.EstimateQuoteAmount(amount, price, side) }, fakeAccountWrapper);
                 orders.Add(order);
                 orderbook.InsertOrder(order);
             }
@@ -238,7 +237,7 @@ namespace Centaurus.Test
 
             foreach (var order in orders)
             {
-                orderbook.RemoveOrder(order.Apex, out _);
+                orderbook.RemoveOrder(order.OrderId, out _);
                 ordersCount--;
                 Assert.AreEqual(ordersCount, orderbook.Count);
                 Assert.AreEqual(ordersCount, getOrdersCount());

@@ -38,7 +38,7 @@ namespace Centaurus.Domain
         {
             MarkAsProcessed();
 
-            orderBook.RemoveOrder(Effect.Apex, out _);
+            orderBook.RemoveOrder(Effect.OrderId, out _);
 
             if (order.Order.Side == OrderSide.Buy)
                 AccountWrapper.Account.GetBalance(baseAsset).UpdateLiabilities(order.Order.QuoteAmount, UpdateSign.Minus);

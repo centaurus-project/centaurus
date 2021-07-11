@@ -1,16 +1,12 @@
 ﻿using Centaurus.Models;
-using Centaurus.DAL;
+using Centaurus.PersistentStorage;
+using Centaurus.PersistentStorage.Abstraction;
 using NLog;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
-using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 using System.Timers;
-using Centaurus.PersistentStorage.Abstraction;
-using Centaurus.PersistentStorage;
 
 namespace Centaurus.Exchange.Analytics
 {

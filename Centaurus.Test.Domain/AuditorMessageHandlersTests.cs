@@ -64,37 +64,6 @@ namespace Centaurus.Test
             Assert.IsTrue(isHandled);
         }
 
-        static object[] LedgerQuantumTestCases =
-        {
-            new object[] { TestEnvironment.Client1KeyPair, ConnectionState.Ready, typeof(UnauthorizedException) },
-            new object[] { TestEnvironment.AlphaKeyPair, ConnectionState.Connected, typeof(InvalidStateException) },
-            new object[] { TestEnvironment.AlphaKeyPair, ConnectionState.Ready, null }
-        };
-
-        [Test]
-        [TestCaseSource(nameof(LedgerQuantumTestCases))]
-        public async Task TxCommitQuantumTest(KeyPair alphaKeyPair, ConnectionState state, Type excpectedException)
-        {
-            context.AppState.State = ApplicationState.Ready;
-
-            var clientConnection = GetOutgoingConnection(context, state);
-
-            var ledgerNotification = new DepositNotification
-            {
-                Cursor = "0",
-                Items = new List<Deposit>()
-            };
-
-            var envelope = new DepositQuantum
-            {
-                Source = ledgerNotification
-            }.CreateEnvelope();
-            envelope.Sign(alphaKeyPair);
-            using var writer = new XdrBufferWriter();
-            var inMessage = envelope.ToIncomingMessage(writer);
-            await AssertMessageHandling(clientConnection, inMessage, excpectedException);
-        }
-
         static object[] QuantaBatchTestCases =
         {
             new object[] { TestEnvironment.Client1KeyPair, ConnectionState.Ready, typeof(UnauthorizedException) },

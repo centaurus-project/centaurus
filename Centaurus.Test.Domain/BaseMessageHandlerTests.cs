@@ -41,7 +41,7 @@ namespace Centaurus.Test
 
         protected OutgoingWebSocketConnection GetOutgoingConnection(ExecutionContext context, ConnectionState? state = null)
         {
-            var connection = GetOutgoingConnection(context);
+            var connection = new OutgoingWebSocketConnection(context, new FakeAuditorConnectionInfo(new FakeWebSocket()));
             if (state != null)
                 connection.ConnectionState = state.Value;
             return connection;

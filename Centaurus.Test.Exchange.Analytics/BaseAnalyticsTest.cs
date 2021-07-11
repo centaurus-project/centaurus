@@ -12,7 +12,7 @@ namespace Centaurus.Test.Exchange.Analytics
     {
         protected AnalyticsManager analyticsManager;
         protected MockStorage storage;
-        protected List<int> markets;
+        protected List<string> markets;
         protected int historyLength;
         protected DateTime now;
 
@@ -25,7 +25,7 @@ namespace Centaurus.Test.Exchange.Analytics
         public void Setup()
         {
             storage = new MockStorage();
-            markets = Enumerable.Range(1, 2).ToList();
+            markets = Enumerable.Range(1, 2).Select(m => m.ToString()).ToList();
             historyLength = 100;
             analyticsManager = new AnalyticsManager(storage, new List<double> { 1 }, markets, new List<OrderInfo>(), historyLength);
         }
@@ -41,14 +41,14 @@ namespace Centaurus.Test.Exchange.Analytics
                 var market = markets[r.Next(0, markets.Count)];
                 for (var c = 0; c < tradesCount; c++)
                 {
-                    var amount = r.Next(1, 1000);
+                    var amount = (ulong)r.Next(1, 1000);
                     var price = r.Next(minPrice, 1000);
                     trades.Add(new Trade
                     {
                         Amount = amount,
                         Asset = market,
                         Price = price,
-                        QuoteAmount = amount * price,
+                        QuoteAmount = amount * (ulong)price,
                         TradeDate = now
                     });
                     if (minPrice == 0)
@@ -58,7 +58,7 @@ namespace Centaurus.Test.Exchange.Analytics
                 }
                 var updates = new ExchangeUpdate(market, now);
                 updates.Trades.AddRange(trades);
-                analyticsManager.OnUpdates(updates).Wait();
+                analyticsManager.OnUpdates(updates);
                 now = now.AddSeconds(20);
             }
         }

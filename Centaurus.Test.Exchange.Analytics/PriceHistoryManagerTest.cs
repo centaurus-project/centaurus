@@ -24,7 +24,7 @@ namespace Centaurus.Test.Exchange.Analytics
                     var cursor = 0;
                     do
                     {
-                        var periodResponse = await analyticsManager.PriceHistoryManager.GetPriceHistory(cursor, market, period);
+                        var periodResponse = analyticsManager.PriceHistoryManager.GetPriceHistory(cursor, market, period);
 
                         for (var i = 0; i < periodResponse.frames.Count; i++)
                         {

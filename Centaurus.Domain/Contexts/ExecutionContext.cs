@@ -61,7 +61,7 @@ namespace Centaurus.Domain
 
             this.useLegacyOrderbook = useLegacyOrderbook;
 
-
+            Init();
         }
 
         /// <summary>
@@ -78,7 +78,7 @@ namespace Centaurus.Domain
             //try to load last settings, we need it to know current auditors
             var lastHash = new byte[] { };
             var lastApex = PersistenceManager.GetLastApex();
-            if (lastApex >= 0)
+            if (lastApex > 0)
             {
                 var lastQuantum = PersistenceManager.GetQuantum(lastApex);
 

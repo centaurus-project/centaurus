@@ -16,27 +16,35 @@ namespace Centaurus.Domain
             if (effects == null)
                 throw new ArgumentNullException(nameof(effects));
 
-            using var writer = new XdrBufferWriter(buffer);
-
-            XdrConverter.Serialize(quantum, writer);
-
-            var quantumData = writer.ToArray();
-
-            var effectsData = effects.Select(e =>
-            {
-                XdrConverter.Serialize(e, writer);
-                return writer.ToArray();
-            }).ToList();
 
             var quantumMessage = (Quantum)quantum.Message;
             return new QuantumPersistentModel
             {
                 Apex = quantumMessage.Apex,
-                Effects = effectsData,
-                RawQuantum = quantumData,
+                Effects = SerializeEffects(effects, buffer),
+                RawQuantum = SerializeQuantum(quantum, buffer),
                 Proof = effectsProof.ToPersistentModel(),
                 TimeStamp = quantumMessage.Timestamp
             };
+        }
+
+        private static byte[] SerializeQuantum(MessageEnvelope quantum, byte[] buffer)
+        {
+            using var writer = new XdrBufferWriter(buffer);
+
+            XdrConverter.Serialize(quantum, writer);
+
+            return writer.ToArray();
+        }
+
+        private static List<byte[]> SerializeEffects(List<Effect> effects, byte[] buffer)
+        {
+            return effects.Select(e =>
+            {
+                using var writer = new XdrBufferWriter(buffer);
+                XdrConverter.Serialize(e, writer);
+                return writer.ToArray();
+            }).ToList();
         }
     }
 }

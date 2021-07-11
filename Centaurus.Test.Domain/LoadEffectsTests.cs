@@ -24,7 +24,7 @@ namespace Centaurus.Test
 
         [Test]
         [TestCaseSource(nameof(EffectsLoadTestCases))]
-        public async Task LoadEffectsTest(KeyPair accountKey, bool isDesc)
+        public void LoadEffectsTest(KeyPair accountKey, bool isDesc)
         {
             var account = context.AccountStorage.GetAccount(accountKey);
 

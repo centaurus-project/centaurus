@@ -9,7 +9,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Centaurus.DAL\Centaurus.DAL.csproj" />
     <ProjectReference Include="..\Centaurus.Models.Extensions\Centaurus.Models.Extensions.csproj" />
     <ProjectReference Include="..\Centaurus.PersistentStorage.Abstraction\Centaurus.PersistentStorage.Abstraction.csproj" />
   </ItemGroup>

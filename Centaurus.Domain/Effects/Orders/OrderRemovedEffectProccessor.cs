@@ -22,7 +22,7 @@ namespace Centaurus.Domain
         public override void CommitEffect()
         {
             MarkAsProcessed();
-            if (!orderbook.RemoveOrder(Effect.Apex, out _))
+            if (!orderbook.RemoveOrder(Effect.OrderId, out _))
                 throw new Exception($"Unable to remove order with id {Effect.Apex}");
 
             if (Effect.Side == OrderSide.Buy)
@@ -43,7 +43,7 @@ namespace Centaurus.Domain
             var order = new OrderWrapper(
                 new Order
                 {
-                    Apex = Effect.Apex,
+                    OrderId = Effect.OrderId,
                     Amount = Effect.Amount,
                     QuoteAmount = Effect.QuoteAmount,
                     Price = Effect.Price,

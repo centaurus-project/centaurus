@@ -23,5 +23,7 @@ namespace Centaurus.Models
 
         [XdrField(4)]
         public string Asset { get; set; }
+
+        public ulong OrderId => Apex;
     }
 }

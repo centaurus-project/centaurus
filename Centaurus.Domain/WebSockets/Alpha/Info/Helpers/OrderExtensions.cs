@@ -13,7 +13,7 @@ namespace Centaurus.Domain
                 throw new ArgumentNullException(nameof(order));
             return new OrderInfo
             {
-                OrderId = order.Apex,
+                OrderId = order.OrderId,
                 AmountDiff = order.Amount,
                 QuoteAmountDiff = order.QuoteAmount,
                 Market = order.Asset,

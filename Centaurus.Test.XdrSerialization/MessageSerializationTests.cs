@@ -1,11 +1,11 @@
 using Centaurus.Models;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using Centaurus.Xdr;
 using NUnit.Framework;
 using stellar_dotnet_sdk.xdr;
+using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 namespace Centaurus.Test
 {
@@ -31,7 +31,7 @@ namespace Centaurus.Test
                 Amount = 2131231,
                 RequestId = 1,
                 TimeInForce = TimeInForce.ImmediateOrCancel,
-                Asset = 5,
+                Asset = "USD",
                 Price = 23423.4325
             };
             var message = new MessageEnvelope()
@@ -52,12 +52,12 @@ namespace Centaurus.Test
         }
 
         [Test]
-        public void AssetsNullValueSerializationTest()
+        public void AccountNullValueSerializationTest()
         {
-            var asset = new AssetSettings { Code = AssetsHelper.XLMCode };
-            var rawData = XdrConverter.Serialize(asset);
-            asset = XdrConverter.Deserialize<AssetSettings>(rawData);
-            Assert.AreEqual(null, asset.Issuer);
+            var account = new Account { Id = 1, Balances = new List<Balance>(), Nonce = 1, Orders = new List<Order>(), Pubkey = KeyPair.Random() };
+            var rawData = XdrConverter.Serialize(account);
+            account = XdrConverter.Deserialize<Account>(rawData);
+            Assert.AreEqual(null, account.RequestRateLimits);
         }
 
         [Test]

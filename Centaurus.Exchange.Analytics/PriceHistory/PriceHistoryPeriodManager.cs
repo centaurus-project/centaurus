@@ -1,16 +1,11 @@
 ﻿using Centaurus.Models;
-using Centaurus.DAL;
+using Centaurus.PersistentStorage.Abstraction;
 using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.Logging;
 using NLog;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
-using Centaurus.PersistentStorage.Abstraction;
 
 namespace Centaurus.Exchange.Analytics
 {
@@ -42,7 +37,7 @@ namespace Centaurus.Exchange.Analytics
             var frames = GetUnit(CurrentFramesUnitDate, true);
             LastAddedFrame = frames.FirstOrDefault();
 
-            var firstFrame = analyticsStorage.GetPriceHistory(0, int.MaxValue, (int)Period, Market).First();
+            var firstFrame = analyticsStorage.GetPriceHistory(0, int.MaxValue, (int)Period, Market).FirstOrDefault();
             if (firstFrame != null)
                 firstFramesUnitDate = GetFramesUnitDate(DateTimeOffset.FromUnixTimeSeconds(firstFrame.Timestamp).DateTime);
         }

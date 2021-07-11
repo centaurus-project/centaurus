@@ -15,7 +15,7 @@ namespace Centaurus.Domain
             takerOrder = new OrderWrapper(
                 new Order
                 {
-                    Apex = effectsContainer.Apex,
+                    OrderId = effectsContainer.Apex,
                     Amount = orderRequest.Amount,
                     Price = orderRequest.Price,
                     Asset = orderRequest.Asset,

@@ -20,14 +20,14 @@ namespace Centaurus.Domain
         {
             MarkAsProcessed();
             var balance = AccountWrapper.Account.GetBalance(Effect.Asset);
-            balance.UpdateBalance(Effect.Amount, UpdateSign.Plus);
+            balance.UpdateBalance(Effect.Amount, sign);
         }
 
         public override void RevertEffect()
         {
             MarkAsProcessed();
             var balance = AccountWrapper.Account.GetBalance(Effect.Asset);
-            balance.UpdateBalance(Effect.Amount, UpdateSign.Minus);
+            balance.UpdateBalance(Effect.Amount, sign.Opposite());
         }
     }
 }

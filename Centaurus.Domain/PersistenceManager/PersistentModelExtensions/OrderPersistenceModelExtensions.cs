@@ -16,7 +16,7 @@ namespace Centaurus.Domain
             {
                 Amount = order.Amount,
                 QuoteAmount = order.QuoteAmount,
-                Apex = order.Apex,
+                OrderId = order.Apex,
                 Price = order.Price,
                 Asset = order.Asset,
                 Side = (OrderSide)order.Side
@@ -32,7 +32,7 @@ namespace Centaurus.Domain
             {
                 Amount = order.Amount,
                 QuoteAmount = order.QuoteAmount,
-                Apex = order.Apex,
+                Apex = order.OrderId,
                 Price = order.Price,
                 Asset = order.Asset,
                 Side = (int)order.Side

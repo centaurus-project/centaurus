@@ -80,10 +80,20 @@ namespace Centaurus.Test
         {
             var quanta = quantaRefCollection.Where(q => q.AccountId == accountId);
             if (order == QueryResultsOrder.Asc)
-                quanta = quanta.OrderBy(q => q.Apex).Where(q => q.Apex > fromApex);
+            {
+                quanta = quanta.OrderBy(q => q.Apex);
+                if (fromApex > 0)
+                    quanta = quanta.Where(q => q.Apex > fromApex);
+            }
             else
-                quanta = quanta.OrderByDescending(q => q.Apex).Where(q => q.Apex < fromApex);
+            {
+                quanta = quanta.OrderByDescending(q => q.Apex);
+                if (fromApex > 0)
+                    quanta = quanta.Where(q => q.Apex < fromApex);
+            }
             var accountQuanta = quanta.Take(limit).Select(a => a.Apex).ToArray();
+            if (accountQuanta.Length < 1)
+                return new List<QuantumPersistentModel>();
             return LoadQuanta(accountQuanta);
         }
 

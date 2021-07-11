@@ -64,7 +64,7 @@ namespace Centaurus.Domain
                 throw new BadRequestException($"Asset {payment.Asset} is not supported");
 
             var minBalance = payment.Asset == baseAsset ? context.CentaurusContext.Constellation.MinAccountBalance : 0;
-            if (context.SourceAccount.Account.GetBalance(payment.Asset)?.HasSufficientBalance(payment.Amount, minBalance) ?? false)
+            if (!(context.SourceAccount.Account.GetBalance(payment.Asset)?.HasSufficientBalance(payment.Amount, minBalance) ?? false))
                 throw new BadRequestException("Insufficient funds");
 
             return Task.CompletedTask;

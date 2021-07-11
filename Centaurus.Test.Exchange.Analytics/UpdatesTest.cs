@@ -22,7 +22,6 @@ namespace Centaurus.Test.Exchange.Analytics
             var settings = GlobalInitHelper.GetAlphaSettings();
 
             context = new ExecutionContext(settings, new MockStorage(), new MockPaymentProviderFactory());
-            context.Init().Wait();
             var requestsLimit = new RequestRateLimits();
 
             account1 = new AccountWrapper(new Models.Account
@@ -32,11 +31,11 @@ namespace Centaurus.Test.Exchange.Analytics
                 Balances = new List<Balance>()
             }, requestsLimit);
 
-            account1.Account.CreateBalance(0);
-            account1.Account.GetBalance(0).UpdateBalance(10000000000);
+            account1.Account.CreateBalance("XLM");
+            account1.Account.GetBalance("XLM").UpdateBalance(10000000000, UpdateSign.Plus);
 
-            account1.Account.CreateBalance(1);
-            account1.Account.GetBalance(1).UpdateBalance(10000000000);
+            account1.Account.CreateBalance("USD");
+            account1.Account.GetBalance("USD").UpdateBalance(10000000000, UpdateSign.Plus);
 
             account2 = new AccountWrapper(new Models.Account
             {
@@ -45,11 +44,11 @@ namespace Centaurus.Test.Exchange.Analytics
                 Balances = new List<Balance>()
             }, requestsLimit);
 
-            account2.Account.CreateBalance(0);
-            account2.Account.GetBalance(0).UpdateBalance(10000000000);
+            account2.Account.CreateBalance("XLM");
+            account2.Account.GetBalance("XLM").UpdateBalance(10000000000, UpdateSign.Plus);
 
-            account2.Account.CreateBalance(1);
-            account2.Account.GetBalance(1).UpdateBalance(10000000000);
+            account2.Account.CreateBalance("USD");
+            account2.Account.GetBalance("USD").UpdateBalance(10000000000, UpdateSign.Plus);
 
             var stellarPaymentProviderVault = KeyPair.Random().AccountId;
             var stellarPaymentProvider = new ProviderSettings
@@ -59,8 +58,8 @@ namespace Centaurus.Test.Exchange.Analytics
                 Vault = stellarPaymentProviderVault,
                 Assets = new List<ProviderAsset>
                 {
-                    new ProviderAsset { CentaurusAsset = 0, Token = "native"},
-                    new ProviderAsset { CentaurusAsset = 1, IsVirtual = true, Token = $"USD-{stellarPaymentProviderVault}" }
+                    new ProviderAsset { CentaurusAsset = "XLM", Token = "native"},
+                    new ProviderAsset { CentaurusAsset = "USD", IsVirtual = true, Token = $"USD-{stellarPaymentProviderVault}" }
                 },
                 InitCursor = "1",
                 PaymentSubmitDelay = 0
@@ -74,10 +73,10 @@ namespace Centaurus.Test.Exchange.Analytics
                 Settings = new ConstellationSettings
                 {
                     Providers = new List<ProviderSettings> { stellarPaymentProvider },
-                    Assets = new List<AssetSettings> { new AssetSettings { Id = 0, Code = "XLM" }, new AssetSettings { Id = 1, Code = "USD" } },
+                    Assets = new List<AssetSettings> { new AssetSettings { Code = "XLM" }, new AssetSettings { Code = "USD" } },
                     RequestRateLimits = new RequestRateLimits { HourLimit = 1000, MinuteLimit = 100 }
                 }
-            }).Wait();
+            });
         }
 
         public void OrderbookPerformanceTest(int iterations, bool useNormalDistribution = false)
@@ -91,15 +90,15 @@ namespace Centaurus.Test.Exchange.Analytics
                 var accountWrapper = context.AccountStorage.GetAccount(account1.Account.Pubkey);
                 var trade = new RequestQuantum
                 {
-                    Apex = i,
+                    Apex = (ulong)i,
                     RequestEnvelope = new MessageEnvelope
                     {
                         Message = new OrderRequest
                         {
                             Account = accountWrapper.Account.Id,
                             RequestId = i,
-                            Amount = rnd.Next(1, 20),
-                            Asset = 1,
+                            Amount = (ulong)rnd.Next(1, 20),
+                            Asset = "USD",
                             Price = Math.Round(price * 10) / 10,
                             Side = rnd.NextDouble() >= 0.5 ? OrderSide.Buy : OrderSide.Sell
                         },
@@ -118,7 +117,7 @@ namespace Centaurus.Test.Exchange.Analytics
                     context.Exchange.ExecuteOrder(trade.Value);
             }, () =>
             {
-                var market = context.Exchange.GetMarket(1);
+                var market = context.Exchange.GetMarket("USD");
                 return $"{iterations} iterations, orderbook size: {market.Bids.Count} bids,  {market.Asks.Count} asks, {market.Bids.GetBestPrice().ToString("G3")}/{market.Asks.GetBestPrice().ToString("G3")} spread.";
             });
         }
@@ -130,30 +129,30 @@ namespace Centaurus.Test.Exchange.Analytics
             OrderbookPerformanceTest(10_000);
         }
 
-        private async void AnalyticsManager_OnUpdate()
+        private void AnalyticsManager_OnUpdate()
         {
             try
             {
                 foreach (var asset in context.Constellation.Assets)
                 {
-                    if (asset.Id == 0) //base asset
+                    if (asset.Code == "XLM") //base asset
                         continue;
                     foreach (var precision in DepthsSubscription.Precisions)
                     {
-                        context.AnalyticsManager.MarketDepthsManager.GetDepth(asset.Id, precision);
+                        context.AnalyticsManager.MarketDepthsManager.GetDepth(asset.Code, precision);
                     }
 
                     var periods = Enum.GetValues(typeof(PriceHistoryPeriod)).Cast<PriceHistoryPeriod>();
                     foreach (var period in periods)
                     {
-                        await context.AnalyticsManager.PriceHistoryManager.GetPriceHistory(0, asset.Id, period);
+                        context.AnalyticsManager.PriceHistoryManager.GetPriceHistory(0, asset.Code, period);
                     }
 
-                    context.AnalyticsManager.TradesHistoryManager.GetTrades(asset.Id);
+                    context.AnalyticsManager.TradesHistoryManager.GetTrades(asset.Code);
 
                     context.AnalyticsManager.MarketTickersManager.GetAllTickers();
 
-                    context.AnalyticsManager.MarketTickersManager.GetMarketTicker(asset.Id);
+                    context.AnalyticsManager.MarketTickersManager.GetMarketTicker(asset.Code);
                 }
             }
             catch (Exception exc)

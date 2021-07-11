@@ -1,16 +1,17 @@
 ﻿using Centaurus.DAL;
 using Centaurus.Domain.Models;
 using Centaurus.Models;
+using Centaurus.PersistentStorage;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 
 namespace Centaurus.Domain
 {
-    public class EffectProcessorsContainer: ContextualBase
+    public class EffectProcessorsContainer : ContextualBase
     {
         public EffectProcessorsContainer(ExecutionContext context, MessageEnvelope quantum, DiffObject pendingDiffObject, AccountWrapper account)
-            :base(context)
+            : base(context)
         {
             Envelope = quantum ?? throw new ArgumentNullException(nameof(quantum));
             PendingDiffObject = pendingDiffObject ?? throw new ArgumentNullException(nameof(pendingDiffObject));
@@ -61,7 +62,13 @@ namespace Centaurus.Domain
                 effectsProof,
                 buffer);
             PendingDiffObject.Batch.Add(quantumModel);
-            PendingDiffObject.Batch.AddRange(Effects.Select(e => e.ToPersistentModel()).ToList());
+            PendingDiffObject.Batch.AddRange(
+                Effects
+                    .Where(e => e.Account > 0)
+                    .GroupBy(e => e.Account)
+                    .Select(e => new QuantumRefPersistentModel { AccountId = e.Key, Apex = Apex })
+                    .ToList()
+            );
             PendingDiffObject.EffectsCount += Effects.Count;
             PendingDiffObject.QuantaCount++;
         }

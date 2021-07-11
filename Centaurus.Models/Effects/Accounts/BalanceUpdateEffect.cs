@@ -22,7 +22,7 @@ namespace Centaurus.Models
 
     public static class UpdateSignExtensions
     {
-        public static UpdateSign Revert(this UpdateSign sign)
+        public static UpdateSign Opposite(this UpdateSign sign)
         {
             return sign == UpdateSign.Plus ? UpdateSign.Minus : UpdateSign.Plus;
         }

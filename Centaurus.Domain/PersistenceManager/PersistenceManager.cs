@@ -180,7 +180,7 @@ namespace Centaurus.Domain
 
             var accountStorage = new AccountStorage(accounts);
 
-            var orders = accounts.SelectMany(a => a.Account.Orders.Select(o => new OrderWrapper(o, a))).OrderBy(o => o.Order.Apex).ToList();
+            var orders = accounts.SelectMany(a => a.Account.Orders.Select(o => new OrderWrapper(o, a))).OrderBy(o => o.Order.OrderId).ToList();
             var exchange = GetRestoredExchange(orders);
 
             var quanta = Context.PermanentStorage.LoadQuantaAboveApex(apex);
@@ -253,7 +253,7 @@ namespace Centaurus.Domain
             {
                 Apex = apex,
                 Accounts = accountStorage.GetAll().OrderBy(a => a.Account.Id).ToList(),
-                Orders = allOrders.OrderBy(o => o.Apex).ToList(),
+                Orders = allOrders.OrderBy(o => o.OrderId).ToList(),
                 Settings = settings,
                 LastHash = lastQuantumData.Message.ComputeHash()
             };

@@ -23,6 +23,6 @@ namespace Centaurus.Models
         public ulong QuoteAmount { get; set; }
 
         [XdrField(5)]
-        public ulong Apex { get; set; }
+        public ulong OrderId { get; set; }
     }
 }
