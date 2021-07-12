@@ -1,5 +1,4 @@
-﻿using Centaurus.DAL;
-using Centaurus.Domain;
+﻿using Centaurus.Domain;
 using Centaurus.Domain.Models;
 using Centaurus.Models;
 using NUnit.Framework;
@@ -83,7 +82,8 @@ namespace Centaurus.Test.Exchange.Analytics
         {
             var rnd = new Random();
 
-            var testTradeResults = new Dictionary<RequestQuantum, EffectProcessorsContainer>();
+            var orderRequestProcessor = new OrderRequestProcessor(context);
+            var testTradeResults = new Dictionary<RequestQuantum, RequestContext>();
             for (var i = 1; i < iterations; i++)
             {
                 var price = useNormalDistribution ? rnd.NextNormallyDistributed() + 50 : rnd.NextDouble() * 100;
@@ -106,9 +106,9 @@ namespace Centaurus.Test.Exchange.Analytics
                     },
                     Timestamp = DateTime.UtcNow.Ticks
                 };
-                var diffObject = new DiffObject();
-                var conterOrderEffectsContainer = new EffectProcessorsContainer(context, trade.CreateEnvelope(), diffObject, context.AccountStorage.GetAccount(account1.Account.Pubkey));
-                testTradeResults.Add(trade, conterOrderEffectsContainer);
+
+                var orderContext = (RequestContext)orderRequestProcessor.GetContext(trade.CreateEnvelope(), context.AccountStorage.GetAccount(account1.Account.Pubkey));
+                testTradeResults.Add(trade, orderContext);
             }
 
             PerfCounter.MeasureTime(() =>

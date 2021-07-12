@@ -1,5 +1,4 @@
-﻿using Centaurus.DAL;
-using Centaurus.Domain;
+﻿using Centaurus.Domain;
 using Centaurus.Domain.Models;
 using Centaurus.Models;
 using NUnit.Framework;
@@ -100,7 +99,9 @@ namespace Centaurus.Test
             var asset = context.Constellation.Assets[1].Code;
             var market = context.Exchange.GetMarket(asset);
 
-            var testTradeResults = new Dictionary<RequestQuantum, EffectProcessorsContainer>();
+
+            var orderRequestProcessor = new OrderRequestProcessor(context);
+            var testTradeResults = new Dictionary<RequestQuantum, RequestContext>();
             for (var i = 1; i < iterations; i++)
             {
                 var price = useNormalDistribution ? rnd.NextNormallyDistributed() + 50 : rnd.NextDouble() * 100;
@@ -135,9 +136,9 @@ namespace Centaurus.Test
                     },
                     Timestamp = DateTime.UtcNow.Ticks
                 };
-                var diffObject = new DiffObject();
-                var conterOrderEffectsContainer = new EffectProcessorsContainer(context, trade.CreateEnvelope(), diffObject, initiator);
-                testTradeResults.Add(trade, conterOrderEffectsContainer);
+
+                var processorContext = (RequestContext)orderRequestProcessor.GetContext(trade.CreateEnvelope(), initiator);
+                testTradeResults.Add(trade, processorContext);
             }
             var baseAsset = context.Constellation.GetBaseAsset();
             var xlmStartBalance = account1.Account.GetBalance(baseAsset).Amount + account2.Account.GetBalance(baseAsset).Amount;

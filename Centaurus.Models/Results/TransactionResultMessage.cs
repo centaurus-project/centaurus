@@ -6,7 +6,7 @@ namespace Centaurus.Models
     /// <summary>
     /// Message used as a quantum response.
     /// </summary>
-    public class ITransactionResultMessage : QuantumResultMessage
+    public class TransactionResultMessage : QuantumResultMessage
     {
         public override MessageTypes MessageType => MessageTypes.ITransactionResultMessage;
 

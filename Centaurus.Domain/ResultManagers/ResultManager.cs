@@ -184,7 +184,7 @@ namespace Centaurus.Domain
                         if (ResultMessageItem.IsTxResultMessage)
                         {
                             var txSignature = new TxSignature { Signature = result.TxSignature, Signer = result.TxSigner };
-                            ((ITransactionResultMessage)ResultMessageItem.Result).TxSignatures.Add(txSignature);
+                            ((TransactionResultMessage)ResultMessageItem.Result).TxSignatures.Add(txSignature);
                         }
                     }
                     var majorityResult = CheckMajority();
@@ -240,7 +240,7 @@ namespace Centaurus.Domain
 
                         if (!ResultManager.Context.PaymentProvidersManager.TryGetManager(paymentProviderId, out var paymentProvider))
                             throw new Exception($"Unable to find manager {paymentProviderId}");
-                        paymentProvider.SubmitTransaction(transactionQuantum.Transaction, ((ITransactionResultMessage)ResultMessageItem.Result).TxSignatures);
+                        paymentProvider.SubmitTransaction(transactionQuantum.Transaction, ((TransactionResultMessage)ResultMessageItem.Result).TxSignatures);
                     }
                 }
                 catch (Exception exc)
@@ -331,7 +331,7 @@ namespace Centaurus.Domain
 
             public QuantumResultMessage Result { get; private set; }
 
-            public bool IsTxResultMessage => Result is ITransactionResultMessage;
+            public bool IsTxResultMessage => Result is TransactionResultMessage;
 
             public bool IsResultAssigned => Result != null;
 

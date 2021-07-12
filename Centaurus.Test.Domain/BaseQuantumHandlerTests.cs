@@ -313,7 +313,7 @@ namespace Centaurus.Test
             {
                 var result = await context.QuantumHandler.HandleAsync(quantum);
 
-                context.PendingUpdatesManager.ApplyUpdates(context.PendingUpdatesManager.Current);
+                context.PendingUpdatesManager.ApplyUpdates(true);
 
                 //check that processed quanta is saved to the storage
                 var lastApex = context.PermanentStorage.GetLastApex();

@@ -9,10 +9,10 @@ namespace Centaurus.Domain
 {
     public class PaymentCommitProcessorContext : ProcessorContext
     {
-        public PaymentCommitProcessorContext(EffectProcessorsContainer effectProcessors) 
-            : base(effectProcessors)
+        public PaymentCommitProcessorContext(ExecutionContext context, MessageEnvelope quantum, AccountWrapper account) 
+            : base(context, quantum, account)
         {
-            var payment = (DepositQuantum)effectProcessors.Envelope.Message;
+            var payment = (DepositQuantum)Quantum;
             if (!CentaurusContext.PaymentProvidersManager.TryGetManager(payment.Source.ProviderId, out var paymentProvider))
                 throw new Exception($"Unable to find payment provider {payment.Source.ProviderId}");
             PaymentProvider = paymentProvider;

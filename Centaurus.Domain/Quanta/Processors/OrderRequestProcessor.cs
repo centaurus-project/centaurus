@@ -9,17 +9,23 @@ namespace Centaurus.Domain
 {
     public class OrderRequestProcessor : RequestQuantumProcessor
     {
+        public OrderRequestProcessor(ExecutionContext context)
+            :base(context)
+        {
+
+        }
+
         public override MessageTypes SupportedMessageType => MessageTypes.OrderRequest;
 
         public override Task<QuantumResultMessage> Process(RequestContext context)
         {
-            var quantum = (RequestQuantum)context.Envelope.Message;
+            var quantum = context.Request;
 
             context.UpdateNonce();
 
-            context.CentaurusContext.Exchange.ExecuteOrder(context.EffectProcessors);
+            context.CentaurusContext.Exchange.ExecuteOrder(context);
 
-            return Task.FromResult((QuantumResultMessage)context.Envelope.CreateResult(ResultStatusCodes.Success));
+            return Task.FromResult((QuantumResultMessage)context.QuantumEnvelope.CreateResult(ResultStatusCodes.Success));
         }
 
         private int MaxCrossOrdersCount = 100;
@@ -28,7 +34,7 @@ namespace Centaurus.Domain
         {
             context.ValidateNonce();
 
-            var quantum = context.Envelope.Message as RequestQuantum;
+            var quantum = context.Request;
             var orderRequest = quantum.RequestEnvelope.Message as OrderRequest;
 
             if (!context.CentaurusContext.Constellation.Assets.Any(a => a.Code == orderRequest.Asset))

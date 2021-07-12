@@ -134,7 +134,7 @@ namespace Centaurus
                 case MessageTypes.AccountDataRequest:
                     return CreateResult<AccountDataResponse>(envelope, status);
                 case MessageTypes.WithdrawalRequest:
-                    return CreateResult<ITransactionResultMessage>(envelope, status);
+                    return CreateResult<TransactionResultMessage>(envelope, status);
                 default:
                     {
                         if (envelope.Message is Quantum)

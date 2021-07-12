@@ -9,8 +9,8 @@ namespace Centaurus.Domain.Quanta.Contexts
 {
     public class OrderCancellationProcessorContext : RequestContext
     {
-        public OrderCancellationProcessorContext(EffectProcessorsContainer effectProcessors) 
-            : base(effectProcessors)
+        public OrderCancellationProcessorContext(ExecutionContext context, MessageEnvelope messageEnvelope, AccountWrapper account) 
+            : base(context, messageEnvelope, account)
         {
         }
 

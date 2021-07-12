@@ -1,12 +1,13 @@
-﻿using Centaurus.Models;
+﻿using Centaurus.Domain.Models;
+using Centaurus.Models;
 using Centaurus.PaymentProvider;
 
 namespace Centaurus.Domain
 {
     public class WithdrawalProcessorContext : RequestContext, ITransactionProcessorContext
     {
-        public WithdrawalProcessorContext(EffectProcessorsContainer effectProcessorsContainer)
-            : base(effectProcessorsContainer)
+        public WithdrawalProcessorContext(ExecutionContext context, MessageEnvelope quantum, AccountWrapper account)
+            : base(context, quantum, account)
         {
             if (!CentaurusContext.PaymentProvidersManager.TryGetManager(WithdrawalRequest.PaymentProvider, out var provider))
                 throw new BadRequestException($"Provider {WithdrawalRequest.PaymentProvider} is not supported.");

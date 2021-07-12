@@ -1,21 +1,28 @@
-﻿using Centaurus.Models;
+﻿using Centaurus.Domain.Models;
+using Centaurus.Models;
 using System.Linq;
 using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
 
-    public class WithdrawalProcessor : QuantumProcessor<WithdrawalProcessorContext>
+    public class WithdrawalProcessor : QuantumProcessorBase<WithdrawalProcessorContext>
     {
+        public WithdrawalProcessor(ExecutionContext context)
+            :base(context)
+        {
+
+        }
+
         public override MessageTypes SupportedMessageType => MessageTypes.WithdrawalRequest;
 
         public override Task<QuantumResultMessage> Process(WithdrawalProcessorContext context)
         {
             context.UpdateNonce();
 
-            context.EffectProcessors.AddBalanceUpdate(context.SourceAccount, context.WithdrawalRequest.Asset, context.WithdrawalRequest.Amount, UpdateSign.Minus);
+            context.AddBalanceUpdate(context.SourceAccount, context.WithdrawalRequest.Asset, context.WithdrawalRequest.Amount, UpdateSign.Minus);
 
-            return Task.FromResult((QuantumResultMessage)context.Envelope.CreateResult(ResultStatusCodes.Success));
+            return Task.FromResult((QuantumResultMessage)context.QuantumEnvelope.CreateResult(ResultStatusCodes.Success));
         }
 
         public override Task Validate(WithdrawalProcessorContext context)
@@ -46,9 +53,9 @@ namespace Centaurus.Domain
             return Task.CompletedTask;
         }
 
-        public override WithdrawalProcessorContext GetContext(EffectProcessorsContainer container)
+        public override ProcessorContext GetContext(MessageEnvelope envelope, AccountWrapper account)
         {
-            return new WithdrawalProcessorContext(container);
+            return new WithdrawalProcessorContext(Context, envelope, account);
         }
     }
 }

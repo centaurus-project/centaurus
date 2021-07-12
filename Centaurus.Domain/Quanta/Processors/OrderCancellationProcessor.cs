@@ -1,4 +1,5 @@
-﻿using Centaurus.Domain.Quanta.Contexts;
+﻿using Centaurus.Domain.Models;
+using Centaurus.Domain.Quanta.Contexts;
 using Centaurus.Models;
 using System;
 using System.Collections.Generic;
@@ -8,24 +9,30 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public class OrderCancellationProcessor : QuantumProcessor<OrderCancellationProcessorContext>
+    public class OrderCancellationProcessor : QuantumProcessorBase<OrderCancellationProcessorContext>
     {
+        public OrderCancellationProcessor(ExecutionContext context)
+            :base(context)
+        {
+
+        }
+
         public override MessageTypes SupportedMessageType => MessageTypes.OrderCancellationRequest;
 
-        public override OrderCancellationProcessorContext GetContext(EffectProcessorsContainer effectProcessors)
+        public override ProcessorContext GetContext(MessageEnvelope messageEnvelope, AccountWrapper account)
         {
-            return new OrderCancellationProcessorContext(effectProcessors);
+            return new OrderCancellationProcessorContext(Context, messageEnvelope, account);
         }
 
         public override Task<QuantumResultMessage> Process(OrderCancellationProcessorContext context)
         {
-            var quantum = (RequestQuantum)context.Envelope.Message;
+            var quantum = (RequestQuantum)context.QuantumEnvelope.Message;
 
             context.UpdateNonce();
 
-            context.CentaurusContext.Exchange.RemoveOrder(context.EffectProcessors, context.Orderbook, context.OrderWrapper);
+            context.CentaurusContext.Exchange.RemoveOrder(context, context.Orderbook, context.OrderWrapper);
 
-            var resultMessage = context.Envelope.CreateResult(ResultStatusCodes.Success);
+            var resultMessage = context.QuantumEnvelope.CreateResult(ResultStatusCodes.Success);
             return Task.FromResult((QuantumResultMessage)resultMessage);
         }
 
@@ -34,7 +41,7 @@ namespace Centaurus.Domain
         {
             context.ValidateNonce();
 
-            var quantum = context.Envelope.Message as RequestQuantum;
+            var quantum = context.QuantumEnvelope.Message as RequestQuantum;
             var orderRequest = (OrderCancellationRequest)quantum.RequestMessage;
 
             context.OrderWrapper = context.CentaurusContext.Exchange.OrderMap.GetOrder(orderRequest.OrderId);

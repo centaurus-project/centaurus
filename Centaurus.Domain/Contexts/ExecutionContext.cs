@@ -32,7 +32,8 @@ namespace Centaurus.Domain
             ExtensionsManager = new ExtensionsManager(Settings.ExtensionsConfigFilePath);
 
             PersistenceManager = new PersistenceManager(this);
-            QuantumProcessor = new QuantumProcessorsStorage();
+
+            QuantumProcessor = new QuantumProcessorsStorage(this);
 
             PendingUpdatesManager = new PendingUpdatesManager(this);
             PendingUpdatesManager.OnBatchSaved += PendingUpdatesManager_OnBatchSaved;

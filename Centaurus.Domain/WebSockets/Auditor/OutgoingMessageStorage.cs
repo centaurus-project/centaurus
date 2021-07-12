@@ -96,14 +96,11 @@ namespace Centaurus.Domain
                 throw new ArgumentNullException(nameof(result));
 
             var txSignature = default(byte[]);
-            if (result is ITransactionResultMessage txResult)
+            if (result is TransactionResultMessage txResult)
             {
                 txSignature = txResult.TxSignatures.FirstOrDefault()?.Signature;
                 if (txSignature == null)
-                    throw new Exception("Tx signature is missing in ITransactionResultMessage.");
-                //TODO: create special envelope for storing tx signature
-                //ugly solution 
-                txResult.TxSignatures.Clear();
+                    throw new Exception("Transaction signature is missing.");
             }
 
             lock (results)

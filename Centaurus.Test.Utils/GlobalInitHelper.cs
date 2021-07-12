@@ -1,7 +1,5 @@
-﻿using Centaurus.DAL;
-using Centaurus.Domain;
+﻿using Centaurus.Domain;
 using Centaurus.Models;
-using Centaurus.PaymentProvider;
 using Centaurus.PersistentStorage.Abstraction;
 using System;
 using System.Collections.Generic;
@@ -167,7 +165,7 @@ namespace Centaurus.Test
             await context.QuantumHandler.HandleAsync(depositQuantum.CreateEnvelope());
 
             //save all effects
-            context.PendingUpdatesManager.ApplyUpdates(context.PendingUpdatesManager.Current);
+            context.PendingUpdatesManager.ApplyUpdates(true);
             return context;
         }
     }

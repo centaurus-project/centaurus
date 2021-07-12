@@ -8,8 +8,8 @@ namespace Centaurus.Domain
 {
     public class PaymentProcessorContext : RequestContext
     {
-        public PaymentProcessorContext(EffectProcessorsContainer effectProcessors) 
-            : base(effectProcessors)
+        public PaymentProcessorContext(ExecutionContext context, MessageEnvelope quantum, AccountWrapper account) 
+            : base(context, quantum, account)
         {
             Payment = (PaymentRequest)Request.RequestEnvelope.Message;
         }
@@ -22,7 +22,7 @@ namespace Centaurus.Domain
             get
             {
                 if (destinationAccount == null)
-                    destinationAccount = EffectProcessors.Context.AccountStorage.GetAccount(Payment.Destination);
+                    destinationAccount = Context.AccountStorage.GetAccount(Payment.Destination);
 
                 return destinationAccount;
             }

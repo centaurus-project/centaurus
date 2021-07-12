@@ -7,16 +7,22 @@ namespace Centaurus.Domain
 {
     public class InitQuantumProcessor : QuantumProcessor
     {
+        public InitQuantumProcessor(ExecutionContext context)
+            :base(context)
+        {
+
+        }
+
         public override MessageTypes SupportedMessageType => MessageTypes.ConstellationInitRequest;
 
         public override Task<QuantumResultMessage> Process(ProcessorContext context)
         {
-            var initQuantum = (ConstellationInitRequest)((ConstellationQuantum)context.Envelope.Message).RequestMessage;
+            var initQuantum = (ConstellationInitRequest)((ConstellationQuantum)context.QuantumEnvelope.Message).RequestMessage;
 
-            context.EffectProcessors.AddConstellationInit(initQuantum);
+            context.AddConstellationInit(initQuantum);
             var initSnapshot = PersistenceManager.GetSnapshot(
-                (ConstellationInitEffect)context.EffectProcessors.Effects[0],
-                context.Envelope.ComputeMessageHash()
+                (ConstellationInitEffect)context.GetClientEffects()[0],
+                context.QuantumEnvelope.ComputeMessageHash()
             );
             context.CentaurusContext.Setup(initSnapshot);
 
@@ -28,7 +34,7 @@ namespace Centaurus.Domain
                 context.CentaurusContext.AppState.State = ApplicationState.Ready;
             }
 
-            return Task.FromResult((QuantumResultMessage)context.Envelope.CreateResult(ResultStatusCodes.Success));
+            return Task.FromResult((QuantumResultMessage)context.QuantumEnvelope.CreateResult(ResultStatusCodes.Success));
         }
 
         const int minAuditorsCount = 2;
@@ -38,7 +44,7 @@ namespace Centaurus.Domain
             if (context.CentaurusContext.AppState.State != ApplicationState.WaitingForInit)
                 throw new InvalidOperationException("Init quantum can be handled only when application is in WaitingForInit state.");
 
-            var requestEnvelope = ((ConstellationQuantum)context.Envelope.Message).RequestEnvelope;
+            var requestEnvelope = ((ConstellationQuantum)context.QuantumEnvelope.Message).RequestEnvelope;
 
             if (!(requestEnvelope.Message is ConstellationInitRequest constellationInit))
                 throw new ArgumentException("Message is not ConstellationInitRequest");

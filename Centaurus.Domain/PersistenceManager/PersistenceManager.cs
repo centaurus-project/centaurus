@@ -1,15 +1,11 @@
-﻿using Centaurus.DAL;
-using Centaurus.Domain.Models;
+﻿using Centaurus.Domain.Models;
 using Centaurus.Models;
 using Centaurus.PersistentStorage;
-using Centaurus.PersistentStorage.Abstraction;
 using Centaurus.Xdr;
 using NLog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
@@ -18,7 +14,7 @@ namespace Centaurus.Domain
     {
         private static Logger logger = LogManager.GetCurrentClassLogger();
 
-        private SemaphoreSlim saveSnapshotSemaphore = new SemaphoreSlim(1);
+        private object syncRoot = new { };
 
         public PersistenceManager(ExecutionContext context)
             : base(context)
@@ -64,24 +60,10 @@ namespace Centaurus.Domain
             };
         }
 
-        public void ApplyUpdates(DiffObject updates)
+        public void ApplyUpdates(List<IPersistentModel> updates)
         {
-            saveSnapshotSemaphore.Wait();
-            try
-            {
-                var updateModels = updates.Batch.ToList();
-                updateModels.AddRange(
-                    updates.Accounts.Select(a => Context.AccountStorage.GetAccount(a).Account.ToPersistentModel()).Cast<IPersistentModel>().ToList()
-                );
-                updateModels.AddRange(
-                    updates.Cursors.Select(p => Context.PaymentProvidersManager.GetManager(p).ToPersistentModel()).Cast<IPersistentModel>().ToList()
-                );
-                Context.PermanentStorage.SaveBatch(updateModels);
-            }
-            finally
-            {
-                saveSnapshotSemaphore.Release();
-            }
+            lock(syncRoot)
+                Context.PermanentStorage.SaveBatch(updates);
         }
 
         /// <summary>
@@ -151,6 +133,7 @@ namespace Centaurus.Domain
             return settingsModel.ToDomainModel();
         }
 
+        //TODO: move it to separate class
         /// <summary>
         /// Builds snapshot for specified apex
         /// </summary>

@@ -144,7 +144,7 @@ namespace Centaurus.SDK
 
             var response = (CentaurusResponse)await connection.SendMessage(paymentMessage.CreateEnvelope());
             var result = await (waitForFinalize ? response.ResponseTask : response.AcknowledgmentTask);
-            var txResultMessage = result.Message as ITransactionResultMessage;
+            var txResultMessage = result.Message as TransactionResultMessage;
             if (txResultMessage is null)
                 throw new Exception($"Unexpected result type '{result.Message.MessageType}'");
 

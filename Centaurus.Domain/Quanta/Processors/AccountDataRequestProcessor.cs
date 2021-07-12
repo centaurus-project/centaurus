@@ -9,16 +9,22 @@ namespace Centaurus.Domain
 {
     public class AccountDataRequestProcessor : RequestQuantumProcessor
     {
+        public AccountDataRequestProcessor(ExecutionContext context)
+            :base(context)
+        {
+
+        }
+
         public override MessageTypes SupportedMessageType => MessageTypes.AccountDataRequest;
 
         public override Task<QuantumResultMessage> Process(RequestContext context)
         {
-            var quantum = (RequestQuantum)context.Envelope.Message;
+            var quantum = context.Request;
             var requestMessage = quantum.RequestMessage;
 
             context.UpdateNonce();
 
-            var resultMessage = (AccountDataResponse)context.Envelope.CreateResult(ResultStatusCodes.Success);
+            var resultMessage = (AccountDataResponse)context.QuantumEnvelope.CreateResult(ResultStatusCodes.Success);
             resultMessage.Balances = context.SourceAccount.Account.Balances
                 .Select(balance => new Balance { Amount = balance.Amount, Asset = balance.Asset, Liabilities = balance.Liabilities })
                 .OrderBy(balance => balance.Asset)

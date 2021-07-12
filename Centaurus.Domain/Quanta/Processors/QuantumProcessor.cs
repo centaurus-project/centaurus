@@ -3,47 +3,90 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Centaurus.Domain.Models;
 using Centaurus.Models;
 
 namespace Centaurus.Domain
 {
-    public abstract class QuantumProcessor<T> : IQuantumProcessor<T>, IQuantumProcessor
-        where T : ProcessorContext
+    public abstract class QuantumProcessorBase : ContextualBase
     {
-        public abstract MessageTypes SupportedMessageType { get; }
-
-        public abstract Task<QuantumResultMessage> Process(T context);
-
-        public abstract Task Validate(T context);
-
-        Task IQuantumProcessor.Validate(object context)
+        public QuantumProcessorBase(ExecutionContext context)
+            : base(context)
         {
-            return Validate((T)context);
+
         }
 
-        Task<QuantumResultMessage> IQuantumProcessor.Process(object context)
+        public abstract MessageTypes SupportedMessageType { get; }
+
+
+        /// <summary>
+        /// Execute quantum request and generate response message.
+        /// </summary>
+        /// <param name="context">Request context</param>
+        public abstract Task<QuantumResultMessage> Process(object context);
+
+        /// <summary>
+        /// Validate quantum request preconditions.
+        /// </summary>
+        /// <param name="context">Request context</param>
+        public abstract Task Validate(object context);
+
+        /// <summary>
+        /// Generates context for the processor.
+        /// </summary>
+        public abstract ProcessorContext GetContext(MessageEnvelope messageEnvelope, AccountWrapper account);
+    }
+
+    public abstract class QuantumProcessorBase<T> : QuantumProcessorBase
+        where T : ProcessorContext
+    {
+        public QuantumProcessorBase(ExecutionContext context)
+            :base(context)
+        {
+
+        }
+
+        public override Task<QuantumResultMessage> Process(object context)
         {
             return Process((T)context);
         }
 
-        public abstract T GetContext(EffectProcessorsContainer container);
+        public abstract Task<QuantumResultMessage> Process(T context);
 
-        ProcessorContext IQuantumProcessor.GetContext(EffectProcessorsContainer container) => GetContext(container);
+
+        public override Task Validate(object context)
+        {
+            return Validate((T)context);
+        }
+
+        public abstract Task Validate(T context);
     }
 
-    public abstract class QuantumProcessor : QuantumProcessor<ProcessorContext>
+    public abstract class QuantumProcessor : QuantumProcessorBase<ProcessorContext>
     {
-        public override ProcessorContext GetContext(EffectProcessorsContainer container)
+        public QuantumProcessor(ExecutionContext context)
+            :base(context)
         {
-            return new ProcessorContext(container);
+
+        }
+
+        public override ProcessorContext GetContext(MessageEnvelope messageEnvelope, AccountWrapper account)
+        {
+            return new ProcessorContext(Context, messageEnvelope, account);
         }
     }
 
-    public abstract class RequestQuantumProcessor : QuantumProcessor<RequestContext>
+    public abstract class RequestQuantumProcessor : QuantumProcessorBase<RequestContext>
     {
-        public override RequestContext GetContext(EffectProcessorsContainer container)
+        public RequestQuantumProcessor(ExecutionContext context)
+            : base(context)
         {
-            return new RequestContext(container);
+
+        }
+
+        public override ProcessorContext GetContext(MessageEnvelope messageEnvelope, AccountWrapper account)
+        {
+            return new RequestContext(Context, messageEnvelope, account);
         }
     }
 }

@@ -113,7 +113,7 @@ namespace Centaurus.SDK
                     throw new RequestException(envelope, "Duplicate signatures.");
                 if (!effectsProof.Signatures.All(s => Auditors.Any(a => s.Signer.Equals(a))))
                     throw new RequestException(envelope, "Unknown signer.");
-                if (!(resultMessage is ITransactionResultMessage || effectsProof.Signatures.AreSignaturesValid(effectsProof.Hashes.ComputeHash())))//TODO: remove it after ITransactionResultMessage refactoring
+                if (!(resultMessage is TransactionResultMessage || effectsProof.Signatures.AreSignaturesValid(effectsProof.Hashes.ComputeHash())))//TODO: remove it after ITransactionResultMessage refactoring
                     throw new RequestException(envelope, "At least one signature is invalid.");
 
                 if (MajorityHelper.HasMajority(effectsProof.Signatures.Count, Auditors.Count))

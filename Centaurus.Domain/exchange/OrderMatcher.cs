@@ -7,32 +7,32 @@ namespace Centaurus.Domain
 {
     public class OrderMatcher
     {
-        public OrderMatcher(OrderRequest orderRequest, EffectProcessorsContainer effectsContainer)
+        public OrderMatcher(OrderRequest orderRequest, ProcessorContext processorContext)
         {
-            this.effectsContainer = effectsContainer;
-            baseAsset = effectsContainer.Context.Constellation.GetBaseAsset();
+            this.processorContext = processorContext;
+            baseAsset = this.processorContext.Context.Constellation.GetBaseAsset();
 
             takerOrder = new OrderWrapper(
                 new Order
                 {
-                    OrderId = effectsContainer.Apex,
+                    OrderId = this.processorContext.Apex,
                     Amount = orderRequest.Amount,
                     Price = orderRequest.Price,
                     Asset = orderRequest.Asset,
                     Side = orderRequest.Side
                 },
-                effectsContainer.AccountWrapper
+                this.processorContext.SourceAccount
             );
             timeInForce = orderRequest.TimeInForce;
 
             asset = takerOrder.Order.Asset;
             side = takerOrder.Order.Side;
             //get asset orderbook
-            market = effectsContainer.Context.Exchange.GetMarket(asset);
+            market = this.processorContext.Context.Exchange.GetMarket(asset);
             orderbook = market.GetOrderbook(side.Inverse());
             //fetch balances
             if (!takerOrder.AccountWrapper.Account.HasBalance(asset))
-                this.effectsContainer.AddBalanceCreate(effectsContainer.AccountWrapper, asset);
+                this.processorContext.AddBalanceCreate(this.processorContext.SourceAccount, asset);
         }
 
         private readonly OrderWrapper takerOrder;
@@ -47,7 +47,7 @@ namespace Centaurus.Domain
 
         private readonly ExchangeMarket market;
 
-        private readonly EffectProcessorsContainer effectsContainer;
+        private readonly ProcessorContext processorContext;
 
         private readonly string baseAsset;
 
@@ -61,7 +61,7 @@ namespace Centaurus.Domain
             var counterOrder = orderbook.Head;
             var nextOrder = default(OrderWrapper);
 
-            var updates = new ExchangeUpdate(asset, new DateTime(effectsContainer.Quantum.Timestamp, DateTimeKind.Utc));
+            var updates = new ExchangeUpdate(asset, new DateTime(processorContext.Quantum.Timestamp, DateTimeKind.Utc));
 
             var tradeAssetAmount = 0ul;
             var tradeQuoteAmount = 0ul;
@@ -103,7 +103,7 @@ namespace Centaurus.Domain
                 return;
 
             //record taker trade effect. AddTrade will update order amount
-            effectsContainer.AddTrade(
+            processorContext.AddTrade(
                 takerOrder,
                 tradeAssetAmount,
                 tradeQuoteAmount,
@@ -144,7 +144,7 @@ namespace Centaurus.Domain
             //select the market to add new order
             var reminderOrderbook = market.GetOrderbook(side);
             //record maker trade effect
-            effectsContainer.AddOrderPlaced(reminderOrderbook, takerOrder, baseAsset);
+            processorContext.AddOrderPlaced(reminderOrderbook, takerOrder, baseAsset);
             return true;
         }
 
@@ -202,7 +202,7 @@ namespace Centaurus.Domain
             private Trade RecordTrade()
             {
                 //record maker trade effect
-                matcher.effectsContainer.AddTrade(
+                matcher.processorContext.AddTrade(
                          makerOrder,
                          AssetAmount,
                          QuoteAmount,
@@ -216,13 +216,13 @@ namespace Centaurus.Domain
                     QuoteAmount = QuoteAmount,
                     Asset = matcher.asset,
                     Price = makerOrder.Order.Price,
-                    TradeDate = new DateTime(matcher.effectsContainer.Quantum.Timestamp, DateTimeKind.Utc)
+                    TradeDate = new DateTime(matcher.processorContext.Quantum.Timestamp, DateTimeKind.Utc)
                 };
             }
 
             private void RecordOrderRemoved()
             {
-                matcher.effectsContainer.AddOrderRemoved(matcher.orderbook, makerOrder, matcher.baseAsset);
+                matcher.processorContext.AddOrderRemoved(matcher.orderbook, makerOrder, matcher.baseAsset);
             }
         }
     }

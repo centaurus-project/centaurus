@@ -1,16 +1,23 @@
-﻿using Centaurus.Models;
+﻿using Centaurus.Domain.Models;
+using Centaurus.Models;
 using System.Linq;
 using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public class PaymentRequestProcessor : QuantumProcessor<PaymentProcessorContext>
+    public class PaymentRequestProcessor : QuantumProcessorBase<PaymentProcessorContext>
     {
+        public PaymentRequestProcessor(ExecutionContext context)
+            :base(context)
+        {
+
+        }
+
         public override MessageTypes SupportedMessageType { get; } = MessageTypes.PaymentRequest;
 
-        public override PaymentProcessorContext GetContext(EffectProcessorsContainer container)
+        public override ProcessorContext GetContext(MessageEnvelope messageEnvelope, AccountWrapper account)
         {
-            return new PaymentProcessorContext(container);
+            return new PaymentProcessorContext(Context, messageEnvelope, account);
         }
 
         public override Task<QuantumResultMessage> Process(PaymentProcessorContext context)
@@ -22,16 +29,16 @@ namespace Centaurus.Domain
             if (context.DestinationAccount == null)
             {
                 var accId = context.CentaurusContext.AccountStorage.NextAccountId;
-                context.EffectProcessors.AddAccountCreate(context.CentaurusContext.AccountStorage, accId, payment.Destination);
+                context.AddAccountCreate(context.CentaurusContext.AccountStorage, accId, payment.Destination);
             }
 
             if (!context.DestinationAccount.Account.HasBalance(payment.Asset))
-                context.EffectProcessors.AddBalanceCreate(context.DestinationAccount, payment.Asset);
-            context.EffectProcessors.AddBalanceUpdate(context.DestinationAccount, payment.Asset, payment.Amount, UpdateSign.Plus);
+                context.AddBalanceCreate(context.DestinationAccount, payment.Asset);
+            context.AddBalanceUpdate(context.DestinationAccount, payment.Asset, payment.Amount, UpdateSign.Plus);
 
-            context.EffectProcessors.AddBalanceUpdate(context.SourceAccount, payment.Asset, payment.Amount, UpdateSign.Minus);
+            context.AddBalanceUpdate(context.SourceAccount, payment.Asset, payment.Amount, UpdateSign.Minus);
 
-            var result = context.Envelope.CreateResult(ResultStatusCodes.Success);
+            var result = context.QuantumEnvelope.CreateResult(ResultStatusCodes.Success);
 
             return Task.FromResult((QuantumResultMessage)result);
         }

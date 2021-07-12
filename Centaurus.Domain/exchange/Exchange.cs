@@ -54,20 +54,19 @@ namespace Centaurus.Domain
         /// </summary>
         /// <param name="orderRequest">Order request quantum</param>
         /// <returns></returns>
-        public void ExecuteOrder(EffectProcessorsContainer effectsContainer)
+        public void ExecuteOrder(RequestContext context)
         {
-            RequestQuantum orderRequestQuantum = (RequestQuantum)effectsContainer.Envelope.Message;
-            var orderRequest = (OrderRequest)orderRequestQuantum.RequestEnvelope.Message;
-            var updates = new OrderMatcher(orderRequest, effectsContainer).Match();
+            var orderRequest = (OrderRequest)context.Request.RequestMessage;
+            var updates = new OrderMatcher(orderRequest, context).Match();
             awaitedUpdates?.Add(updates);
         }
 
-        public void RemoveOrder(EffectProcessorsContainer effectsContainer, OrderbookBase orderbook, OrderWrapper order)
+        public void RemoveOrder(RequestContext context, OrderbookBase orderbook, OrderWrapper order)
         {
-            effectsContainer.AddOrderRemoved(orderbook, order, effectsContainer.Context.Constellation.GetBaseAsset());
+            context.AddOrderRemoved(orderbook, order, context.Context.Constellation.GetBaseAsset());
             if (awaitedUpdates != null)
             {
-                var updateTime = new DateTime(((Quantum)effectsContainer.Envelope.Message).Timestamp, DateTimeKind.Utc);
+                var updateTime = new DateTime(context.Quantum.Timestamp, DateTimeKind.Utc);
                 var exchangeItem = new ExchangeUpdate(orderbook.Market, updateTime);
                 exchangeItem.OrderUpdates.Add(order.Order.ToOrderInfo(OrderState.Deleted));
                 awaitedUpdates.Add(exchangeItem);

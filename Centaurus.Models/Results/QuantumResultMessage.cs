@@ -15,5 +15,7 @@ namespace Centaurus.Models
 
         [XdrField(1)]
         public EffectsProof Effects { get; set; }
+
+        public Quantum Quantum => (Quantum)OriginalMessage.Message;
     }
 }

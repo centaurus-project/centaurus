@@ -1,12 +1,9 @@
-﻿using Centaurus.Models;
-using Centaurus.DAL;
-using Centaurus.Exchange.Analytics;
+﻿using Centaurus.Exchange.Analytics;
+using Centaurus.Models;
 using NUnit.Framework;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Centaurus.Test.Exchange.Analytics
 {
