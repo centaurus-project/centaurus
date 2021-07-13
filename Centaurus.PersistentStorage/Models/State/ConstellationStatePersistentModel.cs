@@ -15,6 +15,7 @@ namespace Centaurus.PersistentStorage
         [Key(1)]
         public string Cursor { get; set; }
 
+        [IgnoreMember]
         public byte[] Key 
         { 
             get
@@ -29,6 +30,7 @@ namespace Centaurus.PersistentStorage
             }
         }
 
+        [IgnoreMember]
         public string ColumnFamily => "cursors";
     }
 }

@@ -30,12 +30,14 @@ namespace Centaurus.PersistentStorage
         [Key(6)]
         public List<ProviderSettingsPersistentModel> Providers { get; set; }
 
+        [IgnoreMember]
         public byte[] Key
         {
             get => ApexConverter.EncodeApex(Apex);
             set => Apex = ApexConverter.DecodeApex(value);
         }
 
+        [IgnoreMember]
         public string ColumnFamily => "settings";
     }
 }

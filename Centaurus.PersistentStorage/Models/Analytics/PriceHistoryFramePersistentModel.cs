@@ -53,6 +53,7 @@ namespace Centaurus.PersistentStorage
             set => OHLC[3] = value;
         }
 
+        [IgnoreMember]
         public byte[] Key
         {
             get
@@ -72,7 +73,10 @@ namespace Centaurus.PersistentStorage
             }
         }
 
+        [IgnoreMember]
         public string ColumnFamily => "pricehistory";
+
+        [IgnoreMember]
         public uint PrefixLength => 8;
     }
 }
