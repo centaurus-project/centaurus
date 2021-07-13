@@ -1,6 +1,10 @@
-﻿using Microsoft.AspNetCore.Mvc.ModelBinding;
+﻿using Centaurus.Models;
+using Centaurus.Xdr;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -8,12 +12,14 @@ namespace Centaurus.Alpha
 {
     public class XdrModelBinder : IModelBinder
     {
-        public Task BindModelAsync(ModelBindingContext bindingContext)
+        public async Task BindModelAsync(ModelBindingContext bindingContext)
         {
             if (bindingContext == null)
                 throw new ArgumentNullException(nameof(bindingContext));
-            bindingContext.Result = ModelBindingResult.Success(new { });
-            return Task.CompletedTask;
+
+            using var memoryStream = new MemoryStream();
+            await bindingContext.HttpContext.Request.Body.CopyToAsync(memoryStream);
+            bindingContext.Result = ModelBindingResult.Success(XdrConverter.Deserialize<MessageEnvelope>(memoryStream.ToArray()));
         }
     }
 }

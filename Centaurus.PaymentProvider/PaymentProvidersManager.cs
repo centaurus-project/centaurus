@@ -9,9 +9,9 @@ namespace Centaurus.PaymentProvider
 {
     public class PaymentProvidersManager : IDisposable
     {
-        public PaymentProvidersManager(PaymentProviderFactoryBase paymentProviderFactory, List<ProviderSettings> settings)
+        public PaymentProvidersManager(PaymentProviderFactoryBase paymentProviderFactory, List<ProviderSettings> settings, string configPath)
         {
-            var config = GetConfig();
+            var config = GetConfig(configPath);
             var providers = new Dictionary<string, PaymentProviderBase>();
             foreach (var provider in settings)
             {
@@ -42,13 +42,11 @@ namespace Centaurus.PaymentProvider
             throw new Exception($"Unable to find provider {provider}.");
         }
 
-        const string configFileName = "payment-providers.config";
-
-        private JsonDocument GetConfig()
+        private JsonDocument GetConfig(string configPath)
         {
-            if (!File.Exists(configFileName))
+            if (!File.Exists(configPath))
                 return null;
-            return JsonDocument.Parse(File.ReadAllText(configFileName));
+            return JsonDocument.Parse(File.ReadAllText(configPath));
         }
 
         public void Dispose()

@@ -17,4 +17,8 @@
     <ProjectReference Include="..\Centaurus.PaymentProvider\Centaurus.PaymentProvider.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Properties\" />
+  </ItemGroup>
+
 </Project>

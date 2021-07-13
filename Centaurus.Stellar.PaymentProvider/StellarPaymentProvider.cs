@@ -27,12 +27,13 @@ namespace Centaurus.Stellar.PaymentProvider
         public StellarPaymentProvider(ProviderSettings settings, string config)
             : base(settings, config)
         {
-            commitDelay = TimeSpan.FromTicks(settings.PaymentSubmitDelay);
+            commitDelay = TimeSpan.FromSeconds(settings.PaymentSubmitDelay);
             submitTimerInterval = TimeSpan.FromSeconds(5).TotalMilliseconds;
 
+            if (config == null)
+                throw new ArgumentNullException(nameof(config));
             var configObject = JsonSerializer.Deserialize<Config>(config);
 
-            maxTxSubmitDelay = configObject.MaxTxSubmitDelay;
             dataSource = new DataSource(configObject.PassPhrase, configObject.Horizon);
 
             secret = stellar_dotnet_sdk.KeyPair.FromSecretSeed(configObject.Secret);
@@ -95,7 +96,7 @@ namespace Centaurus.Stellar.PaymentProvider
             if (!Settings.TryGetAsset(withdrawalRequest.Asset, out var stellarAsset))
                 throw new BadRequestException($"Asset {withdrawalRequest.Asset} is not supported by provider.");
 
-            var transaction = TransactionHelper.BuildPaymentTransaction(options, stellar_dotnet_sdk.KeyPair.FromAccountId(withdrawalRequest.Destination), stellarAsset, withdrawalRequest.Amount);
+            var transaction = TransactionHelper.BuildPaymentTransaction(options, stellar_dotnet_sdk.KeyPair.FromAccountId(withdrawalRequest.Destination), stellarAsset, (long)withdrawalRequest.Amount);
             var txSourceAccount = transaction.SourceAccount;
             if (Vault == txSourceAccount.AccountId)
                 throw new BadRequestException("Vault account cannot be used as transaction source.");
@@ -269,7 +270,6 @@ namespace Centaurus.Stellar.PaymentProvider
         readonly TimeSpan commitDelay;
         readonly double submitTimerInterval;
 
-        private readonly long maxTxSubmitDelay;
         private readonly DataSource dataSource;
 
         private readonly stellar_dotnet_sdk.KeyPair secret;
@@ -315,8 +315,6 @@ namespace Centaurus.Stellar.PaymentProvider
 
     class Config
     {
-        public long MaxTxSubmitDelay { get; set; }
-
         public string Horizon { get; set; }
 
         public string Secret { get; set; }

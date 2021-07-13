@@ -4,7 +4,7 @@
     {
         public ulong GetLastApex()
         {
-            return storage.Last<QuantumPersistentModel>().Apex;
+            return storage.Last<QuantumPersistentModel>()?.Apex ?? 0;
         }
 
         public StorageIterator<AccountPersistentModel> LoadAccounts()

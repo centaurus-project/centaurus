@@ -4,6 +4,7 @@ using Centaurus.PersistentStorage.Abstraction;
 using CommandLine;
 using NLog;
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Threading;
 
@@ -28,6 +29,8 @@ namespace Centaurus
             var isLoggerInited = false;
             try
             {
+                settings.Build();
+
                 var isAlpha = settings.KeyPair.AccountId == settings.AlphaKeyPair.AccountId;
                 Console.Title = isAlpha ? "CentaurusAlpha" : "CentaurusAuditor";
 
@@ -41,7 +44,7 @@ namespace Centaurus
                 var startup = new StartupMain(context, ClientConnectionFactoryBase.Default, AlphaHostFactoryBase.Default);
 
                 var resetEvent = new ManualResetEvent(false);
-                startup.Run(resetEvent).Wait();
+                startup.Run(resetEvent);
 
                 logger.Info("Auditor is started");
                 Console.WriteLine("Press Ctrl+C to quit");
@@ -52,7 +55,7 @@ namespace Centaurus
                     resetEvent.Set();
                 };
                 resetEvent.WaitOne();
-                startup.Shutdown().Wait();
+                startup.Shutdown();
             }
             catch (Exception exc)
             {

@@ -23,19 +23,13 @@ namespace Centaurus
         [Option("cwd", Required = true, HelpText = "Working directory for logs and other files.")]
         public string CWD { get; set; }
 
-        [Option("network_passphrase", Required = true, HelpText = "Stellar network passphrase.")]
-        public string NetworkPassphrase { get; set; }
-
-        [Option("horizon_url", Required = true, HelpText = "URL of Stellar horizon.")]
-        public string HorizonUrl { get; set; }
-
         [Option("connection_string", Required = true, HelpText = "Database connection string.")]
         public string ConnectionString { get; set; }
 
         [Option("extensions_config_file_path", Required = false, HelpText = "Path to extensions config file.")]
         public string ExtensionsConfigFilePath { get; set; }
 
-        [Option("auditor_address_book", Required = true, HelpText = "Auditor URL addresses. ")]
+        [Option("auditor_address_book", Required = true, HelpText = "Auditor URL addresses. ", Separator = ',')]
         public IEnumerable<string> AuditorAddressBook { get; set; }
 
         [Option("alpha_pubkey", Required = true, HelpText = "Alpha server public key.")]
@@ -55,6 +49,9 @@ namespace Centaurus
 
         [Option("participation_level", Default = 0, HelpText = "Centaurus node participation level.")]
         public int ParticipationLevel { get; set; }
+
+        [Option("payment_config", Required = false, HelpText = "Payment providers config path.")]
+        public string PaymentConfigPath { get; set; }
 
         public void Build()
         {

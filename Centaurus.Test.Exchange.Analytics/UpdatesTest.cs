@@ -53,7 +53,7 @@ namespace Centaurus.Test.Exchange.Analytics
             var stellarPaymentProvider = new ProviderSettings
             {
                 Provider = "Stellar",
-                Name = settings.NetworkPassphrase,
+                Name = "Test",
                 Vault = stellarPaymentProviderVault,
                 Assets = new List<ProviderAsset>
                 {

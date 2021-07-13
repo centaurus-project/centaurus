@@ -39,8 +39,6 @@ namespace Centaurus.Test
 
         private static void SetCommonSettings(Settings settings, string secret)
         {
-            settings.HorizonUrl = "https://horizon-testnet.stellar.org";
-            settings.NetworkPassphrase = "Test SDF Network ; September 2015";
             settings.CWD = "AppData";
             settings.AlphaPubKey = TestEnvironment.AlphaKeyPair.AccountId;
             settings.AuditorAddressBook = new string[] { "http://localhost" };

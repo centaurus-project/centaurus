@@ -20,6 +20,8 @@ namespace Centaurus.Domain
         public ExecutionContext(Settings settings, IPersistentStorage storage, PaymentProviderFactoryBase paymentProviderFactory, bool useLegacyOrderbook = false)
         {
             PermanentStorage = storage ?? throw new ArgumentNullException(nameof(storage));
+            PermanentStorage.Connect(settings.ConnectionString);
+
             Settings = settings ?? throw new ArgumentNullException(nameof(settings));
             PaymentProviderFactory = paymentProviderFactory ?? throw new ArgumentNullException(nameof(paymentProviderFactory));
 
@@ -111,7 +113,7 @@ namespace Centaurus.Domain
 
             Exchange?.Dispose(); Exchange = Exchange.RestoreExchange(snapshot.Settings.Assets, snapshot.Orders, IsAlpha, useLegacyOrderbook);
 
-            PaymentProvidersManager?.Dispose(); PaymentProvidersManager = new PaymentProvidersManager(PaymentProviderFactory, Constellation.Providers);
+            PaymentProvidersManager?.Dispose(); PaymentProvidersManager = new PaymentProvidersManager(PaymentProviderFactory, Constellation.Providers, Settings.PaymentConfigPath);
 
             AuditResultManager?.Dispose(); AuditResultManager = new ResultManager(this);
 

@@ -53,6 +53,7 @@ namespace Centaurus.Alpha
                 .ConfigureWebHostDefaults(webBuilder =>
                 {
                     webBuilder
+                        .ConfigureServices(services => services.AddSingleton(Context))
                         .UseStartup<HostStartup>()
                         .UseKestrel(options =>
                         {
@@ -148,7 +149,7 @@ namespace Centaurus.Alpha
             {
                 services
                     .AddMvc(options => options.EnableEndpointRouting = false)
-                    .AddControllersAsServices() 
+                    .AddControllersAsServices()
                     .SetCompatibilityVersion(CompatibilityVersion.Version_3_0);
 
                 services.Add(

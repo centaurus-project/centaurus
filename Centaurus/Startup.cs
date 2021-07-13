@@ -15,8 +15,8 @@ namespace Centaurus
         {
         }
 
-        public abstract Task Run(ManualResetEvent resetEvent);
-        public abstract Task Shutdown();
+        public abstract void Run(ManualResetEvent resetEvent);
+        public abstract void Shutdown();
     }
 
     public class StartupMain : StartupBase
@@ -39,19 +39,19 @@ namespace Centaurus
 
         public AuditorStartup AuditorStartup { get; }
 
-        public override async Task Run(ManualResetEvent resetEvent)
+        public override void Run(ManualResetEvent resetEvent)
         {
-            await AuditorStartup.Run(resetEvent);
+            AuditorStartup.Run(resetEvent);
             if (AlphaStartup != null)
-                await AlphaStartup.Run(resetEvent);
+                AlphaStartup.Run(resetEvent);
         }
 
-        public override async Task Shutdown()
+        public override void Shutdown()
         {
             Context.AppState.State = ApplicationState.Stopped;
-            await AuditorStartup.Shutdown();
+            AuditorStartup.Shutdown();
             if (AlphaStartup != null)
-                await AlphaStartup.Shutdown();
+                AlphaStartup.Shutdown();
         }
     }
 }

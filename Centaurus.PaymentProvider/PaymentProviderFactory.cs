@@ -18,7 +18,7 @@ namespace Centaurus.PaymentProvider
             if (!providerTypes.TryGetValue(providerSettings.Provider, out var providerType))
                 providerType = ProviderDiscoverer.DiscoverProvider(providerSettings.Provider);
 
-            return (PaymentProviderBase)Activator.CreateInstance(providerType, new object[] { providerSettings, config });
+            return (PaymentProviderBase)Activator.CreateInstance(providerType, providerSettings, config);
         }
 
         private static Dictionary<string, Type> providerTypes = new Dictionary<string, Type>();

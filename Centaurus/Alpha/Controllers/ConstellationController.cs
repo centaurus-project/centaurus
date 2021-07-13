@@ -47,7 +47,7 @@ namespace Centaurus.Controllers
         }
 
         [HttpPost("[action]")]
-        public async Task<IActionResult> Init([FromBody] MessageEnvelope constellationInitEnvelope)
+        public async Task<IActionResult> Init(MessageEnvelope constellationInitEnvelope)
         {
             try
             {

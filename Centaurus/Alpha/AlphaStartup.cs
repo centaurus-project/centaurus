@@ -21,7 +21,7 @@ namespace Centaurus.Alpha
             host = hostFactory.GetHost(context);
         }
 
-        public override async Task Run(ManualResetEvent resetEvent)
+        public override void Run(ManualResetEvent resetEvent)
         {
             try
             {
@@ -40,7 +40,14 @@ namespace Centaurus.Alpha
             }
         }
 
-        public override async Task Shutdown()
+        public override void Shutdown()
+        {
+            ShutdownInternal().Wait();
+        }
+
+        #region Private Members
+
+        private async Task ShutdownInternal()
         {
             await Context.ConnectionManager.CloseAllConnections();
             await Context.InfoConnectionManager.CloseAllConnections();
@@ -50,8 +57,6 @@ namespace Centaurus.Alpha
                 host = null;
             }
         }
-
-        #region Private Members
 
         private void ConfigureConstellation()
         {

@@ -46,7 +46,7 @@ namespace Centaurus.Stellar.PaymentProvider
             return asset != null;
         }
 
-        public static bool TryGetAsset(this ProviderSettings providerSettings, int asset, out stellar_dotnet_sdk.Asset stellarAsset)
+        public static bool TryGetAsset(this ProviderSettings providerSettings, string asset, out stellar_dotnet_sdk.Asset stellarAsset)
         {
             if (providerSettings == null)
                 throw new ArgumentNullException(nameof(providerSettings));
@@ -75,7 +75,7 @@ namespace Centaurus.Stellar.PaymentProvider
                 case OperationTypeEnum.PAYMENT:
                     if (!providerSettings.TryGetAsset(operation.PaymentOp.Asset, out asset))
                         return result;
-                    var amount = operation.PaymentOp.Amount.InnerValue;
+                    var amount = (ulong)operation.PaymentOp.Amount.InnerValue;
                     var destKeypair = stellar_dotnet_sdk.KeyPair.FromPublicKey(operation.PaymentOp.Destination.Ed25519.InnerValue);
                     if (vault.Equals((RawPubKey)destKeypair.PublicKey))
                         payment = new Deposit

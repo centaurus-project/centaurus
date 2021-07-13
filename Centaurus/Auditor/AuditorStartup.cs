@@ -24,7 +24,7 @@ namespace Centaurus.Client
             this.connectionFactory = connectionFactory;
         }
 
-        public override Task Run(ManualResetEvent resetEvent)
+        public override void Run(ManualResetEvent resetEvent)
         {
             try
             {
@@ -42,8 +42,6 @@ namespace Centaurus.Client
                 if (!isSet)
                     resetEvent.Set();
             }
-
-            return Task.CompletedTask;
         }
 
         private void InternalRun()
@@ -90,19 +88,13 @@ namespace Centaurus.Client
             }
         }
 
-        public override async Task Shutdown()
+        public override void Shutdown()
         {
-            try
+            lock(syncRoot)
             {
-                await syncRoot.WaitAsync();
                 isAborted = true;
                 Unsubscribe(auditor);
-                await CloseConnection(auditor);
-                syncRoot.Dispose();
-            }
-            catch
-            {
-                syncRoot.Release();
+                CloseConnection(auditor).Wait();
             }
         }
 
@@ -122,7 +114,7 @@ namespace Centaurus.Client
             }
         }
 
-        private async void OnConnectionStateChanged((BaseWebSocketConnection connection, ConnectionState prev, ConnectionState current) args)
+        private void OnConnectionStateChanged((BaseWebSocketConnection connection, ConnectionState prev, ConnectionState current) args)
         {
             switch (args.current)
             {
@@ -130,7 +122,7 @@ namespace Centaurus.Client
                     Ready(args.connection);
                     break;
                 case ConnectionState.Closed:
-                    await Close(args.connection);
+                    Close(args.connection);
                     break;
                 default:
                     break;
@@ -152,24 +144,19 @@ namespace Centaurus.Client
                 Context.AppState.State = ApplicationState.Ready;
         }
 
-        private async Task Close(BaseWebSocketConnection e)
+        private void Close(BaseWebSocketConnection e)
         {
-            await syncRoot.WaitAsync();
-            try
+            lock(syncRoot)
             {
                 Context.AppState.State = ApplicationState.Running;
                 Unsubscribe(auditor);
-                await CloseConnection(auditor);
+                CloseConnection(auditor).Wait();
                 auditor = null;
                 if (!isAborted)
                     InternalRun();
             }
-            finally
-            {
-                syncRoot.Release();
-            }
         }
 
-        private readonly SemaphoreSlim syncRoot = new SemaphoreSlim(1);
+        private readonly object syncRoot = new { };
     }
 }

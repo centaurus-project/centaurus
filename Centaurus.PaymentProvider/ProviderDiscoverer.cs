@@ -39,9 +39,10 @@ namespace Centaurus.PaymentProvider
                 return assembly;
 
             var providerDll = $"Centaurus.{providerName}.PaymentProvider.dll";
-            if (!File.Exists(providerDll))
+            var providerDllPath = Path.GetFullPath(providerDll);
+            if (!File.Exists(providerDllPath))
                 throw new Exception($"{providerDll} is not found.");
-            assembly = Assembly.LoadFile(providerDll);
+            assembly = Assembly.LoadFrom(providerDllPath);
             assemblies.Add(providerName, assembly);
             return assembly;
         }

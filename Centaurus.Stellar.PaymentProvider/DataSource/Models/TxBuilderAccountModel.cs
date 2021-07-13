@@ -9,7 +9,7 @@ namespace Centaurus.Stellar.Models
     {
         public long SequenceNumber { get; set; }
 
-        public KeyPair KeyPair { get; set; }
+        public stellar_dotnet_sdk.KeyPair KeyPair { get; set; }
 
         public string AccountId => KeyPair.AccountId;
 
