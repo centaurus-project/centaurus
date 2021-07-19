@@ -1,10 +1,8 @@
 ﻿using Centaurus.Domain.Models;
 using Centaurus.Models;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 
 namespace Centaurus.Domain
 {
@@ -61,7 +59,8 @@ namespace Centaurus.Domain
             {
                 Id = id,
                 Pubkey = pubkey,
-                Balances = new List<Balance>()
+                Balances = new List<Balance>(),
+                Orders = new List<Order>()
             },
                 rateLimits
             );

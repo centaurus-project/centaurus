@@ -16,9 +16,8 @@ namespace Centaurus.Domain
 
             return new SettingsPersistentModel
             {
-                Apex = settings.Apex,
                 Assets = settings.Assets.Select(a => a.ToPersistentModel()).ToList(),
-                Auditors = settings.Auditors.Cast<byte[]>().ToList(),
+                Auditors = settings.Auditors.Select(a => a.Data).ToList(),
                 MinAccountBalance = settings.MinAccountBalance,
                 MinAllowedLotSize = settings.MinAllowedLotSize,
                 Providers = settings.Providers.Select(p => p.ToPersistentModel()).ToList(),
@@ -32,9 +31,8 @@ namespace Centaurus.Domain
 
             return new ConstellationSettings
             {
-                Apex = settings.Apex,
                 Assets = settings.Assets.Select(a => a.ToDomainModel()).ToList(),
-                Auditors = settings.Auditors.Cast<RawPubKey>().ToList(),
+                Auditors = settings.Auditors.Select(a => new RawPubKey { Data = a }).ToList(),
                 MinAccountBalance = settings.MinAccountBalance,
                 MinAllowedLotSize = settings.MinAllowedLotSize,
                 Providers = settings.Providers.Select(p => p.ToDomainModel()).ToList(),

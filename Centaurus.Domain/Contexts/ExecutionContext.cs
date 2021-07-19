@@ -83,15 +83,13 @@ namespace Centaurus.Domain
             var lastApex = PersistenceManager.GetLastApex();
             if (lastApex > 0)
             {
-                var lastQuantum = PersistenceManager.GetQuantum(lastApex);
-
-                lastHash = lastQuantum.Message.ComputeHash();
                 var snapshot = PersistenceManager.GetSnapshot(lastApex);
                 Setup(snapshot);
                 if (IsAlpha)
                     AppState.State = ApplicationState.Rising;//Alpha should ensure that it has all quanta from auditors
                 else
                     AppState.State = ApplicationState.Running;
+                lastHash = snapshot.LastHash;
             }
             else
                 //if no snapshot, the application is in initialization state
@@ -113,7 +111,7 @@ namespace Centaurus.Domain
 
             Exchange?.Dispose(); Exchange = Exchange.RestoreExchange(snapshot.Settings.Assets, snapshot.Orders, IsAlpha, useLegacyOrderbook);
 
-            PaymentProvidersManager?.Dispose(); PaymentProvidersManager = new PaymentProvidersManager(PaymentProviderFactory, Constellation.Providers, Settings.PaymentConfigPath);
+            PaymentProvidersManager?.Dispose(); PaymentProvidersManager = new PaymentProvidersManager(PaymentProviderFactory, Constellation.Providers.Select(p => p.ToProviderModel()).ToList(), Settings.PaymentConfigPath);
 
             AuditResultManager?.Dispose(); AuditResultManager = new ResultManager(this);
 

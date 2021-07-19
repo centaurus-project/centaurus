@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Buffers.Binary;
+using System.Text;
 using MessagePack;
 
 namespace Centaurus.PersistentStorage
@@ -58,18 +59,18 @@ namespace Centaurus.PersistentStorage
         {
             get
             {
-                var encodedMarket = MessagePackSerializer.Serialize(Market);
-                var key = new byte[8 + encodedMarket.Length];
-                BinaryPrimitives.WriteInt32BigEndian(key.AsSpan(0, 4), Period);
-                BinaryPrimitives.WriteInt32BigEndian(key.AsSpan(4, 4), Timestamp);
-                encodedMarket.CopyTo(key.AsSpan(key.Length - 8));
+                var encodedMarket = Encoding.UTF8.GetBytes(Market);
+                var key = new byte[12];
+                encodedMarket.CopyTo(key.AsSpan(0, 4));
+                BinaryPrimitives.WriteInt32BigEndian(key.AsSpan(4, 4), Period);
+                BinaryPrimitives.WriteInt32BigEndian(key.AsSpan(8, 4), Timestamp);
                 return key;
             }
             set
             {
-                Period = BinaryPrimitives.ReadInt32BigEndian(value.AsSpan(0, 4));
-                Timestamp = BinaryPrimitives.ReadInt32BigEndian(value.AsSpan(4, 4));
-                Market = MessagePackSerializer.Deserialize<string>(value.AsMemory(8, value.Length - 8));
+                Market = Encoding.UTF8.GetString(value.AsSpan(0, 4).TrimEnd((byte)0));
+                Period = BinaryPrimitives.ReadInt32BigEndian(value.AsSpan(4, 4));
+                Timestamp = BinaryPrimitives.ReadInt32BigEndian(value.AsSpan(8, 4));
             }
         }
 

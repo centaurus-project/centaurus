@@ -214,7 +214,7 @@ namespace Centaurus.Domain
             if (processorContext is ITransactionProcessorContext transactionContext)
             {
                 if (result is TransactionResultMessage transactionResult)
-                    transactionResult.TxSignatures.Add(transactionContext.PaymentProvider.SignTransaction(transactionContext.Transaction));
+                    transactionResult.TxSignatures.Add(transactionContext.PaymentProvider.SignTransaction(transactionContext.Transaction).ToDomainModel());
                 else
                     throw new Exception($"Unable to add transaction signature. Result is not {nameof(TransactionResultMessage)}.");
             }
@@ -265,11 +265,11 @@ namespace Centaurus.Domain
 
             var resultMessage = await processor.Process(processorContext);
 
-            processorContext.Complete(buffer.Buffer);
+            processorContext.ComputeEffectsHash();
 
             EnsureMessageHash(envelope, processorContext);
 
-            resultMessage.Effects = processorContext.EffectsProof;
+            resultMessage.Effects = processorContext.GetEffectProof();
 
             resultMessage.ClientEffects = processorContext.GetClientEffects();
 

@@ -13,7 +13,7 @@ namespace Centaurus.Test
         private List<QuantumRefPersistentModel> quantaRefCollection = new List<QuantumRefPersistentModel>();
         private List<SettingsPersistentModel> settingsCollection = new List<SettingsPersistentModel>();
         private List<PriceHistoryFramePersistentModel> frames = new List<PriceHistoryFramePersistentModel>();
-        private List<ProviderCursorPersistentModel> paymentCursors = new List<ProviderCursorPersistentModel>();
+        private CursorsPersistentModel paymentCursors = null;
 
         public void Connect(string path)
         {
@@ -39,7 +39,7 @@ namespace Centaurus.Test
             return accountsCollection.FirstOrDefault(a => a.AccountPubkey.SequenceEqual(accountPubkey));
         }
 
-        public List<ProviderCursorPersistentModel> LoadCursors()
+        public CursorsPersistentModel LoadCursors()
         {
             return paymentCursors;
         }
@@ -94,7 +94,7 @@ namespace Centaurus.Test
             return LoadQuanta(accountQuanta);
         }
 
-        public IEnumerable<PriceHistoryFramePersistentModel> GetPriceHistory(int cursorTimeStamp, int toUnixTimeStamp, int period, string asset)
+        public IEnumerable<PriceHistoryFramePersistentModel> GetPriceHistory(string asset, int period, int cursorTimeStamp, int toUnixTimeStamp)
         {
             return frames.Where(f =>
                     f.Period == period
@@ -132,14 +132,8 @@ namespace Centaurus.Test
                     case PriceHistoryFramePersistentModel frame:
                         frames.Add(frame);
                         break;
-                    case ProviderCursorPersistentModel providerCursor:
-                        {
-                            var current = paymentCursors.FirstOrDefault(c => c.Provider == providerCursor.Provider);
-                            if (current != null)
-                                paymentCursors.Insert(paymentCursors.IndexOf(current), providerCursor);
-                            else
-                                paymentCursors.Add(providerCursor);
-                        }
+                    case CursorsPersistentModel _paymentCursors:
+                            paymentCursors = _paymentCursors;
                         break;
                     default:
                         throw new InvalidOperationException($"Unknown persistent model type.");

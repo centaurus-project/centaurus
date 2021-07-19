@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using System.Timers;
 
@@ -57,22 +58,28 @@ namespace Centaurus.Domain
             }
         }
 
-        public void AddQuantum(ulong apex, MessageEnvelope messageEnvelope, List<Effect> effects, EffectsProof effectsProof)
+        public void AddQuantum(ProcessorContext.ProcessingResult result)
         {
-            var quantumModel = QuantumPersistentModelExtensions.ToPersistentModel(
-                messageEnvelope,
-                effects,
-                effectsProof,
-                buffer.Buffer);
-            pendingUpdates.Batch.Add(quantumModel);
-            pendingUpdates.Batch.AddRange(
-                effects
-                    .Where(e => e.Account > 0)
-                    .GroupBy(e => e.Account)
-                    .Select(e => new QuantumRefPersistentModel { AccountId = e.Key, Apex = apex })
-                    .ToList()
-            );
-            pendingUpdates.EffectsCount += effects.Count;
+            pendingUpdates.Batch.Add(new QuantumPersistentModel
+            {
+                Apex = result.Apex,
+                Effects = result.Effects,
+                RawQuantum = result.QuantumEnvelope,
+                Signatures = new List<byte[]> { result.Signature },
+                TimeStamp = result.Timestamp
+            });
+
+            if (result.HasCursorUpdate) 
+                pendingUpdates.HasCursorUpdate = true;
+
+            if (result.HasSettingsUpdate)
+                pendingUpdates.Batch.Add(Context.Constellation.ToPesrsistentModel());
+
+            pendingUpdates.Batch.AddRange(result.Accounts.Select(a => new QuantumRefPersistentModel { AccountId = a, Apex = result.Apex }));
+
+            pendingUpdates.Accounts.UnionWith(result.Accounts);
+
+            pendingUpdates.EffectsCount += result.Effects.Count;
             pendingUpdates.QuantaCount++;
         }
 
@@ -88,7 +95,8 @@ namespace Centaurus.Domain
 
         private bool IsSaveRequired()
         {
-            return pendingUpdates.QuantaCount >= MaxQuantaCount || DateTime.UtcNow - lastSaveTime > TimeSpan.FromSeconds(MaxSaveInterval);
+            return pendingUpdates.QuantaCount > 0
+                && (pendingUpdates.QuantaCount >= MaxQuantaCount || DateTime.UtcNow - lastSaveTime > TimeSpan.FromSeconds(MaxSaveInterval));
         }
 
         private void InitTimer()
@@ -123,7 +131,7 @@ namespace Centaurus.Domain
 
         public void Dispose()
         {
-            lock(syncRoot)
+            lock (syncRoot)
             {
                 saveTimer.Stop();
                 saveTimer.Elapsed -= SaveTimer_Elapsed;
@@ -138,7 +146,7 @@ namespace Centaurus.Domain
 
             public List<IPersistentModel> Batch { get; } = new List<IPersistentModel>();
 
-            public HashSet<string> Cursors { get; } = new HashSet<string>();
+            public bool HasCursorUpdate { get; set; }
 
             public HashSet<ulong> Accounts { get; } = new HashSet<ulong>();
 
@@ -149,12 +157,14 @@ namespace Centaurus.Domain
             public List<IPersistentModel> GetUpdates(ExecutionContext context)
             {
                 var updates = Batch.ToList();
-                updates.AddRange(
-                    Accounts.Select(a => context.AccountStorage.GetAccount(a).Account.ToPersistentModel()).Cast<IPersistentModel>().ToList()
-                );
-                updates.AddRange(
-                    Cursors.Select(p => context.PaymentProvidersManager.GetManager(p).ToPersistentModel()).Cast<IPersistentModel>().ToList()
-                );
+                if (Accounts.Count > 0)
+                    updates.AddRange(
+                        Accounts.Select(a => context.AccountStorage.GetAccount(a).Account.ToPersistentModel()).Cast<IPersistentModel>().ToList()
+                    );
+
+                if (HasCursorUpdate)
+                    updates.Add(new CursorsPersistentModel { Cursors = context.PaymentProvidersManager.GetAll().ToDictionary(k => k.Id, v => v.Cursor) });
+
                 return updates;
             }
         }

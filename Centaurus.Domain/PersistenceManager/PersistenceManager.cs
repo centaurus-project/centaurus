@@ -27,19 +27,26 @@ namespace Centaurus.Domain
                 rawCursor = "0";
             if (!ulong.TryParse(rawCursor, out var apex))
                 throw new ArgumentException("Cursor is invalid.");
-            var order = isDesc ? PersistentStorage.QueryResultsOrder.Desc : PersistentStorage.QueryResultsOrder.Asc;
+            var order = isDesc ? QueryResultsOrder.Desc : QueryResultsOrder.Asc;
             var accountQuanta = Context.PermanentStorage.LoadQuantaForAccount(account, apex, limit, order);
             var accountEffects = new List<ApexEffects>();
+
             foreach (var quantum in accountQuanta)
             {
+                var effects = new Dictionary<byte[], Effect>();
+                foreach (var rawEffect in quantum.Effects)
+                {
+                    var effect = XdrConverter.Deserialize<Effect>(rawEffect);
+                    effects.Add(rawEffect.ComputeHash(), effect.Account == account ? effect : null);
+                }
                 accountEffects.Add(new ApexEffects
                 {
                     Apex = quantum.Apex,
-                    Items = quantum.Effects.Select(e => XdrConverter.Deserialize<Effect>(e)).Where(a => a.Account == account).ToList(),
+                    Items = effects.Values.ToList(),
                     Proof = new EffectsProof
                     {
-                        Hashes = new EffectHashes { Hashes = quantum.Proof.EffectHashes.Select(h => new Hash { Data = h }).ToList() },
-                        Signatures = quantum.Proof.Signatures.Select(s => new Ed25519Signature { Signer = s.Signer, Signature = s.Data }).ToList()
+                        Hashes = effects.Keys.Select(e => new Hash { Data = e }).ToList(),
+                        Signatures = quantum.Signatures.Select(s => new Ed25519Signature { Signature = s }).ToList()
                     }
                 });
             }
@@ -62,7 +69,7 @@ namespace Centaurus.Domain
 
         public void ApplyUpdates(List<IPersistentModel> updates)
         {
-            lock(syncRoot)
+            lock (syncRoot)
                 Context.PermanentStorage.SaveBatch(updates);
         }
 
@@ -93,28 +100,22 @@ namespace Centaurus.Domain
         }
 
         /// <summary>
-        /// Creates snapshot from effect
+        /// Creates snapshot
         /// </summary>
         /// <returns></returns>
-        public static Snapshot GetSnapshot(ConstellationInitEffect constellationInitEffect, byte[] quantumHash)
+        public static Snapshot GetSnapshot(ulong apex, ConstellationSettings settings, List<AccountWrapper> accounts, List<OrderWrapper> orders, Dictionary<string, string> cursors, byte[] quantumHash)
         {
+            if (apex < 1)
+                throw new ArgumentException("Apex must be greater than zero.");
+
             var snapshot = new Snapshot
             {
-                Apex = constellationInitEffect.Apex,
-                Accounts = new List<AccountWrapper>(),
-                Orders = new List<OrderWrapper>(),
-                Settings = new ConstellationSettings
-                {
-                    Apex = constellationInitEffect.Apex,
-                    Assets = constellationInitEffect.Assets,
-                    Auditors = constellationInitEffect.Auditors,
-                    MinAccountBalance = constellationInitEffect.MinAccountBalance,
-                    MinAllowedLotSize = constellationInitEffect.MinAllowedLotSize,
-                    Providers = constellationInitEffect.Providers,
-                    RequestRateLimits = constellationInitEffect.RequestRateLimits
-                },
-                Cursors = constellationInitEffect.Providers.ToDictionary(k => k.ProviderId, v => v.InitCursor),
-                LastHash = quantumHash
+                Apex = apex,
+                Accounts = accounts ?? throw new ArgumentNullException(nameof(accounts)),
+                Orders = orders ?? throw new ArgumentNullException(nameof(orders)),
+                Settings = settings ?? throw new ArgumentNullException(nameof(settings)),
+                Cursors = cursors ?? throw new ArgumentNullException(nameof(cursors)),
+                LastHash = quantumHash ?? throw new ArgumentNullException(nameof(quantumHash))
             };
             return snapshot;
         }
@@ -124,9 +125,9 @@ namespace Centaurus.Domain
         /// </summary>
         /// <param name="apex"></param>
         /// <returns></returns>
-        public ConstellationSettings GetConstellationSettings(ulong apex)
+        public ConstellationSettings GetConstellationSettings()
         {
-            var settingsModel = Context.PermanentStorage.LoadSettings(apex);
+            var settingsModel = Context.PermanentStorage.LoadSettings(ulong.MaxValue);
             if (settingsModel == null)
                 return null;
 
@@ -153,7 +154,7 @@ namespace Centaurus.Domain
             if (minRevertApex == 0 && apex != lastApex || apex < minRevertApex)
                 throw new InvalidOperationException($"Lack of data to revert to {apex} apex.");
 
-            var settings = GetConstellationSettings(apex);
+            var settings = GetConstellationSettings();
             if (settings == null)
                 return null;
 
@@ -164,20 +165,29 @@ namespace Centaurus.Domain
             var accountStorage = new AccountStorage(accounts);
 
             var orders = accounts.SelectMany(a => a.Account.Orders.Select(o => new OrderWrapper(o, a))).OrderBy(o => o.Order.OrderId).ToList();
-            var exchange = GetRestoredExchange(orders);
+            var exchange = GetRestoredExchange(orders, settings);
 
             var quanta = Context.PermanentStorage.LoadQuantaAboveApex(apex);
 
-            var effects = quanta.SelectMany(q => q.Effects.Select(e => XdrConverter.Deserialize<Effect>(e))).ToList();
+            var effects = quanta.SelectMany(q => q.Effects.Select(e =>
+            {
+                var effect = XdrConverter.Deserialize<Effect>(e);
+                effect.Apex = q.Apex;
+                return effect;
+            })
+            ).ToList();
 
             for (var i = effects.Count - 1; i >= 0; i--)
             {
                 var currentEffect = effects[i];
 
-                var account = accountStorage.GetAccount(currentEffect.Account);
+                var account = currentEffect.Account > 0 ? accountStorage.GetAccount(currentEffect.Account) : null;
                 IEffectProcessor<Effect> processor = null;
                 switch (currentEffect)
                 {
+                    case ConstellationUpdateEffect constellationUpdateEffect:
+                        settings = constellationUpdateEffect.PrevSettings;
+                        break;
                     case AccountCreateEffect accountCreateEffect:
                         processor = new AccountCreateEffectProcessor(accountCreateEffect, accountStorage, settings.RequestRateLimits);
                         break;
@@ -256,9 +266,8 @@ namespace Centaurus.Domain
             return minApex - 1; //we can revert effect for that apex, so the minimal apex is first effect apex - 1
         }
 
-        private Exchange GetRestoredExchange(List<OrderWrapper> orders)
+        private Exchange GetRestoredExchange(List<OrderWrapper> orders, ConstellationSettings settings)
         {
-            var settings = GetConstellationSettings(ulong.MaxValue); // load last settings
             return Exchange.RestoreExchange(settings.Assets, orders, false);
         }
 

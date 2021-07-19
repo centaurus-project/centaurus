@@ -1,5 +1,6 @@
 ﻿using MessagePack;
 using System.Buffers.Binary;
+using System.Collections.Generic;
 
 namespace Centaurus.PersistentStorage
 {
@@ -7,22 +8,17 @@ namespace Centaurus.PersistentStorage
     /// Contains last processed payment token
     /// </summary>
     [MessagePackObject]
-    public class ProviderCursorPersistentModel: IPersistentModel
+    public class CursorsPersistentModel: IPersistentModel
     {
         [Key(0)]
-        public string Provider { get; set; }
-
-        [Key(1)]
-        public string Cursor { get; set; }
+        public Dictionary<string, string> Cursors { get; set; }
 
         [IgnoreMember]
         public byte[] Key 
         { 
             get
             {
-                var res = new byte[4];
-                BinaryPrimitives.WriteInt32BigEndian(res, Provider.GetHashCode());
-                return res;
+                return new byte[] { };
             }
             set
             {

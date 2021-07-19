@@ -9,7 +9,7 @@ namespace Centaurus.PersistentStorage
     {
         public QuantumPersistentModel LoadQuantum(ulong apex)
         {
-            return storage.Get<QuantumPersistentModel>( ApexConverter.EncodeApex(apex));
+            return storage.Get<QuantumPersistentModel>(ApexConverter.EncodeApex(apex));
         }
 
         public List<QuantumPersistentModel> LoadQuanta(params ulong[] apexes)
@@ -19,7 +19,8 @@ namespace Centaurus.PersistentStorage
 
         public StorageIterator<QuantumPersistentModel> LoadQuantaAboveApex(ulong apex)
         {
-            return storage.Find<QuantumPersistentModel>(ApexConverter.EncodeApex(apex));
+            //find returns inclusive results
+            return storage.Find<QuantumPersistentModel>(ApexConverter.EncodeApex(apex + 1));
         }
 
         public List<QuantumPersistentModel> LoadQuantaForAccount(byte[] accountPubkey, ulong apex, int limit, QueryResultsOrder order = QueryResultsOrder.Asc)

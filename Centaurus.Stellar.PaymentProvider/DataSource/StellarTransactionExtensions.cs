@@ -1,11 +1,8 @@
-﻿using Centaurus.Models;
-using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using Centaurus.PaymentProvider.Models;
 using stellar_dotnet_sdk.xdr;
+using System;
 using System.Linq;
 using static stellar_dotnet_sdk.xdr.OperationType;
-using Centaurus.Domain.Models;
 
 namespace Centaurus.Stellar.PaymentProvider
 {
@@ -13,7 +10,7 @@ namespace Centaurus.Stellar.PaymentProvider
     {
         public static stellar_dotnet_sdk.AssetTypeNative NativeAsset = new stellar_dotnet_sdk.AssetTypeNative();
 
-        public static bool TryGetAsset(this ProviderSettings providerSettings, Asset xdrAsset, out ProviderAsset asset)
+        public static bool TryGetAsset(this SettingsModel providerSettings, Asset xdrAsset, out AssetModel asset)
         {
             var sdkAsset = stellar_dotnet_sdk.Asset.FromXdr(xdrAsset);
             return providerSettings.TryGetAsset(sdkAsset, out asset);
@@ -37,7 +34,7 @@ namespace Centaurus.Stellar.PaymentProvider
             return asset != null;
         }
 
-        public static bool TryGetAsset(this ProviderSettings providerSettings, stellar_dotnet_sdk.Asset xdrAsset, out ProviderAsset asset)
+        public static bool TryGetAsset(this SettingsModel providerSettings, stellar_dotnet_sdk.Asset xdrAsset, out AssetModel asset)
         {
             if (providerSettings == null)
                 throw new ArgumentNullException(nameof(providerSettings));
@@ -46,7 +43,7 @@ namespace Centaurus.Stellar.PaymentProvider
             return asset != null;
         }
 
-        public static bool TryGetAsset(this ProviderSettings providerSettings, string asset, out stellar_dotnet_sdk.Asset stellarAsset)
+        public static bool TryGetAsset(this SettingsModel providerSettings, string asset, out stellar_dotnet_sdk.Asset stellarAsset)
         {
             if (providerSettings == null)
                 throw new ArgumentNullException(nameof(providerSettings));
@@ -57,7 +54,7 @@ namespace Centaurus.Stellar.PaymentProvider
 
         public static OperationTypeEnum[] SupportedDepositOperations = new OperationTypeEnum[] { OperationTypeEnum.PAYMENT };
 
-        public static bool TryGetDeposit(this ProviderSettings providerSettings, Operation.OperationBody operation, stellar_dotnet_sdk.KeyPair source, PaymentResults pResult, byte[] transactionHash, out Deposit payment)
+        public static bool TryGetDeposit(this SettingsModel providerSettings, Operation.OperationBody operation, ulong destination, bool isSuccess, byte[] transactionHash, out DepositModel payment)
         {
             if (providerSettings == null)
                 throw new ArgumentNullException(nameof(providerSettings));
@@ -65,7 +62,7 @@ namespace Centaurus.Stellar.PaymentProvider
             var vault = stellar_dotnet_sdk.KeyPair.FromAccountId(providerSettings.Vault);
 
             payment = null;
-            ProviderAsset asset;
+            AssetModel asset;
             //check supported deposit operations is overkill, but we need to keep SupportedDepositOperations up to date
             bool result = false;
             if (!SupportedDepositOperations.Contains(operation.Discriminant.InnerValue))
@@ -77,17 +74,17 @@ namespace Centaurus.Stellar.PaymentProvider
                         return result;
                     var amount = (ulong)operation.PaymentOp.Amount.InnerValue;
                     var destKeypair = stellar_dotnet_sdk.KeyPair.FromPublicKey(operation.PaymentOp.Destination.Ed25519.InnerValue);
-                    if (vault.Equals((RawPubKey)destKeypair.PublicKey))
-                        payment = new Deposit
+                    if (vault.Equals(destKeypair.PublicKey))
+                        payment = new DepositModel
                         {
-                            Destination = new RawPubKey() { Data = source.PublicKey },
+                            Destination = destination,
                             Amount = amount,
                             Asset = asset.CentaurusAsset,
                             TransactionHash = transactionHash
                         };
                     if (payment != null)
                     {
-                        payment.PaymentResult = pResult;
+                        payment.IsSuccess = isSuccess;
                         result = true;
                     }
                     break;

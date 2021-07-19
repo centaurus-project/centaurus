@@ -15,6 +15,8 @@ namespace Centaurus.PersistentStorage
 
         private readonly Iterator iterator;
 
+        private Func<byte[], bool> isKeyWithinBoundaries;
+
         public bool IsReversed { get; private set; }
 
         private T ParseCurrent()
@@ -38,6 +40,7 @@ namespace Centaurus.PersistentStorage
         {
             while (iterator.Valid())
             {
+                if (isKeyWithinBoundaries != null && !isKeyWithinBoundaries(iterator.Key())) break;
                 yield return ParseCurrent();
                 Next();
             }
@@ -48,11 +51,6 @@ namespace Centaurus.PersistentStorage
             var res = ParseCurrent();
             Next();
             return res;
-        }
-
-        public StorageIterator<T> SetUpperBound()
-        {
-            return this;
         }
 
         public StorageIterator<T> Reverse()
@@ -67,6 +65,12 @@ namespace Centaurus.PersistentStorage
                 IsReversed = true;
                 iterator.SeekToLast();
             }
+            return this;
+        }
+
+        public StorageIterator<T> SetBoundaryCheck(Func<byte[], bool> checkKeyIsWithinBoundaries)
+        {
+            isKeyWithinBoundaries = checkKeyIsWithinBoundaries;
             return this;
         }
 

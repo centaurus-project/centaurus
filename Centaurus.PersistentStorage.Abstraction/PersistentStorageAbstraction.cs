@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 
 namespace Centaurus.PersistentStorage.Abstraction
@@ -64,14 +65,14 @@ namespace Centaurus.PersistentStorage.Abstraction
             return Query.LoadQuantaForAccount(accountId, fromApex, limit, order);
         }
 
-        public List<ProviderCursorPersistentModel> LoadCursors()
+        public CursorsPersistentModel LoadCursors()
         {
-            throw new NotImplementedException();
+            return Query.LoadCursors() ?? new CursorsPersistentModel { Cursors = new Dictionary<string, string>() };
         }
 
-        public IEnumerable<PriceHistoryFramePersistentModel> GetPriceHistory(int cursorTimeStamp, int toUnixTimeStamp, int period, string asset)
+        public IEnumerable<PriceHistoryFramePersistentModel> GetPriceHistory(string market, int period, int from, int to)
         {
-            return Query.GetPriceHistory(cursorTimeStamp, toUnixTimeStamp, period, asset);
+            return Query.GetPriceHistory(market, period, from, to);
         }
 
         public void SaveBatch(List<IPersistentModel> batch)

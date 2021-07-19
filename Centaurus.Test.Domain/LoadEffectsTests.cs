@@ -41,7 +41,8 @@ namespace Centaurus.Test
                 var effectsCount = leftEffect.Count;
                 for (int c = 0, opC = effectsCount - 1; c < effectsCount; c++, opC--)
                 {
-                    var areEqual = ByteArrayPrimitives.Equals(leftEffect[c].ComputeHash(), rightEffect[opC].ComputeHash());
+                    var areEqual = leftEffect[c] == null && rightEffect[opC] == null
+                        || ByteArrayPrimitives.Equals(leftEffect[c].ComputeHash(), rightEffect[opC].ComputeHash());
                     Assert.AreEqual(true, areEqual, "Ordering doesn't work as expected.");
                 }
             }
@@ -75,7 +76,8 @@ namespace Centaurus.Test
                     var apexEffects = currentEffectsResult.Items[0].Items;
                     for (var i = 0; i < apexEffects.Count; i++)
                     {
-                        var areEqual = ByteArrayPrimitives.Equals(allEffects[totalCount].Items[i].ComputeHash(), apexEffects[i].ComputeHash());
+                        var areEqual = (allEffects[totalCount].Items[i] == null && apexEffects[i] == null
+                            || ByteArrayPrimitives.Equals(allEffects[totalCount].Items[i].ComputeHash(), apexEffects[i].ComputeHash()));
                         Assert.AreEqual(true, areEqual, "Effects are not equal.");
                     }
                     totalCount++;

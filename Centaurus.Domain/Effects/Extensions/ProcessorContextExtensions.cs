@@ -129,18 +129,14 @@ namespace Centaurus.Domain
             ));
         }
 
-        public static void AddConstellationInit(this ProcessorContext effectProcessors, ConstellationInitRequest initQuantum)
+        public static void AddConstellationUpdate(this ProcessorContext effectProcessors, ConstellationSettings settings, ConstellationSettings prevSettings)
         {
-            effectProcessors.AddEffectProcessor(new ConstellationInitEffectProcessor(
-                new ConstellationInitEffect
+            effectProcessors.AddEffectProcessor(new ConstellationInitUpdateProcessor(
+                new ConstellationUpdateEffect
                 {
                     Apex = effectProcessors.Apex,
-                    Assets = initQuantum.Assets,
-                    Auditors = initQuantum.Auditors,
-                    MinAccountBalance = initQuantum.MinAccountBalance,
-                    MinAllowedLotSize = initQuantum.MinAllowedLotSize,
-                    RequestRateLimits = initQuantum.RequestRateLimits,
-                    Providers = initQuantum.Providers
+                    Settings = settings,
+                    PrevSettings = prevSettings
                 }
             ));
         }

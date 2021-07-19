@@ -1,17 +1,18 @@
 ﻿using Centaurus.Models;
 using Centaurus.PaymentProvider;
+using Centaurus.PaymentProvider.Models;
 using System.Collections.Generic;
 
 namespace Centaurus.Test
 {
     internal class MockPaymentProvider : PaymentProviderBase
     {
-        public MockPaymentProvider(ProviderSettings settings, string config) 
+        public MockPaymentProvider(SettingsModel settings, string config) 
             : base(settings, config)
         {
         }
 
-        public override byte[] BuildTransaction(WithdrawalRequest withdrawalRequest)
+        public override byte[] BuildTransaction(WithdrawalRequestModel withdrawalRequest)
         {
             return new byte[] { };
         }
@@ -26,17 +27,17 @@ namespace Centaurus.Test
             return;
         }
 
-        public override TxSignature SignTransaction(byte[] transaction)
+        public override SignatureModel SignTransaction(byte[] transaction)
         {
-            return new TxSignature { Signer = new byte[] { }, Signature = new byte[] { } };
+            return new SignatureModel { Signer = new byte[] { }, Signature = new byte[] { } };
         }
 
-        public override void SubmitTransaction(byte[] transaction, List<TxSignature> signatures)
+        public override void SubmitTransaction(byte[] transaction, List<SignatureModel> signatures)
         {
             return;
         }
 
-        public override void ValidateTransaction(byte[] transaction, WithdrawalRequest withdrawalRequest)
+        public override void ValidateTransaction(byte[] transaction, WithdrawalRequestModel withdrawalRequest)
         {
             return;
         }

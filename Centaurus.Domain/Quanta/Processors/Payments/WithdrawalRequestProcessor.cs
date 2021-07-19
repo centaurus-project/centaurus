@@ -45,10 +45,11 @@ namespace Centaurus.Domain
             if (!(sourceAccount.GetBalance(centaurusAsset.Code)?.HasSufficientBalance(context.WithdrawalRequest.Amount, minBalance) ?? false))
                 throw new BadRequestException($"Insufficient balance.");
 
+            var withdrawal = context.WithdrawalRequest.ToProviderModel();
             if (context.CentaurusContext.IsAlpha) //if it's Alpha than we need to build transaction
-                context.TransactionQuantum.Transaction = context.PaymentProvider.BuildTransaction(context.WithdrawalRequest);
+                context.TransactionQuantum.Transaction = context.PaymentProvider.BuildTransaction(withdrawal);
             else
-                context.PaymentProvider.ValidateTransaction(context.TransactionQuantum.Transaction, context.WithdrawalRequest);
+                context.PaymentProvider.ValidateTransaction(context.TransactionQuantum.Transaction, withdrawal);
 
             return Task.CompletedTask;
         }

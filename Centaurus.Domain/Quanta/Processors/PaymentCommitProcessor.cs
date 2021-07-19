@@ -37,26 +37,38 @@ namespace Centaurus.Domain
                 ?? throw new ArgumentException($"Unexpected message type. Only messages of type {typeof(DepositQuantum).FullName} are supported.");
 
             if (paymentQuantum.Source == null
-                || !context.PaymentProvider.NotificationsManager.TryGetNextPayment(out var paymentNotificationWrapper)
-                || !ByteArrayPrimitives.Equals(paymentNotificationWrapper.Deposite.ComputeHash(), paymentQuantum.Source.ComputeHash()))
+                || !TryGetNotification(context, out var notification)
+                || !ByteArrayPrimitives.Equals(notification.ComputeHash(), paymentQuantum.Source.ComputeHash()))
                 throw new InvalidOperationException("Unexpected tx notification.");
 
-            foreach (var paymentItem in paymentNotificationWrapper.Deposite.Items)
-                ValidateDeposit(paymentItem);
+            foreach (var paymentItem in notification.Items)
+                ValidateDeposit(context, paymentItem);
 
             return Task.CompletedTask;
         }
 
-        private void ValidateDeposit(Deposit deposit)
+        private bool TryGetNotification(PaymentCommitProcessorContext context, out DepositNotification notification)
+        {
+            notification = null;
+            if (!context.PaymentProvider.NotificationsManager.TryGetNextPayment(out var paymentNotification))
+                return false;
+            notification = paymentNotification.ToDomainModel();
+            return true;
+        }
+
+        private void ValidateDeposit(PaymentCommitProcessorContext context, Deposit deposit)
         {
             if (deposit == null)
                 throw new ArgumentNullException(nameof(deposit));
 
-            if (deposit.Destination == null || deposit.Destination.IsZero())
-                throw new InvalidOperationException("Destination should be valid public key");
+            if (deposit.Destination == 0)
+                throw new InvalidOperationException("Destination id is invalid.");
+
+            if (context.CentaurusContext.AccountStorage.GetAccount(deposit.Destination) == null)
+                throw new InvalidOperationException("Unknown destination.");
 
             if (deposit.Amount <= 0)
-                throw new InvalidOperationException("Amount should be greater than 0");
+                throw new InvalidOperationException("Amount should be greater than 0.");
         }
 
         /// <summary>
@@ -68,16 +80,16 @@ namespace Centaurus.Domain
                 return;
 
             var account = context.CentaurusContext.AccountStorage.GetAccount(deposit.Destination);
-            if (account == null)
-            {
-                var baseAsset = context.CentaurusContext.Constellation.GetBaseAsset();
-                //ignore registration with non-base asset or with amount that is less than MinAccountBalance
-                if (deposit.Asset != baseAsset || deposit.Amount < context.CentaurusContext.Constellation.MinAccountBalance)
-                    return;
-                var accId = context.CentaurusContext.AccountStorage.NextAccountId;
-                context.AddAccountCreate(context.CentaurusContext.AccountStorage, accId, deposit.Destination);
-                account = context.CentaurusContext.AccountStorage.GetAccount(accId);
-            }
+            //if (account == null)
+            //{
+            //    var baseAsset = context.CentaurusContext.Constellation.GetBaseAsset();
+            //    //ignore registration with non-base asset or with amount that is less than MinAccountBalance
+            //    if (deposit.Asset != baseAsset || deposit.Amount < context.CentaurusContext.Constellation.MinAccountBalance)
+            //        return;
+            //    var accId = context.CentaurusContext.AccountStorage.NextAccountId;
+            //    context.AddAccountCreate(context.CentaurusContext.AccountStorage, accId, deposit.Destination);
+            //    account = context.CentaurusContext.AccountStorage.GetAccount(accId);
+            //}
 
             if (!account.Account.HasBalance(deposit.Asset))
                 context.AddBalanceCreate(account, deposit.Asset);

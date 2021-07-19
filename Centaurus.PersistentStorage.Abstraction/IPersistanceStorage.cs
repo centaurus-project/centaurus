@@ -14,7 +14,7 @@ namespace Centaurus.PersistentStorage.Abstraction
 
         AccountPersistentModel LoadAccount(byte[] accountPubkey);
 
-        List<ProviderCursorPersistentModel> LoadCursors();
+        CursorsPersistentModel LoadCursors();
 
         SettingsPersistentModel LoadSettings(ulong fromApex);
 
@@ -28,7 +28,7 @@ namespace Centaurus.PersistentStorage.Abstraction
 
         List<QuantumPersistentModel> LoadQuantaForAccount(ulong accountId, ulong fromApex, int limit, QueryResultsOrder order = QueryResultsOrder.Asc);
 
-        IEnumerable<PriceHistoryFramePersistentModel> GetPriceHistory(int cursorTimeStamp, int toUnixTimeStamp, int period, string asset);
+        IEnumerable<PriceHistoryFramePersistentModel> GetPriceHistory(string market, int period, int from, int to);
 
         void SaveBatch(List<IPersistentModel> batch);
     }

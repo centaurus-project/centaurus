@@ -1,7 +1,5 @@
-﻿using Centaurus.Models;
-using System;
+﻿using Centaurus.PaymentProvider.Models;
 using System.Collections.Generic;
-using System.Text;
 
 namespace Centaurus.PaymentProvider
 {
@@ -11,6 +9,6 @@ namespace Centaurus.PaymentProvider
 
         public byte[] Hash { get; set; }
 
-        public List<TxSignature> Signatures { get; set; }
+        public List<SignatureModel> Signatures { get; set; }
     }
 }

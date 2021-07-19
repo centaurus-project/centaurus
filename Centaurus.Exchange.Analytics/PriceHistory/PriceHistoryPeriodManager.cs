@@ -37,7 +37,7 @@ namespace Centaurus.Exchange.Analytics
             var frames = GetUnit(CurrentFramesUnitDate, true);
             LastAddedFrame = frames.FirstOrDefault();
 
-            var firstFrame = analyticsStorage.GetPriceHistory(0, int.MaxValue, (int)Period, Market).FirstOrDefault();
+            var firstFrame = analyticsStorage.GetPriceHistory(Market, (int)Period, 0, int.MaxValue).FirstOrDefault();
             if (firstFrame != null)
                 firstFramesUnitDate = GetFramesUnitDate(DateTimeOffset.FromUnixTimeSeconds(firstFrame.Timestamp).DateTime);
         }
@@ -222,7 +222,7 @@ namespace Centaurus.Exchange.Analytics
                         var nextUnitDate = GetFramesNextUnitStart(unitDate);
                         var toTimeStamp = (int)((DateTimeOffset)nextUnitDate).ToUnixTimeSeconds();
                         var unixTimeStamp = (int)((DateTimeOffset)unitDate).ToUnixTimeSeconds();
-                        var rawFrames = analyticsStorage.GetPriceHistory(unixTimeStamp, toTimeStamp, (int)Period, Market);
+                        var rawFrames = analyticsStorage.GetPriceHistory(Market, (int)Period, unixTimeStamp, toTimeStamp);
 
                         frames = rawFrames.Select(f => f.FromFramePersistentModel()).OrderByDescending(f => f.StartTime).ToList();
 

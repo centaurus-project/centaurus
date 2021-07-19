@@ -44,8 +44,14 @@ namespace Centaurus.PersistentStorage
 
         public StorageIterator<T> Find<T>(byte[] prefix) where T : IPersistentModel, new()
         {
-            var cf = new T().ColumnFamily;
             var iterator = db.NewIterator(ResolveColumnFamily<T>(), new ReadOptions().SetPrefixSameAsStart(true).SetTotalOrderSeek(false));
+            return new StorageIterator<T>(iterator.Seek(prefix));
+        }
+
+        //TODO: fork the rocksdb wrapper and add rocksdb_readoptions_set_iterate_lower_bound support,as well as NET 5.0 deploy fix (see https://github.com/curiosity-ai/rocksdb-sharp/pulls)
+        public StorageIterator<T> Find<T>(byte[] prefix, byte[] upperBound) where T : IPersistentModel, new()
+        {
+            var iterator = db.NewIterator(ResolveColumnFamily<T>(), new ReadOptions().SetPrefixSameAsStart(true).SetTotalOrderSeek(false).SetIterateUpperBound(upperBound));
             return new StorageIterator<T>(iterator.Seek(prefix));
         }
 

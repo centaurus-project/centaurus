@@ -240,7 +240,8 @@ namespace Centaurus.Domain
 
                         if (!ResultManager.Context.PaymentProvidersManager.TryGetManager(paymentProviderId, out var paymentProvider))
                             throw new Exception($"Unable to find manager {paymentProviderId}");
-                        paymentProvider.SubmitTransaction(transactionQuantum.Transaction, ((TransactionResultMessage)ResultMessageItem.Result).TxSignatures);
+                        var signatures = ((TransactionResultMessage)ResultMessageItem.Result).TxSignatures.Select(s => s.ToProviderModel()).ToList();
+                        paymentProvider.SubmitTransaction(transactionQuantum.Transaction, signatures);
                     }
                 }
                 catch (Exception exc)

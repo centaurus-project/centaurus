@@ -5,7 +5,7 @@ using System.Text;
 
 namespace Centaurus.Models
 {
-    public abstract class ConstellationSettingsRequestBase : ConstellationRequestMessage
+    public class ConstellationUpdate : ConstellationRequestMessage
     {        
         [XdrField(0)]
         public List<ProviderSettings> Providers { get; set; }
@@ -24,5 +24,7 @@ namespace Centaurus.Models
 
         [XdrField(5, Optional = true)]
         public RequestRateLimits RequestRateLimits { get; set; }
+
+        public override MessageTypes MessageType => MessageTypes.ConstellationUpdate;
     }
 }

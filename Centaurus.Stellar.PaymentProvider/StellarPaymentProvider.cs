@@ -1,18 +1,12 @@
-﻿using Centaurus.Domain.Models;
-using Centaurus.Models;
-using Centaurus.PaymentProvider;
-using Centaurus.Stellar;
+﻿using Centaurus.PaymentProvider;
+using Centaurus.PaymentProvider.Models;
 using Centaurus.Stellar.Models;
 using NLog;
 using stellar_dotnet_sdk;
-using stellar_dotnet_sdk.responses;
 using stellar_dotnet_sdk.xdr;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
-using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -24,7 +18,7 @@ namespace Centaurus.Stellar.PaymentProvider
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public StellarPaymentProvider(ProviderSettings settings, string config)
+        public StellarPaymentProvider(SettingsModel settings, string config)
             : base(settings, config)
         {
             commitDelay = TimeSpan.FromSeconds(settings.PaymentSubmitDelay);
@@ -36,13 +30,13 @@ namespace Centaurus.Stellar.PaymentProvider
 
             dataSource = new DataSource(configObject.PassPhrase, configObject.Horizon);
 
-            secret = stellar_dotnet_sdk.KeyPair.FromSecretSeed(configObject.Secret);
+            secret = KeyPair.FromSecretSeed(configObject.Secret);
 
             Task.Factory.StartNew(ListenTransactions, TaskCreationOptions.LongRunning);
             InitTimer();
         }
 
-        public override void ValidateTransaction(byte[] rawTransaction, WithdrawalRequest withdrawalRequest)
+        public override void ValidateTransaction(byte[] rawTransaction, WithdrawalRequestModel withdrawalRequest)
         {
             if (rawTransaction == null)
                 throw new ArgumentNullException(nameof(rawTransaction));
@@ -50,8 +44,8 @@ namespace Centaurus.Stellar.PaymentProvider
             if (withdrawalRequest == null)
                 throw new ArgumentNullException(nameof(withdrawalRequest));
 
-            if (!ByteArrayComparer.Default.Equals(rawTransaction.ComputeHash(), BuildTransaction(withdrawalRequest).ComputeHash()))
-                throw new BadRequestException($"Transaction is not equal to expected one.");
+            if (!rawTransaction.SequenceEqual(BuildTransaction(withdrawalRequest)))
+                throw new InvalidOperationException($"Transaction is not equal to expected one.");
         }
 
         private bool ValidateFee(uint fee)
@@ -59,7 +53,7 @@ namespace Centaurus.Stellar.PaymentProvider
             return true;
         }
 
-        private stellar_dotnet_sdk.Account GetSourceAccount()
+        private Account GetSourceAccount()
         {
             return null;
         }
@@ -85,41 +79,41 @@ namespace Centaurus.Stellar.PaymentProvider
             }
         }
 
-        public override byte[] BuildTransaction(WithdrawalRequest withdrawalRequest)
+        public override byte[] BuildTransaction(WithdrawalRequestModel withdrawalRequest)
         {
             if (withdrawalRequest == null)
                 throw new ArgumentNullException(nameof(withdrawalRequest));
 
             if (!ValidateFee((uint)withdrawalRequest.Fee))
-                throw new BadRequestException($"Not fair fee {withdrawalRequest.Fee}.");
+                throw new InvalidOperationException($"Not fair fee {withdrawalRequest.Fee}.");
             var options = new TransactionBuilderOptions(GetSourceAccount(), (uint)withdrawalRequest.Fee);
             if (!Settings.TryGetAsset(withdrawalRequest.Asset, out var stellarAsset))
-                throw new BadRequestException($"Asset {withdrawalRequest.Asset} is not supported by provider.");
+                throw new InvalidOperationException($"Asset {withdrawalRequest.Asset} is not supported by provider.");
 
             var transaction = TransactionHelper.BuildPaymentTransaction(options, stellar_dotnet_sdk.KeyPair.FromAccountId(withdrawalRequest.Destination), stellarAsset, (long)withdrawalRequest.Amount);
             var txSourceAccount = transaction.SourceAccount;
             if (Vault == txSourceAccount.AccountId)
-                throw new BadRequestException("Vault account cannot be used as transaction source.");
+                throw new InvalidOperationException("Vault account cannot be used as transaction source.");
 
             if (transaction.TimeBounds == null || transaction.TimeBounds.MaxTime <= 0)
-                throw new BadRequestException("Max time must be set.");
+                throw new InvalidOperationException("Max time must be set.");
 
             var currentTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             if (transaction.TimeBounds.MaxTime - currentTime > 1000)
-                throw new BadRequestException("Transaction expiration time is to far.");
+                throw new InvalidOperationException("Transaction expiration time is to far.");
 
             if (transaction.Operations.Any(o => !(o is PaymentOperation)))
-                throw new BadRequestException("Only payment operations are allowed.");
+                throw new InvalidOperationException("Only payment operations are allowed.");
 
             if (transaction.Operations.Length > 100)
-                throw new BadRequestException("Too many operations.");
+                throw new InvalidOperationException("Too many operations.");
             
             var stream = new XdrDataOutputStream();
             stellar_dotnet_sdk.xdr.Transaction.Encode(stream, transaction.ToXdrV1());
             return stream.ToArray();
         }
 
-        public override TxSignature SignTransaction(byte[] transaction)
+        public override SignatureModel SignTransaction(byte[] transaction)
         {
             if (!StellarTransactionExtensions.TryDeserializeTransaction(transaction, out var tx))
                 throw new Exception("Unable to deserialize transaction.");
@@ -129,10 +123,10 @@ namespace Centaurus.Stellar.PaymentProvider
 
             tx.Sign(secret, dataSource.Network);
             var signature = tx.Signatures.First();
-            return new TxSignature { Signer = secret.PublicKey, Signature = signature.Signature.InnerValue };
+            return new SignatureModel { Signer = secret.PublicKey, Signature = signature.Signature.InnerValue };
         }
 
-        public override void SubmitTransaction(byte[] transaction, List<TxSignature> signatures)
+        public override void SubmitTransaction(byte[] transaction, List<SignatureModel> signatures)
         {
             if (!StellarTransactionExtensions.TryDeserializeTransaction(transaction, out var tx))
                 throw new Exception("Unable to deserialize transaction.");
@@ -144,7 +138,7 @@ namespace Centaurus.Stellar.PaymentProvider
             var currentWeight = 0;
             foreach (var signature in signatures)
             {
-                var signerKey = stellar_dotnet_sdk.KeyPair.FromPublicKey(signature.Signer);
+                var signerKey = KeyPair.FromPublicKey(signature.Signer);
                 tx.Signatures.Add(new DecoratedSignature { Hint = signerKey.SignatureHint, Signature = new Signature(signature.Signature) });
                 var currentSigner = accountModel.Signers.FirstOrDefault();
                 if (currentSigner == null)
@@ -156,15 +150,20 @@ namespace Centaurus.Stellar.PaymentProvider
             dataSource.SubmitTransaction(tx).Wait();
         }
 
-        List<Deposit> GetVaultPayments(stellar_dotnet_sdk.Transaction transaction, bool isSuccess)
+        List<DepositModel> GetVaultPayments(stellar_dotnet_sdk.Transaction transaction, bool isSuccess)
         {
-            var ledgerPayments = new List<Deposit>();
-            var res = isSuccess ? PaymentResults.Success : PaymentResults.Failed;
+            var ledgerPayments = new List<DepositModel>();
             var txHash = transaction.Hash();
+            var destination = 0ul;
+            if (transaction.Memo is MemoId memoId)
+                destination = memoId.IdValue;
+            else if (transaction.Memo is MemoText memoText && ulong.TryParse(memoText.MemoTextValue, out destination)) { }
+            else
+                return ledgerPayments;
+                
             for (var i = 0; i < transaction.Operations.Length; i++)
             {
-                var source = transaction.Operations[i].SourceAccount?.SigningKey ?? transaction.SourceAccount.SigningKey;
-                if (Settings.TryGetDeposit(transaction.Operations[i].ToOperationBody(), source, res, txHash, out Deposit payment))
+                if (Settings.TryGetDeposit(transaction.Operations[i].ToOperationBody(), destination, isSuccess, txHash, out DepositModel payment))
                     ledgerPayments.Add(payment);
             }
             return ledgerPayments;
@@ -175,11 +174,12 @@ namespace Centaurus.Stellar.PaymentProvider
             try
             {
                 var payments = GetVaultPayments(stellar_dotnet_sdk.Transaction.FromEnvelopeXdr(tx.EnvelopeXdr), tx.IsSuccess);
-                var payment = new DepositNotification
+                var payment = new DepositNotificationModel
                 {
                     ProviderId = Id,
                     Cursor = tx.PagingToken.ToString(),
-                    Items = payments
+                    Items = payments,
+                    DepositTime = DateTime.UtcNow
                 };
 
                 NotificationsManager.RegisterNotification(payment);
@@ -272,7 +272,7 @@ namespace Centaurus.Stellar.PaymentProvider
 
         private readonly DataSource dataSource;
 
-        private readonly stellar_dotnet_sdk.KeyPair secret;
+        private readonly KeyPair secret;
 
         void InitTimer()
         {
@@ -308,7 +308,7 @@ namespace Centaurus.Stellar.PaymentProvider
             {
                 if (DateTime.UtcNow - payment.DepositTime < commitDelay)
                     break;
-                RaiseOnPaymentCommit(new DepositQuantum { Source = payment.Deposite }.CreateEnvelope());
+                RaiseOnPaymentCommit(payment);
             }
         }
     }

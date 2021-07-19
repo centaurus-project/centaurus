@@ -4,11 +4,4 @@
     <TargetFramework>netcoreapp3.1</TargetFramework>
   </PropertyGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\Centaurus.Common\Centaurus.Common.csproj" />
-    <ProjectReference Include="..\Centaurus.Domain.Models\Centaurus.Domain.Models.csproj" />
-    <ProjectReference Include="..\Centaurus.Models.Extensions\Centaurus.Models.Extensions.csproj" />
-    <ProjectReference Include="..\Centaurus.Models\Centaurus.Models.csproj" />
-  </ItemGroup>
-
 </Project>

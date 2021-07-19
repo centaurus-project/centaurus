@@ -54,7 +54,7 @@ namespace Centaurus.Controllers
                 if (constellationInitEnvelope == null)
                     return StatusCode(415);
 
-                var constellationInitRequest = (ConstellationInitRequest)constellationInitEnvelope.Message;
+                var constellationInitRequest = (ConstellationUpdate)constellationInitEnvelope.Message;
 
                 await Context.QuantumHandler.HandleAsync(constellationInitEnvelope);
 

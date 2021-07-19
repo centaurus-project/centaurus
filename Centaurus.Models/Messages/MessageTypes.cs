@@ -92,13 +92,9 @@ namespace Centaurus.Models
         /// </summary>
         EffectsResponse = 152,
         /// <summary>
-        /// Contains data for init. It will be created by alpha on init.
+        /// Update quorum, add/remove auditors, apply new settings etc.
         /// </summary>
-        ConstellationInitRequest = 200,
-        /// <summary>
-        /// Upgrade quorum, add/remove auditors, apply new settings etc.
-        /// </summary>
-        ConstellationUpgradeRequest = 201,
+        ConstellationUpdate = 201,
         /// <summary>
         /// Alpha state message. It contains Alpha state and last snapshot.
         /// </summary>

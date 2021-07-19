@@ -9,7 +9,7 @@ namespace Centaurus.Models
     public class EffectsProof
     {
         [XdrField(0)]
-        public EffectHashes Hashes { get; set; }
+        public List<Hash> Hashes { get; set; }
 
         [XdrField(1)]
         public List<Ed25519Signature> Signatures { get; set; }

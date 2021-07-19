@@ -1,5 +1,7 @@
 ﻿using Centaurus.Domain;
 using Centaurus.Models;
+using Centaurus.PaymentProvider;
+using Centaurus.PaymentProvider.Models;
 using Centaurus.PersistentStorage.Abstraction;
 using System;
 using System.Collections.Generic;
@@ -111,7 +113,7 @@ namespace Centaurus.Test
                 PaymentSubmitDelay = 0
             };
 
-            var initRequest = new ConstellationInitRequest
+            var initRequest = new ConstellationUpdate
             {
                 Assets = assets,
                 Auditors = auditors.Select(a => (RawPubKey)a.PublicKey).ToList(),
@@ -125,39 +127,42 @@ namespace Centaurus.Test
 
             await context.QuantumHandler.HandleAsync(new ConstellationQuantum { Apex = 1, RequestEnvelope = initRequest }.CreateEnvelope());
 
-            var deposits = new List<Deposit>();
-            Action<byte[], string> addAssetsFn = (acc, asset) =>
+            var deposits = new List<DepositModel>();
+            Action<ulong, string> addAssetsFn = (acc, asset) =>
             {
-                deposits.Add(new Deposit
+                deposits.Add(new DepositModel
                 {
                     Destination = acc,
                     Amount = 10000,
                     Asset = asset,
-                    PaymentResult = PaymentResults.Success
+                    IsSuccess = true
                 });
             };
 
             for (int i = 0; i < clients.Count; i++)
             {
+                var acc = context.AccountStorage.CreateAccount(context.AccountStorage.NextAccountId, clients[i].PublicKey, context.Constellation.RequestRateLimits);
                 for (var c = 0; c < assets.Count; c++)
-                    addAssetsFn(clients[i].PublicKey, assets[c].Code);
+                    addAssetsFn(acc.Id, assets[c].Code);
             }
 
-            var txNotification = new DepositNotification
+            var providerId = PaymentProviderBase.GetProviderId(stellarProviderSettings.Provider, stellarProviderSettings.Name);
+
+            var txNotification = new DepositNotificationModel
             {
                 Cursor = "2",
                 Items = deposits,
-                ProviderId = stellarProviderSettings.ProviderId
+                ProviderId = providerId
             };
 
-            context.PaymentProvidersManager.TryGetManager(stellarProviderSettings.ProviderId, out var paymentProvider);
+            context.PaymentProvidersManager.TryGetManager(providerId, out var paymentProvider);
             paymentProvider.NotificationsManager.RegisterNotification(txNotification);
 
             var depositQuantum = new DepositQuantum
             {
                 Apex = 2,
                 PrevHash = context.QuantumStorage.LastQuantumHash,
-                Source = txNotification,
+                Source = txNotification.ToDomainModel()
             };
 
             await context.QuantumHandler.HandleAsync(depositQuantum.CreateEnvelope());

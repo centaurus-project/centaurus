@@ -1,5 +1,7 @@
 ﻿using Centaurus.Domain;
 using Centaurus.Models;
+using Centaurus.PaymentProvider;
+using Centaurus.PaymentProvider.Models;
 using NUnit.Framework;
 using System;
 using System.Collections.Generic;
@@ -34,19 +36,21 @@ namespace Centaurus.Test
 
             var providerSettings = context.Constellation.Providers.First();
 
-            var paymentNotification = new DepositNotification
+            var paymentNotification = new DepositNotificationModel
             {
                 Cursor = cursor.ToString(),
-                Items = new List<Deposit>
+                Items = new List<DepositModel>
                     {
-                        new Deposit
+                        new DepositModel
                         {
                             Amount = depositAmount,
-                            Destination = TestEnvironment.Client1KeyPair,
-                            Asset = asset
+                            Destination = account1.Id,
+                            Asset = asset,
+                            IsSuccess = true
                         }
                     },
-                ProviderId = providerSettings.ProviderId
+                ProviderId = PaymentProviderBase.GetProviderId(providerSettings.Provider, providerSettings.Name),
+                DepositTime = DateTime.UtcNow
             };
 
             if (!context.PaymentProvidersManager.TryGetManager(paymentNotification.ProviderId, out var provider))
@@ -55,7 +59,7 @@ namespace Centaurus.Test
 
             var ledgerCommitEnv = new DepositQuantum
             {
-                Source = paymentNotification,
+                Source = paymentNotification.ToDomainModel(),
                 Apex = ++apex
             }.CreateEnvelope();
             if (!context.IsAlpha)
@@ -195,7 +199,7 @@ namespace Centaurus.Test
                 Amount = amount,
                 Asset = context.Constellation.GetBaseAsset(),
                 Destination = "some_address",
-                PaymentProvider = providerSettings.ProviderId
+                PaymentProvider = PaymentProviderBase.GetProviderId(providerSettings.Provider, providerSettings.Name)
             };
 
             var envelope = withdrawal

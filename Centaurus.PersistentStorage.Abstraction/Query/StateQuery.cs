@@ -17,17 +17,14 @@
             return storage.Get<AccountPersistentModel>(accountPubkey);
         }
 
-        //DO we retain the settings history?
         public SettingsPersistentModel LoadSettings(ulong fromApex)
         {
             return storage.Find<SettingsPersistentModel>(ApexConverter.EncodeApex(fromApex)).Reverse().First();
         }
 
-
-        //DO we retain the settings history?
-        public StorageIterator<ProviderCursorPersistentModel> LoadCursors(ulong fromApex)
+        public CursorsPersistentModel LoadCursors()
         {
-            return storage.Find<ProviderCursorPersistentModel>();
+            return storage.First<CursorsPersistentModel>();
         }
     }
 }
