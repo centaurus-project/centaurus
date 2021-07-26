@@ -1,11 +1,8 @@
-﻿using Centaurus.Models;
-using Newtonsoft.Json;
-using stellar_dotnet_sdk;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Text;
+using Centaurus.Models;
 
-namespace Centaurus.SDK.Models
+namespace Centaurus.NetSDK
 {
     public class ConstellationInfo
     {
@@ -18,8 +15,6 @@ namespace Centaurus.SDK.Models
         {
             get => vault;
             set {
-                if (!StrKey.IsValidEd25519PublicKey(value))
-                    throw new ArgumentException($"Invalid ed25519 public key {value}");
                 vault = value;
                 VaultPubKey = StrKey.DecodeStellarAccountId(Vault);
             }
@@ -38,8 +33,6 @@ namespace Centaurus.SDK.Models
                 var auditorKeys = new List<RawPubKey>();
                 foreach (var auditor in value)
                 {
-                    if (!StrKey.IsValidEd25519PublicKey(auditor))
-                        throw new ArgumentException($"Invalid ed25519 public key {auditor}");
                     auditorKeys.Add(StrKey.DecodeStellarAccountId(auditor));
                 }
                 AuditorPubKeys = auditorKeys.ToArray();
@@ -90,8 +83,6 @@ namespace Centaurus.SDK.Models
             }
 
             public string DisplayName => Issuer == null ? "XLM" : $"{Code}:{Issuer}";
-
-            public stellar_dotnet_sdk.Asset StellarAsset => Issuer == null ? new AssetTypeNative() : stellar_dotnet_sdk.Asset.CreateNonNativeAsset(Code, Issuer);
         }
 
         public enum ApplicationStateModel

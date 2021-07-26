@@ -5,7 +5,7 @@ using System.Globalization;
 using System.Linq;
 using System.Text;
 
-namespace Centaurus.SDK.Models
+namespace Centaurus.NetSDK
 {
     public class OrderModel
     {
