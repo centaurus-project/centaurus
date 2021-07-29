@@ -55,32 +55,9 @@ namespace Centaurus
         {
             //check for nulls
             if (left == null || right == null) return left == right;
-            var len = left.Length;
             //compare lengths
-            if (len != right.Length) return false;
-            //convert to span<byte>
-            var ls = left.AsSpan();
-            var rs = right.AsSpan();
-            //compare first bytes of each sequence to optimize the best-guess performance
-            if (ls[0] != rs[0]) return false;
-            //optimize memory operations performance by casting to the arrays of longs if possible
-            if (len % 8 == 0)
-            {
-                var leftn = MemoryMarshal.Cast<byte, long>(ls);
-                var rightn = MemoryMarshal.Cast<byte, long>(rs);
-                len /= 8;
-                for (int i = 0; i < len; i++)
-                    if (leftn[i] != rightn[i])
-                        return false;
-            }
-            else
-            {
-                //compare rest of bytes one-by-one
-                for (int i = 1; i < len; i++)
-                    if (ls[i] != rs[i])
-                        return false;
-            }
-            return true;
+            if (left.Length != right.Length) return false;
+            return left.AsSpan().SequenceEqual(right);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

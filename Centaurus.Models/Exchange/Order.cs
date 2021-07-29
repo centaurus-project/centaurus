@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using Centaurus.Xdr;
+﻿using Centaurus.Xdr;
 
 namespace Centaurus.Models
 {
