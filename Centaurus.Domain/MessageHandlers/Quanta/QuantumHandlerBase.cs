@@ -18,7 +18,7 @@ namespace Centaurus.Domain
 
         public override ConnectionState[] ValidConnectionStates { get; } = new ConnectionState[] { ConnectionState.Ready };
 
-        public override Task HandleMessage(BaseWebSocketConnection connection, IncomingMessage message)
+        public override Task HandleMessage(ConnectionBase connection, IncomingMessage message)
         {
             if (Context.IsAlpha)
                 Context.QuantumHandler.HandleAsync(message.Envelope);

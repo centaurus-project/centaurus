@@ -8,50 +8,54 @@ using System.Threading.Tasks;
 
 namespace Centaurus
 {
-    public abstract class StartupBase : ContextualBase
+    public class Startup : ContextualBase
     {
-        public StartupBase(Domain.ExecutionContext context)
+        private ManualResetEvent resetEvent;
+
+        public Startup(Domain.ExecutionContext context, AlphaHostFactoryBase alphaHostFactory)
             : base(context)
         {
-        }
-
-        public abstract void Run(ManualResetEvent resetEvent);
-        public abstract void Shutdown();
-    }
-
-    public class StartupMain : StartupBase
-    {
-        public StartupMain(Domain.ExecutionContext context, ClientConnectionFactoryBase auditorConnectionFactory, AlphaHostFactoryBase alphaHostFactory)
-            : base(context)
-        {
-            if (auditorConnectionFactory == null)
-                throw new ArgumentNullException(nameof(auditorConnectionFactory));
-
             if (alphaHostFactory == null)
                 throw new ArgumentNullException(nameof(alphaHostFactory));
 
-            AuditorStartup = new AuditorStartup(context, auditorConnectionFactory);
             if (context.RoleManager.ParticipationLevel == CentaurusNodeParticipationLevel.Prime)
                 AlphaStartup = new AlphaStartup(context, alphaHostFactory);
         }
 
         public AlphaStartup AlphaStartup { get; }
 
-        public AuditorStartup AuditorStartup { get; }
-
-        public override void Run(ManualResetEvent resetEvent)
+        public void Run(ManualResetEvent resetEvent)
         {
-            AuditorStartup.Run(resetEvent);
+            this.resetEvent = resetEvent ?? throw new ArgumentNullException(nameof(resetEvent));
+
             if (AlphaStartup != null)
                 AlphaStartup.Run(resetEvent);
+
+            Context.AppState.StateChanged += Current_StateChanged;
         }
 
-        public override void Shutdown()
+        private void Current_StateChanged(StateChangedEventArgs eventArgs)
         {
-            Context.AppState.State = ApplicationState.Stopped;
-            AuditorStartup.Shutdown();
+            if (eventArgs.State == State.Failed)
+            {
+                var isSet = resetEvent.WaitOne(0);
+                if (!isSet)
+                    resetEvent.Set();
+            }
+        }
+
+        public void Shutdown()
+        {
+            Context.AppState.SetState( State.Stopped);
             if (AlphaStartup != null)
                 AlphaStartup.Shutdown();
+
+            //close all connections
+            Task.WaitAll(
+                Context.IncomingConnectionManager.CloseAllConnections(),
+                Context.InfoConnectionManager.CloseAllConnections(),
+                Context.OutgoingConnectionManager.CloseAllConnections()
+            );
         }
     }
 }

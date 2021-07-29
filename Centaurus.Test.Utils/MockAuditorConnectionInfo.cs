@@ -8,9 +8,9 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Test
 {
-    public class FakeAuditorConnectionInfo : ClientConnectionWrapperBase
+    public class MockAuditorConnectionInfo : OutgoingConnectionWrapperBase
     {
-        public FakeAuditorConnectionInfo(FakeWebSocket webSocket) 
+        public MockAuditorConnectionInfo(FakeWebSocket webSocket) 
             : base(webSocket)
         {
         }

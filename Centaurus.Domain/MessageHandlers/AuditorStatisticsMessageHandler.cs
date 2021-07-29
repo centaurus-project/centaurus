@@ -17,7 +17,7 @@ namespace Centaurus.Domain
 
         public override bool IsAuditorOnly => true;
 
-        public override Task HandleMessage(BaseWebSocketConnection connection, IncomingMessage message)
+        public override Task HandleMessage(ConnectionBase connection, IncomingMessage message)
         {
             var auditor = connection.PubKeyAddress;
             var statistics = (AuditorPerfStatistics)message.Envelope.Message;

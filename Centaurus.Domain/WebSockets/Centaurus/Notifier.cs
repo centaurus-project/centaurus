@@ -19,7 +19,7 @@ namespace Centaurus.Domain
             if (context == null)
                 throw new ArgumentNullException(nameof(context));
             context.ExtensionsManager.BeforeNotify(account, envelope);
-            if (context.ConnectionManager.TryGetConnection(account, out IncomingWebSocketConnection connection))
+            if (context.IncomingConnectionManager.TryGetConnection(account, out IncomingConnectionBase connection))
                 Task.Factory.StartNew(async () => await connection.SendMessage(envelope)).Unwrap();
         }
 
@@ -32,7 +32,7 @@ namespace Centaurus.Domain
             if (context == null)
                 throw new ArgumentNullException(nameof(context));
             context.ExtensionsManager.BeforeNotifyAuditors(envelope);
-            var auditors = context.ConnectionManager.GetAuditorConnections();
+            var auditors = context.IncomingConnectionManager.GetAuditorConnections();
             for (var i = 0; i < auditors.Count; i++)
             {
                 var auditor = auditors[i];

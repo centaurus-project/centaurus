@@ -22,31 +22,32 @@ namespace Centaurus.Domain
         private static Logger logger = LogManager.GetCurrentClassLogger();
 
         private SemaphoreSlim semaphoreSlim = new SemaphoreSlim(1);
-        private Dictionary<RawPubKey, AuditorState> allAuditorStates = new Dictionary<RawPubKey, AuditorState>();
-        private Dictionary<RawPubKey, AuditorState> validAuditorStates = new Dictionary<RawPubKey, AuditorState>();
+        private Dictionary<RawPubKey, QuantaBatch> allAuditorStates = new Dictionary<RawPubKey, QuantaBatch>();
+        private Dictionary<RawPubKey, QuantaBatch> validAuditorStates = new Dictionary<RawPubKey, QuantaBatch>();
         private System.Timers.Timer applyDataTimer;
 
-        public async Task AddAuditorState(RawPubKey pubKey, AuditorState auditorState)
+        public async Task AddAuditorState(RawPubKey pubKey, QuantaBatch auditorState)
         {
             await semaphoreSlim.WaitAsync();
             try
             {
-                if (!applyDataTimer.Enabled) //start timer
-                    applyDataTimer.Start();
 
                 logger.Trace($"Auditor state from {((KeyPair)pubKey).AccountId} received by AlphaCatchup.");
-                if (Context.AppState.State != ApplicationState.Rising)
+                if (Context.AppState.State != State.Rising)
                 {
                     logger.Warn($"Auditor state messages can be only handled when Alpha is in rising state. State sent by {((KeyPair)pubKey).AccountId}");
                     return;
                 }
 
+                if (!applyDataTimer.Enabled) //start timer
+                    applyDataTimer.Start();
+
                 if (!allAuditorStates.TryGetValue(pubKey, out var pendingAuditorState))
                 {
-                    pendingAuditorState = new AuditorState
+                    pendingAuditorState = new QuantaBatch
                     {
-                        HasMorePendingQuanta = true,
-                        PendingQuanta = new List<MessageEnvelope>()
+                        Quanta = new List<MessageEnvelope>(),
+                        HasMorePendingQuanta = true
                     };
                     allAuditorStates.Add(pubKey, pendingAuditorState);
                     logger.Trace($"Auditor state from {((KeyPair)pubKey).AccountId} added.");
@@ -73,7 +74,7 @@ namespace Centaurus.Domain
             catch (Exception exc)
             {
                 logger.Error(exc, "Error on adding auditors state");
-                Context.AppState.State = ApplicationState.Failed;
+                Context.AppState.SetState(State.Failed);
             }
             finally
             {
@@ -95,19 +96,19 @@ namespace Centaurus.Domain
             }
         }
 
-        private bool AddQuanta(RawPubKey pubKey, AuditorState currentState, AuditorState newAuditorState)
+        private bool AddQuanta(RawPubKey pubKey, QuantaBatch currentState, QuantaBatch newAuditorState)
         {
             if (!currentState.HasMorePendingQuanta
-                || newAuditorState.HasMorePendingQuanta && newAuditorState.PendingQuanta.Count < 1) //prevent spamming
+                || newAuditorState.HasMorePendingQuanta && newAuditorState.Quanta.Count < 1) //prevent spamming
             {
                 logger.Trace($"Unable to add auditor's {((KeyPair)pubKey).AccountId} quanta.");
                 currentState.HasMorePendingQuanta = false;
                 return false;
             }
             currentState.HasMorePendingQuanta = newAuditorState.HasMorePendingQuanta;
-            var lastAddedApex = (ulong)(currentState.PendingQuanta.LastOrDefault()?.Message.MessageId ?? 0);
+            var lastAddedApex = (ulong)(currentState.Quanta.LastOrDefault()?.Message.MessageId ?? 0);
             var alphaPubkey = (RawPubKey)Context.Settings.KeyPair.PublicKey;
-            foreach (var envelope in newAuditorState.PendingQuanta)
+            foreach (var envelope in newAuditorState.Quanta)
             {
                 var currentQuantum = (Quantum)envelope.Message;
                 if (lastAddedApex != 0 && currentQuantum.Apex != lastAddedApex + 1)
@@ -115,7 +116,7 @@ namespace Centaurus.Domain
                 lastAddedApex = currentQuantum.Apex;
                 if (envelope.Signatures.All(s => !s.Signer.Equals(alphaPubkey)) || !envelope.AreSignaturesValid())
                     return false;
-                currentState.PendingQuanta.Add(envelope);
+                currentState.Quanta.Add(envelope);
             }
             logger.Trace($"Auditor's {((KeyPair)pubKey).AccountId} quanta added.");
             return true;
@@ -126,7 +127,7 @@ namespace Centaurus.Domain
             try
             {
                 logger.Trace($"Try apply auditors data.");
-                if (Context.AppState.State != ApplicationState.Rising)
+                if (Context.AppState.State != State.Rising)
                     return;
 
                 int majority = Context.GetMajorityCount(),
@@ -147,8 +148,7 @@ namespace Centaurus.Domain
             }
             catch (Exception exc)
             {
-                logger.Error(exc, "Error during raising.");
-                Context.AppState.State = ApplicationState.Failed;
+                Context.AppState.SetState( State.Failed, new Exception("Error during raising.", exc));
             }
             finally
             {
@@ -186,9 +186,7 @@ namespace Centaurus.Domain
 
             var alphaStateManager = Context.AppState;
 
-            alphaStateManager.AlphaRised();
-
-            Context.NotifyAuditors(Context.GetCurrentState().CreateEnvelope());
+            alphaStateManager.Rised();
         }
 
         private async Task ApplyQuanta(List<MessageEnvelope> quanta)
@@ -215,7 +213,7 @@ namespace Centaurus.Domain
         {
             //group all quanta by their apex
             var quanta = validAuditorStates.Values
-                .SelectMany(a => a.PendingQuanta)
+                .SelectMany(a => a.Quanta)
                 .GroupBy(q => ((Quantum)q.Message).Apex)
                 .OrderBy(q => q.Key);
 

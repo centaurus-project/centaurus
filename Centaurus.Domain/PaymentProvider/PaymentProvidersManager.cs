@@ -1,4 +1,5 @@
-﻿using Centaurus.PaymentProvider.Models;
+﻿using Centaurus.PaymentProvider;
+using Centaurus.PaymentProvider.Models;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -6,11 +7,11 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 
-namespace Centaurus.PaymentProvider
+namespace Centaurus.Domain
 {
     public class PaymentProvidersManager : IDisposable
     {
-        public PaymentProvidersManager(PaymentProviderFactoryBase paymentProviderFactory, List<SettingsModel> settings, string configPath)
+        public PaymentProvidersManager(PaymentProvidersFactoryBase paymentProviderFactory, List<SettingsModel> settings, string configPath)
         {
             var config = GetConfig(configPath);
             var providers = new Dictionary<string, PaymentProviderBase>();
@@ -20,10 +21,18 @@ namespace Centaurus.PaymentProvider
                     throw new Exception($"Payments manager for provider {provider.Id} is already registered.");
 
                 var currentProviderRawConfig = default(string);
+                var assemblyPath = default(string);
                 if (config != null && config.RootElement.TryGetProperty(provider.Id, out var currentProviderElement))
-                    currentProviderRawConfig = currentProviderElement.GetRawText();
+                {
+                    if (!currentProviderElement.TryGetProperty("assemblyPath", out var assemblyPathProperty))
+                        throw new ArgumentNullException("Path property is missing.");
+                    assemblyPath = assemblyPathProperty.GetString();
 
-                providers.Add(provider.Id, paymentProviderFactory.GetProvider(provider, currentProviderRawConfig));
+                    if (currentProviderElement.TryGetProperty("config", out var providerConfig))
+                        currentProviderRawConfig = providerConfig.GetRawText();
+                }
+
+                providers.Add(provider.Id, paymentProviderFactory.GetProvider(provider, assemblyPath, currentProviderRawConfig));
             }
 
             paymentProviders = providers.ToImmutableDictionary();

@@ -138,6 +138,16 @@ namespace Centaurus
             return FromPublicKey(decoded);
         }
 
+        public static bool TryGetFromAccountId(string accountId, out KeyPair keyPair)
+        {
+            keyPair = null;
+            if (!StrKey.IsValidEd25519PublicKey(accountId))
+                return false;
+            byte[] decoded = StrKey.DecodeStellarAccountId(accountId);
+            keyPair = FromPublicKey(decoded);
+            return true;
+        }
+
         public static KeyPair FromBIP39Seed(string seed, uint accountIndex)
         {
             BIP32 bip32 = new BIP32();

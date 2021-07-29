@@ -17,7 +17,7 @@ namespace Centaurus.Domain
             return new SettingsPersistentModel
             {
                 Assets = settings.Assets.Select(a => a.ToPersistentModel()).ToList(),
-                Auditors = settings.Auditors.Select(a => a.Data).ToList(),
+                Auditors = settings.Auditors.Select(a => a.ToPesrsistentModel()).ToList(),
                 MinAccountBalance = settings.MinAccountBalance,
                 MinAllowedLotSize = settings.MinAllowedLotSize,
                 Providers = settings.Providers.Select(p => p.ToPersistentModel()).ToList(),
@@ -32,12 +32,28 @@ namespace Centaurus.Domain
             return new ConstellationSettings
             {
                 Assets = settings.Assets.Select(a => a.ToDomainModel()).ToList(),
-                Auditors = settings.Auditors.Select(a => new RawPubKey { Data = a }).ToList(),
+                Auditors = settings.Auditors.Select(a => a.ToDomainModel()).ToList(),
                 MinAccountBalance = settings.MinAccountBalance,
                 MinAllowedLotSize = settings.MinAllowedLotSize,
                 Providers = settings.Providers.Select(p => p.ToDomainModel()).ToList(),
                 RequestRateLimits = settings.RequestRateLimits.ToDomainModel()
             };
+        }
+
+        public static AuditorModel ToPesrsistentModel(this Auditor auditor)
+        {
+            if (auditor == null)
+                throw new ArgumentNullException(nameof(auditor));
+
+            return new AuditorModel { PubKey = auditor.PubKey.GetAccountId(), Address = auditor.Address };
+        }
+
+        public static Auditor ToDomainModel(this AuditorModel auditor)
+        {
+            if (auditor == null)
+                throw new ArgumentNullException(nameof(auditor));
+
+            return new Auditor { PubKey = new RawPubKey(auditor.PubKey), Address = auditor.Address };
         }
     }
 }

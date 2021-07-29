@@ -22,7 +22,7 @@ namespace Centaurus.Test
         [TestCase(10, "XLM", null)]
         public async Task TxCommitQuantumTest(int cursor, string asset, Type excpectedException)
         {
-            context.AppState.State = ApplicationState.Ready;
+            context.AppState.SetState(State.Ready);
 
             var apex = context.QuantumStorage.CurrentApex;
 
@@ -44,7 +44,7 @@ namespace Centaurus.Test
                         new DepositModel
                         {
                             Amount = depositAmount,
-                            Destination = account1.Id,
+                            Destination = account1.Pubkey,
                             Asset = asset,
                             IsSuccess = true
                         }
@@ -254,7 +254,7 @@ namespace Centaurus.Test
         [TestCase(1, null)]
         public async Task AccountDataRequestTest(int nonce, Type excpectedException)
         {
-            context.AppState.State = ApplicationState.Ready;
+            context.AppState.SetState(State.Ready);
             var accountWrapper = context.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
             var order = new AccountDataRequest
             {
@@ -281,7 +281,7 @@ namespace Centaurus.Test
         [TestCaseSource("AccountRequestRateLimitsCases")]
         public async Task AccountRequestRateLimitTest(KeyPair clientKeyPair, int? requestLimit)
         {
-            context.AppState.State = ApplicationState.Ready;
+            context.AppState.SetState(State.Ready);
 
             var account = context.AccountStorage.GetAccount(clientKeyPair);
             if (requestLimit.HasValue)
@@ -317,6 +317,7 @@ namespace Centaurus.Test
             {
                 var result = await context.QuantumHandler.HandleAsync(quantum);
 
+                context.PendingUpdatesManager.UpdateBatch(true);
                 context.PendingUpdatesManager.ApplyUpdates(true);
 
                 //check that processed quanta is saved to the storage

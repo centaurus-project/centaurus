@@ -29,9 +29,6 @@ namespace Centaurus
         [Option("extensions_config_file_path", Required = false, HelpText = "Path to extensions config file.")]
         public string ExtensionsConfigFilePath { get; set; }
 
-        [Option("auditor_address_book", Required = true, HelpText = "Auditor URL addresses. ", Separator = ',')]
-        public IEnumerable<string> AuditorAddressBook { get; set; }
-
         [Option("alpha_pubkey", Required = true, HelpText = "Alpha server public key.")]
         public string AlphaPubKey { get; set; }
 
@@ -55,8 +52,6 @@ namespace Centaurus
 
         public void Build()
         {
-            if (AuditorAddressBook == null || !AuditorAddressBook.Any(a => Uri.TryCreate(a, UriKind.Absolute, out _)))
-                throw new ArgumentException("At least one auditor address is invalid.", nameof(AuditorAddressBook));
             KeyPair = KeyPair.FromSecretSeed(Secret);
             AlphaKeyPair = KeyPair.FromAccountId(AlphaPubKey);
         }

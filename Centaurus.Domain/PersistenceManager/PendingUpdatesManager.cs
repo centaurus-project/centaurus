@@ -3,6 +3,7 @@ using Centaurus.PersistentStorage;
 using Centaurus.Xdr;
 using NLog;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -20,56 +21,112 @@ namespace Centaurus.Domain
             : base(context)
         {
             InitTimer();
+
+            pendingUpdates = new UpdatesContainer();
+            RegisterUpdates(pendingUpdates);
         }
 
         public event Action<BatchSavedInfo> OnBatchSaved;
-        public void ApplyUpdates(bool force = false)
+        public void UpdateBatch(bool force = false)
         {
             lock (syncRoot)
             {
                 if (force || IsSaveRequired())
                     try
                     {
-                        var sw = new Stopwatch();
-                        sw.Start();
-                        Context.PersistenceManager.ApplyUpdates(pendingUpdates.GetUpdates(Context));
-                        sw.Stop();
+                        pendingUpdates.Complete(Context);
+                        lastUpdateTime = DateTime.UtcNow;
 
-                        lastSaveTime = DateTime.UtcNow;
-
-                        var batchInfo = new BatchSavedInfo
-                        {
-                            SavedAt = lastSaveTime,
-                            QuantaCount = pendingUpdates.QuantaCount,
-                            EffectsCount = pendingUpdates.EffectsCount,
-                            ElapsedMilliseconds = sw.ElapsedMilliseconds
-                        };
-                        Task.Factory.StartNew(() => OnBatchSaved?.Invoke(batchInfo));
-                        pendingUpdates = new UpdatesContainer();
+                        pendingUpdates = new UpdatesContainer(unchecked(pendingUpdates.Id + 1));
+                        RegisterUpdates(pendingUpdates);
                     }
                     catch (Exception exc)
                     {
-                        if (Context.AppState.State != ApplicationState.Failed)
+                        if (Context.AppState.State != State.Failed)
                         {
-                            logger.Error(exc, $"Saving failed.");
-                            Context.AppState.State = ApplicationState.Failed;
+                            Context.AppState.SetState(State.Failed, new Exception("Batch update failed.", exc));
                         }
                     }
             }
         }
 
-        public void AddQuantum(ProcessorContext.ProcessingResult result)
+        public void ApplyUpdates(bool force = false)
         {
-            pendingUpdates.Batch.Add(new QuantumPersistentModel
+            var updates = GetFirstUpdates();
+            while (updates != null && updates.IsCompleted && (updates.AreSignaturesCollected || force))
+            {
+                try
+                {
+                    var sw = new Stopwatch();
+                    sw.Start();
+                    Context.PersistenceManager.ApplyUpdates(updates.UpdateModels);
+                    sw.Stop();
+
+                    var batchInfo = new BatchSavedInfo
+                    {
+                        SavedAt = lastUpdateTime,
+                        QuantaCount = pendingUpdates.QuantaCount,
+                        EffectsCount = pendingUpdates.EffectsCount,
+                        ElapsedMilliseconds = sw.ElapsedMilliseconds
+                    };
+                    Task.Factory.StartNew(() => OnBatchSaved?.Invoke(batchInfo));
+                    RemoveUpdates(updates.Id);
+                    updates = GetFirstUpdates();
+                }
+                catch (Exception exc)
+                {
+                    updates = null;
+                    if (Context.AppState.State != State.Failed)
+                    {
+                        Context.AppState.SetState(State.Failed, new Exception("Saving failed.", exc));
+                    }
+                }
+            }
+        }
+
+        public void AddSignatures(uint updatesId, ulong apex, List<byte[]> signatures)
+        {
+            lock (awaitedUpdatesSyncRoot)
+            {
+                if (!awaitedUpdates.TryGetValue(updatesId, out var updates))
+                    throw new Exception($"Updates with id {updatesId} is not registered.");
+                updates.AddSignatures(apex, signatures);
+                if (updates.AreSignaturesCollected)
+                    ApplyUpdates();
+            }
+        }
+
+        private void RegisterUpdates(UpdatesContainer updatesContainer)
+        {
+            lock (awaitedUpdatesSyncRoot)
+                awaitedUpdates.Add(updatesContainer.Id, updatesContainer);
+        }
+
+        private void RemoveUpdates(uint id)
+        {
+            lock (awaitedUpdatesSyncRoot)
+                if (!awaitedUpdates.Remove(id))
+                    throw new Exception("Unable to remove updates from pending collection.");
+        }
+
+        private UpdatesContainer GetFirstUpdates()
+        {
+            lock (awaitedUpdatesSyncRoot)
+                return awaitedUpdates.FirstOrDefault().Value;
+        }
+
+        public uint AddQuantum(ProcessorContext.ProcessingResult result)
+        {
+            var qModel = new QuantumPersistentModel
             {
                 Apex = result.Apex,
                 Effects = result.Effects,
                 RawQuantum = result.QuantumEnvelope,
-                Signatures = new List<byte[]> { result.Signature },
                 TimeStamp = result.Timestamp
-            });
+            };
+            pendingUpdates.AddQuantum(qModel);
 
-            if (result.HasCursorUpdate) 
+            if (result.HasCursorUpdate)
                 pendingUpdates.HasCursorUpdate = true;
 
             if (result.HasSettingsUpdate)
@@ -81,14 +138,19 @@ namespace Centaurus.Domain
 
             pendingUpdates.EffectsCount += result.Effects.Count;
             pendingUpdates.QuantaCount++;
+
+            return pendingUpdates.Id;
         }
 
-        private UpdatesContainer pendingUpdates = new UpdatesContainer();
+        private object awaitedUpdatesSyncRoot = new { };
+        SortedDictionary<uint, UpdatesContainer> awaitedUpdates = new SortedDictionary<uint, UpdatesContainer>();
+
+        private UpdatesContainer pendingUpdates;
 
         private const int MaxQuantaCount = 50_000;
         private const int MaxSaveInterval = 10;
 
-        private DateTime lastSaveTime;
+        private DateTime lastUpdateTime;
         private object syncRoot = new { };
         private Timer saveTimer = new Timer();
         private XdrBufferFactory.RentedBuffer buffer = XdrBufferFactory.Rent(256 * 1024);
@@ -96,7 +158,7 @@ namespace Centaurus.Domain
         private bool IsSaveRequired()
         {
             return pendingUpdates.QuantaCount > 0
-                && (pendingUpdates.QuantaCount >= MaxQuantaCount || DateTime.UtcNow - lastSaveTime > TimeSpan.FromSeconds(MaxSaveInterval));
+                && (pendingUpdates.QuantaCount >= MaxQuantaCount || DateTime.UtcNow - lastUpdateTime > TimeSpan.FromSeconds(MaxSaveInterval));
         }
 
         private void InitTimer()
@@ -113,9 +175,9 @@ namespace Centaurus.Domain
             {
                 try
                 {
-                    if (Context.AppState.State == ApplicationState.Running || Context.AppState.State == ApplicationState.Ready)
+                    if (Context.AppState.State == State.Running || Context.AppState.State == State.Ready)
                     {
-                        ApplyUpdates();
+                        UpdateBatch();
                     }
                 }
                 catch (Exception exc)
@@ -143,6 +205,12 @@ namespace Centaurus.Domain
 
         class UpdatesContainer
         {
+            public UpdatesContainer(uint id = 0)
+            {
+                Id = id;
+            }
+
+            public uint Id { get; }
 
             public List<IPersistentModel> Batch { get; } = new List<IPersistentModel>();
 
@@ -154,8 +222,20 @@ namespace Centaurus.Domain
 
             public int EffectsCount { get; set; }
 
-            public List<IPersistentModel> GetUpdates(ExecutionContext context)
+            public List<IPersistentModel> UpdateModels { get; private set; }
+
+            public void AddQuantum(QuantumPersistentModel quantum)
             {
+                Batch.Add(quantum);
+                lock (syncRoot)
+                    PendingQuanta.Add(quantum.Apex, quantum);
+            }
+
+            public void Complete(ExecutionContext context)
+            {
+                if (UpdateModels != null)
+                    throw new InvalidOperationException("Already completed.");
+
                 var updates = Batch.ToList();
                 if (Accounts.Count > 0)
                     updates.AddRange(
@@ -165,8 +245,32 @@ namespace Centaurus.Domain
                 if (HasCursorUpdate)
                     updates.Add(new CursorsPersistentModel { Cursors = context.PaymentProvidersManager.GetAll().ToDictionary(k => k.Id, v => v.Cursor) });
 
-                return updates;
+                UpdateModels = updates;
             }
+
+            private object syncRoot = new { };
+            public Dictionary<ulong, QuantumPersistentModel> PendingQuanta { get; } = new Dictionary<ulong, QuantumPersistentModel>();
+
+            public void AddSignatures(ulong apex, List<byte[]> signatures)
+            {
+                lock (syncRoot)
+                {
+                    if (!PendingQuanta.Remove(apex, out var quantum))
+                        throw new InvalidOperationException($"Unable to find quantum with {apex} apex.");
+                    quantum.Signatures = signatures;
+                }
+            }
+
+            public bool AreSignaturesCollected
+            {
+                get
+                {
+                    lock (syncRoot)
+                        return PendingQuanta.Count == 0;
+                }
+            }
+
+            public bool IsCompleted => UpdateModels != null;
         }
     }
 }

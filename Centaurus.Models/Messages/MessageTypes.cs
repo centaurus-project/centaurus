@@ -52,6 +52,10 @@ namespace Centaurus.Models
         /// </summary>
         HandshakeResponse = 101,
         /// <summary>
+        /// Signed handshake data and last known apex.
+        /// </summary>
+        AuditorHandshakeResponse = 110,
+        /// <summary>
         /// Operation result, containing original message and processing status.
         /// </summary>
         ResultMessage = 102,
@@ -68,17 +72,9 @@ namespace Centaurus.Models
         /// </summary>
         EffectsNotification = 105,
         /// <summary>
-        /// Auditor current state (the last snapshot, and all quanta after the last snapshot).
-        /// </summary>
-        AuditorState = 106,
-        /// <summary>
         /// Auditor's performance statistics.
         /// </summary>
         AuditorPerfStatistics = 107,
-        /// <summary>
-        /// Set auditor apex cursor.
-        /// </summary>
-        SetApexCursor = 110,
         /// <summary>
         /// The message is send after success handshake. Contains account id.
         /// </summary>
@@ -96,13 +92,9 @@ namespace Centaurus.Models
         /// </summary>
         ConstellationUpdate = 201,
         /// <summary>
-        /// Alpha state message. It contains Alpha state and last snapshot.
+        /// Quanta batch request
         /// </summary>
-        AlphaState = 202,
-        /// <summary>
-        /// Alpha requests auditor's state for the specified apex
-        /// </summary>
-        AuditorStateRequest = 203,
+        QuantaBatchRequest = 203,
         /// <summary>
         /// Contains batch of quanta
         /// </summary>

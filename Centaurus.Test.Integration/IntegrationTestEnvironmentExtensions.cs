@@ -58,7 +58,7 @@ namespace Centaurus.Test
             Assert.IsTrue(result.IsSuccess, "Init result.");
         }
 
-        public static async Task AssertConstellationState(this IntegrationTestEnvironment environment, ApplicationState targetState, TimeSpan timeOut)
+        public static async Task AssertConstellationState(this IntegrationTestEnvironment environment, State targetState, TimeSpan timeOut)
         {
             Func<Task<bool>> func = () =>
             {
@@ -74,12 +74,12 @@ namespace Centaurus.Test
             );
         }
 
-        public static async Task AssertState(StartupBase startup, ApplicationState targetState, TimeSpan timeOut)
+        public static async Task AssertState(StartupBase startup, State targetState, TimeSpan timeOut)
         {
             Func<Task<bool>> func = () =>
             {
-                TestContext.Out.WriteLine(startup.Context.AppState.State);
-                return Task.FromResult(startup.Context.AppState.State == targetState);
+                TestContext.Out.WriteLine((object)startup.Context.AppState.State);
+                return Task.FromResult(startup.Context.AppState.SetState(= targetState);
             };
 
             await AssertDuringPeriod(
@@ -231,11 +231,11 @@ namespace Centaurus.Test
 
             await environment.InitConstellation();
 
-            await environment.AssertConstellationState(ApplicationState.Running, TimeSpan.FromSeconds(5));
+            await environment.AssertConstellationState(State.Running, TimeSpan.FromSeconds(5));
 
             await environment.RunAuditors();
 
-            await environment.AssertConstellationState(ApplicationState.Ready, TimeSpan.FromSeconds(5));
+            await environment.AssertConstellationState(State.Ready, TimeSpan.FromSeconds(5));
 
             environment.GenerateCliens(clientsCount);
 

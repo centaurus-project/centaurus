@@ -43,7 +43,6 @@ namespace Centaurus.Test
         {
             settings.CWD = "AppData";
             settings.AlphaPubKey = TestEnvironment.AlphaKeyPair.AccountId;
-            settings.AuditorAddressBook = new string[] { "http://localhost" };
             settings.Secret = secret;
             settings.ParticipationLevel = 1;
         }
@@ -93,7 +92,7 @@ namespace Centaurus.Test
         /// <param name="settings">Settings that will be used to init Global</param>
         public static async Task<ExecutionContext> Setup(List<KeyPair> clients, List<KeyPair> auditors, Settings settings, IPersistentStorage storage)
         {
-            var context = new ExecutionContext(settings, storage, new MockPaymentProviderFactory());
+            var context = new ExecutionContext(settings, storage, new MockPaymentProviderFactory(), new MockOutgoingConnectionFactory());
 
             var assets = new List<AssetSettings> { new AssetSettings { Code = "XLM" }, new AssetSettings { Code = "USD" } };
 
@@ -116,7 +115,7 @@ namespace Centaurus.Test
             var initRequest = new ConstellationUpdate
             {
                 Assets = assets,
-                Auditors = auditors.Select(a => (RawPubKey)a.PublicKey).ToList(),
+                Auditors = auditors.Select(a => new Auditor { PubKey = a.PublicKey, Address = "" }).ToList(),
                 MinAccountBalance = 1,
                 MinAllowedLotSize = 1,
                 Providers = new List<ProviderSettings> { stellarProviderSettings },
@@ -128,7 +127,7 @@ namespace Centaurus.Test
             await context.QuantumHandler.HandleAsync(new ConstellationQuantum { Apex = 1, RequestEnvelope = initRequest }.CreateEnvelope());
 
             var deposits = new List<DepositModel>();
-            Action<ulong, string> addAssetsFn = (acc, asset) =>
+            Action<byte[], string> addAssetsFn = (acc, asset) =>
             {
                 deposits.Add(new DepositModel
                 {
@@ -143,7 +142,7 @@ namespace Centaurus.Test
             {
                 var acc = context.AccountStorage.CreateAccount(context.AccountStorage.NextAccountId, clients[i].PublicKey, context.Constellation.RequestRateLimits);
                 for (var c = 0; c < assets.Count; c++)
-                    addAssetsFn(acc.Id, assets[c].Code);
+                    addAssetsFn(acc.Account.Pubkey, assets[c].Code);
             }
 
             var providerId = PaymentProviderBase.GetProviderId(stellarProviderSettings.Provider, stellarProviderSettings.Name);
@@ -168,7 +167,7 @@ namespace Centaurus.Test
             await context.QuantumHandler.HandleAsync(depositQuantum.CreateEnvelope());
 
             //save all effects
-            context.PendingUpdatesManager.ApplyUpdates(true);
+            context.PendingUpdatesManager.UpdateBatch(true);
             return context;
         }
     }

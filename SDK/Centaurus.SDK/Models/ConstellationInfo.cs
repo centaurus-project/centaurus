@@ -11,7 +11,7 @@ namespace Centaurus.SDK.Models
     {
         public string RawObject { get; set; }
 
-        public ApplicationStateModel State { get; set; }
+        public StateModel State { get; set; }
 
         public Dictionary<string, string> Vaults { get; set; }
 
@@ -84,7 +84,7 @@ namespace Centaurus.SDK.Models
             public stellar_dotnet_sdk.Asset StellarAsset => Issuer == null ? new AssetTypeNative() : stellar_dotnet_sdk.Asset.CreateNonNativeAsset(Code, Issuer);
         }
 
-        public enum ApplicationStateModel
+        public enum StateModel
         {
             Undefined = 0,
             /// <summary>

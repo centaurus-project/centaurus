@@ -61,8 +61,8 @@ namespace Centaurus.Domain
             if (deposit == null)
                 throw new ArgumentNullException(nameof(deposit));
 
-            if (deposit.Destination == 0)
-                throw new InvalidOperationException("Destination id is invalid.");
+            if (deposit.Destination == null)
+                throw new InvalidOperationException("Destination is invalid.");
 
             if (context.CentaurusContext.AccountStorage.GetAccount(deposit.Destination) == null)
                 throw new InvalidOperationException("Unknown destination.");
@@ -80,16 +80,16 @@ namespace Centaurus.Domain
                 return;
 
             var account = context.CentaurusContext.AccountStorage.GetAccount(deposit.Destination);
-            //if (account == null)
-            //{
-            //    var baseAsset = context.CentaurusContext.Constellation.GetBaseAsset();
-            //    //ignore registration with non-base asset or with amount that is less than MinAccountBalance
-            //    if (deposit.Asset != baseAsset || deposit.Amount < context.CentaurusContext.Constellation.MinAccountBalance)
-            //        return;
-            //    var accId = context.CentaurusContext.AccountStorage.NextAccountId;
-            //    context.AddAccountCreate(context.CentaurusContext.AccountStorage, accId, deposit.Destination);
-            //    account = context.CentaurusContext.AccountStorage.GetAccount(accId);
-            //}
+            if (account == null)
+            {
+                var baseAsset = context.CentaurusContext.Constellation.GetBaseAsset();
+                //ignore registration with non-base asset or with amount that is less than MinAccountBalance
+                if (deposit.Asset != baseAsset || deposit.Amount < context.CentaurusContext.Constellation.MinAccountBalance)
+                    return;
+                var accId = context.CentaurusContext.AccountStorage.NextAccountId;
+                context.AddAccountCreate(context.CentaurusContext.AccountStorage, accId, deposit.Destination);
+                account = context.CentaurusContext.AccountStorage.GetAccount(accId);
+            }
 
             if (!account.Account.HasBalance(deposit.Asset))
                 context.AddBalanceCreate(account, deposit.Asset);

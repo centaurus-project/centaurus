@@ -45,81 +45,81 @@ namespace Centaurus.Domain
 
         public IEnumerable<ExtensionItem> Extensions => extensions;
 
-
-        public event Action<WebSocket, string> OnBeforeNewConnection;
-        public event Action<BaseWebSocketConnection> OnConnectionValidated;
-
-        public void ConnectionValidated(BaseWebSocketConnection args)
+        public event Action<ConnectionBase> OnConnectionValidated;
+        public void ConnectionValidated(ConnectionBase args)
         {
             OnConnectionValidated?.Invoke(args);
         }
+
+        public event Action<WebSocket, string> OnBeforeNewConnection;
         public void BeforeNewConnection(WebSocket args, string ip)
         {
             OnBeforeNewConnection?.Invoke(args, ip);
         }
 
-        public event Action<BaseWebSocketConnection, MessageEnvelope, Exception> OnHandleMessageFailed;
-        public void HandleMessageFailed(BaseWebSocketConnection connection, MessageEnvelope message, Exception exception)
+        public event Action<ConnectionBase, MessageEnvelope, Exception> OnHandleMessageFailed;
+        public void HandleMessageFailed(ConnectionBase connection, MessageEnvelope message, Exception exception)
         {
             OnHandleMessageFailed?.Invoke(connection, message, exception);
         }
 
-        public event Action<BaseWebSocketConnection, MessageEnvelope> OnBeforeSendMessage;
-        public event Action<BaseWebSocketConnection, MessageEnvelope> OnAfterSendMessage;
-        public event Action<BaseWebSocketConnection, MessageEnvelope, Exception> OnSendMessageFailed;
-        public void BeforeSendMessage(BaseWebSocketConnection connection, MessageEnvelope message)
+        public event Action<ConnectionBase, MessageEnvelope> OnBeforeSendMessage;
+        public void BeforeSendMessage(ConnectionBase connection, MessageEnvelope message)
         {
             OnBeforeSendMessage?.Invoke(connection, message);
         }
-        public void AfterSendMessage(BaseWebSocketConnection connection, MessageEnvelope message)
+
+        public event Action<ConnectionBase, MessageEnvelope> OnAfterSendMessage;
+        public void AfterSendMessage(ConnectionBase connection, MessageEnvelope message)
         {
             OnAfterSendMessage?.Invoke(connection, message);
         }
-        public void SendMessageFailed(BaseWebSocketConnection connection, MessageEnvelope message, Exception exception)
+
+        public event Action<ConnectionBase, MessageEnvelope, Exception> OnSendMessageFailed;
+        public void SendMessageFailed(ConnectionBase connection, MessageEnvelope message, Exception exception)
         {
             OnSendMessageFailed?.Invoke(connection, message, exception);
         }
 
-        public event Action<BaseWebSocketConnection> OnBeforeConnectionClose;
-
-        public void BeforeConnectionClose(BaseWebSocketConnection args)
+        public event Action<ConnectionBase> OnBeforeConnectionClose;
+        public void BeforeConnectionClose(ConnectionBase args)
         {
             OnBeforeConnectionClose?.Invoke(args);
         }
 
         public event Action<RawPubKey, MessageEnvelope> OnBeforeNotify;
-        public event Action<MessageEnvelope> OnBeforeNotifyAuditors;
         public void BeforeNotify(RawPubKey pubKey, MessageEnvelope envelope)
         {
             OnBeforeNotify?.Invoke(pubKey, envelope);
         }
 
+        public event Action<MessageEnvelope> OnBeforeNotifyAuditors;
         public void BeforeNotifyAuditors(MessageEnvelope envelope)
         {
             OnBeforeNotifyAuditors?.Invoke(envelope);
         }
 
-        public event Action<BaseWebSocketConnection, MessageEnvelope> OnBeforeValidateMessage;
-        public event Action<BaseWebSocketConnection, MessageEnvelope> OnAfterValidateMessage;
-        public event Action<BaseWebSocketConnection, MessageEnvelope> OnBeforeHandleMessage;
-        public event Action<BaseWebSocketConnection, MessageEnvelope> OnAfterHandleMessage;
+        public event Action<ConnectionBase, MessageEnvelope> OnBeforeValidateMessage;
+        public event Action<ConnectionBase, MessageEnvelope> OnAfterValidateMessage;
+        public event Action<ConnectionBase, MessageEnvelope> OnBeforeHandleMessage;
+        public event Action<ConnectionBase, MessageEnvelope> OnAfterHandleMessage;
 
-        public void BeforeValidateMessage(BaseWebSocketConnection connection, MessageEnvelope message)
+        public void BeforeValidateMessage(ConnectionBase connection, MessageEnvelope message)
         {
             OnBeforeValidateMessage?.Invoke(connection, message);
         }
 
-        public void AfterValidateMessage(BaseWebSocketConnection connection, MessageEnvelope message)
+        public void AfterValidateMessage(ConnectionBase connection, MessageEnvelope message)
         {
             OnAfterValidateMessage?.Invoke(connection, message);
         }
 
-        public void BeforeHandleMessage(BaseWebSocketConnection connection, MessageEnvelope message)
+        public void BeforeHandleMessage(ConnectionBase connection, MessageEnvelope message)
         {
             OnBeforeHandleMessage?.Invoke(connection, message);
         }
 
-        public void AfterHandleMessage(BaseWebSocketConnection connection, MessageEnvelope message)
+        public void AfterHandleMessage(ConnectionBase connection, MessageEnvelope message)
         {
             OnAfterHandleMessage?.Invoke(connection, message);
         }

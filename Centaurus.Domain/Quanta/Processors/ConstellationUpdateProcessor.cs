@@ -27,7 +27,7 @@ namespace Centaurus.Domain
             context.AddConstellationUpdate(settings, Context.Constellation);
 
 
-            var initSnapshot = PersistenceManager.GetSnapshot(
+            var updateSnapshot = PersistenceManager.GetSnapshot(
                 context.Apex,
                 settings,
                 Context.AccountStorage?.GetAll().ToList() ?? new List<AccountWrapper>(),
@@ -35,16 +35,16 @@ namespace Centaurus.Domain
                 GetCursors(settings.Providers),
                 context.QuantumEnvelope.ComputeMessageHash()
             );
-            context.CentaurusContext.Setup(initSnapshot);
+            context.CentaurusContext.Setup(updateSnapshot);
 
-            if (context.CentaurusContext.AppState.State == ApplicationState.WaitingForInit)
+            if (context.CentaurusContext.AppState.State == State.WaitingForInit)
             {
-                context.CentaurusContext.AppState.State = ApplicationState.Running;
+                context.CentaurusContext.AppState.SetState(State.Running);
                 if (!context.CentaurusContext.IsAlpha) //set auditor to Ready state after init
                 {
                     //send new apex cursor message to notify Alpha that the auditor was initialized
-                    context.CentaurusContext.OutgoingMessageStorage.EnqueueMessage(new SetApexCursor { Apex = context.Apex });
-                    context.CentaurusContext.AppState.State = ApplicationState.Ready;
+                    context.CentaurusContext.OutgoingMessageStorage.EnqueueMessage(new QuantaBatchRequest { LastKnownApex = context.Apex });
+                    context.CentaurusContext.AppState.SetState(State.Ready);
                 }
             }
 
@@ -84,7 +84,7 @@ namespace Centaurus.Domain
 
         public override Task Validate(ProcessorContext context)
         {
-            if (context.CentaurusContext.AppState.State != ApplicationState.WaitingForInit)
+            if (context.CentaurusContext.AppState.State != State.WaitingForInit)
                 throw new InvalidOperationException("Init quantum can be handled only when application is in WaitingForInit state.");
 
             var requestEnvelope = ((ConstellationQuantum)context.QuantumEnvelope.Message).RequestEnvelope;
@@ -95,7 +95,7 @@ namespace Centaurus.Domain
             if (constellationUpdate.Auditors == null || constellationUpdate.Auditors.Count() < minAuditorsCount)
                 throw new ArgumentException($"Min auditors count is {minAuditorsCount}");
 
-            if (!constellationUpdate.Auditors.All(a => requestEnvelope.IsSignedBy((KeyPair)a)))
+            if (!constellationUpdate.Auditors.All(a => requestEnvelope.IsSignedBy(a.PubKey)))
                 throw new InvalidOperationException("The quantum should be signed by all auditors.");
 
             if (!requestEnvelope.AreSignaturesValid())

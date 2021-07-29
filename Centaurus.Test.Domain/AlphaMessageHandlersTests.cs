@@ -4,6 +4,7 @@ using Centaurus.Xdr;
 using NUnit.Framework;
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Threading.Tasks;
 
 namespace Centaurus.Test
@@ -22,21 +23,25 @@ namespace Centaurus.Test
 
         static object[] HandshakeTestCases =
         {
-            new object[] { TestEnvironment.Client1KeyPair, ApplicationState.Rising, typeof(ConnectionCloseException) },
-            new object[] { TestEnvironment.Client1KeyPair, ApplicationState.Ready, null },
-            new object[] { TestEnvironment.Auditor1KeyPair, ApplicationState.Rising, null },
-            new object[] { TestEnvironment.Auditor1KeyPair,  ApplicationState.Ready, null }
+            new object[] { TestEnvironment.Client1KeyPair, State.Rising, typeof(ConnectionCloseException) },
+            new object[] { TestEnvironment.Client1KeyPair, State.Ready, null },
+            new object[] { TestEnvironment.Auditor1KeyPair, State.Rising, typeof(InvalidOperationException) },
+            new object[] { TestEnvironment.Auditor1KeyPair,  State.Ready, typeof(InvalidOperationException) }
         };
 
         [Test]
         [TestCaseSource(nameof(HandshakeTestCases))]
-        public async Task HandshakeTest(KeyPair clientKeyPair, ApplicationState alphaState, Type expectedException)
+        public async Task HandshakeTest(KeyPair clientKeyPair, State alphaState, Type expectedException)
         {
-            context.AppState.State = alphaState;
+            context.AppState.SetState(alphaState);
 
-            var clientConnection = new IncomingWebSocketConnection(context, new FakeWebSocket(), "127.0.0.1");
+            var connection = GetIncomingConnection(context, clientKeyPair);
 
-            var message = new HandshakeResponse { HandshakeData = clientConnection.HandshakeData };
+            var handshakeData = (HandshakeData)typeof(IncomingConnectionBase)
+                .GetField("handshakeData", BindingFlags.Instance | BindingFlags.NonPublic)
+                .GetValue(connection);
+
+            var message = new HandshakeResponse { HandshakeData = handshakeData };
             var envelope = message.CreateEnvelope();
             envelope.Sign(clientKeyPair);
 
@@ -44,25 +49,63 @@ namespace Centaurus.Test
             var inMessage = envelope.ToIncomingMessage(writer);
             if (expectedException == null)
             {
-                var isHandled = await context.MessageHandlers.HandleMessage(clientConnection, inMessage);
+                var isHandled = await context.MessageHandlers.HandleMessage(connection, inMessage);
 
                 Assert.IsTrue(isHandled);
-                Assert.AreEqual(clientConnection.PubKey, new RawPubKey(clientKeyPair.AccountId));
-                if (clientConnection.PubKey.Equals((RawPubKey)TestEnvironment.Auditor1KeyPair))
-                    Assert.AreEqual(clientConnection.ConnectionState, ConnectionState.Validated);
+                if (connection.IsAuditor)
+                    Assert.AreEqual(connection.ConnectionState, ConnectionState.Validated);
                 else
-                    Assert.AreEqual(clientConnection.ConnectionState, ConnectionState.Ready);
+                    Assert.AreEqual(connection.ConnectionState, ConnectionState.Ready);
             }
             else
-                Assert.ThrowsAsync(expectedException, async () => await context.MessageHandlers.HandleMessage(clientConnection, inMessage));
+                Assert.ThrowsAsync(expectedException, async () => await context.MessageHandlers.HandleMessage(connection, inMessage));
+        }
+        static object[] AuditorHandshakeTestCases =
+        {
+            new object[] { TestEnvironment.Client1KeyPair, State.Rising, typeof(InvalidOperationException) },
+            new object[] { TestEnvironment.Client1KeyPair, State.Ready, typeof(InvalidOperationException) },
+            new object[] { TestEnvironment.Auditor1KeyPair, State.Rising, null },
+            new object[] { TestEnvironment.Auditor1KeyPair,  State.Ready, null }
+        };
+
+        [Test]
+        [TestCaseSource(nameof(AuditorHandshakeTestCases))]
+        public async Task AuditorHandshakeTest(KeyPair clientKeyPair, State alphaState, Type expectedException)
+        {
+            context.AppState.SetState(alphaState);
+
+            var connection = GetIncomingConnection(context, clientKeyPair);
+
+            var handshakeData = (HandshakeData)typeof(IncomingConnectionBase)
+                .GetField("handshakeData", BindingFlags.Instance | BindingFlags.NonPublic)
+                .GetValue(connection);
+
+            var message = new AuditorHandshakeResponse { HandshakeData = handshakeData };
+            var envelope = message.CreateEnvelope();
+            envelope.Sign(clientKeyPair);
+
+            using var writer = new XdrBufferWriter();
+            var inMessage = envelope.ToIncomingMessage(writer);
+            if (expectedException == null)
+            {
+                var isHandled = await context.MessageHandlers.HandleMessage(connection, inMessage);
+
+                Assert.IsTrue(isHandled);
+                if (connection.IsAuditor)
+                    Assert.AreEqual(connection.ConnectionState, ConnectionState.Validated);
+                else
+                    Assert.AreEqual(connection.ConnectionState, ConnectionState.Ready);
+            }
+            else
+                Assert.ThrowsAsync(expectedException, async () => await context.MessageHandlers.HandleMessage(connection, inMessage));
         }
 
         [Test]
         public void HandshakeInvalidDataTest()
         {
-            context.AppState.State = ApplicationState.Ready;
+            context.AppState.SetState(State.Ready);
 
-            var clientConnection = new IncomingWebSocketConnection(context, new FakeWebSocket(), "127.0.0.1");
+            var clientConnection = GetIncomingConnection(context, TestEnvironment.Client1KeyPair);
 
             var handshake = new HandshakeData();
             handshake.Randomize();
@@ -100,7 +143,7 @@ namespace Centaurus.Test
 
         }
 
-        static object[] SetApexCursorTestCases =
+        static object[] QuantaBatchRequestTestCases =
         {
             new object[] { TestEnvironment.Client1KeyPair, ConnectionState.Validated, typeof(UnauthorizedException) },
             new object[] { TestEnvironment.Auditor1KeyPair, ConnectionState.Connected, typeof(InvalidStateException) },
@@ -108,14 +151,14 @@ namespace Centaurus.Test
         };
 
         [Test]
-        [TestCaseSource(nameof(SetApexCursorTestCases))]
-        public async Task SetApexCursorTest(KeyPair clientKeyPair, ConnectionState state, Type excpectedException)
+        [TestCaseSource(nameof(QuantaBatchRequestTestCases))]
+        public async Task QuantaBatchRequestTest(KeyPair clientKeyPair, ConnectionState state, Type excpectedException)
         {
-            context.AppState.State = ApplicationState.Ready;
+            context.AppState.SetState(State.Ready);
 
             var clientConnection = GetIncomingConnection(context, clientKeyPair.PublicKey, state);
 
-            var envelope = new SetApexCursor { Apex = 1 }.CreateEnvelope();
+            var envelope = new QuantaBatchRequest { LastKnownApex = 1 }.CreateEnvelope();
             envelope.Sign(clientKeyPair);
             using var writer = new XdrBufferWriter();
             var inMessage = envelope.ToIncomingMessage(writer);
@@ -123,25 +166,25 @@ namespace Centaurus.Test
             await AssertMessageHandling(clientConnection, inMessage, excpectedException);
         }
 
-        static object[] AuditorStateTestCases =
+        static object[] QuantaBatchTestCases =
         {
             new object[] { TestEnvironment.Client1KeyPair, ConnectionState.Validated, typeof(UnauthorizedException) },
             new object[] { TestEnvironment.Auditor1KeyPair, ConnectionState.Connected, typeof(InvalidStateException) },
-            new object[] { TestEnvironment.Auditor1KeyPair, ConnectionState.Ready, null }
+            new object[] { TestEnvironment.Auditor1KeyPair, ConnectionState.Ready, null },
+            new object[] { TestEnvironment.Auditor1KeyPair, ConnectionState.Validated, null }
         };
 
         [Test]
-        [TestCaseSource(nameof(AuditorStateTestCases))]
-        public async Task AuditorStateTest(KeyPair clientKeyPair, ConnectionState state, Type excpectedException)
+        [TestCaseSource(nameof(QuantaBatchTestCases))]
+        public async Task QuantaBatchTest(KeyPair clientKeyPair, ConnectionState state, Type excpectedException)
         {
-            context.AppState.State = ApplicationState.Rising;
+            context.AppState.SetState(State.Rising);
 
             var clientConnection = GetIncomingConnection(context, clientKeyPair.PublicKey, state);
 
-            var envelope = new AuditorState
+            var envelope = new QuantaBatch
             {
-                PendingQuanta = new List<MessageEnvelope>(),
-                State = ApplicationState.Running
+                Quanta = new List<MessageEnvelope>()
             }.CreateEnvelope();
             envelope.Sign(clientKeyPair);
 
@@ -150,7 +193,7 @@ namespace Centaurus.Test
 
             await AssertMessageHandling(clientConnection, inMessage, excpectedException);
             if (excpectedException == null)
-                Assert.AreEqual(context.AppState.State, ApplicationState.Running);
+                Assert.AreEqual(context.AppState.State, State.Running);
         }
 
         static object[] OrderTestCases =
@@ -163,7 +206,7 @@ namespace Centaurus.Test
         [TestCaseSource(nameof(OrderTestCases))]
         public async Task OrderTest(ConnectionState state, Type excpectedException)
         {
-            context.AppState.State = ApplicationState.Ready;
+            context.AppState.SetState(State.Ready);
 
             var clientConnection = GetIncomingConnection(context, TestEnvironment.Client1KeyPair.PublicKey, state);
 
@@ -191,9 +234,9 @@ namespace Centaurus.Test
         [TestCaseSource(nameof(AccountDataTestRequestCases))]
         public async Task AccountDataRequestTest(ConnectionState state, Type excpectedException)
         {
-            context.AppState.State = ApplicationState.Ready;
+            context.AppState.SetState(State.Ready);
 
-            var clientConnection = GetIncomingConnection(context, TestEnvironment.Client1KeyPair.PublicKey, state);
+            var clientConnection = (IncomingClientConnection)GetIncomingConnection(context, TestEnvironment.Client1KeyPair.PublicKey, state);
 
             var envelope = new AccountDataRequest
             {
@@ -216,7 +259,7 @@ namespace Centaurus.Test
         [TestCaseSource(nameof(AccountRequestRateLimitsCases))]
         public async Task AccountRequestRateLimitTest(KeyPair clientKeyPair, int? requestLimit)
         {
-            context.AppState.State = ApplicationState.Ready;
+            context.AppState.SetState(State.Ready);
 
             var account = context.AccountStorage.GetAccount(clientKeyPair);
             if (requestLimit.HasValue)
@@ -267,7 +310,7 @@ namespace Centaurus.Test
         [TestCaseSource(nameof(EffectsRequestTestCases))]
         public async Task EffectsRequestTest(KeyPair client, ConnectionState state, Type excpectedException)
         {
-            context.AppState.State = ApplicationState.Ready;
+            context.AppState.SetState(State.Ready);
 
             var account = context.AccountStorage.GetAccount(client);
 

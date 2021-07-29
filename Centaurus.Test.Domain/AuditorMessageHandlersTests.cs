@@ -24,9 +24,9 @@ namespace Centaurus.Test
         [Test]
         public async Task HandshakeTest()
         {
-            context.AppState.State = ApplicationState.Running;
+            context.AppState.SetState( State.Running);
 
-            var clientConnection = GetOutgoingConnection(context);
+            var clientConnection = GetOutgoingConnection(context, KeyPair.Random());
 
             var hd = new HandshakeData();
             hd.Randomize();
@@ -40,52 +40,29 @@ namespace Centaurus.Test
             Assert.IsTrue(isHandled);
         }
 
-        [Test]
-        [TestCase(ApplicationState.Rising)]
-        [TestCase(ApplicationState.Running)]
-        [TestCase(ApplicationState.Ready)]
-        public async Task AlphaStateTest(ApplicationState alphaState)
-        {
-            context.AppState.State = ApplicationState.Running;
-
-            var clientConnection = GetOutgoingConnection(context);
-
-            var envelope = new AlphaState
-            {
-                State = alphaState
-            }
-            .CreateEnvelope()
-            .Sign(TestEnvironment.AlphaKeyPair);
-
-            using var writer = new XdrBufferWriter();
-            var inMessage = envelope.ToIncomingMessage(writer);
-            var isHandled = await context.MessageHandlers.HandleMessage(clientConnection, inMessage);
-
-            Assert.IsTrue(isHandled);
-        }
-
         static object[] QuantaBatchTestCases =
         {
             new object[] { TestEnvironment.Client1KeyPair, ConnectionState.Ready, typeof(UnauthorizedException) },
-            new object[] { TestEnvironment.AlphaKeyPair, ConnectionState.Validated, typeof(InvalidStateException) },
-            new object[] { TestEnvironment.AlphaKeyPair, ConnectionState.Ready, null },
-            new object[] { TestEnvironment.AlphaKeyPair, ConnectionState.Connected, null },
+            new object[] { TestEnvironment.AlphaKeyPair, ConnectionState.Connected, typeof(InvalidStateException) },
+            new object[] { TestEnvironment.AlphaKeyPair, ConnectionState.Validated, null },
+            new object[] { TestEnvironment.AlphaKeyPair, ConnectionState.Ready, null }
         };
 
         [Test]
         [TestCaseSource(nameof(QuantaBatchTestCases))]
         public async Task QuantaBatchTest(KeyPair alphaKeyPair, ConnectionState state, Type excpectedException)
         {
-            context.AppState.State = ApplicationState.Ready;
+            context.AppState.SetState( State.Ready);
 
-            var clientConnection = GetOutgoingConnection(context, state);
-            var orderEnvelope = new QuantaBatch
+            var clientConnection = GetIncomingConnection(context, alphaKeyPair, state);
+            var batch = new QuantaBatch
             {
                 Quanta = new List<MessageEnvelope>()
             }.CreateEnvelope();
-            orderEnvelope.Sign(alphaKeyPair);
+            batch.Sign(alphaKeyPair);
+
             using var writer = new XdrBufferWriter();
-            var inMessage = orderEnvelope.ToIncomingMessage(writer);
+            var inMessage = batch.ToIncomingMessage(writer);
 
             await AssertMessageHandling(clientConnection, inMessage, excpectedException);
         }

@@ -36,7 +36,7 @@ namespace Centaurus.Domain
             handlers = processors.ToImmutableDictionary();
         }
 
-        public async Task<bool> HandleMessage(BaseWebSocketConnection connetction, IncomingMessage message)
+        public async Task<bool> HandleMessage(ConnectionBase connetction, IncomingMessage message)
         {
             if (message == null)
                 throw new ArgumentNullException(nameof(message));

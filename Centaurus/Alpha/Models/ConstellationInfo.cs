@@ -4,11 +4,11 @@ namespace Centaurus
 {
     public class ConstellationInfo
     {
-        public ApplicationState State { get; set; }
+        public State State { get; set; }
 
         public ProviderSettings[] Providers { get; set; }
 
-        public string[] Auditors { get; set; }
+        public object[] Auditors { get; set; }
 
         public ulong MinAccountBalance { get; set; }
 

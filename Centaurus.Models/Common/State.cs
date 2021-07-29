@@ -4,7 +4,7 @@ using System.Text;
 
 namespace Centaurus.Models
 {
-    public enum ApplicationState
+    public enum State
     {
         Undefined = 0,
         /// <summary>

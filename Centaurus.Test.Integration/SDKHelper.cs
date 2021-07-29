@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using SdkConstellationInfo = Centaurus.SDK.Models.ConstellationInfo;
 using SdkAsset = Centaurus.SDK.Models.ConstellationInfo.Asset;
-using SdkState = Centaurus.SDK.Models.ConstellationInfo.ApplicationStateModel;
+using SdkState = Centaurus.SDK.Models.ConstellationInfo.StateModel;
 using Network = Centaurus.SDK.Models.ConstellationInfo.Network;
 
 namespace Centaurus

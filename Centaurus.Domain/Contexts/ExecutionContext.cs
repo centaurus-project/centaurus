@@ -1,4 +1,5 @@
-﻿using Centaurus.Exchange.Analytics;
+﻿using Centaurus.Client;
+using Centaurus.Exchange.Analytics;
 using Centaurus.Models;
 using Centaurus.PaymentProvider;
 using Centaurus.PersistentStorage.Abstraction;
@@ -17,7 +18,7 @@ namespace Centaurus.Domain
         /// <param name="settings">Application config</param>
         /// <param name="storage">Permanent storage object</param>
         /// <param name="useLegacyOrderbook"></param>
-        public ExecutionContext(Settings settings, IPersistentStorage storage, PaymentProviderFactoryBase paymentProviderFactory, bool useLegacyOrderbook = false)
+        public ExecutionContext(Settings settings, IPersistentStorage storage, PaymentProvidersFactoryBase paymentProviderFactory, OutgoingConnectionFactoryBase connectionFactory, bool useLegacyOrderbook = false)
         {
             PermanentStorage = storage ?? throw new ArgumentNullException(nameof(storage));
             PermanentStorage.Connect(settings.ConnectionString);
@@ -55,7 +56,9 @@ namespace Centaurus.Domain
 
             QuantumHandler = new QuantumHandler(this);
 
-            ConnectionManager = new ConnectionManager(this);
+            IncomingConnectionManager = new IncomingConnectionManager(this);
+
+            OutgoingConnectionManager = new OutgoingConnectionManager(this, connectionFactory);
 
             SubscriptionsManager = new SubscriptionsManager();
             InfoConnectionManager = new InfoConnectionManager(this);
@@ -86,14 +89,14 @@ namespace Centaurus.Domain
                 var snapshot = PersistenceManager.GetSnapshot(lastApex);
                 Setup(snapshot);
                 if (IsAlpha)
-                    AppState.State = ApplicationState.Rising;//Alpha should ensure that it has all quanta from auditors
+                    AppState.SetState(State.Rising);//Alpha should ensure that it has all quanta from auditors
                 else
-                    AppState.State = ApplicationState.Running;
+                    AppState.SetState(State.Running);
                 lastHash = snapshot.LastHash;
             }
             else
                 //if no snapshot, the application is in initialization state
-                AppState.State = ApplicationState.WaitingForInit;
+                AppState.SetState(State.WaitingForInit);
 
             var lastQuantumApex = lastApex < 0 ? 0 : lastApex;
             QuantumStorage.Init(lastQuantumApex, lastHash);
@@ -111,7 +114,7 @@ namespace Centaurus.Domain
 
             Exchange?.Dispose(); Exchange = Exchange.RestoreExchange(snapshot.Settings.Assets, snapshot.Orders, IsAlpha, useLegacyOrderbook);
 
-            PaymentProvidersManager?.Dispose(); PaymentProvidersManager = new PaymentProvidersManager(PaymentProviderFactory, Constellation.Providers.Select(p => p.ToProviderModel()).ToList(), Settings.PaymentConfigPath);
+            SetupPaymentProviders();
 
             AuditResultManager?.Dispose(); AuditResultManager = new ResultManager(this);
 
@@ -132,8 +135,28 @@ namespace Centaurus.Domain
             Exchange.OnUpdates += Exchange_OnUpdates;
 
             PerformanceStatisticsManager?.Dispose(); PerformanceStatisticsManager = new PerformanceStatisticsManager(this);
+
+            OutgoingConnectionManager.Connect().Wait();
         }
 
+        private void SetupPaymentProviders()
+        {
+            PaymentProvidersManager?.Dispose(); 
+            PaymentProvidersManager = new PaymentProvidersManager(PaymentProviderFactory, Constellation.Providers.Select(p => p.ToProviderModel()).ToList(), Settings.PaymentConfigPath);
+
+            foreach (var paymentProvider in PaymentProvidersManager.GetAll())
+            {
+                paymentProvider.OnPaymentCommit += PaymentProvider_OnPaymentCommit;
+            }
+        }
+
+        private void PaymentProvider_OnPaymentCommit(PaymentProviderBase paymentProvider, PaymentProvider.Models.DepositNotificationModel notification)
+        {
+            if (!IsAlpha)
+                return;
+
+            QuantumHandler.HandleAsync(new DepositQuantum { Source = notification.ToDomainModel() }.CreateEnvelope());
+        }
 
         public void Dispose()
         {
@@ -151,8 +174,8 @@ namespace Centaurus.Domain
 
             var state = stateChangedEventArgs.State;
             var prevState = stateChangedEventArgs.PrevState;
-            if (state != ApplicationState.Ready && prevState == ApplicationState.Ready) //close all connections (except auditors)
-                ConnectionManager.CloseAllConnections(false).Wait();
+            if (state != State.Ready && prevState == State.Ready) //close all connections (except auditors)
+                IncomingConnectionManager.CloseAllConnections(false).Wait();
         }
 
         private void PendingUpdatesManager_OnBatchSaved(BatchSavedInfo batchInfo)
@@ -178,13 +201,16 @@ namespace Centaurus.Domain
         public IPersistentStorage PermanentStorage { get; }
 
         public Settings Settings { get; }
-        public PaymentProviderFactoryBase PaymentProviderFactory { get; }
+
+        public PaymentProvidersFactoryBase PaymentProviderFactory { get; }
 
         public StateManager AppState { get; }
 
         public QuantumHandler QuantumHandler { get; }
 
-        public ConnectionManager ConnectionManager { get; }
+        public IncomingConnectionManager IncomingConnectionManager { get; }
+
+        public OutgoingConnectionManager OutgoingConnectionManager { get; }
 
         public SubscriptionsManager SubscriptionsManager { get; }
 

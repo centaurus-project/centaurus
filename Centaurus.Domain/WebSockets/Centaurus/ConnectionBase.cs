@@ -30,98 +30,43 @@ namespace Centaurus
         Closed = 3
     }
 
-    public abstract class BaseWebSocketConnection : ContextualBase, IDisposable
+    public abstract class ConnectionBase : ContextualBase, IDisposable
     {
-        public const int AuditorBufferSize = 50 * 1024 * 1024;
-
         static Logger logger = LogManager.GetCurrentClassLogger();
 
         protected readonly WebSocket webSocket;
-        public BaseWebSocketConnection(Domain.ExecutionContext context, WebSocket webSocket, string ip, int inBufferSize, int outBufferSize)
-            :base(context)
+        public ConnectionBase(Domain.ExecutionContext context, KeyPair pubKey, WebSocket webSocket, string ip)
+            : base(context)
         {
             this.webSocket = webSocket ?? throw new ArgumentNullException(nameof(webSocket));
-            Ip = ip;
+            Ip = ip ?? throw new ArgumentNullException(nameof(ip));
+
+            PubKey = pubKey ?? throw new ArgumentNullException(nameof(pubKey));
+            PubKeyAddress = PubKey.ToString();
 
             incommingBuffer = XdrBufferFactory.Rent(inBufferSize);
             outgoingBuffer = XdrBufferFactory.Rent(outBufferSize);
 
             cancellationTokenSource = new CancellationTokenSource();
             cancellationToken = cancellationTokenSource.Token;
-
-            var hd = new HandshakeData();
-            hd.Randomize();
-            HandshakeData = hd;
-            _ = SendMessage(new HandshakeRequest { HandshakeData = hd });
         }
-
-        public QuantumSyncWorker QuantumWorker { get; private set; }
-        private readonly object apexCursorSyncRoot = new { };
-
-        private void ResetApexCursor(ulong newApexCursor)
-        {
-            lock (apexCursorSyncRoot)
-            {
-                logger.Trace($"Connection {PubKeyAddress}, apex cursor reset requested. New apex cursor {newApexCursor}");
-                //cancel current quantum worker
-                QuantumWorker?.Dispose();
-
-                //set new apex cursor, and start quantum worker
-                QuantumWorker = new QuantumSyncWorker(Context, newApexCursor, this);
-                logger.Trace($"Connection {PubKeyAddress}, apex cursor reseted. New apex cursor {newApexCursor}");
-            }
-        }
-
-        public void ResetApexCursor(SetApexCursor message)
-        {
-            ResetApexCursor(message.Apex);
-        }
-
-        public HandshakeData HandshakeData { get; }
-
-        public AccountWrapper Account { get; set; }
 
         public string Ip { get; }
 
         /// <summary>
         /// Current connection public key
         /// </summary>
-        public RawPubKey PubKey { get; private set; }
+        public RawPubKey PubKey { get; }
 
-        public string PubKeyAddress { get; private set; } = "n/a";
+        public string PubKeyAddress { get; }
 
-        public void SetPubKey(RawPubKey pubKey)
-        {
-            PubKey = pubKey;
-            PubKeyAddress = PubKey.ToString();
-            if (Context.Constellation.Auditors.Contains(pubKey))
-                SetAuditor();
-            else
-                SetClient();
-        }
-
-        private void SetAuditor()
-        {
-            incommingBuffer.Dispose();
-            incommingBuffer = XdrBufferFactory.Rent(AuditorBufferSize);
-            outgoingBuffer.Dispose();
-            outgoingBuffer = XdrBufferFactory.Rent(AuditorBufferSize);
-            IsAuditor = true;
-            logger.Trace($"Connection {PubKeyAddress} promoted to Auditor.");
-            ConnectionState = ConnectionState.Validated;
-        }
-
-        private void SetClient()
-        {
-            Account = Context.AccountStorage.GetAccount(PubKey);
-            if (Account == null)
-                throw new ConnectionCloseException(WebSocketCloseStatus.NormalClosure, "Account is not registered.");
-            ConnectionState = ConnectionState.Ready;
-        }
+        protected virtual int inBufferSize { get; } = 1024;
+        protected virtual int outBufferSize { get; } = 64 * 1024;
 
         protected XdrBufferFactory.RentedBuffer incommingBuffer;
         protected XdrBufferFactory.RentedBuffer outgoingBuffer;
-        public bool IsAuditor { get; private set; } = false;
+
+        public bool IsAuditor => this is IAuditorConnection;
 
         ConnectionState connectionState;
         /// <summary>
@@ -141,14 +86,17 @@ namespace Centaurus
                     connectionState = value;
                     logger.Trace($"Connection {PubKeyAddress} is in {connectionState} state. Prev state is {prevValue}.");
                     OnConnectionStateChanged?.Invoke((this, prevValue, connectionState));
+
+                    if (value == ConnectionState.Validated && prevValue == ConnectionState.Connected) //prevent multiple invocation
+                        Context.ExtensionsManager.ConnectionValidated(this);
                 }
             }
         }
 
+        public event Action<(ConnectionBase connection, ConnectionState prev, ConnectionState current)> OnConnectionStateChanged;
+
         protected readonly CancellationTokenSource cancellationTokenSource;
         protected readonly CancellationToken cancellationToken;
-
-        public event Action<(BaseWebSocketConnection connection, ConnectionState prev, ConnectionState current)> OnConnectionStateChanged;
 
         public async Task CloseConnection(WebSocketCloseStatus status = WebSocketCloseStatus.NormalClosure, string desc = null)
         {
@@ -202,9 +150,10 @@ namespace Centaurus
             await sendMessageSemaphore.WaitAsync();
             try
             {
-                Context.ExtensionsManager.BeforeSendMessage(this, envelope);
                 if (!envelope.IsSignedBy(Context.Settings.KeyPair.PublicKey))
                     envelope.Sign(Context.Settings.KeyPair, outgoingBuffer.Buffer);
+
+                Context.ExtensionsManager.BeforeSendMessage(this, envelope);
 
                 logger.Trace($"Connection {PubKeyAddress}, about to send {envelope.Message.MessageType} message.");
 
@@ -240,7 +189,9 @@ namespace Centaurus
             {
                 while (webSocket.State != WebSocketState.Closed && webSocket.State != WebSocketState.Aborted && !cancellationToken.IsCancellationRequested)
                 {
-                    var messageType = await webSocket.GetWebsocketBuffer(incommingBuffer, cancellationToken);
+                    //if connection isn't validated yet 256 bytes of max message is enough for handling handshake response
+                    var maxLength = ConnectionState == ConnectionState.Connected ? 256 : 0;
+                    var messageType = await webSocket.GetWebsocketBuffer(incommingBuffer, cancellationToken, maxLength);
                     if (!cancellationToken.IsCancellationRequested)
                     {
                         //the client send close message
@@ -326,8 +277,6 @@ namespace Centaurus
         {
             if (isDisposed)
                 throw new ObjectDisposedException("Connection already disposed.");
-
-            QuantumWorker?.Dispose();
 
             Thread.Sleep(100); //wait all tasks to exit
 

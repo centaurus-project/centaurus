@@ -13,7 +13,7 @@ namespace Centaurus.PersistentStorage
         public byte[] Vault { get; set; }
 
         [Key(1)]
-        public List<byte[]> Auditors { get; set; }
+        public List<AuditorModel> Auditors { get; set; }
 
         [Key(2)]
         public ulong MinAccountBalance { get; set; }
@@ -39,5 +39,16 @@ namespace Centaurus.PersistentStorage
 
         [IgnoreMember]
         public string ColumnFamily => "settings";
+    }
+
+
+    [MessagePackObject]
+    public class AuditorModel
+    {
+        [Key(0)]
+        public string PubKey { get; set; }
+
+        [Key(1)]
+        public string Address { get; set; }
     }
 }

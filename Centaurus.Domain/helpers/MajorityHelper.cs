@@ -36,15 +36,15 @@ namespace Centaurus
         /// </summary>
         /// <param name="context">Current execution context.</param>
         /// <param name="auditorsCount">Auditors count.</param>
-        /// <param name="currentIncluded">Specifies if current server is included to auditors count.</param>
+        /// <param name="isCurrentIncluded">Specifies if current server is included to auditors count.</param>
         /// <returns></returns>
-        public static bool HasMajority(this ExecutionContext context, int auditorsCount, bool currentIncluded = true)
+        public static bool HasMajority(this ExecutionContext context, int auditorsCount, bool isCurrentIncluded = true)
         {
             if (context == null)
                 throw new ArgumentNullException(nameof(context));
-            if (!currentIncluded)
+            if (!isCurrentIncluded)
+                //+1 is current auditor
                 auditorsCount++;
-            //+1 is current auditor
             return auditorsCount >= context.GetMajorityCount();
         }
     }

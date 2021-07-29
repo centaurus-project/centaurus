@@ -35,12 +35,12 @@ namespace Centaurus.SDK
                   keyPair,
                   constellation,
                   PaymentProviderFactoryBase.Default,
-                  ClientConnectionFactoryBase.Default
+                  OutgoingConnectionFactoryBase.Default
             )
         {
         }
 
-        public CentaurusClient(Uri alphaWebSocketAddress, KeyPair keyPair, ConstellationInfo constellation, PaymentProviderFactoryBase providerFactory, ClientConnectionFactoryBase connectionFactory)
+        public CentaurusClient(Uri alphaWebSocketAddress, KeyPair keyPair, ConstellationInfo constellation, PaymentProviderFactoryBase providerFactory, OutgoingConnectionFactoryBase connectionFactory)
         {
             KeyPair = keyPair ?? throw new ArgumentNullException(nameof(keyPair));
 
@@ -244,7 +244,7 @@ namespace Centaurus.SDK
         private CentaurusConnection connection;
         private Uri alphaWebSocketAddress;
         private ConstellationInfo constellation;
-        private ClientConnectionFactoryBase connectionFactory;
+        private OutgoingConnectionFactoryBase connectionFactory;
         private TaskCompletionSource<int> handshakeResult;
 
         private List<long> processedEffectsMessages = new List<long>();
@@ -461,7 +461,7 @@ namespace Centaurus.SDK
 
         private class CentaurusConnection : IDisposable
         {
-            public CentaurusConnection(Uri _websocketAddress, KeyPair _clientKeyPair, ClientConnectionWrapperBase connection, ConstellationInfo constellationInfo)
+            public CentaurusConnection(Uri _websocketAddress, KeyPair _clientKeyPair, OutgoingConnectionWrapperBase connection, ConstellationInfo constellationInfo)
             {
                 clientKeyPair = _clientKeyPair ?? throw new ArgumentNullException(nameof(_clientKeyPair));
                 websocketAddress = new Uri(_websocketAddress ?? throw new ArgumentNullException(nameof(_websocketAddress)), "centaurus");
@@ -616,7 +616,7 @@ namespace Centaurus.SDK
             private int accountId;
             private Uri websocketAddress;
             private ConstellationInfo constellationInfo;
-            private ClientConnectionWrapperBase connection;
+            private OutgoingConnectionWrapperBase connection;
 
             private CancellationTokenSource cancellationTokenSource;
             private CancellationToken cancellationToken;

@@ -15,11 +15,11 @@ namespace Centaurus.PaymentProvider
             NotificationsManager = new DepositNotificationManager(settings.InitCursor, this);
         }
 
-        public event Action<DepositNotificationModel> OnPaymentCommit;
+        public event Action<PaymentProviderBase, DepositNotificationModel> OnPaymentCommit;
 
         protected void RaiseOnPaymentCommit(DepositNotificationModel deposit)
         {
-            OnPaymentCommit?.Invoke(deposit);
+            OnPaymentCommit?.Invoke(this, deposit);
         }
 
         public event Action<Exception> OnError;

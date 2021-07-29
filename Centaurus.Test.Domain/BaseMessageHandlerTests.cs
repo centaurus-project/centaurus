@@ -3,6 +3,7 @@ using Centaurus.Models;
 using NUnit.Framework;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -11,7 +12,7 @@ namespace Centaurus.Test
     public abstract class BaseMessageHandlerTests
     {
         protected async Task AssertMessageHandling<T>(T connection, IncomingMessage message, Type excpectedException = null)
-            where T : BaseWebSocketConnection
+            where T : ConnectionBase
         {
             if (excpectedException == null)
             {
@@ -26,22 +27,22 @@ namespace Centaurus.Test
                     });
         }
 
-        protected IncomingWebSocketConnection GetIncomingConnection(ExecutionContext context, byte[] pubKey, ConnectionState? state = null)
+        protected IncomingConnectionBase GetIncomingConnection(ExecutionContext context, RawPubKey pubKey, ConnectionState? state = null)
         {
-            var connection = new IncomingWebSocketConnection(context, new FakeWebSocket(), "127.0.0.1")
-            {
-                Account = context.AccountStorage.GetAccount(pubKey)
-            };
+            var connection = default(IncomingConnectionBase);
+            if (context.Constellation.Auditors.Any(a => a.PubKey.Equals(pubKey)))
+                connection = new IncomingAuditorConnection(context, pubKey, new FakeWebSocket(), "127.0.0.1");
+            else
+                connection = new IncomingClientConnection(context, pubKey, new FakeWebSocket(), "127.0.0.1");
 
-            connection.SetPubKey(pubKey);
             if (state != null)
                 connection.ConnectionState = state.Value;
             return connection;
         }
 
-        protected OutgoingWebSocketConnection GetOutgoingConnection(ExecutionContext context, ConnectionState? state = null)
+        protected OutgoingConnection GetOutgoingConnection(ExecutionContext context, RawPubKey keyPair, ConnectionState? state = null)
         {
-            var connection = new OutgoingWebSocketConnection(context, new FakeAuditorConnectionInfo(new FakeWebSocket()));
+            var connection = new OutgoingConnection(context, keyPair, new MockAuditorConnectionInfo(new FakeWebSocket()));
             if (state != null)
                 connection.ConnectionState = state.Value;
             return connection;

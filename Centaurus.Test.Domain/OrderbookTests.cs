@@ -29,7 +29,7 @@ namespace Centaurus.Test
             EnvironmentHelper.SetTestEnvironmentVariable();
             var settings = GlobalInitHelper.GetAlphaSettings();
 
-            context = new ExecutionContext(settings, new MockStorage(), new MockPaymentProviderFactory(), useLegacyOrderbook);
+            context = new ExecutionContext(settings, new MockStorage(), new MockPaymentProviderFactory(), new MockOutgoingConnectionFactory(), useLegacyOrderbook);
 
             var requestRateLimits = new RequestRateLimits { HourLimit = 1000, MinuteLimit = 100 };
 
@@ -75,7 +75,7 @@ namespace Centaurus.Test
                         }
                     },
                     Assets = new List<AssetSettings> { new AssetSettings { Code = baseAsset }, new AssetSettings { Code = secondAsset } },
-                    Auditors = new List<RawPubKey> { TestEnvironment.AlphaKeyPair, TestEnvironment.Auditor1KeyPair },
+                    Auditors = new List<Auditor> { new Auditor { PubKey = TestEnvironment.AlphaKeyPair, Address = "" }, new Auditor { PubKey = TestEnvironment.Auditor1KeyPair, Address = "" } },
                     MinAccountBalance = 1,
                     MinAllowedLotSize = 1,
                     RequestRateLimits = requestRateLimits

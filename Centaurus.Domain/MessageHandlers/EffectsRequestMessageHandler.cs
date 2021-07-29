@@ -6,11 +6,11 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public class EffectsRequestMessageHandler : MessageHandlerBase
+    public class EffectsRequestMessageHandler : MessageHandlerBase<IncomingClientConnection>
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public EffectsRequestMessageHandler(ExecutionContext context) 
+        public EffectsRequestMessageHandler(ExecutionContext context)
             : base(context)
         {
         }
@@ -19,34 +19,29 @@ namespace Centaurus.Domain
 
         public override ConnectionState[] ValidConnectionStates => new ConnectionState[] { ConnectionState.Ready };
 
-        public override Task HandleMessage(BaseWebSocketConnection connection, IncomingMessage message)
+        public override async Task HandleMessage(IncomingClientConnection connection, IncomingMessage message)
         {
-            //run it in a separate thread to avoid blocking quanta handling
-            Task.Factory.StartNew(async () =>
+            try
             {
+                ResultMessage result;
                 try
                 {
-                    ResultMessage result;
-                    try
-                    {
-                        var request = message.Envelope.Message as EffectsRequest;
-                        var effectsResponse = connection.Context.PersistenceManager.LoadEffects(request.Cursor, request.IsDesc, request.Limit, connection.Account.Id);
-                        effectsResponse.OriginalMessage = message.Envelope;
-                        effectsResponse.Status = ResultStatusCodes.Success;
-                        result = effectsResponse;
-                    }
-                    catch (Exception exc)
-                    {
-                        result = message.Envelope.CreateResult(exc.GetStatusCode());
-                    }
-                    await connection.SendMessage(result);
+                    var request = message.Envelope.Message as EffectsRequest;
+                    var effectsResponse = connection.Context.PersistenceManager.LoadEffects(request.Cursor, request.IsDesc, request.Limit, connection.Account.Id);
+                    effectsResponse.OriginalMessage = message.Envelope;
+                    effectsResponse.Status = ResultStatusCodes.Success;
+                    result = effectsResponse;
                 }
                 catch (Exception exc)
                 {
-                    logger.Error(exc, "Error on sending effects.");
+                    result = message.Envelope.CreateResult(exc.GetStatusCode());
                 }
-            });
-            return Task.CompletedTask;
+                await connection.SendMessage(result);
+            }
+            catch (Exception exc)
+            {
+                logger.Error(exc, "Error on sending effects.");
+            }
         }
     }
 }

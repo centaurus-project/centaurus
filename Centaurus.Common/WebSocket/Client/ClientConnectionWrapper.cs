@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Client
 {
-    public class ClientConnectionWrapper : ClientConnectionWrapperBase
+    public class ClientConnectionWrapper : OutgoingConnectionWrapperBase
     {
         public ClientConnectionWrapper(ClientWebSocket webSocket)
             :base(webSocket)

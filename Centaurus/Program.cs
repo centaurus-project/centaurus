@@ -1,5 +1,6 @@
 using Centaurus.Alpha;
 using Centaurus.Client;
+using Centaurus.Domain;
 using Centaurus.PersistentStorage.Abstraction;
 using CommandLine;
 using NLog;
@@ -34,14 +35,12 @@ namespace Centaurus
                 var isAlpha = settings.KeyPair.AccountId == settings.AlphaKeyPair.AccountId;
                 Console.Title = isAlpha ? "CentaurusAlpha" : "CentaurusAuditor";
 
-                settings.Build();
-
                 var logsDirectory = Path.Combine(settings.CWD, "logs");
                 LogConfigureHelper.Configure(logsDirectory, settings.Silent, settings.Verbose);
                 isLoggerInited = true;
 
-                var context = new Domain.ExecutionContext(settings, new PersistentStorageAbstraction(), PaymentProvider.PaymentProviderFactoryBase.Default);
-                var startup = new StartupMain(context, ClientConnectionFactoryBase.Default, AlphaHostFactoryBase.Default);
+                var context = new Domain.ExecutionContext(settings, new PersistentStorageAbstraction(), PaymentProvidersFactoryBase.Default, OutgoingConnectionFactoryBase.Default);
+                var startup = new Startup(context, AlphaHostFactoryBase.Default);
 
                 var resetEvent = new ManualResetEvent(false);
                 startup.Run(resetEvent);

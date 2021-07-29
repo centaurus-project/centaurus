@@ -7,9 +7,9 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Client
 {
-    public abstract class ClientConnectionWrapperBase
+    public abstract class OutgoingConnectionWrapperBase
     {
-        public ClientConnectionWrapperBase(WebSocket webSocket)
+        public OutgoingConnectionWrapperBase(WebSocket webSocket)
         {
             WebSocket = webSocket;
         }

@@ -20,6 +20,6 @@ namespace Centaurus.Models
         public ulong Amount { get; set; }
 
         [XdrField(4)]
-        public ulong Destination { get; set; }
+        public byte[] Destination { get; set; }
     }
 }

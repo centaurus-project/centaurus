@@ -18,10 +18,22 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
 
         public override ConnectionState[] ValidConnectionStates { get; } = new ConnectionState[] { ConnectionState.Connected };
 
-        public override async Task HandleMessage(BaseWebSocketConnection connection, IncomingMessage message)
+        public override async Task HandleMessage(ConnectionBase connection, IncomingMessage message)
         {
             var handshakeRequest = (HandshakeRequest)message.Envelope.Message;
-            await connection.SendMessage(new HandshakeResponse { HandshakeData = handshakeRequest.HandshakeData }.CreateEnvelope());
+
+            var lastKnownApex = Context.QuantumHandler.LastAddedQuantumApex > 0
+                ? Context.QuantumHandler.LastAddedQuantumApex
+                : Context.QuantumStorage.CurrentApex;
+
+            if (connection is OutgoingConnection) //if connection is an outgoing than the other side is an auditor
+                await connection.SendMessage(new AuditorHandshakeResponse
+                {
+                    HandshakeData = handshakeRequest.HandshakeData,
+                    LastKnownApex = lastKnownApex
+                });
+            else //send a regular handshake response for a client
+                await connection.SendMessage(new HandshakeResponse { HandshakeData = handshakeRequest.HandshakeData });
         }
     }
 }

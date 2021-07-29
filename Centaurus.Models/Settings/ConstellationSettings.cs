@@ -11,7 +11,7 @@ namespace Centaurus.Models
         public List<ProviderSettings> Providers { get; set; }
 
         [XdrField(1)]
-        public List<RawPubKey> Auditors { get; set; }
+        public List<Auditor> Auditors { get; set; }
 
         [XdrField(2)]
         public ulong MinAccountBalance { get; set; }
@@ -22,7 +22,17 @@ namespace Centaurus.Models
         [XdrField(4)]
         public List<AssetSettings> Assets { get; set; }
 
-        [XdrField(5, Optional = true)]
+        [XdrField(5)]
         public RequestRateLimits RequestRateLimits { get; set; }
+    }
+
+    [XdrContract]
+    public class Auditor
+    {
+        [XdrField(0)]
+        public RawPubKey PubKey { get; set; }
+
+        [XdrField(1, Optional = true)]
+        public string Address { get; set; }
     }
 }

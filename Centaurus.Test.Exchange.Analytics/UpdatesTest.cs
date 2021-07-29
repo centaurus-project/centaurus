@@ -20,7 +20,7 @@ namespace Centaurus.Test.Exchange.Analytics
             EnvironmentHelper.SetTestEnvironmentVariable();
             var settings = GlobalInitHelper.GetAlphaSettings();
 
-            context = new ExecutionContext(settings, new MockStorage(), new MockPaymentProviderFactory());
+            context = new ExecutionContext(settings, new MockStorage(), new MockPaymentProviderFactory(), new MockOutgoingConnectionFactory());
             var requestsLimit = new RequestRateLimits();
 
             account1 = new AccountWrapper(new Models.Account

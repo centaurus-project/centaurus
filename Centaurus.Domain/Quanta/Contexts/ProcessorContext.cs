@@ -61,7 +61,11 @@ namespace Centaurus.Domain
             EffectsHash = effects.SelectMany(h => h.Hash).ToArray().ComputeHash(buffer);
         }
 
-        public void PersistQuantum()
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <returns>Updates batch id</returns>
+        public uint PersistQuantum()
         {
             if (!IsCompleted)
                 throw new InvalidOperationException("The quantum must be processed before persistence.");
@@ -87,7 +91,7 @@ namespace Centaurus.Domain
                 result.Effects.Add(effect.RawEffect);
             }
 
-            Context.PendingUpdatesManager.AddQuantum(result);
+            return Context.PendingUpdatesManager.AddQuantum(result);
         }
 
         public List<Effect> GetClientEffects()

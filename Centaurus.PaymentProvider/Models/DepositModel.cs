@@ -14,6 +14,6 @@ namespace Centaurus.PaymentProvider.Models
 
         public ulong Amount { get; set; }
 
-        public ulong Destination { get; set; }
+        public byte[] Destination { get; set; }
     }
 }

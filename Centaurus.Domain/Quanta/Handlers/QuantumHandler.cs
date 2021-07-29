@@ -93,8 +93,7 @@ namespace Centaurus.Domain
             }
             catch (Exception exc)
             {
-                logger.Error(exc, "Quantum worker failed");
-                Context.AppState.State = ApplicationState.Failed;
+                Context.AppState.SetState(State.Failed, new Exception("Quantum worker failed.", exc));
                 throw;
             }
         }
@@ -132,7 +131,7 @@ namespace Centaurus.Domain
 
         async Task<ResultMessage> HandleQuantumInternal(MessageEnvelope quantumEnvelope, long timestamp)
         {
-            Context.PendingUpdatesManager.ApplyUpdates();
+            Context.PendingUpdatesManager.UpdateBatch();
             return await HandleQuantum(quantumEnvelope, timestamp);
         }
 
@@ -180,18 +179,23 @@ namespace Centaurus.Domain
 
             var processorContext = processor.GetContext(envelope, account);
 
-            var result = await ProcessQuantumEnvelope(envelope, account, processor, processorContext);
+            var result = await ProcessQuantumEnvelope(envelope, processor, processorContext);
 
             var messageHash = envelope.ComputeMessageHash(buffer.Buffer);
 
             //we need to sign the quantum here to prevent multiple signatures that can occur if we sign it when sending
             envelope.Signatures.Add(messageHash.Sign(Context.Settings.KeyPair));
 
-            RegisterResult(result, processorContext);
+            //compute hash before adding any signatures, otherwise hashes would be different
+            var resultMessageHash = result.ComputeHash(buffer.Buffer);
+
+            SignResult(result, processorContext);
+
+            var updatesBatchId = processorContext.PersistQuantum();
+
+            RegisterResult(updatesBatchId, result, resultMessageHash, processorContext);
 
             Context.QuantumStorage.AddQuantum(envelope, messageHash);
-
-            processorContext.PersistQuantum();
 
             EnsureOutgoingResult(result.Quantum.Apex, result);
 
@@ -205,10 +209,8 @@ namespace Centaurus.Domain
             Context.OutgoingResultsStorage.EnqueueResult(apex, result);
         }
 
-        private void RegisterResult(QuantumResultMessage result, ProcessorContext processorContext)
+        void SignResult(QuantumResultMessage result, ProcessorContext processorContext)
         {
-            //compute hash before adding any signatures, otherwise hashes would be different
-            var resultMessageHash = result.ComputeHash(buffer.Buffer);
 
             //add transaction signature
             if (processorContext is ITransactionProcessorContext transactionContext)
@@ -221,7 +223,11 @@ namespace Centaurus.Domain
 
             //add effects proof signature
             result.Effects.Signatures.Add(result.Quantum.EffectsHash.Sign(Context.Settings.KeyPair));
-            Context.AuditResultManager.Add(result.Quantum.Apex, result, resultMessageHash, processorContext.GetNotificationMessages());
+        }
+
+        private void RegisterResult(uint updatesBatchId, QuantumResultMessage result, byte[] resultMessageHash, ProcessorContext processorContext)
+        {
+            Context.AuditResultManager.Add(updatesBatchId, result.Quantum.Apex, result, resultMessageHash, processorContext.GetNotificationMessages());
         }
 
         void ValidateRequestQuantum(MessageEnvelope envelope, AccountWrapper accountWrapper)
@@ -259,7 +265,7 @@ namespace Centaurus.Domain
             return processor;
         }
 
-        async Task<QuantumResultMessage> ProcessQuantumEnvelope(MessageEnvelope envelope, AccountWrapper account, QuantumProcessorBase processor, ProcessorContext processorContext)
+        async Task<QuantumResultMessage> ProcessQuantumEnvelope(MessageEnvelope envelope, QuantumProcessorBase processor, ProcessorContext processorContext)
         {
             await processor.Validate(processorContext);
 

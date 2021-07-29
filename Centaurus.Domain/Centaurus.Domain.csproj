@@ -8,25 +8,25 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="WebSockets\Alpha\Info\Subscriptions\**" />
-    <EmbeddedResource Remove="WebSockets\Alpha\Info\Subscriptions\**" />
-    <None Remove="WebSockets\Alpha\Info\Subscriptions\**" />
+    <Compile Remove="WebSockets\Info\Subscriptions\**" />
+    <EmbeddedResource Remove="WebSockets\Info\Subscriptions\**" />
+    <None Remove="WebSockets\Info\Subscriptions\**" />
   </ItemGroup>
 
   <ItemGroup>
     <Compile Remove="Catchups\AuditorCatchup.cs" />
-    <Compile Remove="WebSockets\Alpha\Info\Messages\MarketUpdate.cs" />
+    <Compile Remove="WebSockets\Info\Messages\MarketUpdate.cs" />
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="WebSockets\Alpha\Info\Subscriptions\AllMarketTickersSubscription.cs" />
-    <Compile Include="WebSockets\Alpha\Info\Subscriptions\BaseSubscription.cs" />
-    <Compile Include="WebSockets\Alpha\Info\Subscriptions\DepthsSubscription.cs" />
-    <Compile Include="WebSockets\Alpha\Info\Subscriptions\MarketTickerSubscription.cs" />
-    <Compile Include="WebSockets\Alpha\Info\Subscriptions\PerformanceStatisticsSubscription.cs" />
-    <Compile Include="WebSockets\Alpha\Info\Subscriptions\PriceHistorySubscription.cs" />
-    <Compile Include="WebSockets\Alpha\Info\Subscriptions\SubscriptionsManager.cs" />
-    <Compile Include="WebSockets\Alpha\Info\Subscriptions\TradesFeedSubscription.cs" />
+    <Compile Include="WebSockets\Info\Subscriptions\AllMarketTickersSubscription.cs" />
+    <Compile Include="WebSockets\Info\Subscriptions\BaseSubscription.cs" />
+    <Compile Include="WebSockets\Info\Subscriptions\DepthsSubscription.cs" />
+    <Compile Include="WebSockets\Info\Subscriptions\MarketTickerSubscription.cs" />
+    <Compile Include="WebSockets\Info\Subscriptions\PerformanceStatisticsSubscription.cs" />
+    <Compile Include="WebSockets\Info\Subscriptions\PriceHistorySubscription.cs" />
+    <Compile Include="WebSockets\Info\Subscriptions\SubscriptionsManager.cs" />
+    <Compile Include="WebSockets\Info\Subscriptions\TradesFeedSubscription.cs" />
   </ItemGroup>
 
   <ItemGroup>

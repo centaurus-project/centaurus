@@ -11,5 +11,8 @@ namespace Centaurus.Models
 
         [XdrField(0)]
         public List<MessageEnvelope> Quanta { get; set; }
+
+        [XdrField(1)]
+        public bool HasMorePendingQuanta { get; set; }
     }
 }

@@ -25,11 +25,6 @@ namespace Centaurus.Domain
         public virtual ConnectionState[] ValidConnectionStates { get; }
 
         /// <summary>
-        /// Indicates whether authorization is required for the handler.
-        /// </summary>
-        public virtual bool IsAuthRequired => !((ValidConnectionStates?.Length ?? 0) == 0 || ValidConnectionStates.Any(s => s == ConnectionState.Connected || s == ConnectionState.Closed));
-
-        /// <summary>
         /// If set to true, than messages will be handled only if the other side is an auditor. 
         /// </summary>
         public virtual bool IsAuditorOnly { get; }
@@ -38,7 +33,7 @@ namespace Centaurus.Domain
         /// Validates authentication, connection state and message.
         /// </summary>
         /// <param name="envelope">The current message envelope</param>
-        public virtual Task Validate(BaseWebSocketConnection connection, IncomingMessage message)
+        public virtual Task Validate(ConnectionBase connection, IncomingMessage message)
         {
 
             if ((ValidConnectionStates?.Length ?? 0) > 0
@@ -48,31 +43,28 @@ namespace Centaurus.Domain
                     connection.ConnectionState.ToString(),
                     ValidConnectionStates.Select(s => s.ToString()).ToArray());
 
-            //if auth is required, then we should check that the current client public key is set, and that the envelope signatures contains it
-            if (IsAuthRequired || IsAuditorOnly)
-            {
-                if (connection.PubKey == null || !message.Envelope.Signatures.Any(s => s.Signer != connection.PubKey))
-                    throw new UnauthorizedException();
+            if (connection.PubKey == null || !message.Envelope.Signatures.Any(s => s.Signer != connection.PubKey))
+                throw new UnauthorizedException();
 
-                ValidateAuditor(connection);
-                ValidateClient(connection);
+            ValidateAuditor(connection);
+            ValidateClient(connection);
 
-                if (!message.Envelope.Signatures.AreSignaturesValid(message.MessageHash))
-                    throw new UnauthorizedException();
-            }
+            if (!message.Envelope.Signatures.AreSignaturesValid(message.MessageHash))
+                throw new UnauthorizedException();
 
             return Task.CompletedTask;
         }
 
-        private void ValidateAuditor(BaseWebSocketConnection connection)
+        private void ValidateAuditor(ConnectionBase connection)
         {
             if (IsAuditorOnly && !connection.IsAuditor)
                 throw new UnauthorizedException();
         }
 
-        private void ValidateClient(BaseWebSocketConnection connection)
+        private void ValidateClient(ConnectionBase connection)
         {
-            if (!(IsAuditorOnly || connection.Account.RequestCounter.IncRequestCount(DateTime.UtcNow.Ticks, out string error)))
+            if (connection is IncomingClientConnection clientConnection
+                && !clientConnection.Account.RequestCounter.IncRequestCount(DateTime.UtcNow.Ticks, out var error))
                 throw new TooManyRequestsException(error);
         }
 
@@ -81,8 +73,51 @@ namespace Centaurus.Domain
         /// </summary>
         /// <param name="messageEnvelope">The current message envelope</param>
         /// <returns>Handle result</returns>
-        public abstract Task HandleMessage(BaseWebSocketConnection connection, IncomingMessage message);
+        public abstract Task HandleMessage(ConnectionBase connection, IncomingMessage message);
     }
+
+    public abstract class MessageHandlerBase<T> : MessageHandlerBase
+        where T: ConnectionBase
+    {
+        protected MessageHandlerBase(ExecutionContext context)
+            : base(context)
+        {
+        }
+
+        /// <summary>
+        /// Validates authentication, connection state and message.
+        /// </summary>
+        /// <param name="envelope">The current message envelope</param>
+        public virtual Task Validate(T connection, IncomingMessage message)
+        {
+            return base.Validate(connection, message);
+        }
+
+        public override Task Validate(ConnectionBase connection, IncomingMessage message)
+        {
+            return Validate(GetTypedConnection(connection), message);
+        }
+
+        private T GetTypedConnection(ConnectionBase connection)
+        {
+            if (!(connection is T typedConnection))
+                throw new InvalidOperationException($"Invalid connection type. Only {nameof(T)} connections are supported.");
+            return typedConnection;
+        }
+
+        /// <summary>
+        /// Handles message
+        /// </summary>
+        /// <param name="messageEnvelope">The current message envelope</param>
+        /// <returns>Handle result</returns>
+        public abstract Task HandleMessage(T connection, IncomingMessage message);
+
+        public override Task HandleMessage(ConnectionBase connection, IncomingMessage message)
+        {
+            return HandleMessage(GetTypedConnection(connection), message);
+        }
+    }
+
     public class IncomingMessage
     {
 

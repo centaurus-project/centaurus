@@ -69,7 +69,7 @@ namespace Centaurus.Domain
         {
             lock (auditorsStatistics)
             {
-                var auditorConnections = Context.ConnectionManager.GetAuditorConnections();
+                var auditorConnections = Context.IncomingConnectionManager.GetAuditorConnections();
                 foreach (var auditorConnection in auditorConnections)
                 {
                     var accountId = auditorConnection?.PubKeyAddress;

@@ -24,10 +24,10 @@ namespace Centaurus.Controllers
             ConstellationInfo info;
 
             var state = (int)(Context.AppState?.State ?? 0);
-            if (state < (int)ApplicationState.Running)
+            if (state < (int)State.Running)
                 info = new ConstellationInfo
                 {
-                    State = (ApplicationState)state
+                    State = (State)state
                 };
             else
             {
@@ -35,7 +35,9 @@ namespace Centaurus.Controllers
                 {
                     State = Context.AppState.State,
                     Providers = Context.Constellation.Providers.ToArray(),
-                    Auditors = Context.Constellation.Auditors.Select(a => ((KeyPair)a).AccountId).ToArray(),
+                    Auditors = Context.Constellation.Auditors
+                        .Select(a => new { PubKey = a.PubKey.GetAccountId(), Address = a.Address })
+                        .ToArray(),
                     MinAccountBalance = Context.Constellation.MinAccountBalance,
                     MinAllowedLotSize = Context.Constellation.MinAllowedLotSize,
                     Assets = Context.Constellation.Assets.ToArray(),

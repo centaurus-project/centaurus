@@ -13,7 +13,7 @@ namespace Centaurus
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public QuantumSyncWorker(Domain.ExecutionContext context, ulong apexCursor, BaseWebSocketConnection auditor)
+        public QuantumSyncWorker(Domain.ExecutionContext context, ulong apexCursor, ConnectionBase auditor)
             :base(context)
         {
             this.auditor = auditor ?? throw new ArgumentNullException(nameof(auditor));
@@ -23,7 +23,7 @@ namespace Centaurus
             Task.Factory.StartNew(SendQuantums, TaskCreationOptions.LongRunning);
         }
 
-        private readonly BaseWebSocketConnection auditor;
+        private readonly ConnectionBase auditor;
 
         private CancellationTokenSource cancellationTokenSource;
         private CancellationToken cancellationToken;
@@ -42,14 +42,14 @@ namespace Centaurus
                     await auditor.CloseConnection(System.Net.WebSockets.WebSocketCloseStatus.ProtocolError, "Auditor is above all constellation.");
                     return;
                 }
-                if (auditor.ConnectionState != ConnectionState.Ready && apexDiff <= 100)
+
+                if (auditor.ConnectionState != ConnectionState.Ready && apexDiff <= 100) //auditor has reached the constellation
                 {
                     auditor.ConnectionState = ConnectionState.Ready;
                 }
                 else if (auditor.ConnectionState == ConnectionState.Ready && apexDiff >= 10_000) //auditor is too delayed
                 {
                     auditor.ConnectionState = ConnectionState.Validated;
-                    return;
                 }
 
                 if (CurrentApexCursor == Context.QuantumStorage.CurrentApex)

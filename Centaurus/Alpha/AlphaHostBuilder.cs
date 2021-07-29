@@ -73,7 +73,7 @@ namespace Centaurus.Alpha
                 }).Build();
         }
 
-        public static ApplicationState[] ValidApplicationStates = new ApplicationState[] { ApplicationState.Rising, ApplicationState.Running, ApplicationState.Ready };
+        public static State[] ValidStates = new State[] { State.Rising, State.Running, State.Ready };
 
         public const string centaurusWebSocketEndPoint = "/centaurus";
         public const string infoWebSocketEndPoint = "/info";
@@ -169,15 +169,33 @@ namespace Centaurus.Alpha
             static async Task CentaurusWebSocketHandler(HttpContext context, Func<Task> next)
             {
                 var centaurusContext = context.RequestServices.GetService<ExecutionContext>();
-                if (centaurusContext.AppState == null || ValidApplicationStates.Contains(centaurusContext.AppState.State))
+                if (centaurusContext.AppState != null 
+                    && ValidStates.Contains(centaurusContext.AppState.State) 
+                    && TryGetPubKey(context, out var pubKey))
                 {
                     using (var webSocket = await context.WebSockets.AcceptWebSocketAsync())
-                        await centaurusContext.ConnectionManager.OnNewConnection(webSocket, context.Connection.RemoteIpAddress.ToString());
+                        await centaurusContext.IncomingConnectionManager.OnNewConnection(webSocket,
+                            pubKey, 
+                            context.Connection.RemoteIpAddress.ToString());
                 }
                 else
                 {
                     context.Abort();
                 }
+            }
+
+            const string pubkeyParamName = "pubkey";
+
+            static bool TryGetPubKey(HttpContext context, out RawPubKey pubKey)
+            {
+                pubKey = null;
+                if (context == null)
+                    throw new ArgumentNullException(nameof(context));
+                if (!(context.Request.Query.TryGetValue(pubkeyParamName, out var address) 
+                    && KeyPair.TryGetFromAccountId(address, out var keyPair)))
+                    return false;
+                pubKey = keyPair;
+                return true;
             }
 
             static async Task InfoWebSocketHandler(HttpContext context, Func<Task> next)

@@ -8,20 +8,25 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public class OutgoingWebSocketConnection : BaseWebSocketConnection
+    public class OutgoingConnection : ConnectionBase, IAuditorConnection
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
-        private ClientConnectionWrapperBase connection;
+        private OutgoingConnectionWrapperBase connection;
 
-        public OutgoingWebSocketConnection(ExecutionContext context, ClientConnectionWrapperBase connection)
-            : base(context, connection.WebSocket, null, IncomingWebSocketConnection.AuditorBufferSize, IncomingWebSocketConnection.AuditorBufferSize)
+        public OutgoingConnection(ExecutionContext context, KeyPair keyPair, OutgoingConnectionWrapperBase connection)
+            : base(context, keyPair, connection.WebSocket, ":0")
         {
             this.connection = connection;
         }
 
-        public async Task EstablishConnection()
+        const int BufferSize = 50 * 1024 * 1024;
+
+        protected override int inBufferSize => BufferSize;
+        protected override int outBufferSize => BufferSize;
+
+        public async Task EstablishConnection(Uri uri)
         {
-            await connection.Connect(new Uri(Context.Settings.AuditorAddressBook.First()), cancellationToken);
+            await connection.Connect(uri, cancellationToken);
             _ = Task.Factory.StartNew(Listen, TaskCreationOptions.LongRunning);
             ProcessOutgoingMessageQueue();
         }

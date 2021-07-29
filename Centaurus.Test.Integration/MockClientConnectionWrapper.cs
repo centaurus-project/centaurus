@@ -25,13 +25,13 @@ namespace Centaurus.Test
 
         public override Task Connect(Uri uri, CancellationToken cancellationToken)
         {
-            if (ExecutionContext == null || !AlphaHostBuilder.ValidApplicationStates.Contains(ExecutionContext.AppState.State))
+            if (ExecutionContext == null || !AlphaHostBuilder.ValidStates.Contains(ExecutionContext.AppState.State))
                 throw new InvalidOperationException("Alpha is not ready");
 
 
             ((MockWebSocket)WebSocket).Connect(webSocketServer);
             (webSocketServer).Connect((MockWebSocket)WebSocket);
-            Task.Factory.StartNew(() => ExecutionContext.ConnectionManager.OnNewConnection(webSocketServer, null), TaskCreationOptions.LongRunning);
+            Task.Factory.StartNew(() => ExecutionContext.IncomingConnectionManager.OnNewConnection(webSocketServer, null), TaskCreationOptions.LongRunning);
             return Task.CompletedTask;
         }
     }

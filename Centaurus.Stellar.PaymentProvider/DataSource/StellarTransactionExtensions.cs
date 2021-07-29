@@ -54,7 +54,7 @@ namespace Centaurus.Stellar.PaymentProvider
 
         public static OperationTypeEnum[] SupportedDepositOperations = new OperationTypeEnum[] { OperationTypeEnum.PAYMENT };
 
-        public static bool TryGetDeposit(this SettingsModel providerSettings, Operation.OperationBody operation, ulong destination, bool isSuccess, byte[] transactionHash, out DepositModel payment)
+        public static bool TryGetDeposit(this SettingsModel providerSettings, Operation.OperationBody operation, byte[] destination, bool isSuccess, byte[] transactionHash, out DepositModel payment)
         {
             if (providerSettings == null)
                 throw new ArgumentNullException(nameof(providerSettings));

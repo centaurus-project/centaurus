@@ -11,7 +11,7 @@ namespace Centaurus.Models
         public List<ProviderSettings> Providers { get; set; }
 
         [XdrField(1)]
-        public List<RawPubKey> Auditors { get; set; }
+        public List<Auditor> Auditors { get; set; }
 
         [XdrField(2)]
         public ulong MinAccountBalance { get; set; }

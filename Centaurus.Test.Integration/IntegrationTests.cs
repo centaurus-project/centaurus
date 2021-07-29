@@ -62,7 +62,7 @@ namespace Centaurus.Test
             await auditorStartup.Shutdown();
 
             Assert.AreEqual(1, environment.AlphaWrapper.Context.AppState.ConnectedAuditorsCount, "Auditors count assertion.");
-            await environment.AssertConstellationState(ApplicationState.Ready, TimeSpan.FromSeconds(5));
+            await environment.AssertConstellationState(State.Ready, TimeSpan.FromSeconds(5));
 
             var clientsCount = 100;
             environment.GenerateCliens(clientsCount);
@@ -71,7 +71,7 @@ namespace Centaurus.Test
 
             await auditorStartup.Run();
 
-            await IntegrationTestEnvironmentExtensions.AssertState(auditorStartup.Startup, ApplicationState.Ready, TimeSpan.FromSeconds(10));
+            await IntegrationTestEnvironmentExtensions.AssertState(auditorStartup.Startup, State.Ready, TimeSpan.FromSeconds(10));
             await IntegrationTestEnvironmentExtensions.AssertDuringPeriod(
                 () =>
                 {
@@ -93,13 +93,13 @@ namespace Centaurus.Test
 
             await environment.AlphaWrapper.Shutdown();
 
-            await Task.WhenAll(environment.AuditorWrappers.Select(a => IntegrationTestEnvironmentExtensions.AssertState(a.Startup, ApplicationState.Running, TimeSpan.FromSeconds(10))));
+            await Task.WhenAll(environment.AuditorWrappers.Select(a => IntegrationTestEnvironmentExtensions.AssertState(a.Startup, State.Running, TimeSpan.FromSeconds(10))));
 
             await environment.AlphaWrapper.Run();
 
-            await environment.AssertConstellationState(ApplicationState.Ready, TimeSpan.FromSeconds(15));
+            await environment.AssertConstellationState(State.Ready, TimeSpan.FromSeconds(15));
 
-            await Task.WhenAll(environment.AuditorWrappers.Select(a => IntegrationTestEnvironmentExtensions.AssertState(a.Startup, ApplicationState.Ready, TimeSpan.FromSeconds(10))));
+            await Task.WhenAll(environment.AuditorWrappers.Select(a => IntegrationTestEnvironmentExtensions.AssertState(a.Startup, State.Ready, TimeSpan.FromSeconds(10))));
         }
 
         [Test]
@@ -149,7 +149,7 @@ namespace Centaurus.Test
 
             await environment.AlphaWrapper.Shutdown();
 
-            await Task.WhenAll(environment.AuditorWrappers.Select(a => IntegrationTestEnvironmentExtensions.AssertState(a.Startup, ApplicationState.Running, TimeSpan.FromSeconds(10))));
+            await Task.WhenAll(environment.AuditorWrappers.Select(a => IntegrationTestEnvironmentExtensions.AssertState(a.Startup, State.Running, TimeSpan.FromSeconds(10))));
 
             //handle quantum
             await Task.WhenAll(environment.AuditorWrappers.Select(a =>
@@ -181,14 +181,14 @@ namespace Centaurus.Test
 
             await environment.AlphaWrapper.Run();
 
-            var expectedState = invalidHash || invalidClientSignature || invalidAlphaSignature ? ApplicationState.Failed : ApplicationState.Ready;
+            var expectedState = invalidHash || invalidClientSignature || invalidAlphaSignature ? State.Failed : State.Ready;
 
             await IntegrationTestEnvironmentExtensions.AssertState(environment.AlphaWrapper.Startup, expectedState, TimeSpan.FromSeconds(30));
 
-            if (expectedState == ApplicationState.Failed)
+            if (expectedState == State.Failed)
                 return;
 
-            await Task.WhenAll(environment.AuditorWrappers.Select(a => IntegrationTestEnvironmentExtensions.AssertState(a.Startup, ApplicationState.Ready, TimeSpan.FromSeconds(10))));
+            await Task.WhenAll(environment.AuditorWrappers.Select(a => IntegrationTestEnvironmentExtensions.AssertState(a.Startup, State.Ready, TimeSpan.FromSeconds(10))));
 
             await environment.AssertConstellationApex(lastApex + 1, TimeSpan.FromSeconds(5));
         }
@@ -237,9 +237,9 @@ namespace Centaurus.Test
 
             quantaStorage.AddQuantum(requestQuantum, requestQuantum.ComputeMessageHash());
 
-            var expectedState = useFakeClient || useFakeAlpha || invalidBalance ? ApplicationState.Failed : ApplicationState.Ready;
+            var expectedState = useFakeClient || useFakeAlpha || invalidBalance ? State.Failed : State.Ready;
 
-            if (expectedState == ApplicationState.Ready)
+            if (expectedState == State.Ready)
                 await environment.AssertConstellationApex(apex, TimeSpan.FromSeconds(10));
 
             await Task.WhenAll(environment.AuditorWrappers.Select(a => IntegrationTestEnvironmentExtensions.AssertState(a.Startup, expectedState, TimeSpan.FromSeconds(10))));

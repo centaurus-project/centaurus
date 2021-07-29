@@ -7,9 +7,9 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public class ResultsBatchHandler : MessageHandlerBase
+    public class ResultBatchHandler : MessageHandlerBase
     {
-        public ResultsBatchHandler(ExecutionContext context) 
+        public ResultBatchHandler(ExecutionContext context) 
             : base(context)
         {
         }
@@ -21,7 +21,7 @@ namespace Centaurus.Domain
         public override bool IsAuditorOnly { get; } = true;
 
         //TODO: run result aggregation in separate thread
-        public override Task HandleMessage(BaseWebSocketConnection connection, IncomingMessage message)
+        public override Task HandleMessage(ConnectionBase connection, IncomingMessage message)
         {
             var resultsBatch = (AuditorResultsBatch)message.Envelope.Message;
             foreach (var result in resultsBatch.AuditorResultMessages)

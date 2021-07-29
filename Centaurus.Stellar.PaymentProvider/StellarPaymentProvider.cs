@@ -1,7 +1,6 @@
 ﻿using Centaurus.PaymentProvider;
 using Centaurus.PaymentProvider.Models;
 using Centaurus.Stellar.Models;
-using NLog;
 using stellar_dotnet_sdk;
 using stellar_dotnet_sdk.xdr;
 using System;
@@ -16,8 +15,6 @@ namespace Centaurus.Stellar.PaymentProvider
 {
     public class StellarPaymentProvider : PaymentProviderBase
     {
-        static Logger logger = LogManager.GetCurrentClassLogger();
-
         public StellarPaymentProvider(SettingsModel settings, string config)
             : base(settings, config)
         {
@@ -154,15 +151,10 @@ namespace Centaurus.Stellar.PaymentProvider
         {
             var ledgerPayments = new List<DepositModel>();
             var txHash = transaction.Hash();
-            var destination = 0ul;
-            if (transaction.Memo is MemoId memoId)
-                destination = memoId.IdValue;
-            else if (transaction.Memo is MemoText memoText && ulong.TryParse(memoText.MemoTextValue, out destination)) { }
-            else
-                return ledgerPayments;
                 
             for (var i = 0; i < transaction.Operations.Length; i++)
             {
+                var destination = (transaction.Operations[i].SourceAccount?.SigningKey ?? transaction.SourceAccount.SigningKey).PublicKey;
                 if (Settings.TryGetDeposit(transaction.Operations[i].ToOperationBody(), destination, isSuccess, txHash, out DepositModel payment))
                     ledgerPayments.Add(payment);
             }
@@ -183,18 +175,15 @@ namespace Centaurus.Stellar.PaymentProvider
                 };
 
                 NotificationsManager.RegisterNotification(payment);
-
-                logger.Trace($"Tx with hash {tx.Hash} is handled. Number of payments for account {Vault} is {payment.Items.Count}.");
             }
             catch (Exception exc)
             {
                 var e = exc;
                 if (exc is AggregateException)
                     e = exc.GetBaseException();
-                logger.Error(e, "Transaction listener failed.");
 
                 //if worker is broken, the auditor should quit consensus
-                RaiseOnError(exc);
+                RaiseOnError(e);
                 return;
             }
         }
@@ -233,7 +222,6 @@ namespace Centaurus.Stellar.PaymentProvider
                         var e = exc;
                         if (exc is AggregateException)
                             e = exc.GetBaseException();
-                        logger.Error(e, "Failed to start transaction listener.");
 
                         RaiseOnError(exc);
                         return;
