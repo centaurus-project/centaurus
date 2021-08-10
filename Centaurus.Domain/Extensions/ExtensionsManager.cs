@@ -124,14 +124,14 @@ namespace Centaurus.Domain
             OnAfterHandleMessage?.Invoke(connection, message);
         }
 
-        public event Action<MessageEnvelope> OnBeforeQuantumHandle;
-        public event Action<ResultMessage> OnAfterQuantumHandle;
-        public void BeforeQuantumHandle(MessageEnvelope envelope)
+        public event Action<Quantum> OnBeforeQuantumHandle;
+        public event Action<QuantumResultMessageBase> OnAfterQuantumHandle;
+        public void BeforeQuantumHandle(Quantum quantum)
         {
-            OnBeforeQuantumHandle?.Invoke(envelope);
+            OnBeforeQuantumHandle?.Invoke(quantum);
         }
 
-        public void AfterQuantumHandle(ResultMessage resultMessage)
+        public void AfterQuantumHandle(QuantumResultMessageBase resultMessage)
         {
             OnAfterQuantumHandle?.Invoke(resultMessage);
         }

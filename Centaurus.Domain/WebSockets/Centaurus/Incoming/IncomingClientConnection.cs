@@ -11,7 +11,7 @@ namespace Centaurus
         public IncomingClientConnection(ExecutionContext context, KeyPair keyPair, WebSocket webSocket, string ip)
             : base(context, keyPair, webSocket, ip)
         {
-            Account = Context.AccountStorage.GetAccount(PubKey) ?? throw new BadRequestException("Account is not registered.");
+            Account = Context.AccountStorage.GetAccount(PubKey);
 
             SendHandshake();
         }

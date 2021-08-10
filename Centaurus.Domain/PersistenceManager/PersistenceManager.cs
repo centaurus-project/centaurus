@@ -46,7 +46,7 @@ namespace Centaurus.Domain
                     Proof = new EffectsProof
                     {
                         Hashes = effects.Keys.Select(e => new Hash { Data = e }).ToList(),
-                        Signatures = quantum.Signatures.Select(s => new Ed25519Signature { Signature = s }).ToList()
+                        Signatures = quantum.Signatures.Select(s => new TinySignature { Data = s.EffectsSignature }).ToList()
                     }
                 });
             }
@@ -79,13 +79,13 @@ namespace Centaurus.Domain
         /// <param name="apex"></param>
         /// <param name="count">Count of quanta to load. Loads all if equal or less than 0</param>
         /// <returns></returns>
-        public List<MessageEnvelope> GetQuantaAboveApex(ulong apex, int count = 0)
+        public List<InProgressQuantum> GetQuantaAboveApex(ulong apex, int count = 0)
         {
             var quantaModels = Context.PermanentStorage.LoadQuantaAboveApex(apex);
             var query = (IEnumerable<QuantumPersistentModel>)quantaModels.OrderBy(q => q.Apex);
             if (count > 0)
                 query = query.Take(count);
-            return query.Select(q => XdrConverter.Deserialize<MessageEnvelope>(q.RawQuantum)).ToList();
+            return query.Select(q => q.ToInProgressQuantum()).ToList();
         }
 
         public ulong GetLastApex()
@@ -134,6 +134,11 @@ namespace Centaurus.Domain
             return settingsModel.ToDomainModel();
         }
 
+        public Snapshot GetLastSnapshot()
+        {
+            return GetSnapshot(GetLastApex());
+        }
+
         //TODO: move it to separate class
         /// <summary>
         /// Builds snapshot for specified apex
@@ -142,9 +147,6 @@ namespace Centaurus.Domain
         /// <returns></returns>
         public Snapshot GetSnapshot(ulong apex)
         {
-            if (apex < 0)
-                throw new ArgumentException("Apex cannot be less than zero.");
-
             var lastApex = GetLastApex();
             if (lastApex < apex)
                 throw new InvalidOperationException("Requested apex is greater than the last known one.");

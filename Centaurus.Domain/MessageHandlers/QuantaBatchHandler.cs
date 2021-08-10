@@ -24,7 +24,7 @@ namespace Centaurus.Domain
 
         public override async Task HandleMessage(ConnectionBase connection, IncomingMessage message)
         {
-            if (Context.AppState.State == State.Rising)
+            if (Context.StateManager.State == State.Rising)
                 await AddAuditorState(connection, message);
             else
                 await AddQuantaToQueue(connection, message);
@@ -35,11 +35,9 @@ namespace Centaurus.Domain
             var quantumHandler = connection.Context.QuantumHandler;
             var quantaBatch = (QuantaBatch)message.Envelope.Message;
             var quanta = quantaBatch.Quanta;
-            var quantaBatchCount = quanta.Count;
-            for (var i = 0; i < quantaBatchCount; i++)
+            foreach (var processedQuantum in quanta)
             {
-                var quantumEnvelope = quanta[i];
-                var quantum = (Quantum)quantumEnvelope.Message;
+                var quantum = processedQuantum.Quantum;
                 if (quantum.Apex <= quantumHandler.LastAddedQuantumApex)
                     continue;
 
@@ -49,7 +47,7 @@ namespace Centaurus.Domain
                     await connection.SendMessage(new QuantaBatchRequest { LastKnownApex = quantumHandler.LastAddedQuantumApex });
                     return;
                 }
-                _ = Context.QuantumHandler.HandleAsync(quantumEnvelope);
+                _ = Context.QuantumHandler.HandleAsync(processedQuantum.Quantum);
             }
         }
 

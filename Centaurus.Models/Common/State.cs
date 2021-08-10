@@ -8,19 +8,15 @@ namespace Centaurus.Models
     {
         Undefined = 0,
         /// <summary>
-        /// First start
-        /// </summary>
-        WaitingForInit = 1,
-        /// <summary>
         /// It has started, but not yet ready. If Alpha, then it waits for the majority to connect. If the Auditor, then it waits for a handshake
         /// </summary>
-        Running = 2,
+        Running = 1,
         /// <summary>
         /// Ready to process quanta
         /// </summary>
-        Ready = 3,
+        Ready = 2,
 
-        Rising = 4,
+        Rising = 3,
 
         Failed = 10,
 

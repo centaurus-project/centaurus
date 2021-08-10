@@ -24,7 +24,7 @@ namespace Centaurus.Test
         [Test]
         public async Task HandshakeTest()
         {
-            context.AppState.SetState( State.Running);
+            context.SetState(State.Running);
 
             var clientConnection = GetOutgoingConnection(context, KeyPair.Random());
 
@@ -52,12 +52,12 @@ namespace Centaurus.Test
         [TestCaseSource(nameof(QuantaBatchTestCases))]
         public async Task QuantaBatchTest(KeyPair alphaKeyPair, ConnectionState state, Type excpectedException)
         {
-            context.AppState.SetState( State.Ready);
+            context.SetState(State.Ready);
 
             var clientConnection = GetIncomingConnection(context, alphaKeyPair, state);
             var batch = new QuantaBatch
             {
-                Quanta = new List<MessageEnvelope>()
+                Quanta = new List<InProgressQuantum>()
             }.CreateEnvelope();
             batch.Sign(alphaKeyPair);
 

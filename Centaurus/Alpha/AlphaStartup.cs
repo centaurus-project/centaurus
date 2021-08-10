@@ -11,7 +11,6 @@ namespace Centaurus.Alpha
 {
     public class AlphaStartup
     {
-        static Logger logger = LogManager.GetCurrentClassLogger();
         private IHost host;
 
         public AlphaStartup(Domain.ExecutionContext context, AlphaHostFactoryBase hostFactory)
@@ -19,7 +18,7 @@ namespace Centaurus.Alpha
             host = hostFactory.GetHost(context);
         }
 
-        public void Run(ManualResetEvent resetEvent)
+        public void Run()
         {
             _ = host.RunAsync();
         }
@@ -36,6 +35,7 @@ namespace Centaurus.Alpha
             if (host != null)
             {
                 await host.StopAsync(CancellationToken.None);
+                host.Dispose();
                 host = null;
             }
         }

@@ -29,7 +29,7 @@ namespace Centaurus.Test
             EnvironmentHelper.SetTestEnvironmentVariable();
             var settings = GlobalInitHelper.GetAlphaSettings();
 
-            context = new ExecutionContext(settings, new MockStorage(), new MockPaymentProviderFactory(), new MockOutgoingConnectionFactory(), useLegacyOrderbook);
+            context = new ExecutionContext(settings, new MockStorage(), new MockPaymentProviderFactory(), new DummyConnectionWrapperFactory(), useLegacyOrderbook);
 
             var requestRateLimits = new RequestRateLimits { HourLimit = 1000, MinuteLimit = 100 };
 
@@ -132,12 +132,12 @@ namespace Centaurus.Test
                     RequestEnvelope = new MessageEnvelope
                     {
                         Message = request,
-                        Signatures = new List<Ed25519Signature>()
+                        Signature = new TinySignature { Data = new byte[64] }
                     },
                     Timestamp = DateTime.UtcNow.Ticks
                 };
 
-                var processorContext = (RequestContext)orderRequestProcessor.GetContext(trade.CreateEnvelope(), initiator);
+                var processorContext = (RequestContext)orderRequestProcessor.GetContext(trade, initiator);
                 testTradeResults.Add(trade, processorContext);
             }
             var baseAsset = context.Constellation.GetBaseAsset();

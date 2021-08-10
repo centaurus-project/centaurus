@@ -11,7 +11,7 @@ namespace Centaurus.Domain
         public static void UpdateNonce<T>(this T context)
             where T : RequestContext
         {
-            var requestQuantum = (RequestQuantum)context.QuantumEnvelope.Message;
+            var requestQuantum = (RequestQuantum)context.Quantum;
             var requestMessage = requestQuantum.RequestMessage;
 
             context.AddNonceUpdate(context.SourceAccount, requestMessage.Nonce, context.SourceAccount.Account.Nonce);
@@ -20,7 +20,7 @@ namespace Centaurus.Domain
         public static void ValidateNonce<T>(this T context)
             where T : RequestContext
         {
-            var requestQuantum = context.QuantumEnvelope.Message as RequestQuantum;
+            var requestQuantum = context.Quantum as RequestQuantum;
             if (requestQuantum == null)
                 throw new BadRequestException($"Invalid message type. Client quantum message should be of type {typeof(RequestQuantum).Name}.");
 

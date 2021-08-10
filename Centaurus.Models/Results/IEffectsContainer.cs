@@ -9,5 +9,7 @@ namespace Centaurus.Models
         public List<Effect> ClientEffects { get; set; }
 
         public EffectsProof Effects { get; set; }
+
+        public ulong Apex { get; }
     }
 }

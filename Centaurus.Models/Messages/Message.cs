@@ -13,7 +13,6 @@ namespace Centaurus.Models
     [XdrUnion((int)MessageTypes.ResultMessage, typeof(ResultMessage))]
     [XdrUnion((int)MessageTypes.QuantumResultMessage, typeof(QuantumResultMessage))]
     [XdrUnion((int)MessageTypes.AccountDataResponse, typeof(AccountDataResponse))]
-    [XdrUnion((int)MessageTypes.ITransactionResultMessage, typeof(TransactionResultMessage))]
     [XdrUnion((int)MessageTypes.EffectsNotification, typeof(EffectsNotification))]
     [XdrUnion((int)MessageTypes.PaymentRequest, typeof(PaymentRequest))]
     [XdrUnion((int)MessageTypes.OrderRequest, typeof(OrderRequest))]
@@ -29,6 +28,7 @@ namespace Centaurus.Models
     [XdrUnion((int)MessageTypes.QuantaBatch, typeof(QuantaBatch))]
     [XdrUnion((int)MessageTypes.EffectsRequest, typeof(EffectsRequest))]
     [XdrUnion((int)MessageTypes.EffectsResponse, typeof(EffectsResponse))]
+    [XdrUnion((int)MessageTypes.ProcessedQuantum, typeof(InProgressQuantum))]
     public abstract class Message 
     {
         public abstract MessageTypes MessageType { get; }

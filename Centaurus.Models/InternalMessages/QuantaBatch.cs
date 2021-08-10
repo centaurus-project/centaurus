@@ -10,7 +10,7 @@ namespace Centaurus.Models
         public override MessageTypes MessageType => MessageTypes.QuantaBatch;
 
         [XdrField(0)]
-        public List<MessageEnvelope> Quanta { get; set; }
+        public List<InProgressQuantum> Quanta { get; set; }
 
         [XdrField(1)]
         public bool HasMorePendingQuanta { get; set; }

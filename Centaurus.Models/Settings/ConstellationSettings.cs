@@ -8,22 +8,28 @@ namespace Centaurus.Models
     public class ConstellationSettings
     {
         [XdrField(0)]
-        public List<ProviderSettings> Providers { get; set; }
+        public ulong Apex { get; set; }
 
         [XdrField(1)]
-        public List<Auditor> Auditors { get; set; }
+        public List<ProviderSettings> Providers { get; set; }
 
         [XdrField(2)]
-        public ulong MinAccountBalance { get; set; }
+        public List<Auditor> Auditors { get; set; }
 
         [XdrField(3)]
-        public ulong MinAllowedLotSize { get; set; }
+        public ulong MinAccountBalance { get; set; }
 
         [XdrField(4)]
-        public List<AssetSettings> Assets { get; set; }
+        public ulong MinAllowedLotSize { get; set; }
 
         [XdrField(5)]
+        public List<AssetSettings> Assets { get; set; }
+
+        [XdrField(6)]
         public RequestRateLimits RequestRateLimits { get; set; }
+
+        [XdrField(7)]
+        public RawPubKey Alpha { get; set; }
     }
 
     [XdrContract]

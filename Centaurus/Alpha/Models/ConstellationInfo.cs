@@ -8,7 +8,7 @@ namespace Centaurus
 
         public ProviderSettings[] Providers { get; set; }
 
-        public object[] Auditors { get; set; }
+        public Auditor[] Auditors { get; set; }
 
         public ulong MinAccountBalance { get; set; }
 

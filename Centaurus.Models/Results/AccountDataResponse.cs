@@ -1,11 +1,9 @@
 ﻿using Centaurus.Xdr;
-using System;
 using System.Collections.Generic;
-using System.Text;
 
 namespace Centaurus.Models
 {
-    public class AccountDataResponse: QuantumResultMessage
+    public class AccountDataResponse: QuantumResultMessageBase
     {
         public override MessageTypes MessageType => MessageTypes.AccountDataResponse;
 

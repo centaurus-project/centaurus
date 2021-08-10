@@ -35,11 +35,10 @@ namespace Centaurus
         static Logger logger = LogManager.GetCurrentClassLogger();
 
         protected readonly WebSocket webSocket;
-        public ConnectionBase(Domain.ExecutionContext context, KeyPair pubKey, WebSocket webSocket, string ip)
+        public ConnectionBase(Domain.ExecutionContext context, KeyPair pubKey, WebSocket webSocket)
             : base(context)
         {
             this.webSocket = webSocket ?? throw new ArgumentNullException(nameof(webSocket));
-            Ip = ip ?? throw new ArgumentNullException(nameof(ip));
 
             PubKey = pubKey ?? throw new ArgumentNullException(nameof(pubKey));
             PubKeyAddress = PubKey.ToString();
@@ -50,8 +49,6 @@ namespace Centaurus
             cancellationTokenSource = new CancellationTokenSource();
             cancellationToken = cancellationTokenSource.Token;
         }
-
-        public string Ip { get; }
 
         /// <summary>
         /// Current connection public key
@@ -150,8 +147,7 @@ namespace Centaurus
             await sendMessageSemaphore.WaitAsync();
             try
             {
-                if (!envelope.IsSignedBy(Context.Settings.KeyPair.PublicKey))
-                    envelope.Sign(Context.Settings.KeyPair, outgoingBuffer.Buffer);
+                envelope.Sign(Context.Settings.KeyPair, outgoingBuffer.Buffer);
 
                 Context.ExtensionsManager.BeforeSendMessage(this, envelope);
 
@@ -190,7 +186,7 @@ namespace Centaurus
                 while (webSocket.State != WebSocketState.Closed && webSocket.State != WebSocketState.Aborted && !cancellationToken.IsCancellationRequested)
                 {
                     //if connection isn't validated yet 256 bytes of max message is enough for handling handshake response
-                    var maxLength = ConnectionState == ConnectionState.Connected ? 256 : 0;
+                    var maxLength = ConnectionState == ConnectionState.Connected ? WebSocketExtension.ChunkSize : 0;
                     var messageType = await webSocket.GetWebsocketBuffer(incommingBuffer, cancellationToken, maxLength);
                     if (!cancellationToken.IsCancellationRequested)
                     {

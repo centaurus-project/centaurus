@@ -16,13 +16,13 @@ namespace Centaurus.Domain
 
         public override MessageTypes SupportedMessageType => MessageTypes.WithdrawalRequest;
 
-        public override Task<QuantumResultMessage> Process(WithdrawalProcessorContext context)
+        public override Task<QuantumResultMessageBase> Process(WithdrawalProcessorContext context)
         {
             context.UpdateNonce();
 
             context.AddBalanceUpdate(context.SourceAccount, context.WithdrawalRequest.Asset, context.WithdrawalRequest.Amount, UpdateSign.Minus);
 
-            return Task.FromResult((QuantumResultMessage)context.QuantumEnvelope.CreateResult(ResultStatusCodes.Success));
+            return Task.FromResult((QuantumResultMessageBase)context.Quantum.CreateEnvelope().CreateResult(ResultStatusCodes.Success));
         }
 
         public override Task Validate(WithdrawalProcessorContext context)
@@ -47,16 +47,19 @@ namespace Centaurus.Domain
 
             var withdrawal = context.WithdrawalRequest.ToProviderModel();
             if (context.CentaurusContext.IsAlpha) //if it's Alpha than we need to build transaction
+            {
                 context.TransactionQuantum.Transaction = context.PaymentProvider.BuildTransaction(withdrawal);
+                context.TransactionQuantum.ProviderId = context.PaymentProvider.Id;
+            }
             else
                 context.PaymentProvider.ValidateTransaction(context.TransactionQuantum.Transaction, withdrawal);
 
             return Task.CompletedTask;
         }
 
-        public override ProcessorContext GetContext(MessageEnvelope envelope, AccountWrapper account)
+        public override ProcessorContext GetContext(Quantum quantum, AccountWrapper account)
         {
-            return new WithdrawalProcessorContext(Context, envelope, account);
+            return new WithdrawalProcessorContext(Context, quantum, account);
         }
     }
 }

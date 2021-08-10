@@ -7,7 +7,7 @@ using Centaurus.Models;
 
 namespace Centaurus.Domain.Handlers.AlphaHandlers
 {
-    public class HandshakeRequestHandler : MessageHandlerBase
+    public class HandshakeRequestHandler : MessageHandlerBase<OutgoingConnection>
     {
         public HandshakeRequestHandler(ExecutionContext context)
             : base(context)
@@ -16,24 +16,21 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
 
         public override MessageTypes SupportedMessageType { get; } = MessageTypes.HandshakeRequest;
 
-        public override ConnectionState[] ValidConnectionStates { get; } = new ConnectionState[] { ConnectionState.Connected };
+        public override ConnectionState[] ValidConnectionStates { get; } = new ConnectionState[] { ConnectionState.Validated };
 
-        public override async Task HandleMessage(ConnectionBase connection, IncomingMessage message)
+        public override async Task HandleMessage(OutgoingConnection connection, IncomingMessage message)
         {
             var handshakeRequest = (HandshakeRequest)message.Envelope.Message;
 
-            var lastKnownApex = Context.QuantumHandler.LastAddedQuantumApex > 0
-                ? Context.QuantumHandler.LastAddedQuantumApex
-                : Context.QuantumStorage.CurrentApex;
+            var lastKnownApex = Math.Max(Context.QuantumHandler.LastAddedQuantumApex, Context.QuantumStorage.CurrentApex);
+            await connection.SendMessage(new AuditorHandshakeResponse
+            {
+                HandshakeData = handshakeRequest.HandshakeData,
+                LastKnownApex = lastKnownApex
+            });
 
-            if (connection is OutgoingConnection) //if connection is an outgoing than the other side is an auditor
-                await connection.SendMessage(new AuditorHandshakeResponse
-                {
-                    HandshakeData = handshakeRequest.HandshakeData,
-                    LastKnownApex = lastKnownApex
-                });
-            else //send a regular handshake response for a client
-                await connection.SendMessage(new HandshakeResponse { HandshakeData = handshakeRequest.HandshakeData });
+            //after sending auditor handshake the connection become ready
+            connection.ConnectionState = ConnectionState.Ready;
         }
     }
 }

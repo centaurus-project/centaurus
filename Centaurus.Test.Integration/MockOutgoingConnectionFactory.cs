@@ -11,9 +11,16 @@ namespace Centaurus.Test
 {
     public class MockOutgoingConnectionFactory : OutgoingConnectionFactoryBase
     {
+        private readonly Dictionary<string, StartupWrapper> startups;
+
+        public MockOutgoingConnectionFactory(Dictionary<string, StartupWrapper> startups)
+        {
+            this.startups = startups ?? throw new ArgumentNullException(nameof(startups));
+        }
+
         public override OutgoingConnectionWrapperBase GetConnection()
         {
-            return new MockAuditorConnectionInfo(new FakeWebSocket());
+            return new MockConnectionWrapper(startups);
         }
     }
 }

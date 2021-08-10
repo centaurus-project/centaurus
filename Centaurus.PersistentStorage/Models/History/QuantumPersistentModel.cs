@@ -31,7 +31,7 @@ namespace Centaurus.PersistentStorage
         public List<byte[]> Effects { get; set; }
 
         [Key(3)]
-        public List<byte[]> Signatures { get; set; }
+        public List<SignatureModel> Signatures { get; set; }
 
         [IgnoreMember]
         public byte[] Key
@@ -45,5 +45,18 @@ namespace Centaurus.PersistentStorage
 
         [IgnoreMember]
         public uint PrefixLength => 8;
+    }
+
+    [MessagePackObject]
+    public class SignatureModel
+    {
+        [Key(0)]
+        public byte[] EffectsSignature { get; set; }
+
+        [Key(1)]
+        public byte[] TxSigner { get; set; }
+
+        [Key(2)]
+        public byte[] TxSignature { get; set; }
     }
 }

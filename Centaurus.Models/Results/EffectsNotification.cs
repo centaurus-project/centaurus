@@ -14,5 +14,7 @@ namespace Centaurus.Models
 
         [XdrField(1)]
         public EffectsProof Effects { get; set; }
+
+        public ulong Apex { get; set; }
     }
 }

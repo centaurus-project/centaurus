@@ -20,7 +20,7 @@ namespace Centaurus.Test.Exchange.Analytics
             EnvironmentHelper.SetTestEnvironmentVariable();
             var settings = GlobalInitHelper.GetAlphaSettings();
 
-            context = new ExecutionContext(settings, new MockStorage(), new MockPaymentProviderFactory(), new MockOutgoingConnectionFactory());
+            context = new ExecutionContext(settings, new MockStorage(), new MockPaymentProviderFactory(), new DummyConnectionWrapperFactory());
             var requestsLimit = new RequestRateLimits();
 
             account1 = new AccountWrapper(new Models.Account
@@ -102,12 +102,12 @@ namespace Centaurus.Test.Exchange.Analytics
                             Price = Math.Round(price * 10) / 10,
                             Side = rnd.NextDouble() >= 0.5 ? OrderSide.Buy : OrderSide.Sell
                         },
-                        Signatures = new List<Ed25519Signature>()
+                        Signature = new TinySignature { Data = new byte[64] }
                     },
                     Timestamp = DateTime.UtcNow.Ticks
                 };
 
-                var orderContext = (RequestContext)orderRequestProcessor.GetContext(trade.CreateEnvelope(), context.AccountStorage.GetAccount(account1.Account.Pubkey));
+                var orderContext = (RequestContext)orderRequestProcessor.GetContext(trade, context.AccountStorage.GetAccount(account1.Account.Pubkey));
                 testTradeResults.Add(trade, orderContext);
             }
 

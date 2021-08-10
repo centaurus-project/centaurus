@@ -19,29 +19,26 @@ namespace Centaurus.Domain
 
         public override MessageTypes SupportedMessageType => MessageTypes.OrderCancellationRequest;
 
-        public override ProcessorContext GetContext(MessageEnvelope messageEnvelope, AccountWrapper account)
+        public override ProcessorContext GetContext(Quantum quantum, AccountWrapper account)
         {
-            return new OrderCancellationProcessorContext(Context, messageEnvelope, account);
+            return new OrderCancellationProcessorContext(Context, quantum, account);
         }
 
-        public override Task<QuantumResultMessage> Process(OrderCancellationProcessorContext context)
+        public override Task<QuantumResultMessageBase> Process(OrderCancellationProcessorContext context)
         {
-            var quantum = (RequestQuantum)context.QuantumEnvelope.Message;
-
             context.UpdateNonce();
 
             context.CentaurusContext.Exchange.RemoveOrder(context, context.Orderbook, context.OrderWrapper);
 
-            var resultMessage = context.QuantumEnvelope.CreateResult(ResultStatusCodes.Success);
-            return Task.FromResult((QuantumResultMessage)resultMessage);
+            var resultMessage = context.Quantum.CreateEnvelope().CreateResult(ResultStatusCodes.Success);
+            return Task.FromResult((QuantumResultMessageBase)resultMessage);
         }
-
 
         public override Task Validate(OrderCancellationProcessorContext context)
         {
             context.ValidateNonce();
 
-            var quantum = context.QuantumEnvelope.Message as RequestQuantum;
+            var quantum = context.Quantum as RequestQuantum;
             var orderRequest = (OrderCancellationRequest)quantum.RequestMessage;
 
             context.OrderWrapper = context.CentaurusContext.Exchange.OrderMap.GetOrder(orderRequest.OrderId);

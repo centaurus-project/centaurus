@@ -8,7 +8,7 @@ namespace Centaurus.Domain
 {
     public class PaymentProcessorContext : RequestContext
     {
-        public PaymentProcessorContext(ExecutionContext context, MessageEnvelope quantum, AccountWrapper account) 
+        public PaymentProcessorContext(ExecutionContext context, Quantum quantum, AccountWrapper account) 
             : base(context, quantum, account)
         {
             Payment = (PaymentRequest)Request.RequestEnvelope.Message;

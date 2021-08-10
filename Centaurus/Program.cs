@@ -20,7 +20,8 @@ namespace Centaurus
         {
             var mergedArgs = CommandLineHelper.GetMergedArgs<Settings>(args);
 
-            Parser.Default.ParseArguments<Settings>(mergedArgs)
+            var parser = new Parser(s => s.AllowMultiInstance = true);
+            parser.ParseArguments<Settings>(mergedArgs)
                 .WithParsed(s => ConfigureAndRun(s));
         }
 
@@ -32,8 +33,7 @@ namespace Centaurus
             {
                 settings.Build();
 
-                var isAlpha = settings.KeyPair.AccountId == settings.AlphaKeyPair.AccountId;
-                Console.Title = isAlpha ? "CentaurusAlpha" : "CentaurusAuditor";
+                Console.Title = $"CentaurusAuditor_{settings.KeyPair.AccountId}";
 
                 var logsDirectory = Path.Combine(settings.CWD, "logs");
                 LogConfigureHelper.Configure(logsDirectory, settings.Silent, settings.Verbose);

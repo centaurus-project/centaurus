@@ -48,6 +48,29 @@ namespace Centaurus
             SeedBytes = seed;
         }
 
+        /// <summary>
+        /// This method used for mapping raw string key to KeyPair instance.
+        /// </summary>
+        /// <param name="source"></param>
+        public KeyPair(string source)
+        {
+            if (StrKey.IsValidEd25519SecretSeed(source))
+            {
+                SeedBytes = StrKey.DecodeStellarSecretSeed(source);
+                _secretKey = Key.Import(SignatureAlgorithm.Ed25519, SeedBytes, KeyBlobFormat.RawPrivateKey,
+                    new KeyCreationParameters() { ExportPolicy = KeyExportPolicies.AllowPlaintextExport });
+
+                _publicKey = _secretKey.PublicKey;
+            }
+            else if (StrKey.IsValidEd25519PublicKey(source))
+            {
+                byte[] publicKey = StrKey.DecodeStellarAccountId(source);
+                _publicKey = NSec.Cryptography.PublicKey.Import(SignatureAlgorithm.Ed25519, publicKey, KeyBlobFormat.RawPublicKey);
+            }
+            else
+                throw new ArgumentException("Invalid key format.");
+        }
+
         private readonly Key _secretKey;
         private readonly NSec.Cryptography.PublicKey _publicKey;
 
@@ -225,8 +248,8 @@ namespace Centaurus
         public bool Equals(KeyPair other)
         {
             if (other == null) return false;
-            if (SeedBytes != null && other.SeedBytes == null) return false;
-            if (SeedBytes == null && other.SeedBytes != null) return false;
+            //if (SeedBytes != null && other.SeedBytes == null) return false;
+            //if (SeedBytes == null && other.SeedBytes != null) return false;
             return _publicKey.Equals(other._publicKey);
         }
     }

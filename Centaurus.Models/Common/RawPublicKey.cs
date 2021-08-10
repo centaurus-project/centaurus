@@ -13,6 +13,11 @@
             Data = keypair.PublicKey;
         }
 
+        public RawPubKey(byte[] publicKey)
+        {
+            Data = publicKey;
+        }
+
         public override int ByteLength { get { return 32; } }
 
         public override string ToString()

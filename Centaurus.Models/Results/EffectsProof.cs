@@ -12,6 +12,6 @@ namespace Centaurus.Models
         public List<Hash> Hashes { get; set; }
 
         [XdrField(1)]
-        public List<Ed25519Signature> Signatures { get; set; }
+        public List<TinySignature> Signatures { get; set; }
     }
 }

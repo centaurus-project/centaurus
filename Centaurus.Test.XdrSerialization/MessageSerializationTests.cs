@@ -21,6 +21,8 @@ namespace Centaurus.Test
         [Test]
         public void OrderSerializationTest()
         {
+
+
             var pubkey = new byte[32];
             var signature = new byte[64];
             Array.Fill(pubkey, (byte)10);
@@ -37,12 +39,12 @@ namespace Centaurus.Test
             var message = new MessageEnvelope()
             {
                 Message = original,
-                Signatures = new List<Ed25519Signature> { new Ed25519Signature() { Signer = pubkey, Signature = signature } }
+                Signature = new TinySignature { Data = signature }
             };
             var deserializedMessage = XdrConverter.Deserialize<MessageEnvelope>(XdrConverter.Serialize(message));
             var deserialized = deserializedMessage.Message as OrderRequest;
-            Assert.AreEqual(pubkey, deserializedMessage.Signatures[0].Signer.Data);
-            Assert.AreEqual(signature, deserializedMessage.Signatures[0].Signature);
+            //Assert.AreEqual(pubkey, deserializedMessage.Signatures.Signer.Data);
+            Assert.AreEqual(signature, deserializedMessage.Signature.Data);
             Assert.AreEqual(original.Account, deserialized.Account);
             Assert.AreEqual(original.Amount, deserialized.Amount);
             Assert.AreEqual(original.TimeInForce, deserialized.TimeInForce);

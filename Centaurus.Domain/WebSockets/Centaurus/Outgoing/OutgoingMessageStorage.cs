@@ -8,7 +8,6 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-
     public class OutgoingMessageStorage
     {
         private readonly Queue<MessageEnvelope> outgoingMessages = new Queue<MessageEnvelope>();
@@ -41,48 +40,53 @@ namespace Centaurus.Domain
         }
     }
 
-    public class OutgoingResultsStorage: ContextualBase
+    public class OutgoingResultsStorage: IDisposable
     {
         const int MaxMessageBatchSize = 50;
 
         static Logger logger = LogManager.GetCurrentClassLogger();
-
+        readonly OutgoingMessageStorage outgoingMessageStorage;
         readonly List<AuditorResultMessage> results = new List<AuditorResultMessage>();
 
-        public OutgoingResultsStorage(ExecutionContext context)
-            :base(context)
+        public OutgoingResultsStorage(OutgoingMessageStorage outgoingMessageStorage)
         {
-            _ = Task.Factory.StartNew(RunWorker, TaskCreationOptions.LongRunning);
+            this.outgoingMessageStorage = outgoingMessageStorage ?? throw new ArgumentNullException(nameof(outgoingMessageStorage));
+            Run();
         }
 
-        private void RunWorker()
+        private CancellationTokenSource cts = new CancellationTokenSource();
+
+        private void Run()
         {
-            while (true)
+            Task.Factory.StartNew(() =>
             {
-                try
+                while (!cts.Token.IsCancellationRequested)
                 {
-                    var resultsBatch = default(List<AuditorResultMessage>);
-                    lock (results)
+                    try
                     {
-                        if (results.Count != 0)
+                        var resultsBatch = default(List<AuditorResultMessage>);
+                        lock (results)
                         {
-                            resultsBatch = results.Take(MaxMessageBatchSize).ToList();
-                            var removeCount = Math.Min(MaxMessageBatchSize, results.Count);
-                            results.RemoveRange(0, removeCount);
+                            if (results.Count != 0)
+                            {
+                                resultsBatch = results.Take(MaxMessageBatchSize).ToList();
+                                var removeCount = Math.Min(MaxMessageBatchSize, results.Count);
+                                results.RemoveRange(0, removeCount);
+                            }
                         }
+                        if (resultsBatch != default)
+                        {
+                            outgoingMessageStorage.EnqueueMessage(new AuditorResultsBatch { AuditorResultMessages = resultsBatch });
+                            continue;
+                        }
+                        Thread.Sleep(50);
                     }
-                    if (resultsBatch != default)
+                    catch (Exception exc)
                     {
-                        Context.OutgoingMessageStorage.EnqueueMessage(new AuditorResultsBatch { AuditorResultMessages = resultsBatch });
-                        continue;
+                        logger.Error(exc);
                     }
-                    Thread.Sleep(50);
                 }
-                catch (Exception exc)
-                {
-                    logger.Error(exc);
-                }
-            }
+            }, cts.Token, TaskCreationOptions.LongRunning, TaskScheduler.Default);
         }
 
         /// <summary>
@@ -90,26 +94,18 @@ namespace Centaurus.Domain
         /// </summary>
         /// <param name="result"></param>
         /// <param name="buffer">Buffer to use for serialization</param>
-        public void EnqueueResult(ulong apex, QuantumResultMessage result)
+        public void EnqueueResult(AuditorResultMessage result)
         {
             if (result == null)
                 throw new ArgumentNullException(nameof(result));
 
-            var txSignature = default(byte[]);
-            if (result is TransactionResultMessage txResult)
-            {
-                txSignature = txResult.TxSignatures.FirstOrDefault()?.Signature;
-                if (txSignature == null)
-                    throw new Exception("Transaction signature is missing.");
-            }
-
             lock (results)
-                results.Add(new AuditorResultMessage
-                {
-                    Apex = apex,
-                    Signature = result.Effects.Signatures[0].Signature,
-                    TxSignature = txSignature
-                });
+                results.Add(result);
+        }
+
+        public void Dispose()
+        {
+            cts.Dispose();
         }
     }
 }

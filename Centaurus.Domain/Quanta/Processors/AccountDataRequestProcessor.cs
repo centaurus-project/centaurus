@@ -17,14 +17,14 @@ namespace Centaurus.Domain
 
         public override MessageTypes SupportedMessageType => MessageTypes.AccountDataRequest;
 
-        public override Task<QuantumResultMessage> Process(RequestContext context)
+        public override Task<QuantumResultMessageBase> Process(RequestContext context)
         {
             var quantum = context.Request;
             var requestMessage = quantum.RequestMessage;
 
             context.UpdateNonce();
 
-            var resultMessage = (AccountDataResponse)context.QuantumEnvelope.CreateResult(ResultStatusCodes.Success);
+            var resultMessage = (AccountDataResponse)context.Quantum.CreateEnvelope().CreateResult(ResultStatusCodes.Success);
             resultMessage.Balances = context.SourceAccount.Account.Balances
                 .Select(balance => new Balance { Amount = balance.Amount, Asset = balance.Asset, Liabilities = balance.Liabilities })
                 .OrderBy(balance => balance.Asset)
@@ -46,7 +46,7 @@ namespace Centaurus.Domain
 
 
 
-            return Task.FromResult((QuantumResultMessage)resultMessage);
+            return Task.FromResult((QuantumResultMessageBase)resultMessage);
         }
 
         public override Task Validate(RequestContext context)

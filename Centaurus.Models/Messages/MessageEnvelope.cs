@@ -5,12 +5,21 @@ using Centaurus.Xdr;
 namespace Centaurus.Models
 {
     [XdrContract]
-    public class MessageEnvelope
+    public abstract class MessageEnvelopeBase
     {
         [XdrField(0)]
         public Message Message { get; set; }
+    }
 
-        [XdrField(1)]
-        public List<Ed25519Signature> Signatures { get; set; }
+    public class MessageEnvelope : MessageEnvelopeBase
+    {
+        [XdrField(0)]
+        public TinySignature Signature { get; set; }
+    }
+
+    public class ConstellationMessageEnvelope : MessageEnvelopeBase
+    {
+        [XdrField(0)]
+        public List<TinySignature> Signatures { get; set; }
     }
 }

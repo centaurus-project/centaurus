@@ -33,7 +33,7 @@ namespace Centaurus.Test
         [TestCaseSource(nameof(HandshakeTestCases))]
         public async Task HandshakeTest(KeyPair clientKeyPair, State alphaState, Type expectedException)
         {
-            context.AppState.SetState(alphaState);
+            context.SetState(alphaState);
 
             var connection = GetIncomingConnection(context, clientKeyPair);
 
@@ -72,7 +72,7 @@ namespace Centaurus.Test
         [TestCaseSource(nameof(AuditorHandshakeTestCases))]
         public async Task AuditorHandshakeTest(KeyPair clientKeyPair, State alphaState, Type expectedException)
         {
-            context.AppState.SetState(alphaState);
+            context.SetState(alphaState);
 
             var connection = GetIncomingConnection(context, clientKeyPair);
 
@@ -103,7 +103,7 @@ namespace Centaurus.Test
         [Test]
         public void HandshakeInvalidDataTest()
         {
-            context.AppState.SetState(State.Ready);
+            context.SetState(State.Ready);
 
             var clientConnection = GetIncomingConnection(context, TestEnvironment.Client1KeyPair);
 
@@ -154,7 +154,7 @@ namespace Centaurus.Test
         [TestCaseSource(nameof(QuantaBatchRequestTestCases))]
         public async Task QuantaBatchRequestTest(KeyPair clientKeyPair, ConnectionState state, Type excpectedException)
         {
-            context.AppState.SetState(State.Ready);
+            context.SetState(State.Ready);
 
             var clientConnection = GetIncomingConnection(context, clientKeyPair.PublicKey, state);
 
@@ -178,13 +178,13 @@ namespace Centaurus.Test
         [TestCaseSource(nameof(QuantaBatchTestCases))]
         public async Task QuantaBatchTest(KeyPair clientKeyPair, ConnectionState state, Type excpectedException)
         {
-            context.AppState.SetState(State.Rising);
+            context.SetState(State.Rising);
 
             var clientConnection = GetIncomingConnection(context, clientKeyPair.PublicKey, state);
 
             var envelope = new QuantaBatch
             {
-                Quanta = new List<MessageEnvelope>()
+                Quanta = new List<InProgressQuantum>()
             }.CreateEnvelope();
             envelope.Sign(clientKeyPair);
 
@@ -193,7 +193,7 @@ namespace Centaurus.Test
 
             await AssertMessageHandling(clientConnection, inMessage, excpectedException);
             if (excpectedException == null)
-                Assert.AreEqual(context.AppState.State, State.Running);
+                Assert.AreEqual(context.StateManager.State, State.Running);
         }
 
         static object[] OrderTestCases =
@@ -206,7 +206,7 @@ namespace Centaurus.Test
         [TestCaseSource(nameof(OrderTestCases))]
         public async Task OrderTest(ConnectionState state, Type excpectedException)
         {
-            context.AppState.SetState(State.Ready);
+            context.SetState(State.Ready);
 
             var clientConnection = GetIncomingConnection(context, TestEnvironment.Client1KeyPair.PublicKey, state);
 
@@ -234,7 +234,7 @@ namespace Centaurus.Test
         [TestCaseSource(nameof(AccountDataTestRequestCases))]
         public async Task AccountDataRequestTest(ConnectionState state, Type excpectedException)
         {
-            context.AppState.SetState(State.Ready);
+            context.SetState(State.Ready);
 
             var clientConnection = (IncomingClientConnection)GetIncomingConnection(context, TestEnvironment.Client1KeyPair.PublicKey, state);
 
@@ -259,7 +259,7 @@ namespace Centaurus.Test
         [TestCaseSource(nameof(AccountRequestRateLimitsCases))]
         public async Task AccountRequestRateLimitTest(KeyPair clientKeyPair, int? requestLimit)
         {
-            context.AppState.SetState(State.Ready);
+            context.SetState(State.Ready);
 
             var account = context.AccountStorage.GetAccount(clientKeyPair);
             if (requestLimit.HasValue)
@@ -310,7 +310,7 @@ namespace Centaurus.Test
         [TestCaseSource(nameof(EffectsRequestTestCases))]
         public async Task EffectsRequestTest(KeyPair client, ConnectionState state, Type excpectedException)
         {
-            context.AppState.SetState(State.Ready);
+            context.SetState(State.Ready);
 
             var account = context.AccountStorage.GetAccount(client);
 

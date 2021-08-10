@@ -23,7 +23,7 @@ namespace Centaurus.Domain
         /// Execute quantum request and generate response message.
         /// </summary>
         /// <param name="context">Request context</param>
-        public abstract Task<QuantumResultMessage> Process(object context);
+        public abstract Task<QuantumResultMessageBase> Process(object context);
 
         /// <summary>
         /// Validate quantum request preconditions.
@@ -34,7 +34,7 @@ namespace Centaurus.Domain
         /// <summary>
         /// Generates context for the processor.
         /// </summary>
-        public abstract ProcessorContext GetContext(MessageEnvelope messageEnvelope, AccountWrapper account);
+        public abstract ProcessorContext GetContext(Quantum quantum, AccountWrapper account);
     }
 
     public abstract class QuantumProcessorBase<T> : QuantumProcessorBase
@@ -46,12 +46,12 @@ namespace Centaurus.Domain
 
         }
 
-        public override Task<QuantumResultMessage> Process(object context)
+        public override Task<QuantumResultMessageBase> Process(object context)
         {
             return Process((T)context);
         }
 
-        public abstract Task<QuantumResultMessage> Process(T context);
+        public abstract Task<QuantumResultMessageBase> Process(T context);
 
 
         public override Task Validate(object context)
@@ -70,9 +70,9 @@ namespace Centaurus.Domain
 
         }
 
-        public override ProcessorContext GetContext(MessageEnvelope messageEnvelope, AccountWrapper account)
+        public override ProcessorContext GetContext(Quantum quantum, AccountWrapper account)
         {
-            return new ProcessorContext(Context, messageEnvelope, account);
+            return new ProcessorContext(Context, quantum, account);
         }
     }
 
@@ -84,9 +84,9 @@ namespace Centaurus.Domain
 
         }
 
-        public override ProcessorContext GetContext(MessageEnvelope messageEnvelope, AccountWrapper account)
+        public override ProcessorContext GetContext(Quantum quantum, AccountWrapper account)
         {
-            return new RequestContext(Context, messageEnvelope, account);
+            return new RequestContext(Context, quantum, account);
         }
     }
 }

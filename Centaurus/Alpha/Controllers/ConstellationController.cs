@@ -23,7 +23,7 @@ namespace Centaurus.Controllers
         {
             ConstellationInfo info;
 
-            var state = (int)(Context.AppState?.State ?? 0);
+            var state = (int)(Context.StateManager?.State ?? 0);
             if (state < (int)State.Running)
                 info = new ConstellationInfo
                 {
@@ -33,10 +33,10 @@ namespace Centaurus.Controllers
             {
                 info = new ConstellationInfo
                 {
-                    State = Context.AppState.State,
+                    State = Context.StateManager.State,
                     Providers = Context.Constellation.Providers.ToArray(),
                     Auditors = Context.Constellation.Auditors
-                        .Select(a => new { PubKey = a.PubKey.GetAccountId(), Address = a.Address })
+                        .Select(a => a)
                         .ToArray(),
                     MinAccountBalance = Context.Constellation.MinAccountBalance,
                     MinAllowedLotSize = Context.Constellation.MinAllowedLotSize,
@@ -49,16 +49,19 @@ namespace Centaurus.Controllers
         }
 
         [HttpPost("[action]")]
-        public async Task<IActionResult> Init(MessageEnvelope constellationInitEnvelope)
+        public async Task<IActionResult> Init(ConstellationMessageEnvelope constellationInitEnvelope)
         {
             try
             {
                 if (constellationInitEnvelope == null)
                     return StatusCode(415);
+                //TODO: move all validations to helper class
 
-                var constellationInitRequest = (ConstellationUpdate)constellationInitEnvelope.Message;
+                var constellationQuantum = new ConstellationQuantum { RequestEnvelope = constellationInitEnvelope };
 
-                await Context.QuantumHandler.HandleAsync(constellationInitEnvelope);
+                constellationQuantum.Validate(Context);
+
+                await Context.QuantumHandler.HandleAsync(constellationQuantum);
 
                 return new JsonResult(new InitResult { IsSuccess = true });
             }

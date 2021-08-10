@@ -68,6 +68,9 @@ namespace Centaurus.Domain
         {
             var trade = new TradeEffect
             {
+                OrderId = order.OrderId,
+                Asset = order.Order.Asset,
+                Side = order.Order.Side,
                 Apex = effectProcessors.Apex,
                 Account = order.AccountWrapper.Id,
                 AssetAmount = assetAmount,

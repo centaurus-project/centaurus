@@ -11,12 +11,16 @@ namespace Centaurus.Domain
     public class OutgoingConnection : ConnectionBase, IAuditorConnection
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
-        private OutgoingConnectionWrapperBase connection;
+        private readonly OutgoingConnectionWrapperBase connection;
+        private readonly OutgoingMessageStorage outgoingMessageStorage;
 
-        public OutgoingConnection(ExecutionContext context, KeyPair keyPair, OutgoingConnectionWrapperBase connection)
-            : base(context, keyPair, connection.WebSocket, ":0")
+        public OutgoingConnection(ExecutionContext context, KeyPair keyPair, OutgoingMessageStorage outgoingMessageStorage, OutgoingConnectionWrapperBase connection)
+            : base(context, keyPair, connection.WebSocket)
         {
-            this.connection = connection;
+            this.connection = connection ?? throw new ArgumentNullException(nameof(connection));
+            this.outgoingMessageStorage = outgoingMessageStorage ?? throw new ArgumentNullException(nameof(outgoingMessageStorage));
+            //we know that we connect to auditor so we can set connection state to validated immediately
+            ConnectionState = ConnectionState.Validated;
         }
 
         const int BufferSize = 50 * 1024 * 1024;
@@ -41,13 +45,13 @@ namespace Centaurus.Domain
                     {
                         if (ConnectionState == ConnectionState.Ready
                             && !cancellationToken.IsCancellationRequested
-                            && Context.OutgoingMessageStorage.TryPeek(out MessageEnvelope message)
+                            && outgoingMessageStorage.TryPeek(out MessageEnvelope message)
                             )
                         {
                             try
                             {
                                 await base.SendMessage(message);
-                                if (!Context.OutgoingMessageStorage.TryDequeue(out message))
+                                if (!outgoingMessageStorage.TryDequeue(out message))
                                 {
                                     logger.Error("Unable to dequeue");
                                 }

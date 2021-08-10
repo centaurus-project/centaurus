@@ -61,7 +61,10 @@ namespace Centaurus.Domain
                 throw new ArgumentNullException(nameof(webSocket));
 
             var connection = default(IncomingConnectionBase);
-            if (Context.Constellation.Auditors.Any(a => a.PubKey.Equals(rawPubKey)))
+            var auditors = Context.Constellation == null
+                ? Context.Settings.GenesisAuditors.Select(a => (RawPubKey)a.PubKey)
+                : Context.Constellation.Auditors.Select(a => a.PubKey);
+            if (auditors.Any(a => a.Equals(rawPubKey)))
                 connection = new IncomingAuditorConnection(Context, rawPubKey, webSocket, ip);
             else
                 connection = new IncomingClientConnection(Context, rawPubKey, webSocket, ip);
@@ -87,6 +90,31 @@ namespace Centaurus.Domain
                         continue;
                     await UnsubscribeAndClose(connection);
 
+                }
+                catch (Exception e)
+                {
+                    logger.Error(e, "Unable to close connection");
+                }
+        }
+
+        public void CleanupAuditorConnections()
+        {
+            var irrelevantAuditors = Context.StateManager.ConnectedAuditors
+                .Where(ca => !Context.Constellation.Auditors.Any(a => a.PubKey.Equals(ca)))
+                .ToList();
+
+            foreach (var pk in irrelevantAuditors)
+                try
+                {
+                    if (connections.TryRemove(pk, out var connection))
+                        continue;
+                    UnsubscribeAndClose(connection)
+                        .ContinueWith(t =>
+                        {
+                            //we need to drop it, to prevent sending private constellation data
+                            if (t.IsFaulted)
+                                Context.StateManager.Failed(new Exception("Unable to drop irrelevant auditor connection."));
+                        });
                 }
                 catch (Exception e)
                 {
@@ -152,7 +180,7 @@ namespace Centaurus.Domain
         {
             if (connection.IsAuditor)
             {
-                Context.AppState.RegisterConnection((IAuditorConnection)connection);
+                Context.StateManager.SetConnection((IAuditorConnection)connection);
                 logger.Trace($"Auditor {connection.PubKey} is connected.");
             }
         }
@@ -163,10 +191,13 @@ namespace Centaurus.Domain
             {
                 _ = UnsubscribeAndClose(connection);
 
+                //if it wasn't validated than quit. Otherwise we can close another connection
+                if (!connection.IsValidated)
+                    return;
                 connections.TryRemove(connection.PubKey, out _);
                 if (connection.IsAuditor)
                 {
-                    Context.AppState.RemoveConnection((IAuditorConnection)connection);
+                    Context.StateManager.RemoveConnection((IAuditorConnection)connection);
                     Context.Catchup.RemoveState(connection.PubKey);
                 }
             }

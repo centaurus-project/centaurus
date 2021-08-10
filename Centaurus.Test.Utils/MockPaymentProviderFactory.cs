@@ -12,7 +12,14 @@ namespace Centaurus.Test
     {
         public override PaymentProviderBase GetProvider(SettingsModel providerSettings, string path, string config)
         {
-            return new MockPaymentProvider(providerSettings, config);
+            if (Provider == null)
+            {
+                lock (this)
+                    Provider = new MockPaymentProvider(providerSettings, config);
+            }
+            return Provider;
         }
+
+        public MockPaymentProvider Provider { get; private set; }
     }
 }

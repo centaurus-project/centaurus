@@ -17,10 +17,10 @@ namespace Centaurus.Domain
     {
         static byte[] buffer = new byte[256 * 1024];
 
-        public ProcessorContext(ExecutionContext context, MessageEnvelope quantum, AccountWrapper account)
+        public ProcessorContext(ExecutionContext context, Quantum quantum, AccountWrapper account)
             : base(context)
         {
-            QuantumEnvelope = quantum ?? throw new ArgumentNullException(nameof(quantum));
+            Quantum = quantum ?? throw new ArgumentNullException(nameof(quantum));
             SourceAccount = account;
         }
 
@@ -28,11 +28,9 @@ namespace Centaurus.Domain
 
         public ExecutionContext CentaurusContext => Context;
 
-        public MessageEnvelope QuantumEnvelope { get; }
+        public Quantum Quantum { get; }
 
         public AccountWrapper SourceAccount { get; }
-
-        public Quantum Quantum => (Quantum)QuantumEnvelope.Message;
 
         public ulong Apex => Quantum.Apex;
 
@@ -58,7 +56,9 @@ namespace Centaurus.Domain
 
         public void ComputeEffectsHash()
         {
-            EffectsHash = effects.SelectMany(h => h.Hash).ToArray().ComputeHash(buffer);
+            EffectsHash = effects.SelectMany(h => h.Hash)
+                .ToArray()
+                .ComputeHash(buffer);
         }
 
         /// <summary>
@@ -74,8 +74,8 @@ namespace Centaurus.Domain
             var result = new ProcessingResult
             {
                 Apex = Apex,
-                QuantumEnvelope = XdrConverter.Serialize(QuantumEnvelope),
-                Signature = EffectsHash.Sign(Context.Settings.KeyPair).Signature,
+                QuantumEnvelope = XdrConverter.Serialize(Quantum),
+                Signature = EffectsHash.Sign(Context.Settings.KeyPair).Data,
                 Timestamp = Quantum.Timestamp
             };
 
@@ -96,7 +96,7 @@ namespace Centaurus.Domain
 
         public List<Effect> GetClientEffects()
         {
-            if (QuantumEnvelope.Message is RequestQuantum request)
+            if (Quantum is RequestQuantum request)
                 return effects.Where(e => e.Effect.Account == request.RequestMessage.Account).Select(e => e.Effect).ToList();
             return effects.Select(e => e.Effect).ToList();
         }
@@ -108,7 +108,7 @@ namespace Centaurus.Domain
         public Dictionary<ulong, Message> GetNotificationMessages()
         {
             var requestAccount = 0ul;
-            if (QuantumEnvelope.Message is RequestQuantum request)
+            if (Quantum is RequestQuantum request)
                 requestAccount = request.RequestMessage.Account;
 
             var result = new Dictionary<ulong, EffectsNotification>();
@@ -118,7 +118,7 @@ namespace Centaurus.Domain
                     continue;
                 if (!result.TryGetValue(effect.Effect.Account, out var effectsNotification))
                 {
-                    effectsNotification = new EffectsNotification { ClientEffects = new List<Effect>() };
+                    effectsNotification = new EffectsNotification { ClientEffects = new List<Effect>(), Apex = Apex };
                     result.Add(effect.Effect.Account, effectsNotification);
                 }
                 effectsNotification.ClientEffects.Add(effect.Effect);
@@ -131,7 +131,7 @@ namespace Centaurus.Domain
             return new EffectsProof 
             { 
                 Hashes = effects.Select(e => new Hash { Data = e.Hash }).ToList(), 
-                Signatures = new List<Ed25519Signature> { EffectsHash.Sign(Context.Settings.KeyPair) } 
+                Signatures = new List<TinySignature>()
             };
         }
 

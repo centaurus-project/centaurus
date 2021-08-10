@@ -44,24 +44,16 @@ namespace Centaurus.Domain
         /// Notifies message author(s) about message processing result
         /// </summary>
         /// <param name="result">Result message</param>
-        public static void OnMessageProcessResult(this ExecutionContext context, ResultMessage result)
+        public static void OnMessageProcessResult(this ExecutionContext context, ResultMessageBase result, RawPubKey rawPubKey)
         {
             if (result == null)
                 return;
             if (context == null)
                 throw new ArgumentNullException(nameof(context));
-
-            var signatures = result.OriginalMessage.Signatures;
-
-            //unwrap if it is RequestQuantum
-            if (result.OriginalMessage.Message is RequestQuantum)
-                signatures = ((RequestQuantum)result.OriginalMessage.Message).RequestEnvelope.Signatures;
-            var envelope = result.CreateEnvelope();
-            for (var i = 0; i < signatures.Count; i++)
-            {
-                var accountToNotify = signatures[i];
-                context.Notify(accountToNotify.Signer, envelope);
-            }
+            if (rawPubKey == null)
+                throw new ArgumentNullException(nameof(rawPubKey));
+            
+            context.Notify(rawPubKey, result.CreateEnvelope());
         }
     }
 }

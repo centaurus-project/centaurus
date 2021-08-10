@@ -6,11 +6,11 @@ namespace Centaurus.Models
     /// <summary>
     /// Message used as a quantum response.
     /// </summary>
-    public class TransactionResultMessage : QuantumResultMessage
-    {
-        public override MessageTypes MessageType => MessageTypes.ITransactionResultMessage;
+    //public class TransactionResultMessage : QuantumResultMessage
+    //{
+    //    public override MessageTypes MessageType => MessageTypes.ITransactionResultMessage;
 
-        [XdrField(0)]
-        public List<TxSignature> TxSignatures { get; set; } = new List<TxSignature>();
-    }
+    //    [XdrField(0)]
+    //    public List<TxSignature> TxSignatures { get; set; } = new List<TxSignature>();
+    //}
 }

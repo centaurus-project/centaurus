@@ -11,13 +11,13 @@ namespace Centaurus
         /// <param name="binaryData">Data to sign</param>
         /// <param name="keyPair">KeyPair to sign the data. If null, CentaurusContext.Current.Settings.KeyPair will be used.</param>
         /// <returns></returns>
-        public static Ed25519Signature Sign(this byte[] binaryData, KeyPair keyPair)
+        public static TinySignature Sign(this byte[] binaryData, KeyPair keyPair)
         {
             var rawSignature = keyPair.Sign(binaryData);
-            return new Ed25519Signature()
+            return new TinySignature()
             {
-                Signature = rawSignature,
-                Signer = keyPair.PublicKey
+                Data = rawSignature,
+                //Signer = keyPair.PublicKey
             };
         }
     }

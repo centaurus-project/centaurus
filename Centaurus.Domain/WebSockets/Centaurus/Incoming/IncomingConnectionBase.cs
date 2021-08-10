@@ -10,9 +10,12 @@ namespace Centaurus.Domain
     public class IncomingConnectionBase : ConnectionBase
     {
         public IncomingConnectionBase(ExecutionContext context, KeyPair keyPair, WebSocket webSocket, string ip)
-            : base(context, keyPair, webSocket, ip)
+            : base(context, keyPair, webSocket)
         {
+            Ip = ip ?? throw new ArgumentNullException(nameof(ip));
         }
+
+        public string Ip { get; }
 
         protected void SendHandshake()
         {
@@ -27,11 +30,18 @@ namespace Centaurus.Domain
 
         private HandshakeData handshakeData = new HandshakeData().Randomize();
 
+        /// <summary>
+        /// When closing the connection we need to know if it was validated 
+        /// </summary>
+        public bool IsValidated { get; private set; }
+
         public bool TryValidate(HandshakeData handshakeData)
         {
             if (handshakeData == null
                 || !handshakeData.Equals(this.handshakeData))
                 return false;
+
+            IsValidated = true;
 
             //auditor Ready state would be set after success quanta delay inspection
             ConnectionState = IsAuditor ? ConnectionState.Validated : ConnectionState.Ready;

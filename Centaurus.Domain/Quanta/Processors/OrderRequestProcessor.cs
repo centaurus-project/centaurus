@@ -17,7 +17,7 @@ namespace Centaurus.Domain
 
         public override MessageTypes SupportedMessageType => MessageTypes.OrderRequest;
 
-        public override Task<QuantumResultMessage> Process(RequestContext context)
+        public override Task<QuantumResultMessageBase> Process(RequestContext context)
         {
             var quantum = context.Request;
 
@@ -25,7 +25,7 @@ namespace Centaurus.Domain
 
             context.CentaurusContext.Exchange.ExecuteOrder(context);
 
-            return Task.FromResult((QuantumResultMessage)context.QuantumEnvelope.CreateResult(ResultStatusCodes.Success));
+            return Task.FromResult((QuantumResultMessageBase)context.Quantum.CreateEnvelope().CreateResult(ResultStatusCodes.Success));
         }
 
         private int MaxCrossOrdersCount = 100;

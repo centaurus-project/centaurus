@@ -15,12 +15,12 @@ namespace Centaurus.Domain
 
         public override MessageTypes SupportedMessageType { get; } = MessageTypes.PaymentRequest;
 
-        public override ProcessorContext GetContext(MessageEnvelope messageEnvelope, AccountWrapper account)
+        public override ProcessorContext GetContext(Quantum quantum, AccountWrapper account)
         {
-            return new PaymentProcessorContext(Context, messageEnvelope, account);
+            return new PaymentProcessorContext(Context, quantum, account);
         }
 
-        public override Task<QuantumResultMessage> Process(PaymentProcessorContext context)
+        public override Task<QuantumResultMessageBase> Process(PaymentProcessorContext context)
         {
             context.UpdateNonce();
 
@@ -38,9 +38,9 @@ namespace Centaurus.Domain
 
             context.AddBalanceUpdate(context.SourceAccount, payment.Asset, payment.Amount, UpdateSign.Minus);
 
-            var result = context.QuantumEnvelope.CreateResult(ResultStatusCodes.Success);
+            var result = context.Quantum.CreateEnvelope().CreateResult(ResultStatusCodes.Success);
 
-            return Task.FromResult((QuantumResultMessage)result);
+            return Task.FromResult((QuantumResultMessageBase)result);
         }
 
         public override Task Validate(PaymentProcessorContext context)

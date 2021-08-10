@@ -8,6 +8,9 @@ namespace Centaurus.Models
     {
         public override EffectTypes EffectType => EffectTypes.Trade;
 
+        [XdrField(0)]
+        public ulong OrderId { get; set; }
+
         [XdrField(1)]
         public ulong AssetAmount { get; set; }
 
@@ -16,5 +19,11 @@ namespace Centaurus.Models
 
         [XdrField(3)]
         public bool IsNewOrder { get; set; }
+
+        [XdrField(4)]
+        public OrderSide Side { get; set; }
+
+        [XdrField(5)]
+        public string Asset { get; set; }
     }
 }

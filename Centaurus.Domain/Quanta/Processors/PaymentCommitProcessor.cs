@@ -15,9 +15,9 @@ namespace Centaurus.Domain
 
         public override MessageTypes SupportedMessageType => MessageTypes.DepositQuantum;
 
-        public override Task<QuantumResultMessage> Process(PaymentCommitProcessorContext context)
+        public override Task<QuantumResultMessageBase> Process(PaymentCommitProcessorContext context)
         {
-            var depositQuantum = (DepositQuantum)context.QuantumEnvelope.Message;
+            var depositQuantum = (DepositQuantum)context.Quantum;
             var depositNotification = depositQuantum.Source;
 
             context.AddCursorUpdate(context.PaymentProvider.NotificationsManager, depositNotification.ProviderId, depositNotification.Cursor, context.PaymentProvider.Cursor);
@@ -27,13 +27,13 @@ namespace Centaurus.Domain
 
             context.PaymentProvider.NotificationsManager.RemovePayment(depositNotification.Cursor);
 
-            return Task.FromResult((QuantumResultMessage)context.QuantumEnvelope.CreateResult(ResultStatusCodes.Success));
+            return Task.FromResult((QuantumResultMessageBase)context.Quantum.CreateEnvelope().CreateResult(ResultStatusCodes.Success));
         }
 
         public override Task Validate(PaymentCommitProcessorContext context)
         {
             //TODO: validate type automatically based on the SupportedMessageType
-            var paymentQuantum = context.QuantumEnvelope.Message as DepositQuantum
+            var paymentQuantum = context.Quantum as DepositQuantum
                 ?? throw new ArgumentException($"Unexpected message type. Only messages of type {typeof(DepositQuantum).FullName} are supported.");
 
             if (paymentQuantum.Source == null
@@ -63,9 +63,6 @@ namespace Centaurus.Domain
 
             if (deposit.Destination == null)
                 throw new InvalidOperationException("Destination is invalid.");
-
-            if (context.CentaurusContext.AccountStorage.GetAccount(deposit.Destination) == null)
-                throw new InvalidOperationException("Unknown destination.");
 
             if (deposit.Amount <= 0)
                 throw new InvalidOperationException("Amount should be greater than 0.");
@@ -97,9 +94,9 @@ namespace Centaurus.Domain
             context.AddBalanceUpdate(account, deposit.Asset, deposit.Amount, UpdateSign.Plus);
         }
 
-        public override ProcessorContext GetContext(MessageEnvelope messageEnvelope, AccountWrapper account)
+        public override ProcessorContext GetContext(Quantum quantum, AccountWrapper account)
         {
-            return new PaymentCommitProcessorContext(Context, messageEnvelope, account);
+            return new PaymentCommitProcessorContext(Context, quantum, account);
         }
     }
 }

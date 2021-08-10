@@ -31,9 +31,9 @@ namespace Centaurus.Test
         {
             var connection = default(IncomingConnectionBase);
             if (context.Constellation.Auditors.Any(a => a.PubKey.Equals(pubKey)))
-                connection = new IncomingAuditorConnection(context, pubKey, new FakeWebSocket(), "127.0.0.1");
+                connection = new IncomingAuditorConnection(context, pubKey, new DummyWebSocket(), "127.0.0.1");
             else
-                connection = new IncomingClientConnection(context, pubKey, new FakeWebSocket(), "127.0.0.1");
+                connection = new IncomingClientConnection(context, pubKey, new DummyWebSocket(), "127.0.0.1");
 
             if (state != null)
                 connection.ConnectionState = state.Value;
@@ -42,7 +42,7 @@ namespace Centaurus.Test
 
         protected OutgoingConnection GetOutgoingConnection(ExecutionContext context, RawPubKey keyPair, ConnectionState? state = null)
         {
-            var connection = new OutgoingConnection(context, keyPair, new MockAuditorConnectionInfo(new FakeWebSocket()));
+            var connection = new OutgoingConnection(context, keyPair, new OutgoingMessageStorage(), new DummyConnectionWrapper(new DummyWebSocket()));
             if (state != null)
                 connection.ConnectionState = state.Value;
             return connection;

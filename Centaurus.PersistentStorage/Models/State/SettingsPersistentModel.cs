@@ -10,7 +10,7 @@ namespace Centaurus.PersistentStorage
         public ulong Apex { get; set; }
 
         [Key(0)]
-        public byte[] Vault { get; set; }
+        public byte[] Alpha { get; set; }
 
         [Key(1)]
         public List<AuditorModel> Auditors { get; set; }
@@ -46,7 +46,7 @@ namespace Centaurus.PersistentStorage
     public class AuditorModel
     {
         [Key(0)]
-        public string PubKey { get; set; }
+        public byte[] PubKey { get; set; }
 
         [Key(1)]
         public string Address { get; set; }

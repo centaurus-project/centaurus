@@ -8,7 +8,7 @@ namespace Centaurus.Domain
 {
     public class RequestContext : ProcessorContext
     {
-        public RequestContext(ExecutionContext context, MessageEnvelope quantum, AccountWrapper account)
+        public RequestContext(ExecutionContext context, Quantum quantum, AccountWrapper account)
             : base(context, quantum, account)
         {
             if (account == null)

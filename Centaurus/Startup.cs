@@ -1,5 +1,4 @@
 ﻿using Centaurus.Alpha;
-using Centaurus.Client;
 using Centaurus.Domain;
 using Centaurus.Models;
 using System;
@@ -29,9 +28,9 @@ namespace Centaurus
             this.resetEvent = resetEvent ?? throw new ArgumentNullException(nameof(resetEvent));
 
             if (AlphaStartup != null)
-                AlphaStartup.Run(resetEvent);
+                AlphaStartup.Run();
 
-            Context.AppState.StateChanged += Current_StateChanged;
+            Context.StateManager.StateChanged += Current_StateChanged;
         }
 
         private void Current_StateChanged(StateChangedEventArgs eventArgs)
@@ -46,7 +45,7 @@ namespace Centaurus
 
         public void Shutdown()
         {
-            Context.AppState.SetState( State.Stopped);
+            Context.StateManager.Stopped();
             if (AlphaStartup != null)
                 AlphaStartup.Shutdown();
 
@@ -54,7 +53,7 @@ namespace Centaurus
             Task.WaitAll(
                 Context.IncomingConnectionManager.CloseAllConnections(),
                 Context.InfoConnectionManager.CloseAllConnections(),
-                Context.OutgoingConnectionManager.CloseAllConnections()
+                Task.Factory.StartNew(Context.OutgoingConnectionManager.CloseAllConnections)
             );
         }
     }

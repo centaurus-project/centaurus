@@ -43,14 +43,11 @@ namespace Centaurus.Domain
                     connection.ConnectionState.ToString(),
                     ValidConnectionStates.Select(s => s.ToString()).ToArray());
 
-            if (connection.PubKey == null || !message.Envelope.Signatures.Any(s => s.Signer != connection.PubKey))
+            if (!message.Envelope.Signature.IsValid(connection.PubKey, message.MessageHash))
                 throw new UnauthorizedException();
 
             ValidateAuditor(connection);
             ValidateClient(connection);
-
-            if (!message.Envelope.Signatures.AreSignaturesValid(message.MessageHash))
-                throw new UnauthorizedException();
 
             return Task.CompletedTask;
         }
@@ -61,9 +58,12 @@ namespace Centaurus.Domain
                 throw new UnauthorizedException();
         }
 
+
+        private ConnectionState[] AutorizedConnectionStates = new ConnectionState[] { ConnectionState.Validated, ConnectionState.Ready };
         private void ValidateClient(ConnectionBase connection)
         {
-            if (connection is IncomingClientConnection clientConnection
+            if (connection is IncomingClientConnection clientConnection //check requests count only for a client connection 
+                && AutorizedConnectionStates.Contains(clientConnection.ConnectionState) //increment requests count only for validated connection
                 && !clientConnection.Account.RequestCounter.IncRequestCount(DateTime.UtcNow.Ticks, out var error))
                 throw new TooManyRequestsException(error);
         }

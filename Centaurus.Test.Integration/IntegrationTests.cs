@@ -1,22 +1,9 @@
-﻿using Centaurus.Controllers;
-using Centaurus.DAL;
-using Centaurus.DAL.Mongo;
-using Centaurus.Domain;
-using Centaurus.Models;
-using Centaurus.SDK.Models;
-using Centaurus.Stellar.Models;
+﻿using Centaurus.Models;
 using Centaurus.Xdr;
-using Microsoft.AspNetCore.Mvc;
 using NUnit.Framework;
-using stellar_dotnet_sdk;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
 using System.Linq;
-using System.Text;
-using System.Text.Json;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace Centaurus.Test
@@ -26,11 +13,15 @@ namespace Centaurus.Test
         [Test]
         [Explicit]
         [TestCase(2, 0)]
+        [TestCase(10, 0)]
+        [TestCase(2, 10)]
         [TestCase(2, 100)]
         [TestCase(3, 100)]
         [TestCase(10, 10)]
         public async Task BaseTest(int auditorsCount, int clientsCount)
         {
+
+            TestContext.Out.WriteLine("BaseTest started");
             var environment = new IntegrationTestEnvironment();
 
             await environment.PrepareConstellation(auditorsCount, clientsCount);
@@ -40,11 +31,22 @@ namespace Centaurus.Test
             if (connectedClients.Count > 0)
             {
                 var client = connectedClients.First();
-                await environment.AssertPayment(client, KeyPair.Random(), 0, environment.SDKConstellationInfo.MinAccountBalance);
+                await environment.AssertPayment(
+                    client,
+                    KeyPair.Random(),
+                    environment.SDKConstellationInfo.QuoteAsset.Code,
+                    environment.SDKConstellationInfo.MinAccountBalance
+                );
 
                 await environment.AssertClientsCount(clientsCount + 1, TimeSpan.FromSeconds(15)); //client should be created on payment
 
-                await environment.AssertWithdrawal(client, client.KeyPair, 0, 1.ToString());
+                await environment.AssertWithdrawal(
+                    client,
+                    environment.ProviderFactory.Provider.Id,
+                    client.Config.ClientKeyPair,
+                    environment.SDKConstellationInfo.QuoteAsset.Code,
+                    1
+                );
             }
 
             environment.Dispose();
@@ -58,18 +60,18 @@ namespace Centaurus.Test
 
             await environment.PrepareConstellation(3, 0);
 
-            var auditorStartup = environment.AuditorWrappers.First();
-            await auditorStartup.Shutdown();
+            var auditorStartup = environment.AuditorWrappers.Values.Skip(1).First(); //first is Alpha
+            auditorStartup.Shutdown();
 
-            Assert.AreEqual(1, environment.AlphaWrapper.Context.AppState.ConnectedAuditorsCount, "Auditors count assertion.");
-            await environment.AssertConstellationState(State.Ready, TimeSpan.FromSeconds(5));
+            Assert.AreEqual(1, environment.AlphaWrapper.Context.StateManager.ConnectedAuditorsCount, "Auditors count assertion.");
+            await environment.AssertConstellationState(TimeSpan.FromSeconds(5), State.Ready);
 
             var clientsCount = 100;
             environment.GenerateCliens(clientsCount);
 
             await environment.AssertClientsCount(clientsCount, TimeSpan.FromSeconds(15));
 
-            await auditorStartup.Run();
+            auditorStartup.Run(environment.AuditorWrappers);
 
             await IntegrationTestEnvironmentExtensions.AssertState(auditorStartup.Startup, State.Ready, TimeSpan.FromSeconds(10));
             await IntegrationTestEnvironmentExtensions.AssertDuringPeriod(
@@ -91,24 +93,23 @@ namespace Centaurus.Test
 
             await environment.PrepareConstellation(3, 0);
 
-            await environment.AlphaWrapper.Shutdown();
+            environment.AlphaWrapper.Shutdown();
 
-            await Task.WhenAll(environment.AuditorWrappers.Select(a => IntegrationTestEnvironmentExtensions.AssertState(a.Startup, State.Running, TimeSpan.FromSeconds(10))));
+            await Task.WhenAll(environment.AuditorWrappers.Select(a => IntegrationTestEnvironmentExtensions.AssertState(a.Value.Startup, State.Running, TimeSpan.FromSeconds(10))));
 
-            await environment.AlphaWrapper.Run();
+            environment.AlphaWrapper.Run(environment.AuditorWrappers);
 
-            await environment.AssertConstellationState(State.Ready, TimeSpan.FromSeconds(15));
+            await environment.AssertConstellationState(TimeSpan.FromSeconds(15), State.Ready);
 
-            await Task.WhenAll(environment.AuditorWrappers.Select(a => IntegrationTestEnvironmentExtensions.AssertState(a.Startup, State.Ready, TimeSpan.FromSeconds(10))));
+            await Task.WhenAll(environment.AuditorWrappers.Select(a => IntegrationTestEnvironmentExtensions.AssertState(a.Value.Startup, State.Ready, TimeSpan.FromSeconds(10))));
         }
 
         [Test]
         [Explicit]
-        [TestCase(false, false, false)]
-        [TestCase(true, false, false)]
-        [TestCase(false, true, false)]
-        [TestCase(false, false, true)]
-        public async Task AlphaRestartWithQuantaDelayTest(bool invalidHash, bool invalidClientSignature, bool invalidAlphaSignature)
+        [TestCase(true, false)]
+        [TestCase(false, true)]
+        [TestCase(false, false)]
+        public async Task AlphaRestartWithQuantaDelayTest(bool invalidHash, bool invalidClientSignature)
         {
             var environment = new IntegrationTestEnvironment();
 
@@ -142,53 +143,53 @@ namespace Centaurus.Test
             var quantumEnvelope = quantum
                 .CreateEnvelope();
 
-            var result = await environment.ProcessQuantumIsolated(quantumEnvelope);
+            var result = await environment.ProcessQuantumIsolated(quantum);
 
             quantum.EffectsHash = result.effectsHash;
             quantumEnvelope.Sign(environment.AlphaWrapper.Settings.KeyPair);
 
-            await environment.AlphaWrapper.Shutdown();
+            environment.AlphaWrapper.Shutdown();
 
-            await Task.WhenAll(environment.AuditorWrappers.Select(a => IntegrationTestEnvironmentExtensions.AssertState(a.Startup, State.Running, TimeSpan.FromSeconds(10))));
+            await Task.WhenAll(environment.AuditorWrappers.Select(a => IntegrationTestEnvironmentExtensions.AssertState(a.Value.Startup, State.Running, TimeSpan.FromSeconds(10))));
 
             //handle quantum
             await Task.WhenAll(environment.AuditorWrappers.Select(a =>
             {
                 var rawQuantum = quantumEnvelope.ToByteArray();
-                var auditorsQuantum = XdrConverter.Deserialize<MessageEnvelope>(rawQuantum);
-                return a.Context.QuantumHandler.HandleAsync(auditorsQuantum);
+                var auditorsQuantum = XdrConverter.Deserialize<Quantum>(rawQuantum);
+                return a.Value.Context.QuantumHandler.HandleAsync(auditorsQuantum);
             }));
 
             //change quantum
-            environment.AuditorWrappers.ForEach(a =>
+            environment.AuditorWrappers.Values.ToList().ForEach(a =>
             {
                 a.Context.QuantumStorage.GetQuantaBacth(lastApex + 1, 1, out var quanta);
                 var quantum = quanta.First();
                 if (invalidHash)
-                    ((Quantum)quantum.Message).Timestamp = DateTime.UtcNow.Ticks;
+                    quantum.Quantum.Timestamp = DateTime.UtcNow.Ticks;
                 if (invalidClientSignature)
                 {
-                    var request = (RequestQuantum)quantum.Message;
-                    request.RequestEnvelope.Signatures.Clear();
+                    var request = (RequestQuantum)quantum.Quantum;
+                    request.RequestEnvelope.Signature = new TinySignature { Data = new byte[64] };
                     request.RequestEnvelope.Sign(KeyPair.Random());
                 }
-                if (invalidAlphaSignature)
-                {
-                    quantum.Signatures.Clear();
-                    quantum.Sign(KeyPair.Random());
-                }
+                //if (invalidAlphaSignature)
+                //{
+                //    quantum.Quantum.Signatures.Clear();
+                //    quantum.Quantum.Sign(KeyPair.Random());
+                //}
             });
 
-            await environment.AlphaWrapper.Run();
+            environment.AlphaWrapper.Run(environment.AuditorWrappers);
 
-            var expectedState = invalidHash || invalidClientSignature || invalidAlphaSignature ? State.Failed : State.Ready;
+            var expectedState = invalidHash || invalidClientSignature ? State.Failed : State.Ready;
 
             await IntegrationTestEnvironmentExtensions.AssertState(environment.AlphaWrapper.Startup, expectedState, TimeSpan.FromSeconds(30));
 
             if (expectedState == State.Failed)
                 return;
 
-            await Task.WhenAll(environment.AuditorWrappers.Select(a => IntegrationTestEnvironmentExtensions.AssertState(a.Startup, State.Ready, TimeSpan.FromSeconds(10))));
+            await Task.WhenAll(environment.AuditorWrappers.Select(a => IntegrationTestEnvironmentExtensions.AssertState(a.Value.Startup, State.Ready, TimeSpan.FromSeconds(10))));
 
             await environment.AssertConstellationApex(lastApex + 1, TimeSpan.FromSeconds(5));
         }
@@ -217,10 +218,9 @@ namespace Centaurus.Test
             var sqamRequest = new OrderRequest
             {
                 Account = client.Id,
-                AccountWrapper = client,
                 Amount = amount,
                 Price = 1,
-                Asset = 1,
+                Asset = environment.AlphaWrapper.Context.Constellation.Assets[1].Code,
                 RequestId = 1,
                 Side = OrderSide.Buy
             }.CreateEnvelope().Sign(useFakeClient ? KeyPair.Random() : clientPk);
@@ -233,16 +233,16 @@ namespace Centaurus.Test
                 PrevHash = quantaStorage.LastQuantumHash,
                 RequestEnvelope = sqamRequest,
                 Timestamp = DateTime.UtcNow.Ticks
-            }.CreateEnvelope().Sign(useFakeAlpha ? KeyPair.Random() : environment.AlphaWrapper.Settings.KeyPair);
+            };
 
-            quantaStorage.AddQuantum(requestQuantum, requestQuantum.ComputeMessageHash());
+            quantaStorage.AddQuantum(new InProgressQuantum { QuantumEnvelope = requestQuantum.CreateEnvelope(), Signatures = new List<AuditorSignature>() }, requestQuantum.ComputeHash());
 
             var expectedState = useFakeClient || useFakeAlpha || invalidBalance ? State.Failed : State.Ready;
 
             if (expectedState == State.Ready)
                 await environment.AssertConstellationApex(apex, TimeSpan.FromSeconds(10));
 
-            await Task.WhenAll(environment.AuditorWrappers.Select(a => IntegrationTestEnvironmentExtensions.AssertState(a.Startup, expectedState, TimeSpan.FromSeconds(10))));
+            await Task.WhenAll(environment.AuditorWrappers.Select(a => IntegrationTestEnvironmentExtensions.AssertState(a.Value.Startup, expectedState, TimeSpan.FromSeconds(10))));
         }
     }
 }

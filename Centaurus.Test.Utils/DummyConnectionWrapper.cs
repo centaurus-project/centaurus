@@ -1,16 +1,13 @@
-﻿using Centaurus.Client;
-using System;
-using System.Collections.Generic;
+﻿using System;
 using System.Net.WebSockets;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace Centaurus.Test
 {
-    public class MockAuditorConnectionInfo : OutgoingConnectionWrapperBase
+    public class DummyConnectionWrapper : OutgoingConnectionWrapperBase
     {
-        public MockAuditorConnectionInfo(FakeWebSocket webSocket) 
+        public DummyConnectionWrapper(WebSocket webSocket)
             : base(webSocket)
         {
         }

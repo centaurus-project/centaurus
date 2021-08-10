@@ -5,10 +5,15 @@ namespace Centaurus.Domain
     //TODO: add server types (FullNode, Auditor)
     public class RoleManager
     {
-        public RoleManager(CentaurusNodeParticipationLevel participationLevel, CentaurusNodeRole initRole)
+        public RoleManager(CentaurusNodeParticipationLevel participationLevel)
         {
             ParticipationLevel = participationLevel;
-            SetRole(initRole);
+            if (participationLevel == CentaurusNodeParticipationLevel.Undefined)
+                throw new InvalidOperationException($"Invalid participation level.");
+            if (participationLevel == CentaurusNodeParticipationLevel.Auditor)
+                SetRole(CentaurusNodeRole.Auditor);
+            else
+                SetRole(CentaurusNodeRole.Beta);
         }
 
         private object syncRoot = new { };
@@ -44,7 +49,7 @@ namespace Centaurus.Domain
     public enum CentaurusNodeParticipationLevel
     {
         Undefined = 0,
-        Prime = 1, 
-        Auditor = 2 
+        Prime = 1,
+        Auditor = 2
     }
 }

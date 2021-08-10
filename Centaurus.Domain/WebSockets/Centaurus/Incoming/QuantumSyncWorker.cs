@@ -43,23 +43,24 @@ namespace Centaurus
                     return;
                 }
 
-                if (auditor.ConnectionState != ConnectionState.Ready && apexDiff <= 100) //auditor has reached the constellation
+                if (!Context.IsAlpha || auditor.ConnectionState == ConnectionState.Connected || apexDiff == 0 && auditor.ConnectionState == ConnectionState.Ready)
+                {
+                    Thread.Sleep(50);
+                    continue;
+                }
+                else if (auditor.ConnectionState != ConnectionState.Ready && apexDiff <= 100) //auditor has reached the constellation
                 {
                     auditor.ConnectionState = ConnectionState.Ready;
+                    continue;
                 }
                 else if (auditor.ConnectionState == ConnectionState.Ready && apexDiff >= 10_000) //auditor is too delayed
                 {
                     auditor.ConnectionState = ConnectionState.Validated;
                 }
 
-                if (CurrentApexCursor == Context.QuantumStorage.CurrentApex)
-                {
-                    Thread.Sleep(50);
-                    continue;
-                }
                 try
                 {
-                    List<MessageEnvelope> quanta = null;
+                    List<InProgressQuantum> quanta = null;
                     if (!Context.QuantumStorage.GetQuantaBacth(CurrentApexCursor + 1, batchSize, out quanta))
                     {
                         quanta = Context.PersistenceManager.GetQuantaAboveApex(CurrentApexCursor, batchSize); //quanta are not found in the in-memory storage
@@ -70,8 +71,8 @@ namespace Centaurus
                     if (quanta.Count < 1)
                         throw new Exception("No quanta from storage.");
 
-                    var firstApex = ((Quantum)quanta.First().Message).Apex;
-                    var lastApex = ((Quantum)quanta.Last().Message).Apex;
+                    var firstApex = quanta.First().Quantum.Apex;
+                    var lastApex = quanta.Last().Quantum.Apex;
 
                     logger.Trace($"About to sent {quanta.Count} quanta. Apex from {firstApex} to {lastApex}");
 

@@ -42,6 +42,10 @@ namespace Centaurus
         {
             if (context == null)
                 throw new ArgumentNullException(nameof(context));
+
+            if (context.Constellation == null)
+                return false;
+
             if (!isCurrentIncluded)
                 //+1 is current auditor
                 auditorsCount++;

@@ -17,8 +17,6 @@ namespace Centaurus.Domain
 
         public override MessageTypes SupportedMessageType { get; } = MessageTypes.AuditorHandshakeResponse;
 
-        public override ConnectionState[] ValidConnectionStates { get; } = new ConnectionState[] { ConnectionState.Connected };
-
         public override bool IsAuditorOnly => true;
 
         public override async Task HandleMessage(ConnectionBase connection, IncomingMessage message)

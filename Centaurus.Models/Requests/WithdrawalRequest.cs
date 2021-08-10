@@ -8,7 +8,7 @@ namespace Centaurus.Models
         public override MessageTypes MessageType => MessageTypes.WithdrawalRequest;
 
         [XdrField(0)]
-        public string PaymentProvider { get; set; }
+        public string Provider { get; set; }
 
         [XdrField(1)]
         public string Asset { get; set; }
@@ -17,7 +17,7 @@ namespace Centaurus.Models
         public ulong Amount { get; set; }
 
         [XdrField(3)]
-        public string Destination { get; set; }
+        public byte[] Destination { get; set; }
 
         [XdrField(4)]
         public long Fee { get; set; }

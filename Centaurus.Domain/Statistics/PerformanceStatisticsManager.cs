@@ -75,7 +75,7 @@ namespace Centaurus.Domain
                     var accountId = auditorConnection?.PubKeyAddress;
                     if (!auditorsStatistics.TryGetValue(accountId, out var statistics))
                         continue;
-                    var auditorApex = (ulong)(auditorConnection?.QuantumWorker?.CurrentApexCursor ?? 0);
+                    var auditorApex = auditorConnection?.QuantumWorker?.CurrentApexCursor ?? 0;
                     if (auditorApex >= 0)
                         statistics.Delay = (int)(Context.QuantumStorage.CurrentApex - auditorApex);
                 }
@@ -87,38 +87,44 @@ namespace Centaurus.Domain
         {
             try
             {
-                var statistics = default(PerformanceStatistics);
-                if (Context.IsAlpha)
+                var current = new AuditorPerfStatistics
                 {
-                    if (!Context.SubscriptionsManager.TryGetSubscription(PerformanceStatisticsSubscription.SubscriptionName, out var subscription))
-                        return;
-                    statistics = new AlphaPerformanceStatistics
-                    {
-                        QuantaPerSecond = GetItemsPerSecond(),
-                        QuantaQueueLength = GetQuantaAvgLength(),
-                        Throttling = GetThrottling(),
-                        AuditorStatistics = GetAuditorsStatistics(),
-                        BatchInfos = GetBatchInfos(),
-                        UpdateDate = DateTime.UtcNow
-                    };
-                    Context.InfoConnectionManager.SendSubscriptionUpdate(subscription, PerformanceStatisticsUpdate.Generate((AlphaPerformanceStatistics)statistics, PerformanceStatisticsSubscription.SubscriptionName));
-                }
-                else
-                {
-                    statistics = new AuditorPerformanceStatistics
-                    {
-                        QuantaPerSecond = GetItemsPerSecond(),
-                        QuantaQueueLength = GetQuantaAvgLength(),
-                        BatchInfos = GetBatchInfos(),
-                        UpdateDate = DateTime.UtcNow
-                    };
-                    Context.OutgoingMessageStorage.EnqueueMessage(statistics.ToModel());
-                }
+                    BatchInfos = GetBatchInfos().Select(b => b.ToBatchSavedInfoModel()).ToList(),
+                    QuantaPerSecond = GetItemsPerSecond(),
+                    QuantaQueueLength = GetQuantaAvgLength(),
+                    UpdateDate = DateTime.UtcNow.Ticks,
+                    State = Context.StateManager.State
+                };
+                AddAuditorStatistics(Context.Settings.KeyPair.AccountId, current);
+
+                NotifyAuditors(current);
+                SendToSubscribers();
             }
             catch (Exception exc)
             {
                 logger.Error(exc);
             }
+        }
+
+        void SendToSubscribers()
+        {
+            if (!Context.SubscriptionsManager.TryGetSubscription(PerformanceStatisticsSubscription.SubscriptionName, out var subscription))
+                return;
+            var statistics = new AlphaPerformanceStatistics
+            {
+                QuantaPerSecond = GetItemsPerSecond(),
+                QuantaQueueLength = GetQuantaAvgLength(),
+                Throttling = GetThrottling(),
+                AuditorStatistics = GetAuditorsStatistics(),
+                BatchInfos = GetBatchInfos(),
+                UpdateDate = DateTime.UtcNow
+            };
+            Context.InfoConnectionManager.SendSubscriptionUpdate(subscription, PerformanceStatisticsUpdate.Generate((AlphaPerformanceStatistics)statistics, PerformanceStatisticsSubscription.SubscriptionName));
+        }
+
+        void NotifyAuditors(AuditorPerfStatistics statisticsMessage)
+        {
+            Context.OutgoingConnectionManager.EnqueueMessage(statisticsMessage.CreateEnvelope());
         }
 
         int GetQuantaAvgLength()

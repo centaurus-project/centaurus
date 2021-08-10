@@ -19,6 +19,9 @@ namespace Centaurus.Models
         [XdrField(3)]
         public long UpdateDate { get; set; }
 
+        [XdrField(4)]
+        public State State { get; set; }
+
         public override MessageTypes MessageType => MessageTypes.AuditorPerfStatistics;
     }
 

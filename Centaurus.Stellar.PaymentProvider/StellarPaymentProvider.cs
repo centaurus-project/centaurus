@@ -87,7 +87,7 @@ namespace Centaurus.Stellar.PaymentProvider
             if (!Settings.TryGetAsset(withdrawalRequest.Asset, out var stellarAsset))
                 throw new InvalidOperationException($"Asset {withdrawalRequest.Asset} is not supported by provider.");
 
-            var transaction = TransactionHelper.BuildPaymentTransaction(options, stellar_dotnet_sdk.KeyPair.FromAccountId(withdrawalRequest.Destination), stellarAsset, (long)withdrawalRequest.Amount);
+            var transaction = TransactionHelper.BuildPaymentTransaction(options, stellar_dotnet_sdk.KeyPair.FromPublicKey(withdrawalRequest.Destination), stellarAsset, (long)withdrawalRequest.Amount);
             var txSourceAccount = transaction.SourceAccount;
             if (Vault == txSourceAccount.AccountId)
                 throw new InvalidOperationException("Vault account cannot be used as transaction source.");

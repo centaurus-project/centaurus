@@ -51,7 +51,7 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
                 }
 
                 if (currentBatch == null)
-                    currentBatch = new List<MessageEnvelope>();
+                    currentBatch = new List<InProgressQuantum>();
 
                 hasQuanta = currentBatch.Count == batchSize;
                 var state = new QuantaBatch
@@ -61,7 +61,7 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
                 };
                 await connection.SendMessage(state);
                 var lastQuantum = currentBatch.LastOrDefault();
-                aboveApex = (ulong)(lastQuantum?.Message.MessageId ?? 0);
+                aboveApex = (ulong)(lastQuantum?.Quantum.MessageId ?? 0);
             };
         }
     }

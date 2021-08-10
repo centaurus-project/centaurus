@@ -1,9 +1,7 @@
-﻿using Centaurus.Models;
-using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using System;
+using Centaurus.Models;
 
-namespace Centaurus.SDK
+namespace Centaurus.NetSDK
 {
     public class RequestException: Exception
     {

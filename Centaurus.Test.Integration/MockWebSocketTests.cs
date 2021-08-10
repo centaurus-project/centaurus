@@ -1,10 +1,8 @@
 ﻿using Centaurus.Xdr;
 using NUnit.Framework;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Net.WebSockets;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -19,6 +17,8 @@ namespace Centaurus.Test
         {
             var leftWebsocket = new MockWebSocket();
             var rightWebsocket = new MockWebSocket();
+            leftWebsocket.KeyPair = KeyPair.Random();
+            rightWebsocket.KeyPair = KeyPair.Random();
             leftWebsocket.Connect(rightWebsocket);
             rightWebsocket.Connect(leftWebsocket);
 

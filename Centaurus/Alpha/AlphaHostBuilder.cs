@@ -59,7 +59,7 @@ namespace Centaurus.Alpha
                         {
                             if (Certificate != null)
                             {
-                                options.ListenAnyIP(Context.Settings.AlphaPort,
+                                options.ListenAnyIP(Context.Settings.ListeningPort,
                                 listenOptions =>
                                 {
                                     var httpsOptions = new HttpsConnectionAdapterOptions();
@@ -68,15 +68,12 @@ namespace Centaurus.Alpha
                                 });
                             }
                             else
-                                options.ListenAnyIP(Context.Settings.AlphaPort);
+                                options.ListenAnyIP(Context.Settings.ListeningPort);
                         });
                 }).Build();
         }
 
         public static State[] ValidStates = new State[] { State.Rising, State.Running, State.Ready };
-
-        public const string centaurusWebSocketEndPoint = "/centaurus";
-        public const string infoWebSocketEndPoint = "/info";
 
         private void SetupCertificate(Settings alphaSettings)
         {
@@ -169,8 +166,8 @@ namespace Centaurus.Alpha
             static async Task CentaurusWebSocketHandler(HttpContext context, Func<Task> next)
             {
                 var centaurusContext = context.RequestServices.GetService<ExecutionContext>();
-                if (centaurusContext.AppState != null 
-                    && ValidStates.Contains(centaurusContext.AppState.State) 
+                if (centaurusContext.StateManager != null 
+                    && ValidStates.Contains(centaurusContext.StateManager.State) 
                     && TryGetPubKey(context, out var pubKey))
                 {
                     using (var webSocket = await context.WebSockets.AcceptWebSocketAsync())
@@ -184,14 +181,12 @@ namespace Centaurus.Alpha
                 }
             }
 
-            const string pubkeyParamName = "pubkey";
-
             static bool TryGetPubKey(HttpContext context, out RawPubKey pubKey)
             {
                 pubKey = null;
                 if (context == null)
                     throw new ArgumentNullException(nameof(context));
-                if (!(context.Request.Query.TryGetValue(pubkeyParamName, out var address) 
+                if (!(context.Request.Query.TryGetValue(WebSocketConstants.CentaurusWebSocketEndPoint, out var address) 
                     && KeyPair.TryGetFromAccountId(address, out var keyPair)))
                     return false;
                 pubKey = keyPair;
@@ -207,8 +202,8 @@ namespace Centaurus.Alpha
 
             static Dictionary<string, Func<HttpContext, Func<Task>, Task>> webSocketHandlers = new Dictionary<string, Func<HttpContext, Func<Task>, Task>>
             {
-                { centaurusWebSocketEndPoint, CentaurusWebSocketHandler },
-                { infoWebSocketEndPoint, InfoWebSocketHandler }
+                { WebSocketConstants.CentaurusWebSocketEndPoint, CentaurusWebSocketHandler },
+                { WebSocketConstants.InfoWebSocketEndPoint, InfoWebSocketHandler }
             };
 
             // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

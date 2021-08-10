@@ -54,27 +54,31 @@ namespace Centaurus.Models
         /// <summary>
         /// Signed handshake data and last known apex.
         /// </summary>
-        AuditorHandshakeResponse = 110,
+        AuditorHandshakeResponse = 102,
         /// <summary>
         /// Operation result, containing original message and processing status.
         /// </summary>
-        ResultMessage = 102,
+        ResultMessage = 103,
         /// <summary>
         /// Operation result, containing original quantum and processing status.
         /// </summary>
-        QuantumResultMessage = 103,
+        QuantumResultMessage = 104,
         /// <summary>
         /// ITransaction operation result, containing transaction signature, original quantum and processing status.
         /// </summary>
-        ITransactionResultMessage = 104,
+        ITransactionResultMessage = 105,
         /// <summary>
         /// Message from Alpha to a client with all effects that affects the client, and wasn't triggered by the client (Trade for example).
         /// </summary>
-        EffectsNotification = 105,
+        EffectsNotification = 106,
         /// <summary>
         /// Auditor's performance statistics.
         /// </summary>
-        AuditorPerfStatistics = 107,
+        AuditorPerfStatistics = 107, 
+        /// <summary>
+        /// Internal message. Contains quantum message envelope and effects signatures.
+        /// </summary>
+        ProcessedQuantum = 108,
         /// <summary>
         /// The message is send after success handshake. Contains account id.
         /// </summary>

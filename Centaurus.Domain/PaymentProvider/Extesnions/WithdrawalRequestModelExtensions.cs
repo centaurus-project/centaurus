@@ -19,7 +19,7 @@ namespace Centaurus.Domain
                 Asset = withdrawal.Asset,
                 Destination = withdrawal.Destination,
                 Fee = withdrawal.Fee,
-                PaymentProvider = withdrawal.PaymentProvider
+                PaymentProvider = withdrawal.Provider
             };
         }
     }

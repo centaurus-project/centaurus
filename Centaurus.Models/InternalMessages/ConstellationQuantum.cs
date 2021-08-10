@@ -10,7 +10,7 @@ namespace Centaurus.Models
         public override MessageTypes MessageType => MessageTypes.ConstellationQuantum;
 
         [XdrField(0)]
-        public MessageEnvelope RequestEnvelope { get; set; }
+        public ConstellationMessageEnvelope RequestEnvelope { get; set; }
 
         public Message RequestMessage => RequestEnvelope.Message;
     }

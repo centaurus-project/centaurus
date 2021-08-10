@@ -23,7 +23,7 @@ namespace Centaurus.Domain
         {
             try
             {
-                ResultMessage result;
+                ResultMessageBase result;
                 try
                 {
                     var request = message.Envelope.Message as EffectsRequest;

@@ -7,14 +7,14 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Test
 {
-    public class FakeWebSocket : WebSocket
+    public class DummyWebSocket : WebSocket
     {
-        public FakeWebSocket()
+        public DummyWebSocket()
         {
 
         }
 
-        public FakeWebSocket(byte[] payload)
+        public DummyWebSocket(byte[] payload)
         {
             this.payload = payload;
         }

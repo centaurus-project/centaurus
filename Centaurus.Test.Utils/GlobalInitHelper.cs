@@ -42,7 +42,7 @@ namespace Centaurus.Test
         private static void SetCommonSettings(Settings settings, string secret)
         {
             settings.CWD = "AppData";
-            settings.AlphaPubKey = TestEnvironment.AlphaKeyPair.AccountId;
+            settings.GenesisAuditors = new[] { TestEnvironment.AlphaKeyPair.AccountId, TestEnvironment.Auditor1KeyPair.AccountId }.Select(a => new Settings.Auditor($"{a}={a}.com")).ToList();
             settings.Secret = secret;
             settings.ParticipationLevel = 1;
         }
@@ -92,7 +92,7 @@ namespace Centaurus.Test
         /// <param name="settings">Settings that will be used to init Global</param>
         public static async Task<ExecutionContext> Setup(List<KeyPair> clients, List<KeyPair> auditors, Settings settings, IPersistentStorage storage)
         {
-            var context = new ExecutionContext(settings, storage, new MockPaymentProviderFactory(), new MockOutgoingConnectionFactory());
+            var context = new ExecutionContext(settings, storage, new MockPaymentProviderFactory(), new DummyConnectionWrapperFactory());
 
             var assets = new List<AssetSettings> { new AssetSettings { Code = "XLM" }, new AssetSettings { Code = "USD" } };
 
@@ -114,17 +114,18 @@ namespace Centaurus.Test
 
             var initRequest = new ConstellationUpdate
             {
+                Alpha = auditors.First().PublicKey,
                 Assets = assets,
-                Auditors = auditors.Select(a => new Auditor { PubKey = a.PublicKey, Address = "" }).ToList(),
+                Auditors = auditors.Select(a => new Auditor { PubKey = a.PublicKey, Address = $"{a.Address}.com" }).ToList(),
                 MinAccountBalance = 1,
                 MinAllowedLotSize = 1,
                 Providers = new List<ProviderSettings> { stellarProviderSettings },
                 RequestRateLimits = new RequestRateLimits { HourLimit = 1000, MinuteLimit = 100 },
-            }.CreateEnvelope()
+            }.CreateEnvelope<ConstellationMessageEnvelope>()
                 .Sign(TestEnvironment.AlphaKeyPair)
                 .Sign(TestEnvironment.Auditor1KeyPair);
 
-            await context.QuantumHandler.HandleAsync(new ConstellationQuantum { Apex = 1, RequestEnvelope = initRequest }.CreateEnvelope());
+            await context.QuantumHandler.HandleAsync(new ConstellationQuantum { RequestEnvelope = initRequest });
 
             var deposits = new List<DepositModel>();
             Action<byte[], string> addAssetsFn = (acc, asset) =>
@@ -164,11 +165,17 @@ namespace Centaurus.Test
                 Source = txNotification.ToDomainModel()
             };
 
-            await context.QuantumHandler.HandleAsync(depositQuantum.CreateEnvelope());
+            await context.QuantumHandler.HandleAsync(depositQuantum);
 
             //save all effects
             context.PendingUpdatesManager.UpdateBatch(true);
             return context;
+        }
+
+        public static void SetState(this ExecutionContext context, State state)
+        {
+            var method = typeof(StateManager).GetMethod("SetState", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            method.Invoke(context.StateManager, new object[] { state, null });
         }
     }
 }

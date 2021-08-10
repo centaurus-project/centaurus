@@ -42,9 +42,9 @@ namespace Centaurus.Domain
                     }
                     catch (Exception exc)
                     {
-                        if (Context.AppState.State != State.Failed)
+                        if (Context.StateManager.State != State.Failed)
                         {
-                            Context.AppState.SetState(State.Failed, new Exception("Batch update failed.", exc));
+                            Context.StateManager.Failed(new Exception("Batch update failed.", exc));
                         }
                     }
             }
@@ -76,15 +76,15 @@ namespace Centaurus.Domain
                 catch (Exception exc)
                 {
                     updates = null;
-                    if (Context.AppState.State != State.Failed)
+                    if (Context.StateManager.State != State.Failed)
                     {
-                        Context.AppState.SetState(State.Failed, new Exception("Saving failed.", exc));
+                        Context.StateManager.Failed(new Exception("Saving failed.", exc));
                     }
                 }
             }
         }
 
-        public void AddSignatures(uint updatesId, ulong apex, List<byte[]> signatures)
+        public void AddSignatures(uint updatesId, ulong apex, List<AuditorResultMessage> signatures)
         {
             lock (awaitedUpdatesSyncRoot)
             {
@@ -175,7 +175,7 @@ namespace Centaurus.Domain
             {
                 try
                 {
-                    if (Context.AppState.State == State.Running || Context.AppState.State == State.Ready)
+                    if (Context.StateManager.State == State.Running || Context.StateManager.State == State.Ready)
                     {
                         UpdateBatch();
                     }
@@ -251,13 +251,18 @@ namespace Centaurus.Domain
             private object syncRoot = new { };
             public Dictionary<ulong, QuantumPersistentModel> PendingQuanta { get; } = new Dictionary<ulong, QuantumPersistentModel>();
 
-            public void AddSignatures(ulong apex, List<byte[]> signatures)
+            public void AddSignatures(ulong apex, List<AuditorResultMessage> signatures)
             {
                 lock (syncRoot)
                 {
                     if (!PendingQuanta.Remove(apex, out var quantum))
                         throw new InvalidOperationException($"Unable to find quantum with {apex} apex.");
-                    quantum.Signatures = signatures;
+                    quantum.Signatures = signatures.Select(s => new SignatureModel
+                    {
+                        EffectsSignature = s.Signature.EffectsSignature.Data,
+                        TxSignature = s.Signature.TxSignature,
+                        TxSigner = s.Signature.TxSigner
+                    }).ToList();
                 }
             }
 

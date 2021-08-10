@@ -5,7 +5,7 @@ using System.Collections.Generic;
 
 namespace Centaurus.Test
 {
-    internal class MockPaymentProvider : PaymentProviderBase
+    public class MockPaymentProvider : PaymentProviderBase
     {
         public MockPaymentProvider(SettingsModel settings, string config) 
             : base(settings, config)
@@ -40,6 +40,12 @@ namespace Centaurus.Test
         public override void ValidateTransaction(byte[] transaction, WithdrawalRequestModel withdrawalRequest)
         {
             return;
+        }
+
+        public void Deposit(DepositNotificationModel depositNotificationModel)
+        {
+            NotificationsManager.RegisterNotification(depositNotificationModel);
+            RaiseOnPaymentCommit(depositNotificationModel);
         }
     }
 }

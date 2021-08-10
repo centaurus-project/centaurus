@@ -26,11 +26,7 @@ namespace Centaurus.Domain
             Settings = settings ?? throw new ArgumentNullException(nameof(settings));
             PaymentProviderFactory = paymentProviderFactory ?? throw new ArgumentNullException(nameof(paymentProviderFactory));
 
-            RoleManager = new RoleManager(
-                (CentaurusNodeParticipationLevel)Settings.ParticipationLevel,
-                Settings.AlphaPubKey == Settings.KeyPair.AccountId
-                ? CentaurusNodeRole.Alpha
-                : CentaurusNodeRole.Beta);
+            RoleManager = new RoleManager((CentaurusNodeParticipationLevel)Settings.ParticipationLevel);
 
             ExtensionsManager = new ExtensionsManager(Settings.ExtensionsConfigFilePath);
 
@@ -47,13 +43,6 @@ namespace Centaurus.Domain
 
             InfoCommandsHandlers = new InfoCommandsHandlers(this);
 
-            OutgoingMessageStorage = new OutgoingMessageStorage();
-
-            OutgoingResultsStorage = new OutgoingResultsStorage(this);
-
-            AppState = new StateManager(this);
-            AppState.StateChanged += AppState_StateChanged;
-
             QuantumHandler = new QuantumHandler(this);
 
             IncomingConnectionManager = new IncomingConnectionManager(this);
@@ -67,7 +56,26 @@ namespace Centaurus.Domain
 
             this.useLegacyOrderbook = useLegacyOrderbook;
 
-            Init();
+            DynamicSerializersInitializer.Init();
+
+            var state = State.Running;
+            var lastSnapshot = PersistenceManager.GetLastSnapshot();
+            if (lastSnapshot != null)
+            {
+                Setup(lastSnapshot);
+                if (IsAlpha) //TODO: all auditors should walk trough rising routine
+                    state = State.Rising;//Alpha should ensure that it has all quanta from auditors
+            }
+
+            StateManager = new StateManager(this, state);
+            StateManager.StateChanged += AppState_StateChanged;
+
+            if (lastSnapshot == null)
+            {
+                EstablishOutgoingConnections();
+            }
+            QuantumStorage.Init(lastSnapshot?.Apex ?? 0, lastSnapshot?.LastHash ?? new byte[] { });
+            QuantumHandler.Start();
         }
 
         /// <summary>
@@ -77,38 +85,14 @@ namespace Centaurus.Domain
 
         readonly bool useLegacyOrderbook;
 
-        private void Init()
-        {
-            DynamicSerializersInitializer.Init();
-
-            //try to load last settings, we need it to know current auditors
-            var lastHash = new byte[] { };
-            var lastApex = PersistenceManager.GetLastApex();
-            if (lastApex > 0)
-            {
-                var snapshot = PersistenceManager.GetSnapshot(lastApex);
-                Setup(snapshot);
-                if (IsAlpha)
-                    AppState.SetState(State.Rising);//Alpha should ensure that it has all quanta from auditors
-                else
-                    AppState.SetState(State.Running);
-                lastHash = snapshot.LastHash;
-            }
-            else
-                //if no snapshot, the application is in initialization state
-                AppState.SetState(State.WaitingForInit);
-
-            var lastQuantumApex = lastApex < 0 ? 0 : lastApex;
-            QuantumStorage.Init(lastQuantumApex, lastHash);
-            QuantumHandler.Start();
-        }
-
         public void Setup(Snapshot snapshot)
         {
             if (Exchange != null)
                 Exchange.OnUpdates -= Exchange_OnUpdates;
 
             Constellation = snapshot.Settings;
+
+            SetRole();
 
             AccountStorage = new AccountStorage(snapshot.Accounts);
 
@@ -136,12 +120,36 @@ namespace Centaurus.Domain
 
             PerformanceStatisticsManager?.Dispose(); PerformanceStatisticsManager = new PerformanceStatisticsManager(this);
 
-            OutgoingConnectionManager.Connect().Wait();
+            IncomingConnectionManager.CleanupAuditorConnections();
+
+            EstablishOutgoingConnections();
+        }
+
+        private void EstablishOutgoingConnections()
+        {
+            var auditors = Constellation != null
+                ? Constellation.Auditors.Select(a => new Settings.Auditor(a.PubKey, a.Address)).ToList()
+                : Settings.GenesisAuditors.ToList();
+            OutgoingConnectionManager.Connect(auditors);
+        }
+
+        private void SetRole()
+        {
+            if (RoleManager.ParticipationLevel == CentaurusNodeParticipationLevel.Auditor)
+            {
+                if (Constellation.Alpha.Equals((RawPubKey)Settings.KeyPair))
+                    throw new InvalidOperationException("Server with Auditor level cannot be set as Alpha.");
+                return;
+            }
+            if (Constellation.Alpha.Equals((RawPubKey)Settings.KeyPair))
+                RoleManager.SetRole(CentaurusNodeRole.Alpha);
+            else
+                RoleManager.SetRole(CentaurusNodeRole.Beta);
         }
 
         private void SetupPaymentProviders()
         {
-            PaymentProvidersManager?.Dispose(); 
+            PaymentProvidersManager?.Dispose();
             PaymentProvidersManager = new PaymentProvidersManager(PaymentProviderFactory, Constellation.Providers.Select(p => p.ToProviderModel()).ToList(), Settings.PaymentConfigPath);
 
             foreach (var paymentProvider in PaymentProvidersManager.GetAll())
@@ -155,7 +163,7 @@ namespace Centaurus.Domain
             if (!IsAlpha)
                 return;
 
-            QuantumHandler.HandleAsync(new DepositQuantum { Source = notification.ToDomainModel() }.CreateEnvelope());
+            QuantumHandler.HandleAsync(new DepositQuantum { Source = notification.ToDomainModel() });
         }
 
         public void Dispose()
@@ -165,7 +173,7 @@ namespace Centaurus.Domain
 
             QuantumHandler.Dispose();
             AuditResultManager?.Dispose();
-            DisposeAnalyticsManager(); 
+            DisposeAnalyticsManager();
             PerformanceStatisticsManager?.Dispose();
         }
 
@@ -204,7 +212,7 @@ namespace Centaurus.Domain
 
         public PaymentProvidersFactoryBase PaymentProviderFactory { get; }
 
-        public StateManager AppState { get; }
+        public StateManager StateManager { get; }
 
         public QuantumHandler QuantumHandler { get; }
 
@@ -221,10 +229,6 @@ namespace Centaurus.Domain
         public InfoCommandsHandlers InfoCommandsHandlers { get; }
 
         public MessageHandlers MessageHandlers { get; }
-
-        public OutgoingMessageStorage OutgoingMessageStorage { get; }
-
-        public OutgoingResultsStorage OutgoingResultsStorage { get; }
 
         public PaymentProvidersManager PaymentProvidersManager { get; private set; }
 

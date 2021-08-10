@@ -28,8 +28,6 @@ namespace Centaurus
         {
             lock (apexCursorSyncRoot)
             {
-                if (!Context.IsAlpha)
-                    return;
                 logger.Trace($"Connection {PubKeyAddress}, apex cursor reset requested. New apex cursor {newApexCursor}");
                 //cancel current quantum worker
                 QuantumWorker?.Dispose();
