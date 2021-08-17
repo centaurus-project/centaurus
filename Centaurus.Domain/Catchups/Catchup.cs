@@ -1,4 +1,5 @@
 ﻿using Centaurus.Models;
+using Centaurus.PaymentProvider.Models;
 using NLog;
 using System;
 using System.Collections.Generic;
@@ -46,7 +47,7 @@ namespace Centaurus.Domain
                 {
                     pendingAuditorState = new QuantaBatch
                     {
-                        Quanta = new List<InProgressQuantum>(),
+                        Quanta = new List<PendingQuantum>(),
                         HasMorePendingQuanta = true
                     };
                     allAuditorStates.Add(pubKey, pendingAuditorState);
@@ -187,7 +188,7 @@ namespace Centaurus.Domain
             alphaStateManager.Rised();
         }
 
-        private async Task ApplyQuanta(List<(MessageEnvelope quantum, Dictionary<RawPubKey, AuditorResultMessage> signatures)> quanta)
+        private async Task ApplyQuanta(List<(Quantum quantum, Dictionary<RawPubKey, AuditorResultMessage> signatures)> quanta)
         {
             var quantaCount = quanta.Count;
             foreach (var quantumItem in quanta)
@@ -199,12 +200,12 @@ namespace Centaurus.Domain
                 var resultMessage = await Context.QuantumHandler.HandleAsync(quantumItem.quantum);
                 var processedQuantum = (Quantum)resultMessage.OriginalMessage.Message;
                 //TODO: do we need some extra checks here?
-                if (!ByteArrayPrimitives.Equals(quantumItem.quantum.ComputeMessageHash(), processedQuantum.ComputeHash()))
+                if (!ByteArrayPrimitives.Equals(quantumItem.quantum.ComputeHash(), processedQuantum.ComputeHash()))
                     throw new Exception("Apexes are not equal for a quantum on restore.");
             }
         }
 
-        private List<(MessageEnvelope quantum, Dictionary<RawPubKey, AuditorResultMessage> signatures)> GetValidQuanta()
+        private List<(Quantum quantum, Dictionary<RawPubKey, AuditorResultMessage> signatures)> GetValidQuanta()
         {
             //group all quanta by their apex
             var quanta = allAuditorStates.Values
@@ -212,7 +213,7 @@ namespace Centaurus.Domain
                 .GroupBy(q => q.Quantum.Apex)
                 .OrderBy(q => q.Key);
 
-            var validQuanta = new List<(MessageEnvelope quantum, Dictionary<RawPubKey, AuditorResultMessage> signatures)>();
+            var validQuanta = new List<(Quantum quantum, Dictionary<RawPubKey, AuditorResultMessage> signatures)>();
 
             if (quanta.Count() == 0)
                 return validQuanta;
@@ -230,9 +231,7 @@ namespace Centaurus.Domain
                 if (lastQuantumApex + 1 != currentQuantaGroup.Key)
                     throw new Exception("A quantum is missing");
 
-                var (alphaSignedQuanta, quantum) = GetQuantaToMerge(currentQuantaGroup.Key, currentQuantaGroup.ToList(), constellation.Alpha);
-
-                var signatures = MergeSignatures(quantum, alphaSignedQuanta, auditors);
+                var (quantum, signatures) = GetQuantumData(currentQuantaGroup.Key, currentQuantaGroup.ToList(), constellation.Alpha, auditors);
 
                 if (!signatures.ContainsKey(constellation.Alpha))
                     throw new Exception("Quantum must contain at least Alpha signature");
@@ -242,7 +241,7 @@ namespace Centaurus.Domain
                 lastQuantumApex++;
 
                 //try to update constellation info
-                if (quantum.Message is ConstellationQuantum constellationQuantum
+                if (quantum is ConstellationQuantum constellationQuantum
                     && constellationQuantum.RequestMessage is ConstellationUpdate constellationUpdate)
                 {
                     constellation = constellationUpdate.ToConstellationSettings(currentQuantaGroup.Key);
@@ -255,66 +254,66 @@ namespace Centaurus.Domain
             return validQuanta;
         }
 
-        private (List<InProgressQuantum> alphaSignedQuanta, MessageEnvelope quantum) GetQuantaToMerge(ulong apex, List<InProgressQuantum> allQuanta, RawPubKey alphaPubKey)
+        private (Quantum quantum, Dictionary<RawPubKey, AuditorResultMessage> signatures) GetQuantumData(ulong apex, List<PendingQuantum> allQuanta, RawPubKey alphaPubKey, List<RawPubKey> auditors)
         {
-            //get all quanta signed by Alpha
-            var signedByAlphaQuanta = allQuanta
-                .Where(q => q.QuantumEnvelope.IsSignatureValid(alphaPubKey))
-                .GroupBy(q => q.QuantumEnvelope.ComputeMessageHash(), ByteArrayComparer.Default);
-
-            //if there are several quanta with same apex but with different hash
-            if (signedByAlphaQuanta.Count() > 1)
-                throw new Exception($"Alpha {alphaPubKey.GetAccountId()} private key is compromised. Apex {apex}.");
-            //no quanta signed by Alpha
-            else if (signedByAlphaQuanta.Count() == 0)
-                throw new Exception($"No quanta signed by Alpha {alphaPubKey.GetAccountId()}. Apex {apex}.");
-
-            var allInProgressQuanta = signedByAlphaQuanta
-                .SelectMany(s => s)
-                .ToList();
-
-            var currentQuantum = allInProgressQuanta.First().QuantumEnvelope;
-
-            return (allInProgressQuanta, currentQuantum);
-        }
-
-        private Dictionary<RawPubKey, AuditorResultMessage> MergeSignatures(MessageEnvelope quantumEnvelope, List<InProgressQuantum> inProgressQuanta, List<RawPubKey> auditors)
-        {
+            var payloadHash = default(byte[]);
+            var quantum = default(Quantum);
             var signatures = new Dictionary<RawPubKey, AuditorResultMessage>();
-            var quantum = (Quantum)quantumEnvelope.Message;
-
-            foreach (var inProgressQuantum in inProgressQuanta)
+            foreach (var currentQuantum in allQuanta)
             {
-                foreach (var signature in inProgressQuantum.Signatures)
-                {
-                    //skip if signature already added
-                    if (signatures.Values.Any(s => s.Signature.Equals(signature)))
-                        continue;
+                //compute current quantum payload hash
+                var currentPayloadHash = currentQuantum.Quantum.GetPayloadHash();
 
+                //validate each signature
+                foreach (var signature in currentQuantum.Signatures)
+                {
                     //try get auditor
                     var signer = default(RawPubKey);
                     foreach (var auditor in auditors)
                     {
-                        if (signature.EffectsSignature.IsValid(auditor, quantum.EffectsHash))
+                        if (signature.PayloadSignature.IsValid(auditor, payloadHash))
                         {
                             signer = auditor;
                             break;
                         }
                     }
 
-                    //signature doesn't belong to any known auditor
-                    if (signer == null)
+                    //if auditor is not found or it's signature already added, move to the next signature
+                    if (signer == null || signatures.ContainsKey(signer))
                         continue;
 
-                    //add new signature
-                    signatures.Add(signer, new AuditorResultMessage
+                    if (payloadHash != null && !ByteArrayPrimitives.Equals(payloadHash, currentPayloadHash))
                     {
-                        Apex = quantum.Apex,
-                        Signature = signature
-                    });
+                        //if there are several quanta with same apex but with different hash signed by Alpha
+                        if (signer == alphaPubKey)
+                            throw new Exception($"Alpha {alphaPubKey.GetAccountId()} private key is compromised. Apex {apex}.");
+                        //skip invalid signature
+                        continue;
+                    }
+
+                    //check transaction and it's signatures
+                    if (currentQuantum.Quantum is WithdrawalRequestQuantum transactionQuantum)
+                    {
+                        var provider = Context.PaymentProvidersManager.GetManager(transactionQuantum.ProviderId);
+                        if (!provider.IsTransactionValid(transactionQuantum.Transaction, transactionQuantum.WithdrawalRequest.ToProviderModel(), out var error))
+                            throw new Exception($"Transaction is invalid.\nReason: {error}");
+
+                        if (!provider.AreSignaturesValid(transactionQuantum.Transaction, new SignatureModel { Signer = signature.TxSigner, Signature = signature.TxSignature }))
+                            //skip invalid signature
+                            continue;
+                    }
+                    signatures.Add(signer, new AuditorResultMessage { Apex = quantum.Apex, Signature = signature });
                 }
+
+                //continue if quantum already set
+                if (quantum != null)
+                    continue;
+
+                quantum = currentQuantum.Quantum;
+                payloadHash = currentPayloadHash;
             }
-            return signatures;
+
+            return (quantum, signatures);
         }
 
         public void Dispose()

@@ -14,6 +14,7 @@ namespace Centaurus.Models
         BalanceCreate = 3,
         BalanceUpdate = 4,
         RequestRateLimitUpdate = 6,
+        AccountSequenceIncEffect = 7,
 
         OrderPlaced = 10,
         OrderRemoved = 11,

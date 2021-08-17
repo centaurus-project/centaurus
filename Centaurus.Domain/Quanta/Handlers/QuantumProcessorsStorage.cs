@@ -18,7 +18,7 @@ namespace Centaurus.Domain
                 .GetTypes()
                 .Where(x => typeof(QuantumProcessorBase).IsAssignableFrom(x) && !x.IsInterface && !x.IsAbstract);
 
-            var _processors = new Dictionary<MessageTypes, QuantumProcessorBase>();
+            var _processors = new Dictionary<string, QuantumProcessorBase>();
             foreach (var processorType in discoveredRequestProcessors)
             {
                 var instance = (QuantumProcessorBase)Activator.CreateInstance(processorType, new [] { Context });
@@ -30,9 +30,9 @@ namespace Centaurus.Domain
             processors = _processors.ToImmutableDictionary();
         }
 
-        readonly ImmutableDictionary<MessageTypes, QuantumProcessorBase> processors;
+        readonly ImmutableDictionary<string, QuantumProcessorBase> processors;
 
-        public bool TryGetValue(MessageTypes messageType, out QuantumProcessorBase processor)
+        public bool TryGetValue(string messageType, out QuantumProcessorBase processor)
         {
             return processors.TryGetValue(messageType, out processor);
         }

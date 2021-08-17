@@ -15,12 +15,12 @@ namespace Centaurus.Domain
             PaymentProvider = provider;
         }
 
-        public RequestTransactionQuantum TransactionQuantum => (RequestTransactionQuantum)Request;
+        public WithdrawalRequestQuantum WithdrawalRequestQuantum => (WithdrawalRequestQuantum)Request;
 
         public WithdrawalRequest WithdrawalRequest => (WithdrawalRequest)Request.RequestEnvelope.Message;
 
         public PaymentProviderBase PaymentProvider { get; }
 
-        public byte[] Transaction => TransactionQuantum.Transaction;
+        public byte[] Transaction => WithdrawalRequestQuantum.Transaction;
     }
 }

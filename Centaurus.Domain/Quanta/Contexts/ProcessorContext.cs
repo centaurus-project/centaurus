@@ -1,6 +1,5 @@
 ﻿using Centaurus.Domain.Models;
 using Centaurus.Models;
-using Centaurus.PersistentStorage;
 using Centaurus.Xdr;
 using System;
 using System.Collections.Generic;
@@ -21,22 +20,21 @@ namespace Centaurus.Domain
             : base(context)
         {
             Quantum = quantum ?? throw new ArgumentNullException(nameof(quantum));
-            SourceAccount = account;
+            InitiatorAccount = account;
         }
 
-        private readonly List<ContextEffect> effects = new List<ContextEffect>();
+        private readonly List<EffectsGroup> effects = new List<EffectsGroup>();
+        private readonly Dictionary<ulong, RawPubKey> affectedAccounts = new Dictionary<ulong, RawPubKey>();
 
         public ExecutionContext CentaurusContext => Context;
 
         public Quantum Quantum { get; }
 
-        public AccountWrapper SourceAccount { get; }
+        public AccountWrapper InitiatorAccount { get; }
 
         public ulong Apex => Quantum.Apex;
 
-        public bool IsCompleted => EffectsHash != null;
-
-        public byte[] EffectsHash { get; private set; }
+        public QuantaProcessingResult ProcessingResult { get; private set; }
 
         /// <summary>
         /// Adds effect processor to container
@@ -44,130 +42,156 @@ namespace Centaurus.Domain
         /// <param name="effectProcessor"></param>
         public void AddEffectProcessor(IEffectProcessor<Effect> effectProcessor)
         {
-            if (IsCompleted)
+            if (ProcessingResult != null)
                 throw new InvalidOperationException("The quantum already processed.");
 
-            using var writer = new XdrBufferWriter(buffer);
-            XdrConverter.Serialize(effectProcessor.Effect, writer);
-            var rawEffect = writer.ToArray();
-            effects.Add(new ContextEffect(rawEffect.ComputeHash(), effectProcessor.Effect, rawEffect));
-            effectProcessor.CommitEffect();
-        }
+            var accountId = 0ul;
+            var accountPubKey = default(RawPubKey);
+            //get account id for account effects
+            if (effectProcessor.Effect is AccountEffect clientEffect)
+                accountId = clientEffect.Account;
 
-        public void ComputeEffectsHash()
-        {
-            EffectsHash = effects.SelectMany(h => h.Hash)
-                .ToArray()
-                .ComputeHash(buffer);
+            //get or add account effects group
+            var effectsGroup = effects.FirstOrDefault(e => e.Account == accountId);
+            if (effectsGroup == null)
+            {
+                var accountSequence = 0ul;
+                //increment and set account sequence
+                if (effectProcessor is AccountEffectProcessor accountEffectProcessor)
+                {
+                    accountSequence = ++accountEffectProcessor.AccountWrapper.Account.AccountSequence;
+                    accountPubKey = accountEffectProcessor.AccountWrapper.Account.Pubkey;
+                }
+                effectsGroup = new EffectsGroup
+                {
+                    Account = accountId,
+                    AccountSequence = accountSequence,
+                    Effects = new List<Effect>()
+                };
+                effects.Add(effectsGroup);
+            }
+            //register new effect
+            effectsGroup.Effects.Add(effectProcessor.Effect);
+            //commit the effect
+            effectProcessor.CommitEffect();
+
+            //ensure account is cached
+            if (accountId != 0 && !affectedAccounts.ContainsKey(accountId))
+            {
+                if (accountPubKey == null)
+                    accountPubKey = Context.AccountStorage.GetAccount(accountId).Account.Pubkey;
+                affectedAccounts.Add(accountId, accountPubKey);
+            }
         }
 
         /// <summary>
-        /// 
+        /// Calculates and sets hashes after quantum was handled
         /// </summary>
-        /// <returns>Updates batch id</returns>
-        public uint PersistQuantum()
+        public void Complete(QuantumResultMessageBase quantumResultMessage)
         {
-            if (!IsCompleted)
-                throw new InvalidOperationException("The quantum must be processed before persistence.");
+            var rawEffects = GetRawEffectsDataContainer();
 
+            //set (if Alpha) or compare with presented property
+            EnsureEffectsProof(rawEffects);
 
-            var result = new ProcessingResult
+            BuildProcessingResult(quantumResultMessage, rawEffects);
+
+            //add quantum data to updates batch
+            ProcessingResult.UpdatesBatchId = Context.PendingUpdatesManager.AddQuantum(ProcessingResult);
+        }
+
+        List<RawEffectsDataContainer> GetRawEffectsDataContainer()
+        {
+            return effects.Select(e =>
+            {
+                var rawEffectsGroup = XdrConverter.Serialize(e, buffer);
+                return new RawEffectsDataContainer(e, rawEffectsGroup, rawEffectsGroup.ComputeHash(buffer));
+            }).ToList();
+        }
+
+        void EnsureEffectsProof(List<RawEffectsDataContainer> rawEffects)
+        {
+            //compound effects hash
+            var effectsHash = rawEffects
+                .SelectMany(e => e.Hash)
+                .ToArray()
+                .ComputeHash(buffer); //compute hash of concatenated effects groups hashes
+
+            //if EffectsProof is null set it, otherwise validate equality
+            if (Quantum.EffectsProof == null)
+                Quantum.EffectsProof = effectsHash;
+            else
+            {
+                if (!ByteArrayComparer.Default.Equals(effectsHash, Quantum.EffectsProof) && !EnvironmentHelper.IsTest)
+                    throw new Exception($"Effects hash for quantum {Apex} is not equal to provided by Alpha.");
+            }
+        }
+
+        void BuildProcessingResult(QuantumResultMessageBase quantumResultMessage, List<RawEffectsDataContainer> rawEffects)
+        {
+            if (quantumResultMessage == null)
+                throw new ArgumentNullException(nameof(quantumResultMessage));
+
+            if (rawEffects == null)
+                throw new ArgumentNullException(nameof(rawEffects));
+
+            //serialize quantum
+            using var writer = new XdrBufferWriter(buffer);
+            XdrConverter.Serialize(Quantum, writer);
+            var rawQuantum = writer.ToArray();
+
+            //compute quantum hash
+            var quantumHash = rawQuantum.ComputeHash();
+
+            //compute payload hash
+            var payloadHash = ByteArrayExtensions.ComputeQuantumPayloadHash(Apex, quantumHash, Quantum.EffectsProof);
+
+            var result = new QuantaProcessingResult
             {
                 Apex = Apex,
-                QuantumEnvelope = XdrConverter.Serialize(Quantum),
-                Signature = EffectsHash.Sign(Context.Settings.KeyPair).Data,
-                Timestamp = Quantum.Timestamp
+                RawQuantum = rawQuantum,
+                QuantumHash = quantumHash,
+                PayloadHash = payloadHash,
+                Timestamp = Quantum.Timestamp,
+                Initiator = InitiatorAccount?.Id ?? 0,
+                Effects = rawEffects,
+                CurrentNodeSignature = GetSignature(payloadHash),
+                ResultMessage = quantumResultMessage,
+                AffectedAccounts = affectedAccounts
             };
-
-
-            foreach (var effect in effects)
-            {
-                if (effect.Effect.Account > 0) //ConstellationUpdateEffect and CursorUpdateEffect cannot have account
-                    result.Accounts.Add(effect.Effect.Account);
-                else if (effect.Effect is ConstellationUpdateEffect)
-                    result.HasSettingsUpdate = true;
-                else if (effect.Effect is CursorUpdateEffect)
-                    result.HasCursorUpdate = true;
-                result.Effects.Add(effect.RawEffect);
-            }
-
-            return Context.PendingUpdatesManager.AddQuantum(result);
-        }
-
-        public List<Effect> GetClientEffects()
-        {
-            if (Quantum is RequestQuantum request)
-                return effects.Where(e => e.Effect.Account == request.RequestMessage.Account).Select(e => e.Effect).ToList();
-            return effects.Select(e => e.Effect).ToList();
-        }
-
-        /// <summary>
-        /// Creates message notifications for accounts that were affected by quantum
-        /// </summary>
-        /// <returns></returns>
-        public Dictionary<ulong, Message> GetNotificationMessages()
-        {
-            var requestAccount = 0ul;
-            if (Quantum is RequestQuantum request)
-                requestAccount = request.RequestMessage.Account;
-
-            var result = new Dictionary<ulong, EffectsNotification>();
-            foreach (var effect in effects)
-            {
-                if (effect.Effect.Account == 0 || effect.Effect.Account == requestAccount)
-                    continue;
-                if (!result.TryGetValue(effect.Effect.Account, out var effectsNotification))
+            //get constellation effects
+            var constellationEffects = effects.FirstOrDefault(e => e.Account == 0);
+            if (constellationEffects != null)
+                foreach (var effect in constellationEffects.Effects)
                 {
-                    effectsNotification = new EffectsNotification { ClientEffects = new List<Effect>(), Apex = Apex };
-                    result.Add(effect.Effect.Account, effectsNotification);
+                    if (effect is ConstellationUpdateEffect)
+                        result.HasSettingsUpdate = true;
+                    else if (effect is CursorUpdateEffect)
+                        result.HasCursorUpdate = true;
+                    else
+                        continue;
+                    if (result.HasSettingsUpdate && result.HasCursorUpdate)
+                        break;
                 }
-                effectsNotification.ClientEffects.Add(effect.Effect);
-            }
-            return result.ToDictionary(k => k.Key, v => (Message)v.Value);
+
+            ProcessingResult = result;
         }
 
-        public EffectsProof GetEffectProof()
+        AuditorSignature GetSignature(byte[] payloadHash)
         {
-            return new EffectsProof 
-            { 
-                Hashes = effects.Select(e => new Hash { Data = e.Hash }).ToList(), 
-                Signatures = new List<TinySignature>()
-            };
-        }
-
-        class ContextEffect
-        {
-            public ContextEffect(byte[] hash, Effect effect, byte[] rawEffect)
+            var currentAuditorSignature = new AuditorSignature
             {
-                Hash = hash ?? throw new ArgumentNullException(nameof(hash));
-                Effect = effect ?? throw new ArgumentNullException(nameof(effect));
-                RawEffect = rawEffect ?? throw new ArgumentNullException(nameof(rawEffect));
+                PayloadSignature = payloadHash.Sign(Context.Settings.KeyPair)
+            };
+
+            //add transaction signature
+            if (this is ITransactionProcessorContext transactionContext)
+            {
+                var signature = transactionContext.PaymentProvider.SignTransaction(transactionContext.Transaction);
+                currentAuditorSignature.TxSignature = signature.Signature;
+                currentAuditorSignature.TxSigner = signature.Signer;
             }
-
-            public byte[] Hash { get; }
-
-            public Effect Effect { get; }
-
-            public byte[] RawEffect { get; }
-        }
-
-        public class ProcessingResult
-        {
-            public ulong Apex { get; set; }
-
-            public byte[] QuantumEnvelope { get; set; }
-
-            public List<byte[]> Effects { get; } = new List<byte[]>();
-
-            public HashSet<ulong> Accounts { get; } = new HashSet<ulong>();
-
-            public bool HasCursorUpdate { get; set; }
-
-            public bool HasSettingsUpdate { get; set; }
-
-            public byte[] Signature { get; set; }
-
-            public long Timestamp { get; set; }
+            return currentAuditorSignature;
         }
     }
 }

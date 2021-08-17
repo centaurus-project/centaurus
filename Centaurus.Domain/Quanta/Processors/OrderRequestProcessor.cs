@@ -15,7 +15,7 @@ namespace Centaurus.Domain
 
         }
 
-        public override MessageTypes SupportedMessageType => MessageTypes.OrderRequest;
+        public override string SupportedMessageType { get; } = typeof(OrderRequest).Name;
 
         public override Task<QuantumResultMessageBase> Process(RequestContext context)
         {
@@ -50,14 +50,14 @@ namespace Centaurus.Domain
             //check required balances
             if (orderRequest.Side == OrderSide.Sell)
             {
-                var balance = context.SourceAccount.Account.GetBalance(orderRequest.Asset);
+                var balance = context.InitiatorAccount.Account.GetBalance(orderRequest.Asset);
                 if (!balance.HasSufficientBalance(orderRequest.Amount, 0))
                     throw new BadRequestException("Insufficient funds");
             }
             else
             {
                 var baseAsset = context.CentaurusContext.Constellation.Assets.First();
-                var balance = context.SourceAccount.Account.GetBalance(baseAsset.Code);
+                var balance = context.InitiatorAccount.Account.GetBalance(baseAsset.Code);
                 if (!balance.HasSufficientBalance(quoteAmount, context.CentaurusContext.Constellation.MinAccountBalance))
                     throw new BadRequestException("Insufficient funds");
             }

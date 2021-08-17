@@ -6,6 +6,5 @@ namespace Centaurus.Models
 {
     public class AccountDataRequest : SequentialRequestMessage
     {
-        public override MessageTypes MessageType => MessageTypes.AccountDataRequest;
     }
 }

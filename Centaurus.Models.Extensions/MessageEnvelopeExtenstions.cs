@@ -86,17 +86,17 @@ namespace Centaurus
             if (envelope == null)
                 throw new ArgumentNullException(nameof(envelope));
 
-            var messageType = envelope.Message.MessageType;
+            var messageType = envelope.Message;
             if (envelope.Message is RequestQuantum)
-                messageType = ((RequestQuantum)envelope.Message).RequestEnvelope.Message.MessageType;
+                messageType = ((RequestQuantum)envelope.Message).RequestEnvelope.Message;
 
             //for not Success result return generic message
             if (status == ResultStatusCodes.Success)
                 switch (messageType)
                 {
-                    case MessageTypes.HandshakeResponse:
+                    case HandshakeResponse _:
                         return CreateResult<ClientConnectionSuccess>(envelope, status);
-                    case MessageTypes.AccountDataRequest:
+                    case AccountDataRequest _:
                         return CreateResult<AccountDataResponse>(envelope, status);
                     default:
                         break;
@@ -108,8 +108,11 @@ namespace Centaurus
                 //TODO: remove it after migrating to another serializer
                 if (status != ResultStatusCodes.Success)
                 {
-                    quantumResult.ClientEffects = new List<Effect>();
-                    quantumResult.Effects = new EffectsProof { Hashes = new List<Hash>(), Signatures = new List<TinySignature>() };
+                    quantumResult.Effects = new List<EffectsInfoBase>();
+                    quantumResult.PayloadProof = new PayloadProof { 
+                        PayloadHash = new byte[] { }, 
+                        Signatures = new List<TinySignature>() 
+                    };
                 }
                 return quantumResult;
             }

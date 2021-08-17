@@ -8,6 +8,5 @@ namespace Centaurus.Models
     /// </summary>
     public class QuantumResultMessage : QuantumResultMessageBase
     {
-        public override MessageTypes MessageType => MessageTypes.QuantumResultMessage;
     }
 }

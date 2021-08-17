@@ -6,53 +6,53 @@ namespace Centaurus.Domain
 {
     public static class ProcessorContextExtensions
     {
-        public static void AddAccountCreate(this ProcessorContext effectProcessors, AccountStorage accountStorage, ulong accountId, RawPubKey publicKey)
+        public static void AddAccountCreate(this ProcessorContext processorContext, AccountStorage accountStorage, ulong accountId, RawPubKey publicKey)
         {
-            effectProcessors.AddEffectProcessor(new AccountCreateEffectProcessor(
+            processorContext.AddEffectProcessor(new AccountCreateEffectProcessor(
                 new AccountCreateEffect
                 {
                     Account = accountId,
                     Pubkey = publicKey,
-                    Apex = effectProcessors.Apex
+                    Apex = processorContext.Apex
                 },
                 accountStorage,
-                effectProcessors.Context.Constellation.RequestRateLimits
+                processorContext.Context.Constellation.RequestRateLimits
             ));
         }
 
-        public static void AddBalanceCreate(this ProcessorContext effectProcessors, AccountWrapper account, string asset)
+        public static void AddBalanceCreate(this ProcessorContext processorContext, AccountWrapper account, string asset)
         {
-            effectProcessors.AddEffectProcessor(new BalanceCreateEffectProcessor(
+            processorContext.AddEffectProcessor(new BalanceCreateEffectProcessor(
                 new BalanceCreateEffect
                 {
                     Account = account.Id,
                     Asset = asset,
-                    Apex = effectProcessors.Apex
+                    Apex = processorContext.Apex
                 },
                 account
             ));
         }
 
-        public static void AddBalanceUpdate(this ProcessorContext effectProcessors, AccountWrapper account, string asset, ulong amount, UpdateSign sign)
+        public static void AddBalanceUpdate(this ProcessorContext processorContext, AccountWrapper account, string asset, ulong amount, UpdateSign sign)
         {
-            effectProcessors.AddEffectProcessor(new BalanceUpdateEffectProcesor(
+            processorContext.AddEffectProcessor(new BalanceUpdateEffectProcesor(
                 new BalanceUpdateEffect
                 {
                     Account = account.Id,
                     Amount = amount,
                     Asset = asset,
-                    Apex = effectProcessors.Apex
+                    Apex = processorContext.Apex
                 },
                 account,
                 sign
             ));
         }
 
-        public static void AddOrderPlaced(this ProcessorContext effectProcessors, OrderbookBase orderBook, OrderWrapper order, string baseAsset)
+        public static void AddOrderPlaced(this ProcessorContext processorContext, OrderbookBase orderBook, OrderWrapper order, string baseAsset)
         {
             var effect = new OrderPlacedEffect
             {
-                Apex = effectProcessors.Apex,
+                Apex = processorContext.Apex,
                 Account = order.AccountWrapper.Id,
                 Asset = order.Order.Asset,
                 Amount = order.Order.Amount,
@@ -61,33 +61,33 @@ namespace Centaurus.Domain
                 Side = order.Order.Side
             };
 
-            effectProcessors.AddEffectProcessor(new OrderPlacedEffectProcessor(effect, order.AccountWrapper, orderBook, order, baseAsset));
+            processorContext.AddEffectProcessor(new OrderPlacedEffectProcessor(effect, order.AccountWrapper, orderBook, order, baseAsset));
         }
 
-        public static void AddTrade(this ProcessorContext effectProcessors, OrderWrapper order, ulong assetAmount, ulong quoteAmount, string baseAsset, bool isNewOrder)
+        public static void AddTrade(this ProcessorContext processorContext, OrderWrapper order, ulong assetAmount, ulong quoteAmount, string baseAsset, bool isNewOrder)
         {
             var trade = new TradeEffect
             {
                 OrderId = order.OrderId,
                 Asset = order.Order.Asset,
                 Side = order.Order.Side,
-                Apex = effectProcessors.Apex,
+                Apex = processorContext.Apex,
                 Account = order.AccountWrapper.Id,
                 AssetAmount = assetAmount,
                 QuoteAmount = quoteAmount,
                 IsNewOrder = isNewOrder
             };
 
-            effectProcessors.AddEffectProcessor(new TradeEffectProcessor(trade, order.AccountWrapper, order, baseAsset));
+            processorContext.AddEffectProcessor(new TradeEffectProcessor(trade, order.AccountWrapper, order, baseAsset));
         }
 
 
-        public static void AddOrderRemoved(this ProcessorContext effectProcessors, OrderbookBase orderbook, OrderWrapper order, string baseAsset)
+        public static void AddOrderRemoved(this ProcessorContext processorContext, OrderbookBase orderbook, OrderWrapper order, string baseAsset)
         {
-            effectProcessors.AddEffectProcessor(new OrderRemovedEffectProccessor(
+            processorContext.AddEffectProcessor(new OrderRemovedEffectProccessor(
                 new OrderRemovedEffect
                 {
-                    Apex = effectProcessors.Apex,
+                    Apex = processorContext.Apex,
                     Account = order.AccountWrapper.Id,
                     Amount = order.Order.Amount,
                     QuoteAmount = order.Order.QuoteAmount,
@@ -104,26 +104,26 @@ namespace Centaurus.Domain
 
 
 
-        public static void AddNonceUpdate(this ProcessorContext effectProcessors, AccountWrapper account, ulong newNonce, ulong currentNonce)
+        public static void AddNonceUpdate(this ProcessorContext processorContext, AccountWrapper account, ulong newNonce, ulong currentNonce)
         {
-            effectProcessors.AddEffectProcessor(new NonceUpdateEffectProcessor(
+            processorContext.AddEffectProcessor(new NonceUpdateEffectProcessor(
                 new NonceUpdateEffect
                 {
                     Nonce = newNonce,
                     PrevNonce = currentNonce,
                     Account = account.Id,
-                    Apex = effectProcessors.Apex
+                    Apex = processorContext.Apex
                 },
                 account
             ));
         }
 
-        public static void AddCursorUpdate(this ProcessorContext effectProcessors, DepositNotificationManager notificationManager, string providerId, string newCursor, string prevCursor)
+        public static void AddCursorUpdate(this ProcessorContext processorContext, DepositNotificationManager notificationManager, string providerId, string newCursor, string prevCursor)
         {
-            effectProcessors.AddEffectProcessor(new TxCursorUpdateEffectProcessor(
+            processorContext.AddEffectProcessor(new TxCursorUpdateEffectProcessor(
                 new CursorUpdateEffect
                 {
-                    Apex = effectProcessors.Apex,
+                    Apex = processorContext.Apex,
                     Cursor = newCursor,
                     PrevCursor = prevCursor,
                     ProviderId = providerId
@@ -132,12 +132,12 @@ namespace Centaurus.Domain
             ));
         }
 
-        public static void AddConstellationUpdate(this ProcessorContext effectProcessors, ConstellationSettings settings, ConstellationSettings prevSettings)
+        public static void AddConstellationUpdate(this ProcessorContext processorContext, ConstellationSettings settings, ConstellationSettings prevSettings)
         {
-            effectProcessors.AddEffectProcessor(new ConstellationInitUpdateProcessor(
+            processorContext.AddEffectProcessor(new ConstellationInitUpdateProcessor(
                 new ConstellationUpdateEffect
                 {
-                    Apex = effectProcessors.Apex,
+                    Apex = processorContext.Apex,
                     Settings = settings,
                     PrevSettings = prevSettings
                 }

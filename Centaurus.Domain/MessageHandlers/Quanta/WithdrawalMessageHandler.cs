@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
@@ -12,6 +13,12 @@ namespace Centaurus.Domain
         {
         }
 
-        public override MessageTypes SupportedMessageType { get; } = MessageTypes.WithdrawalRequest;
+        public override string SupportedMessageType { get; } = typeof(WithdrawalRequest).Name;
+
+        protected override Task HandleQuantum(ConnectionBase connection, IncomingMessage message)
+        {
+            Context.QuantumHandler.HandleAsync(new WithdrawalRequestQuantum { RequestEnvelope = message.Envelope });
+            return Task.CompletedTask;
+        }
     }
 }

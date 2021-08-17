@@ -24,7 +24,5 @@ namespace Centaurus.Models
 
         [XdrField(5, Optional = true)]
         public RequestRateLimits RequestRateLimits { get; set; }
-
-        public override MessageTypes MessageType => MessageTypes.ConstellationUpdate;
     }
 }

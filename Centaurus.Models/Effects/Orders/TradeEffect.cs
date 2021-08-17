@@ -4,10 +4,8 @@ using Centaurus.Xdr;
 
 namespace Centaurus.Models
 {
-    public class TradeEffect: Effect
+    public class TradeEffect: AccountEffect
     {
-        public override EffectTypes EffectType => EffectTypes.Trade;
-
         [XdrField(0)]
         public ulong OrderId { get; set; }
 

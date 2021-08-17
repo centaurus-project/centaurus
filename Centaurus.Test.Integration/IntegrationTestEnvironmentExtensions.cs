@@ -237,7 +237,7 @@ namespace Centaurus.Test
             await environment.AssertClientsCount(clientsCount, TimeSpan.FromSeconds(5));
         }
 
-        public static async Task<(QuantumResultMessageBase result, byte[] effectsHash)> ProcessQuantumIsolated(this IntegrationTestEnvironment environment, Quantum quantum)
+        public static async Task<QuantumResultMessageBase> ProcessQuantumIsolated(this IntegrationTestEnvironment environment, Quantum quantum)
         {
             var context = new Domain.ExecutionContext(environment.AlphaWrapper.Context.Settings, new MockStorage(), new MockPaymentProviderFactory(), new MockOutgoingConnectionFactory(new Dictionary<string, StartupWrapper>()));
 
@@ -247,12 +247,11 @@ namespace Centaurus.Test
 
             context.Setup(environment.AlphaWrapper.Context.PersistenceManager.GetSnapshot(environment.AlphaWrapper.Context.QuantumStorage.CurrentApex));
 
-            var messageType = quantum.MessageType;
+            var messageType = quantum.GetType().Name;
             var account = default(AccountWrapper);
-            if (messageType == MessageTypes.RequestQuantum)
+            if (quantum is RequestQuantum requestQuantum)
             {
-                var requestQuantum = (RequestQuantum)quantum;
-                messageType = requestQuantum.RequestMessage.MessageType;
+                messageType = requestQuantum.RequestMessage.GetMessageType();
                 account = context.AccountStorage.GetAccount(requestQuantum.RequestMessage.Account);
             }
 
@@ -262,19 +261,18 @@ namespace Centaurus.Test
 
             var res = await processor.Process(processContext);
 
-            return (res, res.Effects.Hashes.SelectMany(h => h.Data).ToArray().ComputeHash());
+            return res;
         }
 
 
 
-        public static async Task<(QuantumResultMessageBase result, byte[] effectsHash)> ProcessQuantumWithoutValidation(Domain.ExecutionContext context, Quantum quantum)
+        public static async Task<QuantumResultMessageBase> ProcessQuantumWithoutValidation(Domain.ExecutionContext context, Quantum quantum)
         {
-            var messageType = quantum.MessageType;
+            var messageType = quantum.GetType().Name;
             var account = default(AccountWrapper);
-            if (messageType == MessageTypes.RequestQuantum)
+            if (quantum is RequestQuantum requestQuantum)
             {
-                var requestQuantum = (RequestQuantum)quantum;
-                messageType = requestQuantum.RequestMessage.MessageType;
+                messageType = requestQuantum.RequestMessage.GetMessageType();
                 account = context.AccountStorage.GetAccount(requestQuantum.RequestMessage.Account);
             }
 
@@ -284,9 +282,12 @@ namespace Centaurus.Test
 
             var res = await processor.Process(processContext);
 
-            context.QuantumStorage.AddQuantum(new InProgressQuantum { QuantumEnvelope = quantum.CreateEnvelope(), Signatures = new List<AuditorSignature>() }, quantum.ComputeHash());
+            context.QuantumStorage.AddQuantum(new PendingQuantum { 
+                Quantum = quantum, 
+                Signatures = new List<AuditorSignature>() }, 
+            quantum.ComputeHash());
 
-            return (res, res.Effects.Hashes.SelectMany(h => h.Data).ToArray().ComputeHash());
+            return res;
         }
     }
 }

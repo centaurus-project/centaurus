@@ -13,7 +13,7 @@ namespace Centaurus.Domain
 
         }
 
-        public override MessageTypes SupportedMessageType => MessageTypes.DepositQuantum;
+        public override string SupportedMessageType { get; } = typeof(DepositQuantum).Name;
 
         public override Task<QuantumResultMessageBase> Process(PaymentCommitProcessorContext context)
         {

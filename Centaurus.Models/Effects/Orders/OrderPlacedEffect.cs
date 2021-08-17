@@ -5,10 +5,8 @@ using Centaurus.Xdr;
 namespace Centaurus.Models
 {
     [XdrContract]
-    public class OrderPlacedEffect: Effect
+    public class OrderPlacedEffect: AccountEffect
     {
-        public override EffectTypes EffectType => EffectTypes.OrderPlaced;
-
         [XdrField(0)]
         public double Price { get; set; }
 

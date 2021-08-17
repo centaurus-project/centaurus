@@ -21,7 +21,7 @@ namespace Centaurus.Domain
         {
         }
 
-        public EffectsResponse LoadEffects(string rawCursor, bool isDesc, int limit, ulong account)
+        public QuantumInfoResponse LoadEffects(string rawCursor, bool isDesc, int limit, ulong account)
         {
             if (string.IsNullOrEmpty(rawCursor))
                 rawCursor = "0";
@@ -29,40 +29,53 @@ namespace Centaurus.Domain
                 throw new ArgumentException("Cursor is invalid.");
             var order = isDesc ? QueryResultsOrder.Desc : QueryResultsOrder.Asc;
             var accountQuanta = Context.PermanentStorage.LoadQuantaForAccount(account, apex, limit, order);
-            var accountEffects = new List<ApexEffects>();
+            var accountQuantumInfos = new List<QuantumInfo>();
 
-            foreach (var quantum in accountQuanta)
+            foreach (var accountQuantum in accountQuanta)
             {
-                var effects = new Dictionary<byte[], Effect>();
-                foreach (var rawEffect in quantum.Effects)
+                var effects = new List<EffectsInfoBase>();
+
+                var quantum = accountQuantum.Quantum;
+
+                var effectsBytes = (IEnumerable<byte>)new byte[] { };
+                foreach (var effectsGroup in quantum.Effects)
                 {
-                    var effect = XdrConverter.Deserialize<Effect>(rawEffect);
-                    effects.Add(rawEffect.ComputeHash(), effect.Account == account ? effect : null);
+                    var effectHash = effectsGroup.Effects.ComputeHash();
+                    if (effectsGroup.Account == account)
+                        effects.Add(new EffectsInfo { EffectsGroupData = effectsGroup.Effects });
+                    else
+                        effects.Add(new EffectsHashInfo { EffectsGroupData = effectHash });
+
+                    effectsBytes.Concat(effectHash);
                 }
-                accountEffects.Add(new ApexEffects
+
+                var quantumHash = quantum.RawQuantum.ComputeHash();
+
+                var payloadHash = ByteArrayExtensions.ComputeQuantumPayloadHash(quantum.Apex, quantumHash, effectsBytes.ComputeHash());
+
+                accountQuantumInfos.Add(new QuantumInfo
                 {
-                    Apex = quantum.Apex,
-                    Items = effects.Values.ToList(),
-                    Proof = new EffectsProof
-                    {
-                        Hashes = effects.Keys.Select(e => new Hash { Data = e }).ToList(),
-                        Signatures = quantum.Signatures.Select(s => new TinySignature { Data = s.EffectsSignature }).ToList()
-                    }
+                    Apex = accountQuantum.Quantum.Apex,
+                    Items = effects,
+                    Proof = quantum.Signatures.Select(s => new TinySignature { Data = s.PayloadSignature }).ToList(),
+                    Request = accountQuantum.IsInitiator
+                        ? (RequestInfoBase)new RequestInfo { Request = quantum.RawQuantum }
+                        : new RequestHashInfo { Request = quantumHash }
                 });
             }
 
             if (isDesc)
             {
-                accountEffects.Reverse();
-                accountEffects.ForEach(ae => ae.Items.Reverse());
+                accountQuantumInfos.Reverse();
+                accountQuantumInfos.ForEach(ae => ae.Items.Reverse());
             }
-            return new EffectsResponse
+            return new QuantumInfoResponse
             {
                 CurrentPagingToken = rawCursor,
                 Order = isDesc ? EffectsRequest.Desc : EffectsRequest.Asc,
-                Items = accountEffects,
-                NextPageToken = accountEffects.LastOrDefault()?.Apex.ToString(),
-                PrevPageToken = accountEffects.FirstOrDefault()?.Apex.ToString(),
+                Items = accountQuantumInfos,
+                NextPageToken = accountQuantumInfos.LastOrDefault()?.Apex.ToString(),
+                PrevPageToken = accountQuantumInfos.FirstOrDefault()?.Apex.ToString(),
                 Limit = limit
             };
         }
@@ -79,7 +92,7 @@ namespace Centaurus.Domain
         /// <param name="apex"></param>
         /// <param name="count">Count of quanta to load. Loads all if equal or less than 0</param>
         /// <returns></returns>
-        public List<InProgressQuantum> GetQuantaAboveApex(ulong apex, int count = 0)
+        public List<PendingQuantum> GetQuantaAboveApex(ulong apex, int count = 0)
         {
             var quantaModels = Context.PermanentStorage.LoadQuantaAboveApex(apex);
             var query = (IEnumerable<QuantumPersistentModel>)quantaModels.OrderBy(q => q.Apex);
@@ -171,19 +184,30 @@ namespace Centaurus.Domain
 
             var quanta = Context.PermanentStorage.LoadQuantaAboveApex(apex);
 
-            var effects = quanta.SelectMany(q => q.Effects.Select(e =>
-            {
-                var effect = XdrConverter.Deserialize<Effect>(e);
-                effect.Apex = q.Apex;
-                return effect;
-            })
-            ).ToList();
+            var effects = quanta
+                .SelectMany(q => {
+                    var effects = new List<Effect>();
+                    foreach (var rawEffectsGroup in q.Effects)
+                    {
+                        var effectsGroup = XdrConverter.Deserialize<EffectsGroup>(rawEffectsGroup.Effects);
+                        foreach (var effect in effectsGroup.Effects)
+                        {
+                            effect.Apex = q.Apex;
+                            if (effect is AccountEffect accountEffect)
+                                accountEffect.Account = effectsGroup.Account;
+                            effects.Add(effect);
+                        }
+                    }
+                    return effects;
+                }).ToList();
 
             for (var i = effects.Count - 1; i >= 0; i--)
             {
                 var currentEffect = effects[i];
 
-                var account = currentEffect.Account > 0 ? accountStorage.GetAccount(currentEffect.Account) : null;
+                var account = currentEffect is AccountEffect accountEffect 
+                    ? accountStorage.GetAccount(accountEffect.Account) 
+                    : null;
                 IEffectProcessor<Effect> processor = null;
                 switch (currentEffect)
                 {

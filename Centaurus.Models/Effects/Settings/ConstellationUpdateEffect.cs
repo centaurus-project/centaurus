@@ -8,8 +8,6 @@ namespace Centaurus.Models
     [XdrContract]
     public class ConstellationUpdateEffect : Effect
     {
-        public override EffectTypes EffectType => EffectTypes.ConstellationUpdate;
-
         [XdrField(0)]
         public ConstellationSettings Settings { get; set; }
 

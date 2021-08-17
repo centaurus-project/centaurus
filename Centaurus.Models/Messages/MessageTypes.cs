@@ -28,9 +28,9 @@ namespace Centaurus.Models
         /// </summary>
         AccountDataRequest = 10,
         /// <summary>
-        /// Wrapper for client request messages that contains transaction. Created by Alpha.
+        /// Wrapper for client request messages that contains withdrawal. Created by Alpha.
         /// </summary>
-        RequestTransactionQuantum = 47,
+        WithdrawalRequestQuantum = 47,
         /// <summary>
         /// Wrapper for client request messages. Created by Alpha.
         /// </summary>
@@ -78,7 +78,7 @@ namespace Centaurus.Models
         /// <summary>
         /// Internal message. Contains quantum message envelope and effects signatures.
         /// </summary>
-        ProcessedQuantum = 108,
+        PendingQuantum = 108,
         /// <summary>
         /// The message is send after success handshake. Contains account id.
         /// </summary>

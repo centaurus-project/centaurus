@@ -7,8 +7,6 @@ namespace Centaurus.Models
 {
     public class AuditorResultsBatch : Message
     {
-        public override MessageTypes MessageType => MessageTypes.AuditorResultsBatch;
-
         [XdrField(0)]
         public List<AuditorResultMessage> AuditorResultMessages { get; set; }
     }

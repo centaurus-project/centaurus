@@ -3,6 +3,7 @@ using Centaurus.Models;
 using Centaurus.Xdr;
 using NLog;
 using System;
+using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,17 +16,13 @@ namespace Centaurus.Domain
     {
         class HandleItem
         {
-            public HandleItem(MessageEnvelope quantumEnvelope)
+            public HandleItem(Quantum quantum)
             {
-                Envelope = quantumEnvelope ?? throw new ArgumentNullException(nameof(quantumEnvelope));
-                if (!(Envelope.Message is Quantum))
-                    throw new ArgumentException("Message must be Quantum type.");
+                Quantum = quantum ?? throw new ArgumentNullException(nameof(quantum));
                 HandlingTaskSource = new TaskCompletionSource<QuantumResultMessageBase>(TaskCreationOptions.RunContinuationsAsynchronously);
             }
 
-            public MessageEnvelope Envelope { get; }
-
-            public Quantum Quantum => (Quantum)Envelope.Message;
+            public Quantum Quantum { get; }
 
             public TaskCompletionSource<QuantumResultMessageBase> HandlingTaskSource { get; }
         }
@@ -51,16 +48,6 @@ namespace Centaurus.Domain
         /// </summary>
         /// <param name="quantum">Quantum to handle</param>
         public Task<QuantumResultMessageBase> HandleAsync(Quantum quantum)
-        {
-            return HandleAsync(quantum.CreateEnvelope());
-        }
-
-
-        /// <summary>
-        /// Handles the quantum and returns Task.
-        /// </summary>
-        /// <param name="quantum">Quantum to handle</param>
-        public Task<QuantumResultMessageBase> HandleAsync(MessageEnvelope quantum)
         {
             if (QuantaThrottlingManager.Current.IsThrottlingEnabled && QuantaThrottlingManager.Current.MaxItemsPerSecond <= awaitedQuanta.Count)
                 throw new TooManyRequestsException("Server is too busy. Try again later.");
@@ -102,7 +89,7 @@ namespace Centaurus.Domain
                 Context.ExtensionsManager.BeforeQuantumHandle(handleItem.Quantum);
 
                 Context.PendingUpdatesManager.UpdateBatch();
-                result = await HandleQuantum(handleItem.Envelope);
+                result = await HandleQuantum(handleItem.Quantum);
                 if (result.Status != ResultStatusCodes.Success)
                     throw new Exception("Failed to handle quantum.");
                 tcs.SetResult(result);
@@ -155,10 +142,8 @@ namespace Centaurus.Domain
                 return null; //the quantum is not client quantum
         }
 
-        async Task<QuantumResultMessageBase> HandleQuantum(MessageEnvelope quantumEnvelope)
+        async Task<QuantumResultMessageBase> HandleQuantum(Quantum quantum)
         {
-            var quantum = (Quantum)quantumEnvelope.Message;
-
             var account = GetAccountWrapper(quantum);
 
             ValidateQuantum(quantum, account);
@@ -167,54 +152,28 @@ namespace Centaurus.Domain
 
             var processorContext = processor.GetContext(quantum, account);
 
-            var result = await ProcessQuantumEnvelope(quantum, processor, processorContext);
+            await ProcessQuantum(processor, processorContext);
 
-            var quantumHash = quantum.ComputeHash(buffer.Buffer);
+            ProcessResult(processorContext);
 
-            var updatesBatchId = processorContext.PersistQuantum();
+            Context.QuantumStorage.AddQuantum(new PendingQuantum { Quantum = quantum, Signatures = new List<AuditorSignature>() }, processorContext.ProcessingResult.QuantumHash);
 
-            ProcessResult(updatesBatchId, result, processorContext);
+            logger.Trace($"Message of type {quantum.GetType().Name} with apex {quantum.Apex} is handled.");
 
-            if (Context.IsAlpha)
-                quantumEnvelope.Sign(Context.Settings.KeyPair);
-
-            Context.QuantumStorage.AddQuantum(new InProgressQuantum { QuantumEnvelope = quantumEnvelope, Signatures = new List<AuditorSignature>() }, quantumHash);
-
-            EnsureOutgoingResult(result.Quantum.Apex, result);
-
-            logger.Trace($"Message of type {quantum.MessageType} with apex {quantum.Apex} is handled.");
-
-            return result;
+            return processorContext.ProcessingResult.ResultMessage;
         }
 
-        void EnsureOutgoingResult(ulong apex, QuantumResultMessageBase result)
-        {
-        }
-
-        AuditorSignature GetSignature(QuantumResultMessageBase result, ProcessorContext processorContext)
-        {
-            var auditorSignature = new AuditorSignature { EffectsSignature = result.Quantum.EffectsHash.Sign(Context.Settings.KeyPair) };
-            //add transaction signature
-            if (processorContext is ITransactionProcessorContext transactionContext)
-            {
-                var signature = transactionContext.PaymentProvider.SignTransaction(transactionContext.Transaction);
-                auditorSignature.TxSignature = signature.Signature;
-                auditorSignature.TxSigner = signature.Signer;
-            }
-            return auditorSignature;
-        }
-
-        private void ProcessResult(uint updatesBatchId, QuantumResultMessageBase result, ProcessorContext processorContext)
+        private void ProcessResult(ProcessorContext processorContext)
         {
             //register result
-            Context.AuditResultManager.Add(updatesBatchId, result.Quantum.Apex, result, processorContext.GetNotificationMessages());
-            //build result message
-            var resultSignature = GetSignature(result, processorContext);
-            var auditorResultMessage = new AuditorResultMessage { Apex = result.Quantum.Apex, Signature = resultSignature };
-            //add result to manager
-            Context.AuditResultManager.Add(auditorResultMessage, Context.Settings.KeyPair);
+            Context.AuditResultManager.Add(processorContext.ProcessingResult);
+
             //send result to auditors
-            Context.OutgoingConnectionManager.EnqueueResult(auditorResultMessage);
+            Context.OutgoingConnectionManager.EnqueueResult(new AuditorResultMessage
+            {
+                Apex = processorContext.Quantum.Apex,
+                Signature = processorContext.ProcessingResult.CurrentNodeSignature
+            });
         }
 
         void ValidateRequestQuantum(Quantum quantum, AccountWrapper accountWrapper)
@@ -251,41 +210,22 @@ namespace Centaurus.Domain
             return processor;
         }
 
-        async Task<QuantumResultMessageBase> ProcessQuantumEnvelope(Quantum quantum, QuantumProcessorBase processor, ProcessorContext processorContext)
+        async Task ProcessQuantum(QuantumProcessorBase processor, ProcessorContext processorContext)
         {
             await processor.Validate(processorContext);
 
             var resultMessage = await processor.Process(processorContext);
 
-            processorContext.ComputeEffectsHash();
-
-            EnsureMessageHash(quantum, processorContext);
-
-            resultMessage.Effects = processorContext.GetEffectProof();
-
-            resultMessage.ClientEffects = processorContext.GetClientEffects();
-
-            return resultMessage;
+            processorContext.Complete(resultMessage);
         }
 
-        void EnsureMessageHash(Quantum quantum, ProcessorContext context)
-        {
-            if (Context.IsAlpha)
-                quantum.EffectsHash = context.EffectsHash;
-            else
-            {
-                if (!ByteArrayComparer.Default.Equals(context.EffectsHash, quantum.EffectsHash) && !EnvironmentHelper.IsTest)
-                    throw new Exception($"Effects hash for quantum {quantum.Apex} is not equal to provided by Alpha.");
-            }
-        }
-
-        MessageTypes GetMessageType(Quantum quantum)
+        string GetMessageType(Quantum quantum)
         {
             if (quantum is RequestQuantum requestQuantum)
-                return requestQuantum.RequestMessage.MessageType;
+                return requestQuantum.RequestMessage.GetMessageType();
             else if (quantum is ConstellationQuantum constellationQuantum)
-                return constellationQuantum.RequestMessage.MessageType;
-            return quantum.MessageType;
+                return constellationQuantum.RequestMessage.GetMessageType();
+            return quantum.GetType().Name;
         }
 
         public void Dispose()

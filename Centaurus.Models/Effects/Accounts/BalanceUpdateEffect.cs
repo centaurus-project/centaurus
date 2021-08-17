@@ -8,10 +8,11 @@ namespace Centaurus.Models
     [XdrContract]
     public class BalanceUpdateEffect: BaseBalanceEffect
     {
-        public override EffectTypes EffectType => EffectTypes.BalanceUpdate;
-
         [XdrField(0)]
         public UpdateSign Sign { get; set; }
+
+        [XdrField(1)]
+        public ulong Amount { get; set; }
     }
 
     public enum UpdateSign

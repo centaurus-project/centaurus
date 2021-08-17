@@ -21,7 +21,7 @@ namespace Centaurus.Domain
                     Asset = orderRequest.Asset,
                     Side = orderRequest.Side
                 },
-                this.processorContext.SourceAccount
+                this.processorContext.InitiatorAccount
             );
             timeInForce = orderRequest.TimeInForce;
 
@@ -32,7 +32,7 @@ namespace Centaurus.Domain
             orderbook = market.GetOrderbook(side.Inverse());
             //fetch balances
             if (!takerOrder.AccountWrapper.Account.HasBalance(asset))
-                this.processorContext.AddBalanceCreate(this.processorContext.SourceAccount, asset);
+                this.processorContext.AddBalanceCreate(this.processorContext.InitiatorAccount, asset);
         }
 
         private readonly OrderWrapper takerOrder;

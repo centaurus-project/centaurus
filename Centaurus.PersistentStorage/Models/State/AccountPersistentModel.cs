@@ -13,15 +13,18 @@ namespace Centaurus.PersistentStorage
         public ulong AccountId { get; set; }
 
         [Key(1)]
-        public ulong Nonce { get; set; }
+        public ulong AccountSequence { get; set; }
 
         [Key(2)]
-        public List<BalancePersistentModel> Balances { get; set; }
+        public ulong Nonce { get; set; }
 
         [Key(3)]
-        public List<OrderPersistentModel> Orders { get; set; }
+        public List<BalancePersistentModel> Balances { get; set; }
 
         [Key(4)]
+        public List<OrderPersistentModel> Orders { get; set; }
+
+        [Key(5)]
         public RequestRateLimitPersistentModel RequestRateLimits { get; set; } //TODO: make optional
 
         [IgnoreMember]

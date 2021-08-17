@@ -18,7 +18,7 @@ namespace Centaurus.Models
     [XdrUnion((int)MessageTypes.OrderRequest, typeof(OrderRequest))]
     [XdrUnion((int)MessageTypes.OrderCancellationRequest, typeof(OrderCancellationRequest))]
     [XdrUnion((int)MessageTypes.RequestQuantum, typeof(RequestQuantum))]
-    [XdrUnion((int)MessageTypes.RequestTransactionQuantum, typeof(RequestTransactionQuantum))]
+    [XdrUnion((int)MessageTypes.WithdrawalRequestQuantum, typeof(WithdrawalRequestQuantum))]
     [XdrUnion((int)MessageTypes.DepositQuantum, typeof(DepositQuantum))]
     [XdrUnion((int)MessageTypes.AuditorPerfStatistics, typeof(AuditorPerfStatistics))]
     [XdrUnion((int)MessageTypes.AuditorResultsBatch, typeof(AuditorResultsBatch))]
@@ -27,12 +27,10 @@ namespace Centaurus.Models
     [XdrUnion((int)MessageTypes.QuantaBatchRequest, typeof(QuantaBatchRequest))]
     [XdrUnion((int)MessageTypes.QuantaBatch, typeof(QuantaBatch))]
     [XdrUnion((int)MessageTypes.EffectsRequest, typeof(EffectsRequest))]
-    [XdrUnion((int)MessageTypes.EffectsResponse, typeof(EffectsResponse))]
-    [XdrUnion((int)MessageTypes.ProcessedQuantum, typeof(InProgressQuantum))]
+    [XdrUnion((int)MessageTypes.EffectsResponse, typeof(QuantumInfoResponse))]
+    [XdrUnion((int)MessageTypes.PendingQuantum, typeof(PendingQuantum))]
     public abstract class Message 
     {
-        public abstract MessageTypes MessageType { get; }
-
         public virtual long MessageId { get { return 0; } }
     }
 }

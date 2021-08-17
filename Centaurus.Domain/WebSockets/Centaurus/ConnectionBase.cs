@@ -151,7 +151,7 @@ namespace Centaurus
 
                 Context.ExtensionsManager.BeforeSendMessage(this, envelope);
 
-                logger.Trace($"Connection {PubKeyAddress}, about to send {envelope.Message.MessageType} message.");
+                logger.Trace($"Connection {PubKeyAddress}, about to send {envelope.Message.GetMessageType()} message.");
 
                 using (var writer = new XdrBufferWriter(outgoingBuffer.Buffer))
                 {
@@ -162,7 +162,7 @@ namespace Centaurus
                         await webSocket.SendAsync(outgoingBuffer.Buffer.AsMemory(0, writer.Length), WebSocketMessageType.Binary, true, cancellationToken);
                     Context.ExtensionsManager.AfterSendMessage(this, envelope);
 
-                    logger.Trace($"Connection {PubKeyAddress}, message {envelope.Message.MessageType} sent. Size: {writer.Length}");
+                    logger.Trace($"Connection {PubKeyAddress}, message {envelope.Message.GetMessageType()} sent. Size: {writer.Length}");
                 }
             }
             catch (Exception exc)
@@ -215,10 +215,10 @@ namespace Centaurus
                                 var reader = new XdrBufferReader(incommingBuffer.Buffer, incommingBuffer.Length);
                                 envelope = XdrConverter.Deserialize<MessageEnvelope>(reader);
 
-                                logger.Trace($"Connection {PubKeyAddress}, message {envelope.Message.MessageType} received.");
+                                logger.Trace($"Connection {PubKeyAddress}, message {envelope.Message.GetMessageType()} received.");
                                 if (!await HandleMessage(envelope))
-                                    throw new UnexpectedMessageException($"No handler registered for message type {envelope.Message.MessageType}.");
-                                logger.Trace($"Connection {PubKeyAddress}, message {envelope.Message.MessageType} handled.");
+                                    throw new UnexpectedMessageException($"No handler registered for message type {envelope.Message.GetMessageType()}.");
+                                logger.Trace($"Connection {PubKeyAddress}, message {envelope.Message.GetMessageType()} handled.");
                             }
                             catch (BaseClientException exc)
                             {

@@ -15,7 +15,7 @@ namespace Centaurus.Domain
         {
         }
 
-        public override MessageTypes SupportedMessageType => MessageTypes.EffectsRequest;
+        public override string SupportedMessageType { get; } = typeof(EffectsRequest).Name;
 
         public override ConnectionState[] ValidConnectionStates => new ConnectionState[] { ConnectionState.Ready };
 

@@ -18,7 +18,7 @@ namespace Centaurus.Domain
 
         public override bool IsAuditorOnly => true;
 
-        public override MessageTypes SupportedMessageType => MessageTypes.QuantaBatch;
+        public override string SupportedMessageType { get; } = typeof(QuantaBatch).Name;
 
         public override ConnectionState[] ValidConnectionStates => new ConnectionState[] { ConnectionState.Validated, ConnectionState.Ready };
 

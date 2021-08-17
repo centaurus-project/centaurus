@@ -67,31 +67,38 @@ namespace Centaurus.Test
             return quantaCollection.OrderBy(q => q.Apex).SkipWhile(q => q.Apex <= apex).ToList();
         }
 
-        public List<QuantumPersistentModel> LoadQuantaForAccount(byte[] accountPubkey, ulong apex, int limit, QueryResultsOrder order = QueryResultsOrder.Asc)
+        public List<AccountQuantumDTO> LoadQuantaForAccount(byte[] accountPubkey, ulong apex, int limit, QueryResultsOrder order = QueryResultsOrder.Asc)
         {
             var account = LoadAccount(accountPubkey);
             return LoadQuantaForAccount(account.AccountId, apex, limit, order);
         }
 
-        public List<QuantumPersistentModel> LoadQuantaForAccount(ulong accountId, ulong fromApex, int limit, QueryResultsOrder order = QueryResultsOrder.Asc)
+        public List<AccountQuantumDTO> LoadQuantaForAccount(ulong accountId, ulong fromApex, int limit, QueryResultsOrder order = QueryResultsOrder.Asc)
         {
-            var quanta = quantaRefCollection.Where(q => q.AccountId == accountId);
+            var quantaRefs = quantaRefCollection.Where(q => q.AccountId == accountId);
             if (order == QueryResultsOrder.Asc)
             {
-                quanta = quanta.OrderBy(q => q.Apex);
+                quantaRefs = quantaRefs.OrderBy(q => q.Apex);
                 if (fromApex > 0)
-                    quanta = quanta.Where(q => q.Apex > fromApex);
+                    quantaRefs = quantaRefs.Where(q => q.Apex > fromApex);
             }
             else
             {
-                quanta = quanta.OrderByDescending(q => q.Apex);
+                quantaRefs = quantaRefs.OrderByDescending(q => q.Apex);
                 if (fromApex > 0)
-                    quanta = quanta.Where(q => q.Apex < fromApex);
+                    quantaRefs = quantaRefs.Where(q => q.Apex < fromApex);
             }
-            var accountQuanta = quanta.Take(limit).Select(a => a.Apex).ToArray();
+
+            var accountQuanta = quantaRefs.Take(limit).Select(a => a.Apex).ToArray();
             if (accountQuanta.Length < 1)
-                return new List<QuantumPersistentModel>();
-            return LoadQuanta(accountQuanta);
+                return new List<AccountQuantumDTO>();
+            return LoadQuanta(accountQuanta)
+                .Select(q => new AccountQuantumDTO
+                {
+                    Quantum = q,
+                    IsInitiator = quantaRefs.First(qr => qr.Apex == q.Apex).IsQuantumInitiator
+                })
+                .ToList();
         }
 
         public IEnumerable<PriceHistoryFramePersistentModel> GetPriceHistory(string asset, int period, int cursorTimeStamp, int toUnixTimeStamp)
@@ -133,7 +140,7 @@ namespace Centaurus.Test
                         frames.Add(frame);
                         break;
                     case CursorsPersistentModel _paymentCursors:
-                            paymentCursors = _paymentCursors;
+                        paymentCursors = _paymentCursors;
                         break;
                     default:
                         throw new InvalidOperationException($"Unknown persistent model type.");

@@ -14,7 +14,7 @@ namespace Centaurus.Domain
         {
         }
 
-        public override MessageTypes SupportedMessageType { get; } = MessageTypes.AuditorPerfStatistics;
+        public override string SupportedMessageType { get; } = typeof(AuditorPerfStatistics).Name;
 
         public override ConnectionState[] ValidConnectionStates => new[] { ConnectionState.Validated, ConnectionState.Ready };
 

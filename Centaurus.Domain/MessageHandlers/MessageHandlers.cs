@@ -14,7 +14,7 @@ namespace Centaurus.Domain
     /// </summary>
     public class MessageHandlers: ContextualBase
     {
-        readonly ImmutableDictionary<MessageTypes, MessageHandlerBase> handlers;
+        readonly ImmutableDictionary<string, MessageHandlerBase> handlers;
 
         public MessageHandlers(ExecutionContext context)
             :base(context)
@@ -25,7 +25,7 @@ namespace Centaurus.Domain
                     && !x.IsInterface
                     && !x.IsAbstract);
 
-            var processors = new Dictionary<MessageTypes, MessageHandlerBase>();
+            var processors = new Dictionary<string, MessageHandlerBase>();
             foreach (var processorType in discoveredRequestProcessors)
             {
                 var instance = Activator.CreateInstance(processorType, new object[] { Context }) as MessageHandlerBase;
@@ -40,7 +40,7 @@ namespace Centaurus.Domain
         {
             if (message == null)
                 throw new ArgumentNullException(nameof(message));
-            if (!handlers.TryGetValue(message.Envelope.Message.MessageType, out var handler))
+            if (!handlers.TryGetValue(message.Envelope.Message.GetMessageType(), out var handler))
                 return false;
 
             Context.ExtensionsManager.BeforeValidateMessage(connetction, message.Envelope);

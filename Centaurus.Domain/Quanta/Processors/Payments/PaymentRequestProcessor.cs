@@ -13,7 +13,7 @@ namespace Centaurus.Domain
 
         }
 
-        public override MessageTypes SupportedMessageType { get; } = MessageTypes.PaymentRequest;
+        public override string SupportedMessageType { get; } = typeof(PaymentRequest).Name;
 
         public override ProcessorContext GetContext(Quantum quantum, AccountWrapper account)
         {
@@ -36,7 +36,7 @@ namespace Centaurus.Domain
                 context.AddBalanceCreate(context.DestinationAccount, payment.Asset);
             context.AddBalanceUpdate(context.DestinationAccount, payment.Asset, payment.Amount, UpdateSign.Plus);
 
-            context.AddBalanceUpdate(context.SourceAccount, payment.Asset, payment.Amount, UpdateSign.Minus);
+            context.AddBalanceUpdate(context.InitiatorAccount, payment.Asset, payment.Amount, UpdateSign.Minus);
 
             var result = context.Quantum.CreateEnvelope().CreateResult(ResultStatusCodes.Success);
 
@@ -61,7 +61,7 @@ namespace Centaurus.Domain
                     throw new BadRequestException($"Min payment amount is {context.CentaurusContext.Constellation.MinAccountBalance} for this account.");
             }
 
-            if (payment.Destination.Equals(context.SourceAccount.Account.Pubkey))
+            if (payment.Destination.Equals(context.InitiatorAccount.Account.Pubkey))
                 throw new BadRequestException("Source and destination must be different public keys");
 
             if (payment.Amount <= 0)
@@ -71,7 +71,7 @@ namespace Centaurus.Domain
                 throw new BadRequestException($"Asset {payment.Asset} is not supported");
 
             var minBalance = payment.Asset == baseAsset ? context.CentaurusContext.Constellation.MinAccountBalance : 0;
-            if (!(context.SourceAccount.Account.GetBalance(payment.Asset)?.HasSufficientBalance(payment.Amount, minBalance) ?? false))
+            if (!(context.InitiatorAccount.Account.GetBalance(payment.Asset)?.HasSufficientBalance(payment.Amount, minBalance) ?? false))
                 throw new BadRequestException("Insufficient funds");
 
             return Task.CompletedTask;

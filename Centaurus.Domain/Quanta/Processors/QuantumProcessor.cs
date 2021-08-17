@@ -16,7 +16,10 @@ namespace Centaurus.Domain
 
         }
 
-        public abstract MessageTypes SupportedMessageType { get; }
+        /// <summary>
+        /// Short quantum class name
+        /// </summary>
+        public abstract string SupportedMessageType { get; }
 
 
         /// <summary>

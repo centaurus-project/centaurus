@@ -6,24 +6,28 @@ using System.Text;
 
 namespace Centaurus.Domain
 {
-    public interface IEffectProcessor<out T>
-        where T : Effect
+    public interface IEffectProcessor
     {
-        public T Effect { get; }
+        public Effect Effect { get; }
 
         public void CommitEffect();
         public void RevertEffect();
     }
 
-    public abstract class EffectProcessor<T>: IEffectProcessor<T>
-        where T: Effect
+    public interface IEffectProcessor<out T>: IEffectProcessor
+        where T : Effect
     {
-        public EffectProcessor(T effect)
+        public new T Effect { get; }
+    }
+
+    public abstract class EffectProcessor : IEffectProcessor
+    {
+        public EffectProcessor(Effect effect)
         {
             Effect = effect ?? throw new ArgumentNullException(nameof(effect));
         }
 
-        public T Effect { get; }
+        public Effect Effect { get; }
 
         public bool IsProcessed { get; private set; }
 
@@ -39,15 +43,40 @@ namespace Centaurus.Domain
         public abstract void RevertEffect();
     }
 
-    public abstract class ClientEffectProcessor<T> : EffectProcessor<T>
-        where T : Effect
+    public abstract class EffectProcessor<T>: EffectProcessor, IEffectProcessor<T>
+        where T: Effect
     {
-        public ClientEffectProcessor(T effect, AccountWrapper accountWrapper)
+        public EffectProcessor(T effect)
             :base(effect)
+        {
+        }
+
+        public new T Effect => (T)base.Effect;
+
+        Effect IEffectProcessor.Effect => Effect;
+    }
+
+    public abstract class AccountEffectProcessor : EffectProcessor
+    {
+        public AccountEffectProcessor(AccountEffect clientEffect, AccountWrapper accountWrapper)
+            :base(clientEffect)
         {
             AccountWrapper = accountWrapper ?? throw new ArgumentNullException(nameof(accountWrapper));
         }
 
+        public new AccountEffect Effect => (AccountEffect)base.Effect;
+
         public AccountWrapper AccountWrapper { get; }
+    }
+
+    public abstract class ClientEffectProcessor<T> : AccountEffectProcessor, IEffectProcessor<T>
+        where T : AccountEffect
+    {
+        public ClientEffectProcessor(T effect, AccountWrapper accountWrapper)
+            :base(effect, accountWrapper)
+        {
+        }
+
+        public new T Effect => (T)base.Effect;
     }
 }

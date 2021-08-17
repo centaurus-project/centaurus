@@ -140,13 +140,8 @@ namespace Centaurus.Test
                 RequestEnvelope = request,
                 Timestamp = DateTime.UtcNow.Ticks
             };
-            var quantumEnvelope = quantum
-                .CreateEnvelope();
 
             var result = await environment.ProcessQuantumIsolated(quantum);
-
-            quantum.EffectsHash = result.effectsHash;
-            quantumEnvelope.Sign(environment.AlphaWrapper.Settings.KeyPair);
 
             environment.AlphaWrapper.Shutdown();
 
@@ -155,7 +150,7 @@ namespace Centaurus.Test
             //handle quantum
             await Task.WhenAll(environment.AuditorWrappers.Select(a =>
             {
-                var rawQuantum = quantumEnvelope.ToByteArray();
+                var rawQuantum = quantum.ToByteArray();
                 var auditorsQuantum = XdrConverter.Deserialize<Quantum>(rawQuantum);
                 return a.Value.Context.QuantumHandler.HandleAsync(auditorsQuantum);
             }));
@@ -229,13 +224,13 @@ namespace Centaurus.Test
             var requestQuantum = new RequestQuantum
             {
                 Apex = quantaStorage.CurrentApex + 1,
-                EffectsHash = new byte[] { },
+                EffectsProof = new byte[] { },
                 PrevHash = quantaStorage.LastQuantumHash,
                 RequestEnvelope = sqamRequest,
                 Timestamp = DateTime.UtcNow.Ticks
             };
 
-            quantaStorage.AddQuantum(new InProgressQuantum { QuantumEnvelope = requestQuantum.CreateEnvelope(), Signatures = new List<AuditorSignature>() }, requestQuantum.ComputeHash());
+            quantaStorage.AddQuantum(new PendingQuantum { Quantum = requestQuantum, Signatures = new List<AuditorSignature>() }, requestQuantum.ComputeHash());
 
             var expectedState = useFakeClient || useFakeAlpha || invalidBalance ? State.Failed : State.Ready;
 

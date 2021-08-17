@@ -15,7 +15,7 @@ namespace Centaurus.Domain
         {
         }
 
-        public override MessageTypes SupportedMessageType { get; } = MessageTypes.AuditorHandshakeResponse;
+        public override string SupportedMessageType { get; } = typeof(AuditorHandshakeResponse).Name;
 
         public override bool IsAuditorOnly => true;
 

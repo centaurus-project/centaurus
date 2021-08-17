@@ -16,8 +16,7 @@ namespace Centaurus
             var rawSignature = keyPair.Sign(binaryData);
             return new TinySignature()
             {
-                Data = rawSignature,
-                //Signer = keyPair.PublicKey
+                Data = rawSignature
             };
         }
     }

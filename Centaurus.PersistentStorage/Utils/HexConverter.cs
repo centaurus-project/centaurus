@@ -4,7 +4,6 @@ namespace Centaurus.PersistentStorage
 {
     public static class HexConverter
     {
-
         public static string BufferToHex(byte[] buffer)
         {
             return BitConverter.ToString(buffer).Replace("-", "");

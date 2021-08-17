@@ -58,7 +58,7 @@ namespace Centaurus.Test
             TestFetching(allEffectsResult, zeroCursor, !isDesc, limit, account.Account.Id, true);
         }
 
-        private void TestFetching(List<ApexEffects> allEffects, string cursor, bool isDesc, int limit, ulong account, bool isReverseDirection = false)
+        private void TestFetching(List<QuantumInfo> allEffects, string cursor, bool isDesc, int limit, ulong account, bool isReverseDirection = false)
         {
             var nextCursor = cursor;
             var totalCount = 0;

@@ -18,7 +18,7 @@ namespace Centaurus.Domain
             CurrentApex = currentApex;
             LastQuantumHash = lastQuantumHash;
         }
-        public void AddQuantum(InProgressQuantum processedQuantum, byte[] hash)
+        public void AddQuantum(PendingQuantum processedQuantum, byte[] hash)
         {
             lock (syncRoot)
             {
@@ -45,7 +45,7 @@ namespace Centaurus.Domain
         /// <param name="maxCount">Batch max size.</param>
         /// <param name="quanta">Batch itself. Can be null.</param>
         /// <returns>True if data presented in the storage, otherwise false.</returns>
-        public bool GetQuantaBacth(ulong apexFrom, int maxCount, out List<InProgressQuantum> quantaBatch)
+        public bool GetQuantaBacth(ulong apexFrom, int maxCount, out List<PendingQuantum> quantaBatch)
         {
             lock (syncRoot)
             {
@@ -72,7 +72,7 @@ namespace Centaurus.Domain
 
         private List<ulong> apexes = new List<ulong>();
 
-        private List<InProgressQuantum> quanta = new List<InProgressQuantum>();
+        private List<PendingQuantum> quanta = new List<PendingQuantum>();
 
         private int QuantaCacheCapacity = 1_000_000;
         private int capacityThreshold = 100_000;

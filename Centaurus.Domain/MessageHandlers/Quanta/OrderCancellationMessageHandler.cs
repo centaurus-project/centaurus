@@ -13,6 +13,6 @@ namespace Centaurus.Domain
         {
         }
 
-        public override MessageTypes SupportedMessageType { get; } = MessageTypes.OrderCancellationRequest;
+        public override string SupportedMessageType { get; } = typeof(OrderCancellationRequest).Name;
     }
 }

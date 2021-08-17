@@ -7,6 +7,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using static Centaurus.Domain.ProcessorContext;
 
 namespace Centaurus.Domain
 {
@@ -18,31 +19,31 @@ namespace Centaurus.Domain
             InitTimers();
         }
 
-        public void Add(uint updatesBatchId, ulong apex, QuantumResultMessageBase resultMessage, Dictionary<ulong, Message> notifications)
+        public void Add(QuantaProcessingResult processingResult)
         {
-            var aggregate = default(ResultConsensusAggregate);
+            var aggregate = default(Aggregate);
             lock (pendingAggregatesSyncRoot)
             {
-                if (!pendingAggregates.TryGetValue(apex, out aggregate))
+                if (!pendingAggregates.TryGetValue(processingResult.Apex, out aggregate))
                 {
-                    pendingAggregates.Add(apex, new ResultConsensusAggregate(updatesBatchId, resultMessage, notifications, this));
+                    pendingAggregates.Add(processingResult.Apex, new Aggregate(processingResult, this));
                     return;
                 }
             }
-
-            aggregate.Add(updatesBatchId, resultMessage, notifications);
+            aggregate.Add(processingResult);
         }
 
         public void Add(AuditorResultMessage resultMessage, RawPubKey auditor)
         {
-            var aggregate = default(ResultConsensusAggregate);
+            var aggregate = default(Aggregate);
             lock (pendingAggregatesSyncRoot)
             {
+                //result message could be received before quantum was processed
                 if (!pendingAggregates.TryGetValue(resultMessage.Apex, out aggregate))
                 {
                     //if result apex is less than or equal to last processed apex, then the result is no more relevant
                     if (resultMessage.Apex > Context.QuantumStorage.CurrentApex)
-                        pendingAggregates.Add(resultMessage.Apex, new ResultConsensusAggregate(resultMessage, auditor, this));
+                        pendingAggregates.Add(resultMessage.Apex, new Aggregate(resultMessage, auditor, this));
                     return;
                 }
             }
@@ -93,11 +94,11 @@ namespace Centaurus.Domain
         private void SendAcknowledgment()
         {
             var acknowledgmentTimeout = TimeSpan.FromMilliseconds(100);
-            var resultsToSend = default(List<ResultConsensusAggregate>);
+            var resultsToSend = default(List<Aggregate>);
             lock (pendingAggregatesSyncRoot)
             {
                 resultsToSend = pendingAggregates.Values
-                    .Where(a => a.ResultMessageItem.IsResultAssigned && !a.IsAcknowledgmentSent && DateTime.UtcNow - a.CreatedAt > acknowledgmentTimeout)
+                    .Where(a => a.Item.IsResultAssigned && !a.IsAcknowledgmentSent && DateTime.UtcNow - a.CreatedAt > acknowledgmentTimeout)
                     .ToList();
             }
             foreach (var resultItem in resultsToSend)
@@ -130,35 +131,39 @@ namespace Centaurus.Domain
         protected static Logger logger = LogManager.GetCurrentClassLogger();
 
         private object pendingAggregatesSyncRoot = new { };
-        private Dictionary<ulong, ResultConsensusAggregate> pendingAggregates = new Dictionary<ulong, ResultConsensusAggregate>();
+        private Dictionary<ulong, Aggregate> pendingAggregates = new Dictionary<ulong, Aggregate>();
 
-        class ResultConsensusAggregate
+        class Aggregate
         {
-            private ResultConsensusAggregate(ResultManager resultManager)
+            private Aggregate(ResultManager manager)
             {
-                ResultManager = resultManager;
+                Manager = manager;
                 CreatedAt = DateTime.UtcNow;
             }
 
-            public ResultConsensusAggregate(uint updatesBatchId, QuantumResultMessageBase result, Dictionary<ulong, Message> notifications, ResultManager resultManager)
-                : this(resultManager)
+            public Aggregate(QuantaProcessingResult processingResult, ResultManager manager)
+                : this(manager)
             {
-                ResultMessageItem = new ResultMessageItem(updatesBatchId, result, notifications, this);
-                IsAcknowledgmentSent = ResultMessageItem.AccountPubKey == null && ResultMessageItem.Notifications.Count < 1;
+                Item = new AggregateItem(processingResult, this);
+                IsAcknowledgmentSent = Item.Result.Initiator == 0 && Item.Result.Effects.All(eg => eg.Account == 0);
+                Item.ProcessOutrunSignatures(this);
             }
 
-            public ResultConsensusAggregate(AuditorResultMessage resultMessage, RawPubKey auditor, ResultManager resultManager)
+            public Aggregate(AuditorResultMessage resultMessage, RawPubKey auditor, ResultManager resultManager)
                 : this(resultManager)
             {
-                ResultMessageItem = new ResultMessageItem(resultMessage, auditor);
+                Item = new AggregateItem(resultMessage, auditor);
             }
 
             public bool IsProcessed { get; private set; }
+
             public bool IsAcknowledgmentSent { get; private set; }
 
             public DateTime CreatedAt { get; }
-            public ResultMessageItem ResultMessageItem { get; }
-            public ResultManager ResultManager { get; }
+
+            public AggregateItem Item { get; }
+
+            public ResultManager Manager { get; }
 
             private object syncRoot = new { };
             private HashSet<RawPubKey> processedAuditors = new HashSet<RawPubKey>();
@@ -173,9 +178,9 @@ namespace Centaurus.Domain
                         return;
 
                     //if current server is not Alpha than it can delay
-                    if (!ResultMessageItem.IsResultAssigned)
+                    if (!Item.IsResultAssigned)
                     {
-                        ResultMessageItem.AddResultMessage(resultMessage, auditor);
+                        Item.AddResultMessage(resultMessage, auditor);
                         return;
                     }
 
@@ -183,15 +188,12 @@ namespace Centaurus.Domain
                     processedAuditors.Add(auditor);
 
                     //check if signature is valid and tx signature is presented for TxResultMessage
-                    if (resultMessage.Signature.EffectsSignature.IsValid(auditor, ResultMessageItem.EffectsHash))
+                    if (resultMessage.Signature.PayloadSignature.IsValid(auditor, Item.Result.PayloadHash))
                     {
                         resultMessages.Add(resultMessage);
 
-                        //add signatures to result
-                        ResultMessageItem.Result.Effects.Signatures.Add(resultMessage.Signature.EffectsSignature);
-
                         //add signatures to cached quantum
-                        ResultManager.Context.QuantumStorage.AddResult(resultMessage);
+                        Manager.Context.QuantumStorage.AddResult(resultMessage);
                     }
 
                     var majorityResult = CheckMajority();
@@ -199,16 +201,16 @@ namespace Centaurus.Domain
                         return;
 
                     OnResult(majorityResult);
-                    ResultManager.Remove(ResultMessageItem.Apex);
+                    Manager.Remove(Item.Apex);
                     IsProcessed = true;
                 }
             }
 
-            public void Add(uint updatesBatchId, QuantumResultMessageBase result, Dictionary<ulong, Message> notifications)
+            public void Add(QuantaProcessingResult processingResult)
             {
                 lock (syncRoot)
                 {
-                    ResultMessageItem.AssignResult(updatesBatchId, result, notifications, this);
+                    Item.AssignResult(processingResult, this);
                 }
             }
 
@@ -219,18 +221,25 @@ namespace Centaurus.Domain
                     if (IsProcessed || (isAcknowledgment && IsAcknowledgmentSent))
                         return;
 
-                    if (!IsAcknowledgmentSent)
+                    var effectsProof = new PayloadProof
                     {
-                        foreach (var notification in ResultMessageItem.Notifications)
-                        {
-                            var aPubKey = ResultManager.Context.AccountStorage.GetAccount(notification.Key).Account.Pubkey;
-                            ResultManager.Context.Notify(aPubKey, notification.Value.CreateEnvelope());
-                        }
+                        PayloadHash = Item.Result.PayloadHash,
+                        Signatures = resultMessages.Select(r => r.Signature.PayloadSignature).ToList()
+                    };
+
+                    foreach (var notification in Item.Result.GetNotificationMessages(effectsProof))
+                    {
+                        var aPubKey = Item.Result.AffectedAccounts[notification.Key];
+                        Manager.Context.Notify(aPubKey, notification.Value.CreateEnvelope());
                     }
 
-                    if (ResultMessageItem.AccountPubKey != null)
-                        ResultManager.Context.Notify(ResultMessageItem.AccountPubKey, ResultMessageItem.Result.CreateEnvelope());
-
+                    if (Item.Result.Initiator != 0)
+                    {
+                        var aPubKey = Item.Result.AffectedAccounts[Item.Result.Initiator];
+                        Item.Result.ResultMessage.PayloadProof = effectsProof;
+                        Item.Result.ResultMessage.Effects = Item.Result.Effects.GetAccountEffects(Item.Result.Initiator);
+                        Manager.Context.Notify(aPubKey, Item.Result.ResultMessage.CreateEnvelope());
+                    }
                     IsAcknowledgmentSent = true;
                 }
             }
@@ -239,9 +248,9 @@ namespace Centaurus.Domain
             {
                 try
                 {
-                    if (ResultMessageItem.Result.OriginalMessage.Message is RequestTransactionQuantum transactionQuantum)
+                    if (Item.Result.ResultMessage.Quantum is WithdrawalRequestQuantum transactionQuantum)
                     {
-                        if (!ResultManager.Context.PaymentProvidersManager.TryGetManager(transactionQuantum.ProviderId, out var paymentProvider))
+                        if (!Manager.Context.PaymentProvidersManager.TryGetManager(transactionQuantum.ProviderId, out var paymentProvider))
                             throw new Exception($"Unable to find manager {transactionQuantum.ProviderId}");
                         var signatures = resultMessages
                             .Where(r => r.Signature.TxSignature != null)
@@ -260,9 +269,9 @@ namespace Centaurus.Domain
             {
                 if (majorityResult == MajorityResults.Unreachable)
                 {
-                    var votesCount = ResultMessageItem.Result.Effects.Signatures.Count;
+                    var votesCount = resultMessages.Count;
 
-                    var originalEnvelope = ResultMessageItem.Result.OriginalMessage;
+                    var originalEnvelope = Item.Result.ResultMessage.OriginalMessage;
                     SequentialRequestMessage requestMessage = null;
                     if (originalEnvelope.Message is SequentialRequestMessage)
                         requestMessage = (SequentialRequestMessage)originalEnvelope.Message;
@@ -270,10 +279,10 @@ namespace Centaurus.Domain
                         requestMessage = ((RequestQuantum)originalEnvelope.Message).RequestEnvelope.Message as SequentialRequestMessage;
 
                     var exc = new Exception("Majority for quantum" +
-                        $" {ResultMessageItem.Apex} ({requestMessage?.MessageType ?? originalEnvelope.Message.MessageType})" +
+                        $" {Item.Apex} ({requestMessage?.GetMessageType() ?? originalEnvelope.Message.GetMessageType()})" +
                         $" is unreachable. Results received count is {processedAuditors.Count}," +
                         $" valid results count is {votesCount}. The constellation collapsed.");
-                    ResultManager.Context.StateManager.Failed(exc);
+                    Manager.Context.StateManager.Failed(exc);
                     throw exc;
                 }
                 SubmitTransaction();
@@ -288,16 +297,16 @@ namespace Centaurus.Domain
                     if (IsProcessed)
                         return;
 
-                    ResultManager.Context.PendingUpdatesManager.AddSignatures(ResultMessageItem.UpdatesBatchId, ResultMessageItem.Apex, resultMessages);
+                    Manager.Context.PendingUpdatesManager.AddSignatures(Item.Result.UpdatesBatchId, Item.Apex, resultMessages);
                 }
             }
 
             private MajorityResults CheckMajority()
             {
-                int requiredMajority = ResultManager.Context.GetMajorityCount(),
-                    maxVotes = ResultManager.Context.GetTotalAuditorsCount();
+                int requiredMajority = Manager.Context.GetMajorityCount(),
+                    maxVotes = Manager.Context.GetTotalAuditorsCount();
 
-                var votesCount = resultMessages.Count;
+                var votesCount = resultMessages.Count + 1;
 
                 //check if we have the majority
                 if (votesCount >= requiredMajority)
@@ -313,71 +322,52 @@ namespace Centaurus.Domain
             }
         }
 
-        class ResultMessageItem
+        class AggregateItem
         {
-            public ResultMessageItem(AuditorResultMessage result, RawPubKey auditor)
+            public AggregateItem(AuditorResultMessage result, RawPubKey auditor)
             {
                 Apex = result.Apex;
                 AddResultMessage(result, auditor);
             }
 
-            public ResultMessageItem(uint updatesBatchId, QuantumResultMessageBase result, Dictionary<ulong, Message> notifications, ResultConsensusAggregate aggregate)
+            public AggregateItem(QuantaProcessingResult processingResult, Aggregate aggregate)
             {
-                AssignResult(updatesBatchId, result, notifications, aggregate);
-                Apex = ((Quantum)result.OriginalMessage.Message).Apex;
+                AssignResult(processingResult, aggregate);
+                Apex = processingResult.Apex;
             }
 
-            public void AssignResult(uint updatesBatchId, QuantumResultMessageBase result, Dictionary<ulong, Message> notifications, ResultConsensusAggregate aggregate)
+            public void AssignResult(QuantaProcessingResult result, Aggregate aggregate)
             {
-                UpdatesBatchId = updatesBatchId;
                 Result = result ?? throw new ArgumentNullException(nameof(result));
-                EffectsHash = Result.Quantum.EffectsHash;
-                AccountPubKey = GetMessageAccount(aggregate.ResultManager.Context);
-                Notifications = notifications ?? throw new ArgumentNullException(nameof(notifications));
-                AddOutrunSignatures(aggregate);
+
+                //add current node signature
+                AddResultMessage(new AuditorResultMessage
+                {
+                    Apex = Result.Apex,
+                    Signature = Result.CurrentNodeSignature
+                },
+                    aggregate.Manager.Context.Settings.KeyPair);
             }
 
             public void AddResultMessage(AuditorResultMessage result, RawPubKey auditor)
             {
-                if (OutrunSignatures.ContainsKey(auditor))
+                if (outrunSignatures.ContainsKey(auditor))
                     return;
-                OutrunSignatures.Add(auditor, result);
+                outrunSignatures.Add(auditor, result);
             }
-
-            public uint UpdatesBatchId { get; private set; }
 
             public ulong Apex { get; }
 
-            public QuantumResultMessageBase Result { get; private set; }
+            public QuantaProcessingResult Result { get; private set; }
 
             public bool IsResultAssigned => Result != null;
 
-            public Dictionary<RawPubKey, AuditorResultMessage> OutrunSignatures { get; } = new Dictionary<RawPubKey, AuditorResultMessage>();
+            Dictionary<RawPubKey, AuditorResultMessage> outrunSignatures { get; } = new Dictionary<RawPubKey, AuditorResultMessage>();
 
-            public byte[] EffectsHash { get; private set; }
-
-            public Dictionary<ulong, Message> Notifications { get; private set; }
-
-            public RawPubKey AccountPubKey { get; private set; }
-
-            private void AddOutrunSignatures(ResultConsensusAggregate aggregate)
+            public void ProcessOutrunSignatures(Aggregate aggregate)
             {
-                foreach (var result in OutrunSignatures)
+                foreach (var result in outrunSignatures)
                     aggregate.Add(result.Value, result.Key);
-            }
-
-            private RawPubKey GetMessageAccount(ExecutionContext context)
-            {
-                var originalEnvelope = Result.OriginalMessage;
-                SequentialRequestMessage requestMessage = null;
-                if (originalEnvelope.Message is SequentialRequestMessage)
-                    requestMessage = (SequentialRequestMessage)originalEnvelope.Message;
-                else if (originalEnvelope.Message is RequestQuantum)
-                    requestMessage = ((RequestQuantum)originalEnvelope.Message).RequestEnvelope.Message as SequentialRequestMessage;
-
-                if (requestMessage == null)
-                    return null;
-                return context.AccountStorage.GetAccount(requestMessage.Account).Account.Pubkey;
             }
         }
     }

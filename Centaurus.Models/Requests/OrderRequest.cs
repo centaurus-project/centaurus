@@ -6,8 +6,6 @@ namespace Centaurus.Models
 {
     public class OrderRequest : SequentialRequestMessage
     {
-        public override MessageTypes MessageType => MessageTypes.OrderRequest;
-
         [XdrField(0)]
         public TimeInForce TimeInForce { get; set; }
 

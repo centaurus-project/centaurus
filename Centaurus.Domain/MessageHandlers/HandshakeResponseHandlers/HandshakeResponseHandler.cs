@@ -15,7 +15,7 @@ namespace Centaurus.Domain
         {
         }
 
-        public override MessageTypes SupportedMessageType { get; } = MessageTypes.HandshakeResponse;
+        public override string SupportedMessageType { get; } = typeof(HandshakeResponse).Name;
 
         public override async Task HandleMessage(IncomingClientConnection connection, IncomingMessage message)
         {

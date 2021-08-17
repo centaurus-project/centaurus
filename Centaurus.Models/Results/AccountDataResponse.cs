@@ -5,8 +5,6 @@ namespace Centaurus.Models
 {
     public class AccountDataResponse: QuantumResultMessageBase
     {
-        public override MessageTypes MessageType => MessageTypes.AccountDataResponse;
-
         [XdrField(0)]
         public List<Balance> Balances { get; set; }
 

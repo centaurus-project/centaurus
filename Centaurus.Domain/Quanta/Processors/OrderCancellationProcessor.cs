@@ -17,7 +17,7 @@ namespace Centaurus.Domain
 
         }
 
-        public override MessageTypes SupportedMessageType => MessageTypes.OrderCancellationRequest;
+        public override string SupportedMessageType { get; } = typeof(OrderCancellationRequest).Name;
 
         public override ProcessorContext GetContext(Quantum quantum, AccountWrapper account)
         {
@@ -53,13 +53,13 @@ namespace Centaurus.Domain
 
             if (context.OrderWrapper.Order.Side == OrderSide.Buy)
             {
-                var balance = context.SourceAccount.Account.GetBalance(context.CentaurusContext.Constellation.GetBaseAsset());
+                var balance = context.InitiatorAccount.Account.GetBalance(context.CentaurusContext.Constellation.GetBaseAsset());
                 if (balance.Liabilities < context.OrderWrapper.Order.QuoteAmount)
                     throw new BadRequestException("Quote liabilities is less than order size.");
             }
             else
             {
-                var balance = context.SourceAccount.Account.GetBalance(context.OrderWrapper.Order.Asset);
+                var balance = context.InitiatorAccount.Account.GetBalance(context.OrderWrapper.Order.Asset);
                 if (balance == null)
                     throw new BadRequestException("Balance for asset not found.");
                 if (balance.Liabilities < context.OrderWrapper.Order.Amount)

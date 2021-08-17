@@ -60,7 +60,7 @@ namespace Centaurus
 
                 try
                 {
-                    List<InProgressQuantum> quanta = null;
+                    List<PendingQuantum> quanta = null;
                     if (!Context.QuantumStorage.GetQuantaBacth(CurrentApexCursor + 1, batchSize, out quanta))
                     {
                         quanta = Context.PersistenceManager.GetQuantaAboveApex(CurrentApexCursor, batchSize); //quanta are not found in the in-memory storage

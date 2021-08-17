@@ -21,8 +21,6 @@ namespace Centaurus.Models
 
         [XdrField(4)]
         public State State { get; set; }
-
-        public override MessageTypes MessageType => MessageTypes.AuditorPerfStatistics;
     }
 
     [XdrContract]

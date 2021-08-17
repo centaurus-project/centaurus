@@ -33,8 +33,9 @@ namespace Centaurus.Stellar.PaymentProvider
             InitTimer();
         }
 
-        public override void ValidateTransaction(byte[] rawTransaction, WithdrawalRequestModel withdrawalRequest)
+        public override bool IsTransactionValid(byte[] rawTransaction, WithdrawalRequestModel withdrawalRequest, out string error)
         {
+            error = null;
             if (rawTransaction == null)
                 throw new ArgumentNullException(nameof(rawTransaction));
 
@@ -42,7 +43,11 @@ namespace Centaurus.Stellar.PaymentProvider
                 throw new ArgumentNullException(nameof(withdrawalRequest));
 
             if (!rawTransaction.SequenceEqual(BuildTransaction(withdrawalRequest)))
-                throw new InvalidOperationException($"Transaction is not equal to expected one.");
+            {
+                error = "Transaction is not equal to expected one.";
+                return false;
+            }
+            return true;
         }
 
         private bool ValidateFee(uint fee)
@@ -104,7 +109,7 @@ namespace Centaurus.Stellar.PaymentProvider
 
             if (transaction.Operations.Length > 100)
                 throw new InvalidOperationException("Too many operations.");
-            
+
             var stream = new XdrDataOutputStream();
             stellar_dotnet_sdk.xdr.Transaction.Encode(stream, transaction.ToXdrV1());
             return stream.ToArray();
@@ -151,7 +156,7 @@ namespace Centaurus.Stellar.PaymentProvider
         {
             var ledgerPayments = new List<DepositModel>();
             var txHash = transaction.Hash();
-                
+
             for (var i = 0; i < transaction.Operations.Length; i++)
             {
                 var destination = (transaction.Operations[i].SourceAccount?.SigningKey ?? transaction.SourceAccount.SigningKey).PublicKey;
@@ -297,6 +302,31 @@ namespace Centaurus.Stellar.PaymentProvider
                 if (DateTime.UtcNow - payment.DepositTime < commitDelay)
                     break;
                 RaiseOnPaymentCommit(payment);
+            }
+        }
+
+        public override bool AreSignaturesValid(byte[] transaction, params SignatureModel[] signatures)
+        {
+            if (signatures.Length < 1)
+                throw new ArgumentException("At least one signature must be specified.");
+
+            if (transaction == null)
+                throw new ArgumentNullException(nameof(transaction));
+
+            try
+            {
+                var decoratedSignatures = new List<DecoratedSignature>();
+                foreach (var signature in signatures)
+                {
+                    var pubKey = KeyPair.FromPublicKey(signature.Signer);
+                    if (!pubKey.Verify(transaction, signature.Signature))
+                        return false;
+                }
+                return true;
+            }
+            catch
+            {
+                return false;
             }
         }
     }

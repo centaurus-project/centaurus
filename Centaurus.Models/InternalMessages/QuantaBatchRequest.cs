@@ -8,8 +8,6 @@ namespace Centaurus.Models
     [XdrContract]
     public class QuantaBatchRequest : Message
     {
-        public override MessageTypes MessageType => MessageTypes.QuantaBatchRequest;
-
         [XdrField(0)]
         public ulong LastKnownApex { get; set; }
     }

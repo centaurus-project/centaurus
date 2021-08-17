@@ -14,7 +14,6 @@ namespace Centaurus.PersistentStorage
         [IgnoreMember]
         public ulong Apex { get; set; }
 
-        //Do we really need it?
         /**
          * Quantum application timestamp.
          */
@@ -28,7 +27,7 @@ namespace Centaurus.PersistentStorage
         public byte[] RawQuantum { get; set; }
 
         [Key(2)]
-        public List<byte[]> Effects { get; set; }
+        public List<AccountEffects> Effects { get; set; }
 
         [Key(3)]
         public List<SignatureModel> Signatures { get; set; }
@@ -51,12 +50,22 @@ namespace Centaurus.PersistentStorage
     public class SignatureModel
     {
         [Key(0)]
-        public byte[] EffectsSignature { get; set; }
+        public byte[] PayloadSignature { get; set; }
 
         [Key(1)]
         public byte[] TxSigner { get; set; }
 
         [Key(2)]
         public byte[] TxSignature { get; set; }
+    }
+
+    [MessagePackObject]
+    public class AccountEffects
+    {
+        [Key(0)]
+        public ulong Account { get; set; }
+
+        [Key(1)]
+        public byte[] Effects { get; set; }
     }
 }

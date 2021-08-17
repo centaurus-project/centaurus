@@ -5,14 +5,10 @@ using System.Text;
 
 namespace Centaurus.Models
 {
-    public class InProgressQuantum : Message
+    public class PendingQuantum : Message
     {
-        public override MessageTypes MessageType => MessageTypes.ProcessedQuantum;
-
         [XdrField(0)]
-        public MessageEnvelope QuantumEnvelope { get; set; }
-
-        public Quantum Quantum => (Quantum)QuantumEnvelope.Message;
+        public Quantum Quantum { get; set; }
 
         [XdrField(1)]
         public List<AuditorSignature> Signatures { get; set; }
@@ -22,7 +18,7 @@ namespace Centaurus.Models
     public class AuditorSignature
     {
         [XdrField(0)]
-        public TinySignature EffectsSignature { get; set; }
+        public TinySignature PayloadSignature { get; set; }
 
         [XdrField(1, Optional = true)]
         public byte[] TxSigner { get; set; }

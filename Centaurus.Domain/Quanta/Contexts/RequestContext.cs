@@ -15,6 +15,6 @@ namespace Centaurus.Domain
                 throw new ArgumentNullException("Source account cannot be null for requests.");
         }
 
-        public RequestQuantum Request => (RequestQuantum)Quantum;
+        public RequestQuantumBase Request => (RequestQuantumBase)Quantum;
     }
 }

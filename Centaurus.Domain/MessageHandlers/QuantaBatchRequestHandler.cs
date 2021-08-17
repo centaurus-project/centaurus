@@ -14,7 +14,7 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
         {
         }
 
-        public override MessageTypes SupportedMessageType { get; } = MessageTypes.QuantaBatchRequest;
+        public override string SupportedMessageType { get; } = typeof(QuantaBatchRequest).Name;
 
         public override bool IsAuditorOnly { get; } = true;
 
@@ -51,7 +51,7 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
                 }
 
                 if (currentBatch == null)
-                    currentBatch = new List<InProgressQuantum>();
+                    currentBatch = new List<PendingQuantum>();
 
                 hasQuanta = currentBatch.Count == batchSize;
                 var state = new QuantaBatch

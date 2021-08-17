@@ -15,7 +15,7 @@ namespace Centaurus.Domain
 
         }
 
-        public override MessageTypes SupportedMessageType => MessageTypes.AccountDataRequest;
+        public override string SupportedMessageType { get; } = typeof(AccountDataRequest).Name;
 
         public override Task<QuantumResultMessageBase> Process(RequestContext context)
         {
@@ -25,12 +25,12 @@ namespace Centaurus.Domain
             context.UpdateNonce();
 
             var resultMessage = (AccountDataResponse)context.Quantum.CreateEnvelope().CreateResult(ResultStatusCodes.Success);
-            resultMessage.Balances = context.SourceAccount.Account.Balances
+            resultMessage.Balances = context.InitiatorAccount.Account.Balances
                 .Select(balance => new Balance { Amount = balance.Amount, Asset = balance.Asset, Liabilities = balance.Liabilities })
                 .OrderBy(balance => balance.Asset)
                 .ToList();
 
-            resultMessage.Orders = context.CentaurusContext.Exchange.OrderMap.GetAllAccountOrders(context.SourceAccount)
+            resultMessage.Orders = context.CentaurusContext.Exchange.OrderMap.GetAllAccountOrders(context.InitiatorAccount)
                 .Select(order =>
                     new Order
                     {

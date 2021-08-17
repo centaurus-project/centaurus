@@ -5,8 +5,6 @@ namespace Centaurus.Models
 {
     public class WithdrawalRequest : SequentialRequestMessage
     {
-        public override MessageTypes MessageType => MessageTypes.WithdrawalRequest;
-
         [XdrField(0)]
         public string Provider { get; set; }
 

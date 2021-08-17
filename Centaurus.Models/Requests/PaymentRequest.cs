@@ -6,8 +6,6 @@ namespace Centaurus.Models
 {
     public class PaymentRequest : SequentialRequestMessage
     {
-        public override MessageTypes MessageType => MessageTypes.PaymentRequest;
-
         [XdrField(0)]
         public string Asset { get; set; }
 

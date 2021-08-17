@@ -37,15 +37,21 @@ namespace Centaurus.Test
             return;
         }
 
-        public override void ValidateTransaction(byte[] transaction, WithdrawalRequestModel withdrawalRequest)
+        public override bool IsTransactionValid(byte[] transaction, WithdrawalRequestModel withdrawalRequestm, out string error)
         {
-            return;
+            error = null;
+            return true;
         }
 
         public void Deposit(DepositNotificationModel depositNotificationModel)
         {
             NotificationsManager.RegisterNotification(depositNotificationModel);
             RaiseOnPaymentCommit(depositNotificationModel);
+        }
+
+        public override bool AreSignaturesValid(byte[] transaction, params SignatureModel[] signature)
+        {
+            return true;
         }
     }
 }

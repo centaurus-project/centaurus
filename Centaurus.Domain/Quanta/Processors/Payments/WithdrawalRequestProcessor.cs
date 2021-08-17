@@ -9,18 +9,18 @@ namespace Centaurus.Domain
     public class WithdrawalProcessor : QuantumProcessorBase<WithdrawalProcessorContext>
     {
         public WithdrawalProcessor(ExecutionContext context)
-            :base(context)
+            : base(context)
         {
 
         }
 
-        public override MessageTypes SupportedMessageType => MessageTypes.WithdrawalRequest;
+        public override string SupportedMessageType { get; } = typeof(WithdrawalRequest).Name;
 
         public override Task<QuantumResultMessageBase> Process(WithdrawalProcessorContext context)
         {
             context.UpdateNonce();
 
-            context.AddBalanceUpdate(context.SourceAccount, context.WithdrawalRequest.Asset, context.WithdrawalRequest.Amount, UpdateSign.Minus);
+            context.AddBalanceUpdate(context.InitiatorAccount, context.WithdrawalRequest.Asset, context.WithdrawalRequest.Amount, UpdateSign.Minus);
 
             return Task.FromResult((QuantumResultMessageBase)context.Quantum.CreateEnvelope().CreateResult(ResultStatusCodes.Success));
         }
@@ -29,7 +29,7 @@ namespace Centaurus.Domain
         {
             context.ValidateNonce();
 
-            var sourceAccount = context.SourceAccount.Account;
+            var sourceAccount = context.InitiatorAccount.Account;
 
             var centaurusAsset = context.CentaurusContext.Constellation.Assets.FirstOrDefault(a => a.Code == context.WithdrawalRequest.Asset);
             if (centaurusAsset == null || centaurusAsset.IsSuspended)
@@ -48,11 +48,12 @@ namespace Centaurus.Domain
             var withdrawal = context.WithdrawalRequest.ToProviderModel();
             if (context.CentaurusContext.IsAlpha) //if it's Alpha than we need to build transaction
             {
-                context.TransactionQuantum.Transaction = context.PaymentProvider.BuildTransaction(withdrawal);
-                context.TransactionQuantum.ProviderId = context.PaymentProvider.Id;
+                context.WithdrawalRequestQuantum.Transaction = context.PaymentProvider.BuildTransaction(withdrawal);
+                context.WithdrawalRequestQuantum.ProviderId = context.PaymentProvider.Id;
             }
-            else
-                context.PaymentProvider.ValidateTransaction(context.TransactionQuantum.Transaction, withdrawal);
+            //should we validate signatures here?
+            else if (!context.PaymentProvider.IsTransactionValid(context.WithdrawalRequestQuantum.Transaction, withdrawal, out var error))
+                throw new BadRequestException($"Transaction is invalid.\nReason: {error}");
 
             return Task.CompletedTask;
         }

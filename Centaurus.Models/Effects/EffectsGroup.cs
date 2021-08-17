@@ -6,15 +6,15 @@ using System.Text;
 namespace Centaurus.Models
 {
     [XdrContract]
-    public class QuantumContainer
+    public class EffectsGroup
     {
         [XdrField(0)]
-        public MessageEnvelope Quantum { get; set; }
+        public ulong Account { get; set; }
 
         [XdrField(1)]
-        public List<Effect> Effects { get; set; }
+        public ulong AccountSequence { get; set; }
 
         [XdrField(2)]
-        public EffectsProof EffectsProof { get; set; }
+        public List<Effect> Effects { get; set; }
     }
 }

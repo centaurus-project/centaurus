@@ -5,12 +5,10 @@ using System.Text;
 
 namespace Centaurus.Models
 {
-    public class EffectsResponse : ResultMessage
+    public class QuantumInfoResponse : ResultMessage
     {
-        public override MessageTypes MessageType => MessageTypes.EffectsResponse;
-
         [XdrField(0)]
-        public List<ApexEffects> Items { get; set; }
+        public List<QuantumInfo> Items { get; set; }
 
         [XdrField(1)]
         public string CurrentPagingToken { get; set; }
@@ -26,18 +24,5 @@ namespace Centaurus.Models
 
         [XdrField(5)]
         public int Limit { get; set; }
-    }
-
-    [XdrContract]
-    public class ApexEffects
-    {
-        [XdrField(0)]
-        public ulong Apex { get; set; }
-
-        [XdrField(1)]
-        public List<Effect> Items { get; set; }
-
-        [XdrField(2)]
-        public EffectsProof Proof { get; set; }
     }
 }

@@ -115,15 +115,22 @@ namespace Centaurus.Domain
                 return awaitedUpdates.FirstOrDefault().Value;
         }
 
-        public uint AddQuantum(ProcessorContext.ProcessingResult result)
+        public uint AddQuantum(QuantaProcessingResult result)
         {
             var qModel = new QuantumPersistentModel
             {
                 Apex = result.Apex,
-                Effects = result.Effects,
-                RawQuantum = result.QuantumEnvelope,
+                Effects = result.Effects.Select(eg => new AccountEffects
+                {
+                    Account = eg.Account,
+                    Effects = eg.RawEffects
+                }).ToList(),
+                RawQuantum = result.RawQuantum,
                 TimeStamp = result.Timestamp
             };
+
+            qModel.Signatures = new List<SignatureModel> { result.CurrentNodeSignature.ToPersistenModel() };
+
             pendingUpdates.AddQuantum(qModel);
 
             if (result.HasCursorUpdate)
@@ -132,9 +139,14 @@ namespace Centaurus.Domain
             if (result.HasSettingsUpdate)
                 pendingUpdates.Batch.Add(Context.Constellation.ToPesrsistentModel());
 
-            pendingUpdates.Batch.AddRange(result.Accounts.Select(a => new QuantumRefPersistentModel { AccountId = a, Apex = result.Apex }));
+            pendingUpdates.Batch.AddRange(result.Effects.Select(eg => new QuantumRefPersistentModel
+            {
+                AccountId = eg.Account,
+                Apex = result.Apex,
+                IsQuantumInitiator = eg.Account == result.Initiator
+            }));
 
-            pendingUpdates.Accounts.UnionWith(result.Accounts);
+            pendingUpdates.Accounts.UnionWith(result.Effects.Select(eg => eg.Account));
 
             pendingUpdates.EffectsCount += result.Effects.Count;
             pendingUpdates.QuantaCount++;
@@ -257,12 +269,7 @@ namespace Centaurus.Domain
                 {
                     if (!PendingQuanta.Remove(apex, out var quantum))
                         throw new InvalidOperationException($"Unable to find quantum with {apex} apex.");
-                    quantum.Signatures = signatures.Select(s => new SignatureModel
-                    {
-                        EffectsSignature = s.Signature.EffectsSignature.Data,
-                        TxSignature = s.Signature.TxSignature,
-                        TxSigner = s.Signature.TxSigner
-                    }).ToList();
+                    quantum.Signatures = signatures.Select(s => s.Signature.ToPersistenModel()).ToList();
                 }
             }
 

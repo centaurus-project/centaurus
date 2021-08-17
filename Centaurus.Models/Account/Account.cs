@@ -16,12 +16,15 @@ namespace Centaurus.Models
         public ulong Nonce { get; set; }
 
         [XdrField(3)]
-        public List<Balance> Balances { get; set; }
+        public ulong AccountSequence { get; set; }
 
-        [XdrField(4, Optional = true)]
-        public RequestRateLimits RequestRateLimits { get; set; }
+        [XdrField(4)]
+        public List<Balance> Balances { get; set; }
 
         [XdrField(5)]
         public List<Order> Orders { get; set; }
+
+        [XdrField(6, Optional = true)]
+        public RequestRateLimits RequestRateLimits { get; set; }
     }
 }

@@ -43,8 +43,8 @@ namespace Centaurus.PersistentStorage
                     Apex = (ulong)(i + prefix),
                     TimeStamp = 100 * i,
                     RawQuantum = RandomData(64),
-                    Effects = GenerateBuffers(4, 40),
-                    Signatures = auditors.Select(_ => RandomData(64)).ToList()
+                    Effects = GenerateBuffers(4, 40).Select((b, i) => new AccountEffects { Account = (ulong)i, Effects = b }).ToList(),
+                    Signatures = auditors.Select(_ => RandomData(64)).Select(s => new SignatureModel { PayloadSignature = s }).ToList()
                 });
             Generate(QuantaPerBatch * EffectsPerQuantum, testData,
                 i => new QuantumRefPersistentModel() { AccountId = (ulong)rnd.Next(1, 1000), Apex = (ulong)(i + prefix) });

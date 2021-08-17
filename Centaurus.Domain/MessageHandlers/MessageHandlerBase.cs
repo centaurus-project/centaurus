@@ -17,7 +17,7 @@ namespace Centaurus.Domain
         /// <summary>
         /// Handler supported message types
         /// </summary>
-        public abstract MessageTypes SupportedMessageType { get; }
+        public abstract string SupportedMessageType { get; }
 
         /// <summary>
         /// Only specified states are valid for the handler. Should be null or empty if any state is valid.

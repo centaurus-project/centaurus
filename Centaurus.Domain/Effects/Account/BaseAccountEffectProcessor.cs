@@ -7,7 +7,7 @@ using System.Text;
 namespace Centaurus.Domain
 {
     public abstract class BaseAccountEffectProcessor<T>: ClientEffectProcessor<T>
-        where T: Effect
+        where T: AccountEffect
     {
         public BaseAccountEffectProcessor(T effect, AccountWrapper account)
             :base(effect, account)

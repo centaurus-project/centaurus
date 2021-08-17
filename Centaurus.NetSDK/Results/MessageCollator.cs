@@ -29,7 +29,7 @@ namespace Centaurus.NetSDK
                 resultMessage.OriginalMessage.Message.MessageId;
             if (!Requests.TryGetValue(messageId, out var response))
             {
-                logger.Trace($"Unable set result for msg with id {envelope.Message.MessageType}:{messageId}.");
+                logger.Trace($"Unable set result for msg with id {envelope.Message.GetMessageType()}:{messageId}.");
                 return;
             }
             response.AssignResponse(envelope);
@@ -38,7 +38,7 @@ namespace Centaurus.NetSDK
                 Requests.TryRemove(messageId, out _);
             }
 
-            logger.Trace($"{envelope.Message.MessageType}:{messageId} result was set.");
+            logger.Trace($"{envelope.Message.GetMessageType()}:{messageId} result was set.");
             return;
         }
 

@@ -12,12 +12,10 @@ namespace Centaurus.Models
 
     public class HandshakeResponse : HandshakeResponseBase
     {
-        public override MessageTypes MessageType => MessageTypes.HandshakeResponse;
     }
 
     public class AuditorHandshakeResponse : HandshakeResponseBase
     {
-        public override MessageTypes MessageType => MessageTypes.AuditorHandshakeResponse;
 
         [XdrField(0)]
         public ulong LastKnownApex { get; set; }

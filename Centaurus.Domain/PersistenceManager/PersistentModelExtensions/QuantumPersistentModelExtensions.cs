@@ -8,11 +8,11 @@ namespace Centaurus.Domain
 {
     public static class QuantumPersistentModelExtensions
     {
-        public static InProgressQuantum ToInProgressQuantum(this QuantumPersistentModel quantumPersistentModel)
+        public static PendingQuantum ToInProgressQuantum(this QuantumPersistentModel quantumPersistentModel)
         {
-            var quantum = new InProgressQuantum
+            var quantum = new PendingQuantum
             {
-                QuantumEnvelope = XdrConverter.Deserialize<MessageEnvelope>(quantumPersistentModel.RawQuantum),
+                Quantum = XdrConverter.Deserialize<Quantum>(quantumPersistentModel.RawQuantum),
                 Signatures = new List<AuditorSignature>()
             };
 
@@ -20,7 +20,7 @@ namespace Centaurus.Domain
             {
                 quantum.Signatures.Add(new AuditorSignature
                 {
-                    EffectsSignature = new TinySignature { Data = signature.EffectsSignature },
+                    PayloadSignature = new TinySignature { Data = signature.PayloadSignature },
                     TxSignature = signature.TxSignature,
                     TxSigner = signature.TxSigner
                 });

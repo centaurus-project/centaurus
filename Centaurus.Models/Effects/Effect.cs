@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using Centaurus.Xdr;
+﻿using Centaurus.Xdr;
 
 namespace Centaurus.Models
 {
@@ -18,11 +16,11 @@ namespace Centaurus.Models
     [XdrUnion((int)EffectTypes.RequestRateLimitUpdate, typeof(RequestRateLimitUpdateEffect))]
     public abstract class Effect
     {
-        public abstract EffectTypes EffectType { get; }
-
         public ulong Apex { get; set; }
+    }
 
-        [XdrField(0)]
+    public abstract class AccountEffect: Effect
+    {
         public ulong Account { get; set; }
     }
 }

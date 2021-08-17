@@ -55,12 +55,12 @@ namespace Centaurus.PersistentStorage.Abstraction
             return Query.LoadQuantaAboveApex(apex);
         }
 
-        public List<QuantumPersistentModel> LoadQuantaForAccount(byte[] accountPubkey, ulong apex, int limit, QueryResultsOrder order = QueryResultsOrder.Asc)
+        public List<AccountQuantumDTO> LoadQuantaForAccount(byte[] accountPubkey, ulong apex, int limit, QueryResultsOrder order = QueryResultsOrder.Asc)
         {
             return Query.LoadQuantaForAccount(accountPubkey, apex, limit, order);
         }
 
-        public List<QuantumPersistentModel> LoadQuantaForAccount(ulong accountId, ulong fromApex, int limit, QueryResultsOrder order = QueryResultsOrder.Asc)
+        public List<AccountQuantumDTO> LoadQuantaForAccount(ulong accountId, ulong fromApex, int limit, QueryResultsOrder order = QueryResultsOrder.Asc)
         {
             return Query.LoadQuantaForAccount(accountId, fromApex, limit, order);
         }

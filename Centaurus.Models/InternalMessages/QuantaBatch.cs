@@ -7,10 +7,8 @@ namespace Centaurus.Models
     [XdrContract]
     public class QuantaBatch : Message
     {
-        public override MessageTypes MessageType => MessageTypes.QuantaBatch;
-
         [XdrField(0)]
-        public List<InProgressQuantum> Quanta { get; set; }
+        public List<PendingQuantum> Quanta { get; set; }
 
         [XdrField(1)]
         public bool HasMorePendingQuanta { get; set; }

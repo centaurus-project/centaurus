@@ -24,5 +24,13 @@ namespace Centaurus
                 messageEnvelope.Signatures = new List<TinySignature>();
             return envelope;
         }
+
+        public static string GetMessageType(this Message message)
+        {
+            if (message == null)
+                throw new ArgumentNullException(nameof(message));
+
+            return message.GetType().Name;
+        }
     }
 }

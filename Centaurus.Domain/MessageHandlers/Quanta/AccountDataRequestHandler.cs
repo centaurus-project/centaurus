@@ -13,6 +13,6 @@ namespace Centaurus.Domain
         {
         }
 
-        public override MessageTypes SupportedMessageType => MessageTypes.AccountDataRequest;
+        public override string SupportedMessageType => typeof(AccountDataRequest).Name;
     }
 }

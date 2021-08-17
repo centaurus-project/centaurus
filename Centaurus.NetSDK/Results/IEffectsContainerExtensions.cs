@@ -8,10 +8,10 @@ namespace Centaurus.NetSDK
 {
     public static class IEffectsContainerExtensions
     {
-        public static int GetValidSignaturesCount(this IEffectsContainer effects, List<KeyPair> validSigners)
+        public static int GetValidSignaturesCount(this IQuantumInfoContainer quantumInfo, List<KeyPair> validSigners)
         {
-            if (effects == null)
-                throw new ArgumentNullException(nameof(effects));
+            if (quantumInfo == null)
+                throw new ArgumentNullException(nameof(quantumInfo));
 
             if (validSigners == null)
                 throw new ArgumentNullException(nameof(validSigners));
@@ -19,32 +19,33 @@ namespace Centaurus.NetSDK
                 throw new ArgumentException("Lack of valid signers.", nameof(validSigners));
 
             //check that all signatures are unique
-            if (effects.Effects.Signatures.Distinct().Count() != effects.Effects.Signatures.Count)
+            if (quantumInfo.PayloadProof.Signatures.Distinct().Count() != quantumInfo.PayloadProof.Signatures.Count)
                 return 0;
-
-            //compute hashes hash
-            var hash = effects.Effects.Hashes.SelectMany(h => h.Data).ComputeHash();
 
             //count valid signatures
             var validSignatures = 0;
-            foreach (var singnature in effects.Effects.Signatures)
+            foreach (var singnature in quantumInfo.PayloadProof.Signatures)
             {
-                if (validSigners.Any(s => singnature.IsValid(s, hash)))
+                if (validSigners.Any(s => singnature.IsValid(s, quantumInfo.PayloadProof.PayloadHash)))
                     validSignatures++;
             }
 
-            //validate that client effect hashes equal to signed hashes
-            for (var i = 0; i < effects.ClientEffects.Count; i++)
+            var effectsBytes = (IEnumerable<byte>)new byte[] { };
+            //validate payload hash is valid
+            foreach (var effectsInfo in quantumInfo.Effects)
             {
-                var currentEffect = effects.ClientEffects[i];
-                if (currentEffect == null)
-                    continue;
-
-                var currentEffectHash = effects.Effects.Hashes[i];
-
-                if (!XdrConverter.Serialize(currentEffect).ComputeHash().SequenceEqual(currentEffectHash.Data))
-                    return 0;
+                if (effectsInfo is EffectsHashInfo)
+                    effectsBytes.Concat(effectsInfo.EffectsGroupData);
+                else
+                    effectsBytes.Concat(effectsInfo.EffectsGroupData.ComputeHash());
             }
+
+            //compute payload hash
+            var payloadHash = ByteArrayExtensions.ComputeQuantumPayloadHash(quantumInfo.Apex, quantumInfo.QuantumHash, effectsBytes.ComputeHash());
+
+            if (!effectsBytes.ComputeHash().Equals(payloadHash))
+                return 0;
+
             return validSignatures;
         }
     }

@@ -184,7 +184,7 @@ namespace Centaurus.Test
 
             var envelope = new QuantaBatch
             {
-                Quanta = new List<InProgressQuantum>()
+                Quanta = new List<PendingQuantum>()
             }.CreateEnvelope();
             envelope.Sign(clientKeyPair);
 

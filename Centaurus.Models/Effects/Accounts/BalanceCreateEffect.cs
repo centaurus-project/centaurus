@@ -6,11 +6,7 @@ using System.Text;
 namespace Centaurus.Models
 {
     [XdrContract]
-    public class BalanceCreateEffect: Effect
+    public class BalanceCreateEffect: BaseBalanceEffect
     {
-        public override EffectTypes EffectType => EffectTypes.BalanceCreate;
-
-        [XdrField(0)]
-        public string Asset { get; set; }
     }
 }

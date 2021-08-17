@@ -7,7 +7,7 @@ namespace Centaurus.Models
 {
     public static class EffectsProofExtensions
     {
-        public static bool ContainsSingnature(this EffectsProof effectsProof, byte[] signature)
+        public static bool ContainsSingnature(this PayloadProof effectsProof, byte[] signature)
         {
             if (effectsProof == null)
                 throw new ArgumentNullException(nameof(effectsProof));

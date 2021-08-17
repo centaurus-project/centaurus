@@ -23,7 +23,7 @@ namespace Centaurus.Models
         /// Effects hash.
         /// </summary>
         [XdrField(2)]
-        public byte[] EffectsHash { get; set; }
+        public byte[] EffectsProof { get; set; }
 
         /// <summary>
         /// Operation time stamp. Assigned by Alpha server when it finishes processing a quantum.

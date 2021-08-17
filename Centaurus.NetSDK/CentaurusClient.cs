@@ -4,6 +4,7 @@ using System.Net.WebSockets;
 using Centaurus.Models;
 using NLog;
 using System.Linq;
+using Centaurus.Xdr;
 
 namespace Centaurus.NetSDK
 {
@@ -24,6 +25,7 @@ namespace Centaurus.NetSDK
         public bool IsConnected => connection != null && connection.IsConnected;
 
         private ulong lastHandledApex;
+        private ulong lastHandledAccountSequence;
 
         public event Action<Exception> OnException;
 
@@ -69,9 +71,14 @@ namespace Centaurus.NetSDK
             var result = await Send(new AccountDataRequest());
             await result.OnFinalized;
             var adr = result.Result.Message as AccountDataResponse;
-            lastHandledApex = adr.Quantum.Apex;
             AccountState.AccountId = connection.AccountId;
             AccountState.ConstellationInfo = connection.ConstellationInfo;
+
+            lastHandledApex = adr.Quantum.Apex;
+            //get last account sequence
+            var effects = XdrConverter.Deserialize<EffectsGroup>(adr.Effects.First().EffectsGroupData);
+            lastHandledAccountSequence = effects.AccountSequence;
+
             foreach (var balance in adr.Balances)
             {
                 AccountState.balances[balance.Asset] = new BalanceModel
@@ -115,7 +122,10 @@ namespace Centaurus.NetSDK
                     if (task.IsFaulted)
                         OnException?.Invoke(task.Exception);
                     else
-                        HandleQuantumResult(task.Result);
+                    {
+                        if (task.Result.Message is IQuantumInfoContainer quantumInfo)
+                            HandleQuantumResult(quantumInfo);
+                    }
                 });
             }
             return result;
@@ -199,29 +209,40 @@ namespace Centaurus.NetSDK
             return new DepositInstructions(Config.ClientKeyPair.AccountId, providerSettings.Vault, providerAsset.Token);
         }
 
-        private void HandleQuantumResult(MessageEnvelope envelope)
+        private void HandleQuantumResult(IQuantumInfoContainer quantumInfo)
         {
-            if (!(envelope.Message is IEffectsContainer effectsMessage) || lastHandledApex >= effectsMessage.Apex)
+            if (!(quantumInfo == null || lastHandledApex >= quantumInfo.Apex))
                 return;
 
-            if (effectsMessage.ClientEffects.Count > 0)
+            try
             {
-                try
+                foreach (var effectsInfo in quantumInfo.Effects)
                 {
+                    if (effectsInfo is EffectsHashInfo)
+                        continue;
+
+                    var accountEffects = XdrConverter.Deserialize<EffectsGroup>(effectsInfo.EffectsGroupData);
+
+                    if (accountEffects.AccountSequence != lastHandledAccountSequence + 1)
+                        throw new Exception("Account sequence is invalid. At least one quantum result is missing.");
+
                     //apply effects to the client-side state
-                    foreach (var effect in effectsMessage.ClientEffects)
+                    foreach (var effect in accountEffects.Effects)
                     {
-                        if (effect.Account != connection.AccountId)
-                            continue;
                         AccountState.ApplyAccountStateChanges(effect);
                     }
+
+                    //set apex and account sequence
+                    lastHandledApex = quantumInfo.Apex;
+                    lastHandledAccountSequence = accountEffects.AccountSequence;
+
                     //notify subscribers about the account state update
                     OnAccountUpdate?.Invoke(AccountState);
                 }
-                catch (Exception e)
-                {
-                    OnException?.Invoke(e);
-                }
+            }
+            catch (Exception e)
+            {
+                OnException?.Invoke(e);
             }
         }
 

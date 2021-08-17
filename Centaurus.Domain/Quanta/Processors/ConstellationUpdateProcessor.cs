@@ -16,7 +16,7 @@ namespace Centaurus.Domain
 
         }
 
-        public override MessageTypes SupportedMessageType => MessageTypes.ConstellationUpdate;
+        public override string SupportedMessageType { get; } = typeof(ConstellationUpdate).Name;
 
         public override Task<QuantumResultMessageBase> Process(ProcessorContext context)
         {

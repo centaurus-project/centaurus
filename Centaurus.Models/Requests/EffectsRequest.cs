@@ -7,8 +7,6 @@ namespace Centaurus.Models
 {
     public class EffectsRequest : RequestMessage
     {
-        public override MessageTypes MessageType => MessageTypes.EffectsRequest;
-
         public const string Desc = "DESC";
 
         public const string Asc = "ASC";

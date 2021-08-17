@@ -57,7 +57,7 @@ namespace Centaurus.Test
             var clientConnection = GetIncomingConnection(context, alphaKeyPair, state);
             var batch = new QuantaBatch
             {
-                Quanta = new List<InProgressQuantum>()
+                Quanta = new List<PendingQuantum>()
             }.CreateEnvelope();
             batch.Sign(alphaKeyPair);
 

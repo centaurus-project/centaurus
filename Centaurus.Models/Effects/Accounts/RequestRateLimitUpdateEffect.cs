@@ -3,10 +3,8 @@
 namespace Centaurus.Models
 {
     [XdrContract]
-    public class RequestRateLimitUpdateEffect : Effect
+    public class RequestRateLimitUpdateEffect : AccountEffect
     {
-        public override EffectTypes EffectType => EffectTypes.RequestRateLimitUpdate;
-
         [XdrField(0)]
         public RequestRateLimits RequestRateLimits { get; set; }
 

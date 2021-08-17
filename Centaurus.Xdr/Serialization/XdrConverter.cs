@@ -30,10 +30,23 @@ namespace Centaurus.Xdr
             return writer.ToArray();
         }
 
+        public static byte[] Serialize(object value, byte[] buffer)
+        {
+            if (buffer == null)
+                throw new ArgumentNullException(nameof(buffer));
+
+            using var writer = new XdrBufferWriter(buffer);
+            Serialize(value, writer);
+            return writer.ToArray();
+        }
+
         public static void Serialize(object value, XdrWriter writer)
         {
             if (value == null)
                 throw new ArgumentNullException(nameof(value), "Failed to serialize null value. All values should be initialized before the serialization.");
+            if (writer == null)
+                throw new ArgumentNullException(nameof(writer));
+
             var serializer = LookupSerializer(value.GetType());
             serializer.SerializeMethod.Invoke(null, new object[] { value, writer });
         }

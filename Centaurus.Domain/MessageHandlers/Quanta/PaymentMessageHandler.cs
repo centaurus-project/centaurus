@@ -12,6 +12,6 @@ namespace Centaurus.Domain
         {
         }
 
-        public override MessageTypes SupportedMessageType { get; } = MessageTypes.PaymentRequest;
+        public override string SupportedMessageType { get; } = typeof(PaymentRequest).Name;
     }
 }

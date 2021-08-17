@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Data.HashFunction.FarmHash;
 using System.Linq;
@@ -54,6 +55,24 @@ namespace Centaurus
         }
 
         /// <summary>
+        /// Computes payload hash
+        /// </summary>
+        /// <param name="apex"></param>
+        /// <param name="quantumHash"></param>
+        /// <param name="effectsHash"></param>
+        /// <returns></returns>
+        public static byte[] ComputeQuantumPayloadHash(ulong apex, byte[] quantumHash, byte[] effectsHash)
+        {
+            var apexBuffer = new byte[8]; 
+            BinaryPrimitives.WriteUInt64BigEndian(apexBuffer.AsSpan(0, 8), apex);
+            return apexBuffer
+                .Concat(quantumHash)
+                .Concat(effectsHash)
+                .ToArray()
+                .ComputeHash();
+        }
+
+        /// <summary>
         /// 
         /// </summary>
         /// <param name="objToSerialize">Object to serialize</param>
@@ -96,7 +115,7 @@ namespace Centaurus
         {
             if (data == null)
                 return default;
-            return BitConverter.ToInt64(farmHash.ComputeHash(data).Hash);
+            return BinaryPrimitives.ReadInt64LittleEndian(farmHash.ComputeHash(data).Hash);
         }
     }
 }

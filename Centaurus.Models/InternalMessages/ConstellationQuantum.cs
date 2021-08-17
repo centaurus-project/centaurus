@@ -7,8 +7,6 @@ namespace Centaurus.Models
 {
     public class ConstellationQuantum: Quantum
     {
-        public override MessageTypes MessageType => MessageTypes.ConstellationQuantum;
-
         [XdrField(0)]
         public ConstellationMessageEnvelope RequestEnvelope { get; set; }
 

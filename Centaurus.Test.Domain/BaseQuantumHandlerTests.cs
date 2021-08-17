@@ -186,7 +186,7 @@ namespace Centaurus.Test
                 .CreateEnvelope()
                 .Sign(useFakeSigner ? TestEnvironment.Client2KeyPair : TestEnvironment.Client1KeyPair);
 
-            await AssertQuantumHandling(new RequestTransactionQuantum { RequestEnvelope = envelope }, excpectedException);
+            await AssertQuantumHandling(new WithdrawalRequestQuantum { RequestEnvelope = envelope }, excpectedException);
         }
 
         [Test]

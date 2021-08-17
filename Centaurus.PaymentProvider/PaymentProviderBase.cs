@@ -50,7 +50,15 @@ namespace Centaurus.PaymentProvider
         /// </summary>
         /// <param name="transaction"></param>
         /// <param name="withdrawalRequest"></param>
-        public abstract void ValidateTransaction(byte[] transaction, WithdrawalRequestModel withdrawalRequest);
+        public abstract bool IsTransactionValid(byte[] transaction, WithdrawalRequestModel withdrawalRequest, out string error);
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="transaction"></param>
+        /// <param name="signature"></param>
+        /// <returns></returns>
+        public abstract bool AreSignaturesValid(byte[] transaction, params SignatureModel[] signature);
 
         public abstract SignatureModel SignTransaction(byte[] transaction);
 

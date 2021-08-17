@@ -22,12 +22,18 @@ namespace Centaurus.PersistentStorage
         [IgnoreMember]
         public ulong Apex { get; set; }
 
+        /**
+         * Is the quantum was initiated by the account.
+         */
+        [Key(0)]
+        public bool IsQuantumInitiator { get; set; }
+
         [IgnoreMember]
         public byte[] Key
         {
             get
             {
-                //{account_pubkey}{quantum_apex}{effect_index}
+                //{account_pubkey}{quantum_apex}
                 var rawId = new byte[16];
                 BinaryPrimitives.WriteUInt64BigEndian(rawId.AsSpan(0, 8), AccountId);
                 BinaryPrimitives.WriteUInt64BigEndian(rawId.AsSpan(8, 8), Apex);

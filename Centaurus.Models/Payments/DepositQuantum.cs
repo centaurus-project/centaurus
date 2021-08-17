@@ -9,8 +9,6 @@ namespace Centaurus.Models
     /// </summary>
     public class DepositQuantum : Quantum
     {
-        public override MessageTypes MessageType => MessageTypes.DepositQuantum;
-
         [XdrField(0)]
         public DepositNotification Source { get; set; }
     }
