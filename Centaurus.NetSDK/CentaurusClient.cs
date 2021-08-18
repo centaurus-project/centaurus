@@ -70,7 +70,16 @@ namespace Centaurus.NetSDK
         {
             var result = await Send(new AccountDataRequest());
             await result.OnFinalized;
-            var adr = result.Result.Message as AccountDataResponse;
+
+            var adr = (AccountDataResponse)result.Result.Message;
+
+            //compute payload hash
+            var payloadHash = adr.ComputePayloadHash();
+
+            //compare with specified one
+            if (!payloadHash.SequenceEqual(((AccountDataRequestQuantum)adr.Quantum).PayloadHash))
+                throw new Exception("Computed payload hash isn't equal to quantum payload hash.");
+
             AccountState.AccountId = connection.AccountId;
             AccountState.ConstellationInfo = connection.ConstellationInfo;
 

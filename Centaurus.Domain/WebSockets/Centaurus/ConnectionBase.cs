@@ -16,10 +16,10 @@ namespace Centaurus
         /// Connection established.
         /// </summary>
         Connected = 0,
-        /// <summary>
-        /// Successful handshake.
-        /// </summary>
-        Validated = 1,
+        ///// <summary>
+        ///// Successful handshake.
+        ///// </summary>
+        //Validated = 1,
         /// <summary>
         /// Ready to receive and send messages.
         /// </summary>
@@ -84,8 +84,8 @@ namespace Centaurus
                     logger.Trace($"Connection {PubKeyAddress} is in {connectionState} state. Prev state is {prevValue}.");
                     OnConnectionStateChanged?.Invoke((this, prevValue, connectionState));
 
-                    if (value == ConnectionState.Validated && prevValue == ConnectionState.Connected) //prevent multiple invocation
-                        Context.ExtensionsManager.ConnectionValidated(this);
+                    if (value == ConnectionState.Ready && prevValue == ConnectionState.Connected) //prevent multiple invocation
+                        Context.ExtensionsManager.ConnectionReady(this);
                 }
             }
         }

@@ -146,7 +146,7 @@ namespace Centaurus.Domain
                 IsQuantumInitiator = eg.Account == result.Initiator
             }));
 
-            pendingUpdates.Accounts.UnionWith(result.Effects.Select(eg => eg.Account));
+            pendingUpdates.Accounts.UnionWith(result.AffectedAccounts.Keys);
 
             pendingUpdates.EffectsCount += result.Effects.Count;
             pendingUpdates.QuantaCount++;

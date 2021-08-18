@@ -10,6 +10,7 @@ namespace Centaurus.Models
     [XdrUnion((int)MessageTypes.ClientConnectionSuccess, typeof(ClientConnectionSuccess))]
     [XdrUnion((int)MessageTypes.WithdrawalRequest, typeof(WithdrawalRequest))]
     [XdrUnion((int)MessageTypes.AccountDataRequest, typeof(AccountDataRequest))]
+    [XdrUnion((int)MessageTypes.AccountDataRequestQuantum, typeof(AccountDataRequestQuantum))]
     [XdrUnion((int)MessageTypes.ResultMessage, typeof(ResultMessage))]
     [XdrUnion((int)MessageTypes.QuantumResultMessage, typeof(QuantumResultMessage))]
     [XdrUnion((int)MessageTypes.AccountDataResponse, typeof(AccountDataResponse))]

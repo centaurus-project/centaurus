@@ -55,7 +55,7 @@ namespace Centaurus
                 }
                 else if (auditor.ConnectionState == ConnectionState.Ready && apexDiff >= 10_000) //auditor is too delayed
                 {
-                    auditor.ConnectionState = ConnectionState.Validated;
+                    //auditor.ConnectionState = ConnectionState.Validated;
                 }
 
                 try

@@ -52,10 +52,7 @@ namespace Centaurus.Test
                 var isHandled = await context.MessageHandlers.HandleMessage(connection, inMessage);
 
                 Assert.IsTrue(isHandled);
-                if (connection.IsAuditor)
-                    Assert.AreEqual(connection.ConnectionState, ConnectionState.Validated);
-                else
-                    Assert.AreEqual(connection.ConnectionState, ConnectionState.Ready);
+                Assert.AreEqual(connection.ConnectionState, ConnectionState.Ready);
             }
             else
                 Assert.ThrowsAsync(expectedException, async () => await context.MessageHandlers.HandleMessage(connection, inMessage));
@@ -91,10 +88,7 @@ namespace Centaurus.Test
                 var isHandled = await context.MessageHandlers.HandleMessage(connection, inMessage);
 
                 Assert.IsTrue(isHandled);
-                if (connection.IsAuditor)
-                    Assert.AreEqual(connection.ConnectionState, ConnectionState.Validated);
-                else
-                    Assert.AreEqual(connection.ConnectionState, ConnectionState.Ready);
+                Assert.AreEqual(connection.ConnectionState, ConnectionState.Ready);
             }
             else
                 Assert.ThrowsAsync(expectedException, async () => await context.MessageHandlers.HandleMessage(connection, inMessage));
@@ -134,7 +128,7 @@ namespace Centaurus.Test
             envelope.Sign(TestEnvironment.Auditor1KeyPair);
 
 
-            var auditorConnection = GetIncomingConnection(context, TestEnvironment.Auditor1KeyPair.PublicKey, ConnectionState.Validated);
+            var auditorConnection = GetIncomingConnection(context, TestEnvironment.Auditor1KeyPair.PublicKey, ConnectionState.Ready);
 
             using var writer = new XdrBufferWriter();
             var inMessage = envelope.ToIncomingMessage(writer);
@@ -145,9 +139,9 @@ namespace Centaurus.Test
 
         static object[] QuantaBatchRequestTestCases =
         {
-            new object[] { TestEnvironment.Client1KeyPair, ConnectionState.Validated, typeof(UnauthorizedException) },
+            new object[] { TestEnvironment.Client1KeyPair, ConnectionState.Ready, typeof(UnauthorizedException) },
             new object[] { TestEnvironment.Auditor1KeyPair, ConnectionState.Connected, typeof(InvalidStateException) },
-            new object[] { TestEnvironment.Auditor1KeyPair, ConnectionState.Validated, null }
+            new object[] { TestEnvironment.Auditor1KeyPair, ConnectionState.Ready, null }
         };
 
         [Test]
@@ -168,10 +162,10 @@ namespace Centaurus.Test
 
         static object[] QuantaBatchTestCases =
         {
-            new object[] { TestEnvironment.Client1KeyPair, ConnectionState.Validated, typeof(UnauthorizedException) },
+            new object[] { TestEnvironment.Client1KeyPair, ConnectionState.Ready, typeof(UnauthorizedException) },
             new object[] { TestEnvironment.Auditor1KeyPair, ConnectionState.Connected, typeof(InvalidStateException) },
             new object[] { TestEnvironment.Auditor1KeyPair, ConnectionState.Ready, null },
-            new object[] { TestEnvironment.Auditor1KeyPair, ConnectionState.Validated, null }
+            new object[] { TestEnvironment.Auditor1KeyPair, ConnectionState.Ready, null }
         };
 
         [Test]
@@ -198,7 +192,7 @@ namespace Centaurus.Test
 
         static object[] OrderTestCases =
         {
-            new object[] { ConnectionState.Validated, typeof(InvalidStateException) },
+            new object[] { ConnectionState.Connected, typeof(InvalidStateException) },
             new object[] { ConnectionState.Ready, null }
         };
 
@@ -226,7 +220,7 @@ namespace Centaurus.Test
 
         static object[] AccountDataTestRequestCases =
         {
-            new object[] { ConnectionState.Validated, typeof(InvalidStateException) },
+            new object[] { ConnectionState.Connected, typeof(InvalidStateException) },
             new object[] { ConnectionState.Ready, null }
         };
 
@@ -302,7 +296,7 @@ namespace Centaurus.Test
 
         static object[] EffectsRequestTestCases =
         {
-            new object[] { TestEnvironment.Client1KeyPair, ConnectionState.Validated, typeof(InvalidStateException) },
+            new object[] { TestEnvironment.Client1KeyPair, ConnectionState.Connected, typeof(InvalidStateException) },
             new object[] { TestEnvironment.Client1KeyPair, ConnectionState.Ready, null }
         };
 

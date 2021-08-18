@@ -161,7 +161,6 @@ namespace Centaurus.Domain
             var connection = (IncomingConnectionBase)args.connection;
             switch (args.current)
             {
-                case ConnectionState.Validated:
                 case ConnectionState.Ready:
                     //avoid multiple validation event firing
                     if (args.prev == ConnectionState.Connected)

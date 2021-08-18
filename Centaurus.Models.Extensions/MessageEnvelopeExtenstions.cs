@@ -87,8 +87,8 @@ namespace Centaurus
                 throw new ArgumentNullException(nameof(envelope));
 
             var messageType = envelope.Message;
-            if (envelope.Message is RequestQuantum)
-                messageType = ((RequestQuantum)envelope.Message).RequestEnvelope.Message;
+            if (envelope.Message is RequestQuantumBase)
+                messageType = ((RequestQuantumBase)envelope.Message).RequestEnvelope.Message;
 
             //for not Success result return generic message
             if (status == ResultStatusCodes.Success)

@@ -1,9 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using System.Threading.Tasks;
-using Centaurus.Models;
+﻿using Centaurus.Models;
 using NLog;
+using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
@@ -20,7 +17,7 @@ namespace Centaurus.Domain
 
         public override string SupportedMessageType { get; } = typeof(QuantaBatch).Name;
 
-        public override ConnectionState[] ValidConnectionStates => new ConnectionState[] { ConnectionState.Validated, ConnectionState.Ready };
+        public override ConnectionState[] ValidConnectionStates => new ConnectionState[] { ConnectionState.Ready };
 
         public override async Task HandleMessage(ConnectionBase connection, IncomingMessage message)
         {

@@ -26,13 +26,13 @@ namespace Centaurus.Test
         {
             context.SetState(State.Running);
 
-            var clientConnection = GetOutgoingConnection(context, KeyPair.Random());
+            var clientConnection = GetOutgoingConnection(context, TestEnvironment.AlphaKeyPair);
 
-            var hd = new HandshakeData();
-            hd.Randomize();
+            var hd = new HandshakeData().Randomize();
 
             var envelope = new HandshakeRequest { HandshakeData = hd }.CreateEnvelope();
             envelope.Sign(TestEnvironment.AlphaKeyPair);
+
             using var writer = new XdrBufferWriter();
             var inMessage = envelope.ToIncomingMessage(writer);
             var isHandled = await context.MessageHandlers.HandleMessage(clientConnection, inMessage);
@@ -44,7 +44,6 @@ namespace Centaurus.Test
         {
             new object[] { TestEnvironment.Client1KeyPair, ConnectionState.Ready, typeof(UnauthorizedException) },
             new object[] { TestEnvironment.AlphaKeyPair, ConnectionState.Connected, typeof(InvalidStateException) },
-            new object[] { TestEnvironment.AlphaKeyPair, ConnectionState.Validated, null },
             new object[] { TestEnvironment.AlphaKeyPair, ConnectionState.Ready, null }
         };
 

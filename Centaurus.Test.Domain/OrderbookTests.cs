@@ -4,6 +4,7 @@ using Centaurus.Models;
 using NUnit.Framework;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Centaurus.Test
 {
@@ -75,7 +76,14 @@ namespace Centaurus.Test
                         }
                     },
                     Assets = new List<AssetSettings> { new AssetSettings { Code = baseAsset }, new AssetSettings { Code = secondAsset } },
-                    Auditors = new List<Auditor> { new Auditor { PubKey = TestEnvironment.AlphaKeyPair, Address = "" }, new Auditor { PubKey = TestEnvironment.Auditor1KeyPair, Address = "" } },
+                    Alpha = TestEnvironment.AlphaKeyPair,
+                    Auditors = new[] { TestEnvironment.AlphaKeyPair, TestEnvironment.Auditor1KeyPair }
+                        .Select(pk => new Auditor
+                        {
+                            PubKey = TestEnvironment.AlphaKeyPair,
+                            Address = $"{TestEnvironment.AlphaKeyPair.AccountId}.com"
+                        })
+                        .ToList(),
                     MinAccountBalance = 1,
                     MinAllowedLotSize = 1,
                     RequestRateLimits = requestRateLimits

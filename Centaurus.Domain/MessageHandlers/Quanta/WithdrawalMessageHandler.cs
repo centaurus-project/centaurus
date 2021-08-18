@@ -15,10 +15,9 @@ namespace Centaurus.Domain
 
         public override string SupportedMessageType { get; } = typeof(WithdrawalRequest).Name;
 
-        protected override Task HandleQuantum(ConnectionBase connection, IncomingMessage message)
+        protected override Quantum GetQuantum(ConnectionBase connection, IncomingMessage message)
         {
-            Context.QuantumHandler.HandleAsync(new WithdrawalRequestQuantum { RequestEnvelope = message.Envelope });
-            return Task.CompletedTask;
+            return new WithdrawalRequestQuantum { RequestEnvelope = message.Envelope };
         }
     }
 }

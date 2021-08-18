@@ -16,7 +16,7 @@ namespace Centaurus.Domain
 
         public override string SupportedMessageType { get; } = typeof(AuditorResultsBatch).Name;
 
-        public override ConnectionState[] ValidConnectionStates { get; } = new ConnectionState[] { ConnectionState.Ready, ConnectionState.Validated };
+        public override ConnectionState[] ValidConnectionStates { get; } = new ConnectionState[] { ConnectionState.Ready };
 
         public override bool IsAuditorOnly { get; } = true;
 

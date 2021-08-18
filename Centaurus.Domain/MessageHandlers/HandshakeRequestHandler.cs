@@ -16,7 +16,7 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
 
         public override string SupportedMessageType { get; } = typeof(HandshakeRequest).Name;
 
-        public override ConnectionState[] ValidConnectionStates { get; } = new ConnectionState[] { ConnectionState.Validated };
+        public override ConnectionState[] ValidConnectionStates { get; } = new ConnectionState[] { ConnectionState.Ready };
 
         public override async Task HandleMessage(OutgoingConnection connection, IncomingMessage message)
         {

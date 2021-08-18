@@ -59,7 +59,7 @@ namespace Centaurus.Domain
         }
 
 
-        private ConnectionState[] AutorizedConnectionStates = new ConnectionState[] { ConnectionState.Validated, ConnectionState.Ready };
+        private ConnectionState[] AutorizedConnectionStates = new ConnectionState[] { ConnectionState.Ready };
         private void ValidateClient(ConnectionBase connection)
         {
             if (connection is IncomingClientConnection clientConnection //check requests count only for a client connection 

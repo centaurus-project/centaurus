@@ -20,7 +20,6 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
 
         public override ConnectionState[] ValidConnectionStates { get; } =
             new ConnectionState[] {
-                ConnectionState.Validated,
                 ConnectionState.Ready
             };
 

@@ -8,7 +8,13 @@ namespace Centaurus.Models
     public class PendingQuantum : Message
     {
         [XdrField(0)]
-        public Quantum Quantum { get; set; }
+        public Message Message { get; set; }
+
+        public Quantum Quantum
+        {
+            get { return (Quantum)Message; }
+            set { Message = value; }
+        }
 
         [XdrField(1)]
         public List<AuditorSignature> Signatures { get; set; }

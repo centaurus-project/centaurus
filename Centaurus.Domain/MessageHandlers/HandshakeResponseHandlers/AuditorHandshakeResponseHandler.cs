@@ -31,6 +31,12 @@ namespace Centaurus.Domain
             if (!incomingAuditorConnection.TryValidate(auditorHandshake.HandshakeData))
                 throw new ConnectionCloseException(WebSocketCloseStatus.InvalidPayloadData, "Handshake data is invalid.");
 
+            //if has any quanta than running otherwise init
+            var auditorState = auditorHandshake.LastKnownApex == 0 ? State.Undefined : State.Running;
+
+            //if auditor sent handshake response that it at least at Running state
+            Context.StateManager.SetAuditorState(connection.PubKey, auditorState);
+
             incomingAuditorConnection.SetApexCursor(auditorHandshake.LastKnownApex);
         }
     }

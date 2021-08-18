@@ -19,7 +19,7 @@ namespace Centaurus.Domain
 
         public override Task<QuantumResultMessageBase> Process(RequestContext context)
         {
-            var quantum = context.Request;
+            var quantum = (AccountDataRequestQuantum)context.Request;
             var requestMessage = quantum.RequestMessage;
 
             context.UpdateNonce();
@@ -44,7 +44,9 @@ namespace Centaurus.Domain
                 .OrderBy(order => order.OrderId)
                 .ToList();
 
+            resultMessage.Sequence = context.InitiatorAccount.Account.AccountSequence;
 
+            quantum.PayloadHash = resultMessage.ComputePayloadHash();
 
             return Task.FromResult((QuantumResultMessageBase)resultMessage);
         }

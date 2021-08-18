@@ -10,5 +10,10 @@ namespace Centaurus.Models
 
         [XdrField(1)]
         public List<Order> Orders { get; set; }
+
+        [XdrField(2)]
+        public ulong Sequence { get; set; }
+
+        public new AccountDataRequestQuantum Quantum => (AccountDataRequestQuantum)base.Quantum;
     }
 }

@@ -239,11 +239,16 @@ namespace Centaurus.Test
 
             var envelope = order.CreateEnvelope();
             envelope.Sign(TestEnvironment.Client1KeyPair);
-            var quantum = new RequestQuantum { RequestEnvelope = envelope };
+            var quantum = new AccountDataRequestQuantum { RequestEnvelope = envelope };
 
             var res = await AssertQuantumHandling(quantum, excpectedException);
             if (excpectedException == null)
-                Assert.IsInstanceOf<Models.AccountDataResponse>(res);
+            {
+                Assert.IsInstanceOf<AccountDataResponse>(res);
+                var adr = (AccountDataResponse)res;
+                var payloadHash = adr.ComputePayloadHash();
+                Assert.AreEqual(payloadHash, adr.Quantum.PayloadHash);
+            }
         }
 
         [Test]
@@ -266,7 +271,7 @@ namespace Centaurus.Test
                     RequestId = i + 1
                 }.CreateEnvelope();
                 envelope.Sign(clientKeyPair);
-                var quantum = new RequestQuantum { RequestEnvelope = envelope };
+                var quantum = new AccountDataRequestQuantum { RequestEnvelope = envelope };
 
                 if (i + 1 > minuteLimit)
                     await AssertQuantumHandling(quantum, typeof(TooManyRequestsException));

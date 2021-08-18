@@ -21,7 +21,7 @@ namespace Centaurus.Domain
         public override Task HandleMessage(ConnectionBase connection, IncomingMessage message)
         {
             if (Context.IsAlpha)
-                HandleQuantum(connection, message);
+                Context.QuantumHandler.HandleAsync(GetQuantum(connection, message));
             else
             { 
                 //TODO: send it to Alpha
@@ -29,10 +29,9 @@ namespace Centaurus.Domain
             return Task.CompletedTask;
         }
 
-        protected virtual Task HandleQuantum(ConnectionBase connection, IncomingMessage message)
+        protected virtual Quantum GetQuantum(ConnectionBase connection, IncomingMessage message)
         {
-            Context.QuantumHandler.HandleAsync(new RequestQuantum { RequestEnvelope = message.Envelope });
-            return Task.CompletedTask;
+            return new RequestQuantum { RequestEnvelope = message.Envelope };
         }
     }
 }

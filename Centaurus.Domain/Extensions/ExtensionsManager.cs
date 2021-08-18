@@ -46,7 +46,7 @@ namespace Centaurus.Domain
         public IEnumerable<ExtensionItem> Extensions => extensions;
 
         public event Action<ConnectionBase> OnConnectionValidated;
-        public void ConnectionValidated(ConnectionBase args)
+        public void ConnectionReady(ConnectionBase args)
         {
             OnConnectionValidated?.Invoke(args);
         }

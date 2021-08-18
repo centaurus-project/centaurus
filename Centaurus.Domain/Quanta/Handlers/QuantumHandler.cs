@@ -136,7 +136,7 @@ namespace Centaurus.Domain
 
         AccountWrapper GetAccountWrapper(Quantum quantum)
         {
-            if (quantum is RequestQuantum requestQuantum)
+            if (quantum is RequestQuantumBase requestQuantum)
                 return Context.AccountStorage.GetAccount(requestQuantum.RequestMessage.Account);
             else
                 return null; //the quantum is not client quantum
@@ -178,20 +178,20 @@ namespace Centaurus.Domain
 
         void ValidateRequestQuantum(Quantum quantum, AccountWrapper accountWrapper)
         {
-            var request = quantum as RequestQuantum;
+            var request = quantum as RequestQuantumBase;
             if (request == null)
                 return;
             ValidateAccountRequestSignature(request, accountWrapper);
             ValidateAccountRequestRate(request, accountWrapper);
         }
 
-        void ValidateAccountRequestSignature(RequestQuantum request, AccountWrapper accountWrapper)
+        void ValidateAccountRequestSignature(RequestQuantumBase request, AccountWrapper accountWrapper)
         {
             if (!request.RequestEnvelope.IsSignatureValid(accountWrapper.Account.Pubkey))
                 throw new UnauthorizedAccessException("Request quantum has invalid signature.");
         }
 
-        void ValidateAccountRequestRate(RequestQuantum request, AccountWrapper accountWrapper)
+        void ValidateAccountRequestRate(RequestQuantumBase request, AccountWrapper accountWrapper)
         {
             if (!accountWrapper.RequestCounter.IncRequestCount(request.Timestamp, out string error))
                 throw new TooManyRequestsException($"Request limit reached for account {accountWrapper.Account.Pubkey}.");
@@ -221,7 +221,7 @@ namespace Centaurus.Domain
 
         string GetMessageType(Quantum quantum)
         {
-            if (quantum is RequestQuantum requestQuantum)
+            if (quantum is RequestQuantumBase requestQuantum)
                 return requestQuantum.RequestMessage.GetMessageType();
             else if (quantum is ConstellationQuantum constellationQuantum)
                 return constellationQuantum.RequestMessage.GetMessageType();

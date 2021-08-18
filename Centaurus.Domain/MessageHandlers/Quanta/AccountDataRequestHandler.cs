@@ -14,5 +14,10 @@ namespace Centaurus.Domain
         }
 
         public override string SupportedMessageType => typeof(AccountDataRequest).Name;
+
+        protected override Quantum GetQuantum(ConnectionBase connection, IncomingMessage message)
+        {
+            return new AccountDataRequestQuantum { RequestEnvelope = message.Envelope };
+        }
     }
 }

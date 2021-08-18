@@ -28,6 +28,10 @@ namespace Centaurus.Models
         /// </summary>
         AccountDataRequest = 10,
         /// <summary>
+        /// Wrapper for client account data request. Created by Alpha.
+        /// </summary>
+        AccountDataRequestQuantum = 46,
+        /// <summary>
         /// Wrapper for client request messages that contains withdrawal. Created by Alpha.
         /// </summary>
         WithdrawalRequestQuantum = 47,

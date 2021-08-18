@@ -73,7 +73,15 @@ namespace Centaurus.Test.Exchange.Analytics
                 {
                     Providers = new List<ProviderSettings> { stellarPaymentProvider },
                     Assets = new List<AssetSettings> { new AssetSettings { Code = "XLM" }, new AssetSettings { Code = "USD" } },
-                    RequestRateLimits = new RequestRateLimits { HourLimit = 1000, MinuteLimit = 100 }
+                    RequestRateLimits = new RequestRateLimits { HourLimit = 1000, MinuteLimit = 100 },
+                    Alpha = TestEnvironment.AlphaKeyPair,
+                    Auditors = new[] { TestEnvironment.AlphaKeyPair, TestEnvironment.Auditor1KeyPair }
+                        .Select(pk => new Auditor
+                        {
+                            PubKey = TestEnvironment.AlphaKeyPair,
+                            Address = $"{TestEnvironment.AlphaKeyPair.AccountId}.com"
+                        })
+                        .ToList()
                 }
             });
         }

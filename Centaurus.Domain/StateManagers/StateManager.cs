@@ -226,7 +226,7 @@ namespace Centaurus.Domain
 
         public bool IsReady => AuditorState == State.Ready || AuditorState == State.Running && isConnectionReady();
 
-        private static ConnectionState[] validConnectionStates = new[] { ConnectionState.Ready, ConnectionState.Validated };
+        private static ConnectionState[] validConnectionStates = new[] { ConnectionState.Ready };
         private bool isConnectionReady()
         {
             var connection = Context.IsAlpha ? (ConnectionBase)incoming : outgoing;

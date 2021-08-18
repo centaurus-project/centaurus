@@ -44,7 +44,7 @@ namespace Centaurus.Domain
             IsValidated = true;
 
             //auditor Ready state would be set after success quanta delay inspection
-            ConnectionState = IsAuditor ? ConnectionState.Validated : ConnectionState.Ready;
+            ConnectionState = ConnectionState.Ready;
             return true;
         }
     }

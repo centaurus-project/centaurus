@@ -20,7 +20,7 @@ namespace Centaurus.Domain
             this.connection = connection ?? throw new ArgumentNullException(nameof(connection));
             this.outgoingMessageStorage = outgoingMessageStorage ?? throw new ArgumentNullException(nameof(outgoingMessageStorage));
             //we know that we connect to auditor so we can set connection state to validated immediately
-            ConnectionState = ConnectionState.Validated;
+            ConnectionState = ConnectionState.Ready;
         }
 
         const int BufferSize = 50 * 1024 * 1024;
@@ -43,9 +43,9 @@ namespace Centaurus.Domain
                 {
                     try
                     {
-                        if (ConnectionState == ConnectionState.Ready
-                            && !cancellationToken.IsCancellationRequested
+                        if (!cancellationToken.IsCancellationRequested
                             && outgoingMessageStorage.TryPeek(out MessageEnvelope message)
+                            && Context.StateManager.IsAuditorReady(PubKey)
                             )
                         {
                             try

@@ -119,7 +119,7 @@ namespace Centaurus.Domain
                 BatchInfos = GetBatchInfos(),
                 UpdateDate = DateTime.UtcNow
             };
-            Context.InfoConnectionManager.SendSubscriptionUpdate(subscription, PerformanceStatisticsUpdate.Generate((AlphaPerformanceStatistics)statistics, PerformanceStatisticsSubscription.SubscriptionName));
+            Context.InfoConnectionManager.SendSubscriptionUpdate(subscription, PerformanceStatisticsUpdate.Generate(statistics, PerformanceStatisticsSubscription.SubscriptionName));
         }
 
         void NotifyAuditors(AuditorPerfStatistics statisticsMessage)
