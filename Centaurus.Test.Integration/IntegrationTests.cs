@@ -17,6 +17,7 @@ namespace Centaurus.Test
         [TestCase(2, 10)]
         [TestCase(2, 100)]
         [TestCase(3, 100)]
+        [TestCase(3, 10)]
         [TestCase(10, 10)]
         public async Task BaseTest(int auditorsCount, int clientsCount)
         {
@@ -42,7 +43,7 @@ namespace Centaurus.Test
 
                 await environment.AssertWithdrawal(
                     client,
-                    environment.ProviderFactory.Provider.Id,
+                    environment.AlphaWrapper.ProviderFactory.Provider.Id,
                     client.Config.ClientKeyPair,
                     environment.SDKConstellationInfo.QuoteAsset.Code,
                     1
@@ -165,7 +166,7 @@ namespace Centaurus.Test
                 if (invalidClientSignature)
                 {
                     var request = (RequestQuantum)quantum.Quantum;
-                    request.RequestEnvelope.Signature = new TinySignature { Data = new byte[64] };
+                    ((MessageEnvelope)request.RequestEnvelope).Signature = new TinySignature { Data = new byte[64] };
                     request.RequestEnvelope.Sign(KeyPair.Random());
                 }
                 //if (invalidAlphaSignature)

@@ -35,19 +35,20 @@ namespace Centaurus.Domain
 
             var messageHash = constellationQuantum.RequestMessage.ComputeHash();
 
-            var availableAuditors = auditors.ToList();
+            var invalidatedAuditors = auditors.ToList();
             foreach (var signature in signatures)
             {
-                foreach (var auditor in availableAuditors)
+                foreach (var auditor in invalidatedAuditors)
                 {
                     if (signature.IsValid(auditor, messageHash))
                     {
-                        availableAuditors.Remove(auditor);
+                        invalidatedAuditors.Remove(auditor);
                         break;
                     }
-                    throw new Exception("Invalid signature.");
                 }
             }
+            if (invalidatedAuditors.Count > 0)
+                throw new Exception("Invalid signature.");
         }
     }
 }

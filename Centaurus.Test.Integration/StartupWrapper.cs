@@ -9,15 +9,16 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Test
 {
-    public class StartupWrapper: IDisposable
+    public class StartupWrapper : IDisposable
     {
-        public StartupWrapper(Settings settings, MockPaymentProviderFactory providerFactory, ManualResetEvent resetEvent)
+        public StartupWrapper(Settings settings, ManualResetEvent resetEvent)
         {
             Settings = settings ?? throw new ArgumentNullException(nameof(settings));
             Storage = GetStorage() ?? throw new ArgumentNullException(nameof(Storage));
             this.resetEvent = resetEvent ?? throw new ArgumentNullException(nameof(resetEvent));
-            this.providerFactory = providerFactory ?? throw new ArgumentNullException(nameof(providerFactory));
         }
+
+        public MockPaymentProviderFactory ProviderFactory { get; } = new MockPaymentProviderFactory();
 
         public Settings Settings { get; }
 
@@ -34,7 +35,7 @@ namespace Centaurus.Test
             if (Startup != null)
                 throw new InvalidOperationException("Already running.");
 
-            var context = new Domain.ExecutionContext(Settings, Storage, providerFactory, new MockOutgoingConnectionFactory(startups));
+            var context = new Domain.ExecutionContext(Settings, Storage, ProviderFactory, new MockOutgoingConnectionFactory(startups));
 
             ConstellationController = new ConstellationController(context);
             Startup = new Startup(context, new MockHostFactory());
@@ -50,7 +51,6 @@ namespace Centaurus.Test
         }
 
         protected ManualResetEvent resetEvent;
-        private MockPaymentProviderFactory providerFactory;
 
         protected virtual IPersistentStorage GetStorage()
         {

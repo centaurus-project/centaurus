@@ -9,7 +9,7 @@ namespace Centaurus.Models
     public abstract class ResultMessageBase : Message
     {
         [XdrField(0)]
-        public MessageEnvelope OriginalMessage { get; set; }
+        public MessageEnvelopeBase OriginalMessage { get; set; }
 
         [XdrField(1)]
         public ResultStatusCodes Status { get; set; }

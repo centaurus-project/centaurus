@@ -27,7 +27,7 @@ namespace Centaurus
         [Option("extensions_config_file_path", Required = false, HelpText = "Path to extensions config file.")]
         public string ExtensionsConfigFilePath { get; set; }
 
-        [Option("auditor", Required = false, HelpText = "Genesis auditor settings. Each item must contain auditor's public key and domain in format {publicKey}={domain:port}. The option can be set multiple times.")]
+        [Option("auditor", Required = false, HelpText = "Genesis auditor settings. Each item must contain auditor's public key and domain in format {publicKey}={domain:port}. The option can be set multiple times.", Separator = ';')]
         public IEnumerable<Auditor> GenesisAuditors { get; set; }
 
         [Option("listening_port", Required = false, HelpText = "Port the alpha will listen on.")]

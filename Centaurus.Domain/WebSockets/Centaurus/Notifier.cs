@@ -14,7 +14,7 @@ namespace Centaurus.Domain
         /// </summary>
         /// <param name="account">Target account</param>
         /// <param name="envelope">Message to send</param>
-        public static void Notify(this ExecutionContext context, RawPubKey account, MessageEnvelope envelope)
+        public static void Notify(this ExecutionContext context, RawPubKey account, MessageEnvelopeBase envelope)
         {
             if (context == null)
                 throw new ArgumentNullException(nameof(context));
@@ -27,7 +27,7 @@ namespace Centaurus.Domain
         /// Sends the message to all connected auditors
         /// </summary>
         /// <param name="envelope">Message to send</param>
-        public static void NotifyAuditors(this ExecutionContext context, MessageEnvelope envelope)
+        public static void NotifyAuditors(this ExecutionContext context, MessageEnvelopeBase envelope)
         {
             if (context == null)
                 throw new ArgumentNullException(nameof(context));

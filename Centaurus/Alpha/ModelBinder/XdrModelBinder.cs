@@ -19,7 +19,7 @@ namespace Centaurus.Alpha
 
             using var memoryStream = new MemoryStream();
             await bindingContext.HttpContext.Request.Body.CopyToAsync(memoryStream);
-            bindingContext.Result = ModelBindingResult.Success(XdrConverter.Deserialize<MessageEnvelope>(memoryStream.ToArray()));
+            bindingContext.Result = ModelBindingResult.Success(XdrConverter.Deserialize<MessageEnvelopeBase>(memoryStream.ToArray()));
         }
     }
 }

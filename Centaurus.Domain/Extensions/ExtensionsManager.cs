@@ -57,26 +57,26 @@ namespace Centaurus.Domain
             OnBeforeNewConnection?.Invoke(args, ip);
         }
 
-        public event Action<ConnectionBase, MessageEnvelope, Exception> OnHandleMessageFailed;
-        public void HandleMessageFailed(ConnectionBase connection, MessageEnvelope message, Exception exception)
+        public event Action<ConnectionBase, MessageEnvelopeBase, Exception> OnHandleMessageFailed;
+        public void HandleMessageFailed(ConnectionBase connection, MessageEnvelopeBase message, Exception exception)
         {
             OnHandleMessageFailed?.Invoke(connection, message, exception);
         }
 
-        public event Action<ConnectionBase, MessageEnvelope> OnBeforeSendMessage;
-        public void BeforeSendMessage(ConnectionBase connection, MessageEnvelope message)
+        public event Action<ConnectionBase, MessageEnvelopeBase> OnBeforeSendMessage;
+        public void BeforeSendMessage(ConnectionBase connection, MessageEnvelopeBase message)
         {
             OnBeforeSendMessage?.Invoke(connection, message);
         }
 
-        public event Action<ConnectionBase, MessageEnvelope> OnAfterSendMessage;
-        public void AfterSendMessage(ConnectionBase connection, MessageEnvelope message)
+        public event Action<ConnectionBase, MessageEnvelopeBase> OnAfterSendMessage;
+        public void AfterSendMessage(ConnectionBase connection, MessageEnvelopeBase message)
         {
             OnAfterSendMessage?.Invoke(connection, message);
         }
 
-        public event Action<ConnectionBase, MessageEnvelope, Exception> OnSendMessageFailed;
-        public void SendMessageFailed(ConnectionBase connection, MessageEnvelope message, Exception exception)
+        public event Action<ConnectionBase, MessageEnvelopeBase, Exception> OnSendMessageFailed;
+        public void SendMessageFailed(ConnectionBase connection, MessageEnvelopeBase message, Exception exception)
         {
             OnSendMessageFailed?.Invoke(connection, message, exception);
         }
@@ -87,39 +87,39 @@ namespace Centaurus.Domain
             OnBeforeConnectionClose?.Invoke(args);
         }
 
-        public event Action<RawPubKey, MessageEnvelope> OnBeforeNotify;
-        public void BeforeNotify(RawPubKey pubKey, MessageEnvelope envelope)
+        public event Action<RawPubKey, MessageEnvelopeBase> OnBeforeNotify;
+        public void BeforeNotify(RawPubKey pubKey, MessageEnvelopeBase envelope)
         {
             OnBeforeNotify?.Invoke(pubKey, envelope);
         }
 
-        public event Action<MessageEnvelope> OnBeforeNotifyAuditors;
-        public void BeforeNotifyAuditors(MessageEnvelope envelope)
+        public event Action<MessageEnvelopeBase> OnBeforeNotifyAuditors;
+        public void BeforeNotifyAuditors(MessageEnvelopeBase envelope)
         {
             OnBeforeNotifyAuditors?.Invoke(envelope);
         }
 
-        public event Action<ConnectionBase, MessageEnvelope> OnBeforeValidateMessage;
-        public event Action<ConnectionBase, MessageEnvelope> OnAfterValidateMessage;
-        public event Action<ConnectionBase, MessageEnvelope> OnBeforeHandleMessage;
-        public event Action<ConnectionBase, MessageEnvelope> OnAfterHandleMessage;
+        public event Action<ConnectionBase, MessageEnvelopeBase> OnBeforeValidateMessage;
+        public event Action<ConnectionBase, MessageEnvelopeBase> OnAfterValidateMessage;
+        public event Action<ConnectionBase, MessageEnvelopeBase> OnBeforeHandleMessage;
+        public event Action<ConnectionBase, MessageEnvelopeBase> OnAfterHandleMessage;
 
-        public void BeforeValidateMessage(ConnectionBase connection, MessageEnvelope message)
+        public void BeforeValidateMessage(ConnectionBase connection, MessageEnvelopeBase message)
         {
             OnBeforeValidateMessage?.Invoke(connection, message);
         }
 
-        public void AfterValidateMessage(ConnectionBase connection, MessageEnvelope message)
+        public void AfterValidateMessage(ConnectionBase connection, MessageEnvelopeBase message)
         {
             OnAfterValidateMessage?.Invoke(connection, message);
         }
 
-        public void BeforeHandleMessage(ConnectionBase connection, MessageEnvelope message)
+        public void BeforeHandleMessage(ConnectionBase connection, MessageEnvelopeBase message)
         {
             OnBeforeHandleMessage?.Invoke(connection, message);
         }
 
-        public void AfterHandleMessage(ConnectionBase connection, MessageEnvelope message)
+        public void AfterHandleMessage(ConnectionBase connection, MessageEnvelopeBase message)
         {
             OnAfterHandleMessage?.Invoke(connection, message);
         }

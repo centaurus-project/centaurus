@@ -23,14 +23,13 @@ namespace Centaurus.Domain
         {
             var aggregate = default(Aggregate);
             lock (pendingAggregatesSyncRoot)
-            {
                 if (!pendingAggregates.TryGetValue(processingResult.Apex, out aggregate))
                 {
                     pendingAggregates.Add(processingResult.Apex, new Aggregate(processingResult, this));
                     return;
                 }
-            }
             aggregate.Add(processingResult);
+            aggregate.Item.ProcessOutrunSignatures(aggregate);
         }
 
         public void Add(AuditorResultMessage resultMessage, RawPubKey auditor)
@@ -41,9 +40,10 @@ namespace Centaurus.Domain
                 //result message could be received before quantum was processed
                 if (!pendingAggregates.TryGetValue(resultMessage.Apex, out aggregate))
                 {
+                    aggregate = new Aggregate(resultMessage, auditor, this);
                     //if result apex is less than or equal to last processed apex, then the result is no more relevant
                     if (resultMessage.Apex > Context.QuantumStorage.CurrentApex)
-                        pendingAggregates.Add(resultMessage.Apex, new Aggregate(resultMessage, auditor, this));
+                        pendingAggregates.Add(resultMessage.Apex, aggregate);
                     return;
                 }
             }
@@ -192,8 +192,12 @@ namespace Centaurus.Domain
                     {
                         resultMessages.Add(resultMessage);
 
-                        //add signatures to cached quantum
-                        Manager.Context.QuantumStorage.AddResult(resultMessage);
+                        //skip if current node signature, it already added
+                        if (!auditor.Equals(Manager.Context.Settings.KeyPair))
+                        {
+                            //add signatures to cached quantum
+                            Manager.Context.QuantumStorage.AddResult(resultMessage);
+                        }
                     }
 
                     var majorityResult = CheckMajority();
@@ -221,6 +225,8 @@ namespace Centaurus.Domain
                     if (IsProcessed || (isAcknowledgment && IsAcknowledgmentSent))
                         return;
 
+                    if (!isAcknowledgment)
+                    { }
                     var effectsProof = new PayloadProof
                     {
                         PayloadHash = Item.Result.PayloadHash,
@@ -306,7 +312,7 @@ namespace Centaurus.Domain
                 int requiredMajority = Manager.Context.GetMajorityCount(),
                     maxVotes = Manager.Context.GetTotalAuditorsCount();
 
-                var votesCount = resultMessages.Count + 1;
+                var votesCount = resultMessages.Count;
 
                 //check if we have the majority
                 if (votesCount >= requiredMajority)

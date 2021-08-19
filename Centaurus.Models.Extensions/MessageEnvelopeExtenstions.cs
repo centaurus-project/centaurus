@@ -23,7 +23,7 @@ namespace Centaurus
         }
 
         /// <summary>
-        /// Signs an envelope with a given <see cref="KeyPair"/> and appends the signature to the <see cref="MessageEnvelope.Signature"/>.
+        /// Signs an envelope with a given <see cref="KeyPair"/> and appends the signature to the <see cref="MessageEnvelopeBase.Signature"/>.
         /// </summary>
         /// <param name="messageEnvelope">Envelope to sign</param>
         /// <param name="keyPair">Key pair to use for signing</param>
@@ -35,6 +35,9 @@ namespace Centaurus
                 throw new ArgumentNullException(nameof(messageEnvelope));
             if (keyPair == null)
                 throw new ArgumentNullException(nameof(keyPair));
+
+            if (messageEnvelope is MessageEnvelopeSigneless)
+                return messageEnvelope;
 
             var writer = default(XdrBufferWriter);
             if (buffer == null)
@@ -60,17 +63,51 @@ namespace Centaurus
         /// </summary>
         /// <param name="envelope">Target envelope</param>
         /// <returns>True if signature is valid, otherwise false</returns>
-        public static bool IsSignatureValid(this MessageEnvelope envelope, KeyPair keyPair)
+        public static bool IsSignatureValid(this MessageEnvelopeBase envelope, KeyPair keyPair)
         {
             if (envelope == null)
                 throw new ArgumentNullException(nameof(envelope));
-            if (envelope.Signature == null)
+
+            if (keyPair == null)
+                throw new ArgumentNullException(nameof(keyPair));
+
+            if (envelope is MessageEnvelopeSigneless)
                 return true;
+
             var messageHash = envelope.Message.ComputeHash();
-            return envelope.Signature.IsValid(keyPair, messageHash);
+            return envelope.IsSignatureValid(keyPair, messageHash);
         }
 
-        private static TResultMessage CreateResult<TResultMessage>(this MessageEnvelope envelope, ResultStatusCodes status = ResultStatusCodes.InternalError)
+        /// <summary>
+        /// Checks that envelope signature is valid
+        /// </summary>
+        /// <param name="envelope">Target envelope</param>
+        /// <returns>True if signature is valid, otherwise false</returns>
+        public static bool IsSignatureValid(this MessageEnvelopeBase envelope, KeyPair keyPair, byte[] messageHash)
+        {
+            if (envelope == null)
+                throw new ArgumentNullException(nameof(envelope));
+
+            if (messageHash == null)
+                throw new ArgumentNullException(nameof(messageHash));
+
+            if (keyPair == null)
+                throw new ArgumentNullException(nameof(keyPair));
+
+            if (envelope is MessageEnvelopeSigneless)
+                return true;
+
+            if (envelope is MessageEnvelope messageEnvelope && messageEnvelope.Signature != null)
+            {
+                return messageEnvelope.Signature.IsValid(keyPair, messageHash);
+            }
+            else if (envelope is ConstellationMessageEnvelope constellationMessageEnvelope
+                && constellationMessageEnvelope.Signatures.Any(s => s.IsValid(keyPair, messageHash)))
+                return true;
+            return false;
+        }
+
+        private static TResultMessage CreateResult<TResultMessage>(this MessageEnvelopeBase envelope, ResultStatusCodes status = ResultStatusCodes.InternalError)
             where TResultMessage : ResultMessageBase
         {
             if (envelope == null)
@@ -81,7 +118,7 @@ namespace Centaurus
             return resultMessage;
         }
 
-        public static ResultMessageBase CreateResult(this MessageEnvelope envelope, ResultStatusCodes status = ResultStatusCodes.InternalError)
+        public static ResultMessageBase CreateResult(this MessageEnvelopeBase envelope, ResultStatusCodes status = ResultStatusCodes.InternalError)
         {
             if (envelope == null)
                 throw new ArgumentNullException(nameof(envelope));
@@ -109,9 +146,10 @@ namespace Centaurus
                 if (status != ResultStatusCodes.Success)
                 {
                     quantumResult.Effects = new List<EffectsInfoBase>();
-                    quantumResult.PayloadProof = new PayloadProof { 
-                        PayloadHash = new byte[] { }, 
-                        Signatures = new List<TinySignature>() 
+                    quantumResult.PayloadProof = new PayloadProof
+                    {
+                        PayloadHash = new byte[] { },
+                        Signatures = new List<TinySignature>()
                     };
                 }
                 return quantumResult;
@@ -119,7 +157,7 @@ namespace Centaurus
             return CreateResult<ResultMessage>(envelope, status);
         }
 
-        public static ResultMessageBase CreateResult(this MessageEnvelope envelope, Exception exc)
+        public static ResultMessageBase CreateResult(this MessageEnvelopeBase envelope, Exception exc)
         {
             if (envelope == null)
                 throw new ArgumentNullException(nameof(envelope));

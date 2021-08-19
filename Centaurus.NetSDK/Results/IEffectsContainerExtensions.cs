@@ -35,15 +35,15 @@ namespace Centaurus.NetSDK
             foreach (var effectsInfo in quantumInfo.Effects)
             {
                 if (effectsInfo is EffectsHashInfo)
-                    effectsBytes.Concat(effectsInfo.EffectsGroupData);
+                    effectsBytes = effectsBytes.Concat(effectsInfo.EffectsGroupData);
                 else
-                    effectsBytes.Concat(effectsInfo.EffectsGroupData.ComputeHash());
+                    effectsBytes = effectsBytes.Concat(effectsInfo.EffectsGroupData.ComputeHash());
             }
 
             //compute payload hash
-            var payloadHash = ByteArrayExtensions.ComputeQuantumPayloadHash(quantumInfo.Apex, quantumInfo.QuantumHash, effectsBytes.ComputeHash());
+            var payloadHash = ByteArrayExtensions.ComputeQuantumPayloadHash(quantumInfo.Apex, quantumInfo.QuantumHash, effectsBytes.ToArray().ComputeHash());
 
-            if (!effectsBytes.ComputeHash().Equals(payloadHash))
+            if (!ByteArrayPrimitives.Equals(quantumInfo.PayloadProof.PayloadHash, payloadHash))
                 return 0;
 
             return validSignatures;

@@ -36,7 +36,7 @@ namespace Centaurus.Test
                 Asset = "USD",
                 Price = 23423.4325
             };
-            var message = new MessageEnvelope()
+            var message = new MessageEnvelope
             {
                 Message = original,
                 Signature = new TinySignature { Data = signature }

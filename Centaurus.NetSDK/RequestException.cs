@@ -5,12 +5,12 @@ namespace Centaurus.NetSDK
 {
     public class RequestException: Exception
     {
-        public RequestException(MessageEnvelope envelope, string message = null)
+        public RequestException(MessageEnvelopeBase envelope, string message = null)
             :base(message)
         {
             Envelope = envelope;
         }
 
-        public MessageEnvelope Envelope { get; }
+        public MessageEnvelopeBase Envelope { get; }
     }
 }

@@ -44,8 +44,8 @@ namespace Centaurus.Domain
                     try
                     {
                         if (!cancellationToken.IsCancellationRequested
-                            && outgoingMessageStorage.TryPeek(out MessageEnvelope message)
-                            && Context.StateManager.IsAuditorReady(PubKey)
+                            && outgoingMessageStorage.TryPeek(out MessageEnvelopeBase message)
+                            && Context.StateManager.IsAuditorRunning(PubKey)
                             )
                         {
                             try

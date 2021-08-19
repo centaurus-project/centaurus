@@ -6,6 +6,7 @@ using Centaurus.PersistentStorage.Abstraction;
 using NLog;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -50,30 +51,36 @@ namespace Centaurus.Domain
             OutgoingConnectionManager = new OutgoingConnectionManager(this, connectionFactory);
 
             SubscriptionsManager = new SubscriptionsManager();
+
             InfoConnectionManager = new InfoConnectionManager(this);
 
             Catchup = new Catchup(this);
+
+            StateManager = new StateManager(this);
+            StateManager.StateChanged += AppState_StateChanged;
 
             this.useLegacyOrderbook = useLegacyOrderbook;
 
             DynamicSerializersInitializer.Init();
 
-            var state = State.Running;
+            var state = State.Undefined;
             var lastSnapshot = PersistenceManager.GetLastSnapshot();
             if (lastSnapshot != null)
             {
-                Setup(lastSnapshot);
                 if (IsAlpha) //TODO: all auditors should walk trough rising routine
                     state = State.Rising;//Alpha should ensure that it has all quanta from auditors
+                else
+                    state = State.Running;
+                Setup(lastSnapshot);
             }
-
-            StateManager = new StateManager(this, state);
-            StateManager.StateChanged += AppState_StateChanged;
-
-            if (lastSnapshot == null)
+            else if (lastSnapshot == null)
             {
+                //establish connection with genesis auditors
                 EstablishOutgoingConnections();
             }
+
+            StateManager.Init(state);
+
             QuantumStorage.Init(lastSnapshot?.Apex ?? 0, lastSnapshot?.LastHash ?? new byte[] { });
             QuantumHandler.Start();
         }
@@ -184,13 +191,13 @@ namespace Centaurus.Domain
             var prevState = stateChangedEventArgs.PrevState;
             if (state != State.Ready && prevState == State.Ready) //close all connections (except auditors)
                 IncomingConnectionManager.CloseAllConnections(false).Wait();
+            this.NotifyAuditors(new StateUpdateMessage { State = state }.CreateEnvelope());
         }
 
         private void PendingUpdatesManager_OnBatchSaved(BatchSavedInfo batchInfo)
         {
             PerformanceStatisticsManager?.OnBatchSaved(batchInfo);
         }
-
 
         public PersistenceManager PersistenceManager { get; }
 

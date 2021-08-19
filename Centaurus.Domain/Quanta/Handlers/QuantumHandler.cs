@@ -1,9 +1,7 @@
 ﻿using Centaurus.Domain.Models;
 using Centaurus.Models;
-using Centaurus.Xdr;
 using NLog;
 using System;
-using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -30,7 +28,6 @@ namespace Centaurus.Domain
         public QuantumHandler(ExecutionContext context)
             : base(context)
         {
-            buffer = XdrBufferFactory.Rent(256 * 1024);
         }
 
         static Logger logger = LogManager.GetCurrentClassLogger();
@@ -41,7 +38,6 @@ namespace Centaurus.Domain
         }
 
         BlockingCollection<HandleItem> awaitedQuanta = new BlockingCollection<HandleItem>();
-        XdrBufferFactory.RentedBuffer buffer;
 
         /// <summary>
         /// Handles the quantum and returns Task.
@@ -154,13 +150,22 @@ namespace Centaurus.Domain
 
             await ProcessQuantum(processor, processorContext);
 
-            ProcessResult(processorContext);
+            AddToQuantumStorage(processorContext.ProcessingResult);
 
-            Context.QuantumStorage.AddQuantum(new PendingQuantum { Quantum = quantum, Signatures = new List<AuditorSignature>() }, processorContext.ProcessingResult.QuantumHash);
+            ProcessResult(processorContext);
 
             logger.Trace($"Message of type {quantum.GetType().Name} with apex {quantum.Apex} is handled.");
 
             return processorContext.ProcessingResult.ResultMessage;
+        }
+
+        private void AddToQuantumStorage(QuantaProcessingResult processingResult)
+        {
+            Context.QuantumStorage.AddQuantum(new PendingQuantum
+            {
+                Quantum = processingResult.ResultMessage.Quantum,
+                Signatures = new List<AuditorSignature> { processingResult.CurrentNodeSignature }
+            }, processingResult.QuantumHash);
         }
 
         private void ProcessResult(ProcessorContext processorContext)

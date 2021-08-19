@@ -14,8 +14,6 @@ namespace Centaurus.Test
             Reset = new ManualResetEvent(false);
         }
 
-        public MockPaymentProviderFactory ProviderFactory { get; } = new MockPaymentProviderFactory();
-
         public const string HorizonUrl = "https://horizon-testnet.stellar.org";
         public const string NetworkPassphrase = "Test SDF Network ; September 2015";
         public const int AlphaPort = 5000;
@@ -49,7 +47,6 @@ namespace Centaurus.Test
                         host,
                         new StartupWrapper(
                             GetSettings(kp.SecretSeed, auditors),
-                            ProviderFactory,
                             Reset
                         )
                     );
@@ -62,26 +59,29 @@ namespace Centaurus.Test
             var clients = Enumerable.Range(0, clientsCount).Select(_ => KeyPair.Random()).ToList();
             var info = AlphaWrapper.ConstellationController.Info();
             var assets = info.Assets;
-            var provider = ProviderFactory.Provider;
-            var cursor = ulong.Parse(provider.Cursor);
-            for (var i = 0; i < clients.Count; i++)
+            var cursor = ulong.Parse(AlphaWrapper.ProviderFactory.Provider.Cursor);
+            foreach (var client in clients)
             {
                 cursor++;
-                var client = clients[i];
-                provider.Deposit(new DepositNotificationModel
+                foreach (var wrapper in AuditorWrappers)
                 {
-                    Cursor = cursor.ToString(),
-                    DepositTime = DateTime.UtcNow,
-                    ProviderId = provider.Id,
-                    Items = assets.Select(a => new DepositModel
+                    var provider = wrapper.Value.ProviderFactory.Provider;
+                    var depositNotification = new DepositNotificationModel
                     {
-                        Amount = 1000,
-                        Asset = a.Code,
-                        Destination = client.PublicKey,
-                        IsSuccess = true,
-                        TransactionHash = new byte[] { }
-                    }).ToList()
-                });
+                        Cursor = cursor.ToString(),
+                        DepositTime = DateTime.UtcNow,
+                        ProviderId = provider.Id,
+                        Items = assets.Select(a => new DepositModel
+                        {
+                            Amount = 1000000000000,
+                            Asset = a.Code,
+                            Destination = client.PublicKey,
+                            IsSuccess = true,
+                            TransactionHash = new byte[] { }
+                        }).ToList()
+                    };
+                    provider.Deposit(depositNotification);
+                }
             }
             Clients.AddRange(clients);
         }

@@ -80,10 +80,13 @@ namespace Centaurus.Domain
                 connection.Value.OutgoingResultsStorage.EnqueueResult(result);
         }
 
-        public void EnqueueMessage(MessageEnvelope message)
+        public void EnqueueMessage(MessageEnvelopeBase message)
         {
             foreach (var connection in connections)
-                connection.Value.OutgoingMessageStorage.EnqueueMessage(message);
+            {
+                if (Context.StateManager.IsAuditorRunning(connection.Key))
+                    connection.Value.OutgoingMessageStorage.EnqueueMessage(message);
+            }
         }
 
         class AtomicConnection : ContextualBase

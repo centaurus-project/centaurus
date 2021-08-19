@@ -187,7 +187,7 @@ namespace Centaurus.Domain
             {
                 try
                 {
-                    if (Context.StateManager.State == State.Running || Context.StateManager.State == State.Ready)
+                    if (Context.StateManager?.State == State.Running || Context.StateManager?.State == State.Ready)
                     {
                         UpdateBatch();
                     }

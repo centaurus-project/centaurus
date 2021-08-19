@@ -29,16 +29,18 @@ namespace Centaurus.Domain
 
         private async Task AddQuantaToQueue(ConnectionBase connection, IncomingMessage message)
         {
-            var quantumHandler = connection.Context.QuantumHandler;
+            var quantumHandler = Context.QuantumHandler;
             var quantaBatch = (QuantaBatch)message.Envelope.Message;
             var quanta = quantaBatch.Quanta;
             foreach (var processedQuantum in quanta)
             {
                 var quantum = processedQuantum.Quantum;
-                if (quantum.Apex <= quantumHandler.LastAddedQuantumApex)
+                //get last known apex
+                var lastKnownApex = quantumHandler.LastAddedQuantumApex == 0 ? Context.QuantumStorage.CurrentApex : quantumHandler.LastAddedQuantumApex;
+                if (quantum.Apex <= lastKnownApex)
                     continue;
 
-                if (quantum.Apex != quantumHandler.LastAddedQuantumApex + 1)
+                if (quantum.Apex != lastKnownApex + 1)
                 {
                     logger.Warn($"Batch has invalid quantum apexes (current: {quantumHandler.LastAddedQuantumApex}, received: {quantum.Apex}). New apex cursor request will be send.");
                     await connection.SendMessage(new QuantaBatchRequest { LastKnownApex = quantumHandler.LastAddedQuantumApex });

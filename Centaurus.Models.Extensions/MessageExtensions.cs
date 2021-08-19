@@ -7,7 +7,7 @@ namespace Centaurus
 {
     public static class MessageExtensions
     {
-        public static MessageEnvelope CreateEnvelope(this Message message)
+        public static MessageEnvelopeBase CreateEnvelope(this Message message)
         {
             return message.CreateEnvelope<MessageEnvelope>();
         }

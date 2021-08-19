@@ -186,7 +186,7 @@ namespace Centaurus.Alpha
                 pubKey = null;
                 if (context == null)
                     throw new ArgumentNullException(nameof(context));
-                if (!(context.Request.Query.TryGetValue(WebSocketConstants.CentaurusWebSocketEndPoint, out var address) 
+                if (!(context.Request.Query.TryGetValue(WebSocketConstants.PubkeyParamName, out var address) 
                     && KeyPair.TryGetFromAccountId(address, out var keyPair)))
                     return false;
                 pubKey = keyPair;

@@ -92,8 +92,7 @@ namespace Centaurus.Domain
                     BatchInfos = GetBatchInfos().Select(b => b.ToBatchSavedInfoModel()).ToList(),
                     QuantaPerSecond = GetItemsPerSecond(),
                     QuantaQueueLength = GetQuantaAvgLength(),
-                    UpdateDate = DateTime.UtcNow.Ticks,
-                    State = Context.StateManager.State
+                    UpdateDate = DateTime.UtcNow.Ticks
                 };
                 AddAuditorStatistics(Context.Settings.KeyPair.AccountId, current);
 

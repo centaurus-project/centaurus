@@ -166,11 +166,6 @@ namespace Centaurus.Test
             return clientConnections;
         }
 
-        public static void AssertFinalize(QuantumResult resultMessage)
-        {
-            Assert.IsTrue(resultMessage.IsFinalized, "Majority validation.");
-        }
-
         public static async Task AssertPayment(this IntegrationTestEnvironment environment, CentaurusClient client, KeyPair keyPair, string asset, ulong amount)
         {
             var balance = client.AccountState.GetBalances().First(a => a.Asset == asset);
@@ -178,7 +173,7 @@ namespace Centaurus.Test
             try
             {
                 var result = await client.Pay(keyPair.PublicKey, asset, amount);
-                AssertFinalize(result);
+                await result.OnAcknowledged;
                 await AssertBalance(client, asset, balanceAmount - amount, 0);
             }
             catch (Exception exc)
@@ -194,7 +189,6 @@ namespace Centaurus.Test
             try
             {
                 var result = await client.Withdraw(provider, keyPair.PublicKey, asset, amount);
-                AssertFinalize(result);
                 await AssertBalance(client, asset, balanceAmount - amount, 0);
             }
             catch (Exception exc)

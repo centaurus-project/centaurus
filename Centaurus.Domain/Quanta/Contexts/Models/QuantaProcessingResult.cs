@@ -44,7 +44,7 @@ namespace Centaurus.Domain
                 throw new ArgumentNullException(nameof(payloadProof));
 
             var requestAccount = 0ul;
-            if (ResultMessage.Quantum is RequestQuantum request)
+            if (ResultMessage.Quantum is RequestQuantumBase request)
                 requestAccount = request.RequestMessage.Account;
 
             var result = new Dictionary<ulong, EffectsNotification>();

@@ -16,14 +16,10 @@ namespace Centaurus
         /// Connection established.
         /// </summary>
         Connected = 0,
-        ///// <summary>
-        ///// Successful handshake.
-        ///// </summary>
-        //Validated = 1,
         /// <summary>
         /// Ready to receive and send messages.
         /// </summary>
-        Ready = 2,
+        Ready = 1,
         /// <summary>
         /// Connection was closed.
         /// </summary>
@@ -140,7 +136,7 @@ namespace Centaurus
 
         private readonly SemaphoreSlim sendMessageSemaphore = new SemaphoreSlim(1);
 
-        public virtual async Task SendMessage(MessageEnvelope envelope)
+        public virtual async Task SendMessage(MessageEnvelopeBase envelope)
         {
             if (envelope == null)
                 throw new ArgumentNullException(nameof(envelope));
@@ -209,11 +205,11 @@ namespace Centaurus
                         }
                         else
                         {
-                            MessageEnvelope envelope = null;
+                            MessageEnvelopeBase envelope = null;
                             try
                             {
                                 var reader = new XdrBufferReader(incommingBuffer.Buffer, incommingBuffer.Length);
-                                envelope = XdrConverter.Deserialize<MessageEnvelope>(reader);
+                                envelope = XdrConverter.Deserialize<MessageEnvelopeBase>(reader);
 
                                 logger.Trace($"Connection {PubKeyAddress}, message {envelope.Message.GetMessageType()} received.");
                                 if (!await HandleMessage(envelope))
@@ -262,7 +258,7 @@ namespace Centaurus
             }
         }
 
-        private async Task<bool> HandleMessage(MessageEnvelope envelope)
+        private async Task<bool> HandleMessage(MessageEnvelopeBase envelope)
         {
             return await Context.MessageHandlers.HandleMessage(this, envelope.ToIncomingMessage(incommingBuffer));
         }

@@ -1,6 +1,7 @@
 ﻿using Centaurus.Domain.Models;
 using Centaurus.Models;
 using System;
+using System.Diagnostics;
 using System.Threading.Tasks;
 
 namespace Centaurus.Domain
@@ -39,7 +40,9 @@ namespace Centaurus.Domain
             if (paymentQuantum.Source == null
                 || !TryGetNotification(context, out var notification)
                 || !ByteArrayPrimitives.Equals(notification.ComputeHash(), paymentQuantum.Source.ComputeHash()))
+            {
                 throw new InvalidOperationException("Unexpected tx notification.");
+            }
 
             foreach (var paymentItem in notification.Items)
                 ValidateDeposit(context, paymentItem);

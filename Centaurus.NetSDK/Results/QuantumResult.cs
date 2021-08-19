@@ -10,16 +10,16 @@ namespace Centaurus.NetSDK
     /// </summary>
     public class QuantumResult
     {
-        public QuantumResult(MessageEnvelope requestEnvelope, ConstellationInfo constellationInfo)
+        public QuantumResult(MessageEnvelopeBase requestEnvelope, ConstellationInfo constellationInfo)
         {
             Request = requestEnvelope ?? throw new ArgumentNullException(nameof(requestEnvelope));
             IsFinalizationRequired = requestEnvelope.Message is SequentialRequestMessage;
             ConstellationInfo = constellationInfo ?? throw new ArgumentNullException(nameof(constellationInfo));
         }
 
-        internal readonly TaskCompletionSource<MessageEnvelope> Acknowledged = new TaskCompletionSource<MessageEnvelope>();
+        internal readonly TaskCompletionSource<MessageEnvelopeBase> Acknowledged = new TaskCompletionSource<MessageEnvelopeBase>();
 
-        internal readonly TaskCompletionSource<MessageEnvelope> Finalized = new TaskCompletionSource<MessageEnvelope>();
+        internal readonly TaskCompletionSource<MessageEnvelopeBase> Finalized = new TaskCompletionSource<MessageEnvelopeBase>();
 
         internal bool IsFinalizationRequired { get; private set; }
 
@@ -28,12 +28,12 @@ namespace Centaurus.NetSDK
         /// <summary>
         /// Event that resolves when the server returns the acknowledgment confirmation for the client request.
         /// </summary>
-        public Task<MessageEnvelope> OnAcknowledged => Acknowledged.Task;
+        public Task<MessageEnvelopeBase> OnAcknowledged => Acknowledged.Task;
 
         /// <summary>
         /// Event that resolves when the server returns both the acknowledgment and the finalization confirmation for the quantum request.
         /// </summary>
-        public Task<MessageEnvelope> OnFinalized => Finalized.Task;
+        public Task<MessageEnvelopeBase> OnFinalized => Finalized.Task;
 
         /// <summary>
         /// Returns <see langword="true"/> when the quantum confirmation response from the server received and <see langword="false"/> otherwise.
@@ -48,7 +48,7 @@ namespace Centaurus.NetSDK
         /// <summary>
         /// Original request message sent from the client.
         /// </summary>
-        public MessageEnvelope Request { get; private set; }
+        public MessageEnvelopeBase Request { get; private set; }
 
         /// <summary>
         /// Returns a result message envelope once a response received.
@@ -56,9 +56,9 @@ namespace Centaurus.NetSDK
         /// <remarks>
         /// Calling this method will block current thread until the response from the server is received.
         /// </remarks>
-        public virtual MessageEnvelope Result => IsFinalizationRequired ? OnFinalized.Result : OnAcknowledged.Result;
+        public virtual MessageEnvelopeBase Result => IsFinalizationRequired ? OnFinalized.Result : OnAcknowledged.Result;
 
-        internal void AssignResponse(MessageEnvelope resultEnvelope)
+        internal void AssignResponse(MessageEnvelopeBase resultEnvelope)
         {
             if (!(resultEnvelope.Message is ResultMessageBase resultMessage))
                 SetException(new RequestException(resultEnvelope, "Received message is not result message."));
@@ -93,9 +93,9 @@ namespace Centaurus.NetSDK
                 }
         }
 
-        private (bool isValid, bool isFinalized) ValidateResultMessage(MessageEnvelope resultEnvelope)
+        private (bool isValid, bool isFinalized) ValidateResultMessage(MessageEnvelopeBase resultEnvelope)
         {
-            if (resultEnvelope.Message is QuantumResultMessage quantumResult)
+            if (resultEnvelope.Message is QuantumResultMessageBase quantumResult)
             {
                 //TODO: cache current auditors keypairs
                 var signaturesCount = quantumResult.GetValidSignaturesCount(ConstellationInfo.Auditors.Select(a => new KeyPair(a.PubKey)).ToList());

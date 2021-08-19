@@ -36,6 +36,9 @@ namespace Centaurus.Domain
             );
             context.CentaurusContext.Setup(updateSnapshot);
 
+            if (context.CentaurusContext.StateManager.State == State.Undefined)
+                context.CentaurusContext.StateManager.Init(State.Running);
+
             return Task.FromResult((QuantumResultMessageBase)context.Quantum.CreateEnvelope().CreateResult(ResultStatusCodes.Success));
         }
 

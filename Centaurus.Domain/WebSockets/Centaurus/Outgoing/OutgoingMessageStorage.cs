@@ -10,7 +10,7 @@ namespace Centaurus.Domain
 {
     public class OutgoingMessageStorage
     {
-        private readonly Queue<MessageEnvelope> outgoingMessages = new Queue<MessageEnvelope>();
+        private readonly Queue<MessageEnvelopeBase> outgoingMessages = new Queue<MessageEnvelopeBase>();
 
         public void EnqueueMessage(Message message)
         {
@@ -19,7 +19,7 @@ namespace Centaurus.Domain
             EnqueueMessage(message.CreateEnvelope());
         }
 
-        public void EnqueueMessage(MessageEnvelope message)
+        public void EnqueueMessage(MessageEnvelopeBase message)
         {
             if (message == null)
                 throw new ArgumentNullException(nameof(message));
@@ -27,13 +27,13 @@ namespace Centaurus.Domain
                 outgoingMessages.Enqueue(message);
         }
 
-        public bool TryPeek(out MessageEnvelope message)
+        public bool TryPeek(out MessageEnvelopeBase message)
         {
             lock (outgoingMessages)
                 return outgoingMessages.TryPeek(out message);
         }
 
-        public bool TryDequeue(out MessageEnvelope message)
+        public bool TryDequeue(out MessageEnvelopeBase message)
         {
             lock (outgoingMessages)
                 return outgoingMessages.TryDequeue(out message);
@@ -76,7 +76,7 @@ namespace Centaurus.Domain
                         }
                         if (resultsBatch != default)
                         {
-                            outgoingMessageStorage.EnqueueMessage(new AuditorResultsBatch { AuditorResultMessages = resultsBatch });
+                            outgoingMessageStorage.EnqueueMessage(new AuditorResultsBatch { AuditorResultMessages = resultsBatch }.CreateEnvelope<MessageEnvelopeSigneless>());
                             continue;
                         }
                         Thread.Sleep(50);

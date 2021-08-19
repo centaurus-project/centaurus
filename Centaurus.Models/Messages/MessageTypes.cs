@@ -84,6 +84,10 @@ namespace Centaurus.Models
         /// </summary>
         PendingQuantum = 108,
         /// <summary>
+        /// Internal message. Contains new Auditor state.
+        /// </summary>
+        StateUpdate = 109,
+        /// <summary>
         /// The message is send after success handshake. Contains account id.
         /// </summary>
         ClientConnectionSuccess = 150,

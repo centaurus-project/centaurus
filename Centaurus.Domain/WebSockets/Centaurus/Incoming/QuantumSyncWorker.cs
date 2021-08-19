@@ -43,19 +43,10 @@ namespace Centaurus
                     return;
                 }
 
-                if (!Context.IsAlpha || auditor.ConnectionState == ConnectionState.Connected || apexDiff == 0 && auditor.ConnectionState == ConnectionState.Ready)
+                if (!Context.IsAlpha || auditor.ConnectionState != ConnectionState.Ready || apexDiff == 0)
                 {
                     Thread.Sleep(50);
                     continue;
-                }
-                else if (auditor.ConnectionState != ConnectionState.Ready && apexDiff <= 100) //auditor has reached the constellation
-                {
-                    auditor.ConnectionState = ConnectionState.Ready;
-                    continue;
-                }
-                else if (auditor.ConnectionState == ConnectionState.Ready && apexDiff >= 10_000) //auditor is too delayed
-                {
-                    //auditor.ConnectionState = ConnectionState.Validated;
                 }
 
                 try

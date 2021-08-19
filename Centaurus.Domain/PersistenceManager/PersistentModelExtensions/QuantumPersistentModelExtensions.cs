@@ -12,7 +12,7 @@ namespace Centaurus.Domain
         {
             var quantum = new PendingQuantum
             {
-                Quantum = XdrConverter.Deserialize<Quantum>(quantumPersistentModel.RawQuantum),
+                Quantum = (Quantum)XdrConverter.Deserialize<Message>(quantumPersistentModel.RawQuantum),
                 Signatures = new List<AuditorSignature>()
             };
 

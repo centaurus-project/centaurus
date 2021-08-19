@@ -17,14 +17,14 @@ namespace Centaurus.NetSDK
                 throw new Exception("Failed to schedule request collation.");
         }
 
-        public void Resolve(MessageEnvelope envelope)
+        public void Resolve(MessageEnvelopeBase envelope)
         {
             if (!(envelope.Message is ResultMessageBase resultMessage))
             {
                 logger.Trace("Request is not a quantum result message.");
                 return;
             }
-            var messageId = resultMessage.OriginalMessage.Message is RequestQuantum requestQuantum ?
+            var messageId = resultMessage.OriginalMessage.Message is RequestQuantumBase requestQuantum ?
                 requestQuantum.RequestMessage.MessageId :
                 resultMessage.OriginalMessage.Message.MessageId;
             if (!Requests.TryGetValue(messageId, out var response))

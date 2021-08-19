@@ -106,10 +106,10 @@ namespace Centaurus.Domain
             return Context.PermanentStorage.GetLastApex();
         }
 
-        public MessageEnvelope GetQuantum(ulong apex)
+        public MessageEnvelopeBase GetQuantum(ulong apex)
         {
             var quantumModel = Context.PermanentStorage.LoadQuantum(apex);
-            return XdrConverter.Deserialize<MessageEnvelope>(quantumModel.RawQuantum);
+            return XdrConverter.Deserialize<MessageEnvelopeBase>(quantumModel.RawQuantum);
         }
 
         /// <summary>
@@ -149,7 +149,10 @@ namespace Centaurus.Domain
 
         public Snapshot GetLastSnapshot()
         {
-            return GetSnapshot(GetLastApex());
+            var lastApex = GetLastApex();
+            if (lastApex < 1)
+                return null;
+            return GetSnapshot(lastApex);
         }
 
         //TODO: move it to separate class
@@ -185,7 +188,8 @@ namespace Centaurus.Domain
             var quanta = Context.PermanentStorage.LoadQuantaAboveApex(apex);
 
             var effects = quanta
-                .SelectMany(q => {
+                .SelectMany(q =>
+                {
                     var effects = new List<Effect>();
                     foreach (var rawEffectsGroup in q.Effects)
                     {
@@ -205,8 +209,8 @@ namespace Centaurus.Domain
             {
                 var currentEffect = effects[i];
 
-                var account = currentEffect is AccountEffect accountEffect 
-                    ? accountStorage.GetAccount(accountEffect.Account) 
+                var account = currentEffect is AccountEffect accountEffect
+                    ? accountStorage.GetAccount(accountEffect.Account)
                     : null;
                 IEffectProcessor<Effect> processor = null;
                 switch (currentEffect)
@@ -257,7 +261,7 @@ namespace Centaurus.Domain
                 processor.RevertEffect();
             }
 
-            var lastQuantumData = XdrConverter.Deserialize<MessageEnvelope>(Context.PermanentStorage.LoadQuantum(apex).RawQuantum);
+            var lastQuantumData = (Quantum)XdrConverter.Deserialize<Message>(Context.PermanentStorage.LoadQuantum(apex).RawQuantum);
 
             //TODO: refactor restore exchange
             //we need to clean all order links to be able to restore exchange
@@ -274,7 +278,7 @@ namespace Centaurus.Domain
                 Accounts = accountStorage.GetAll().OrderBy(a => a.Account.Id).ToList(),
                 Orders = allOrders.OrderBy(o => o.OrderId).ToList(),
                 Settings = settings,
-                LastHash = lastQuantumData.Message.ComputeHash()
+                LastHash = lastQuantumData.ComputeHash()
             };
         }
 

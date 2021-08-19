@@ -22,6 +22,7 @@ namespace Centaurus.Models
     [XdrUnion((int)MessageTypes.WithdrawalRequestQuantum, typeof(WithdrawalRequestQuantum))]
     [XdrUnion((int)MessageTypes.DepositQuantum, typeof(DepositQuantum))]
     [XdrUnion((int)MessageTypes.AuditorPerfStatistics, typeof(AuditorPerfStatistics))]
+    [XdrUnion((int)MessageTypes.StateUpdate, typeof(StateUpdateMessage))]
     [XdrUnion((int)MessageTypes.AuditorResultsBatch, typeof(AuditorResultsBatch))]
     [XdrUnion((int)MessageTypes.ConstellationUpdate, typeof(ConstellationUpdate))]
     [XdrUnion((int)MessageTypes.ConstellationQuantum, typeof(ConstellationQuantum))]

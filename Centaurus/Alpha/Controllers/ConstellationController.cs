@@ -1,10 +1,9 @@
-﻿using System;
-using System.Linq;
-using System.Threading.Tasks;
-using Centaurus.Domain;
+﻿using Centaurus.Domain;
 using Centaurus.Models;
 using Microsoft.AspNetCore.Mvc;
-using NSec.Cryptography;
+using System;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace Centaurus.Controllers
 {
@@ -23,7 +22,9 @@ namespace Centaurus.Controllers
         {
             ConstellationInfo info;
 
-            var state = (int)(Context.StateManager?.State ?? 0);
+            var state = -1;
+            if (Context.StateManager != null)
+                state = (int)Context.StateManager.State;
             if (state < (int)State.Running)
                 info = new ConstellationInfo
                 {

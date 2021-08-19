@@ -41,10 +41,10 @@ namespace Centaurus.Domain
         public List<IncomingAuditorConnection> GetAuditorConnections()
         {
             var auditorConnections = new List<IncomingAuditorConnection>();
-            var auditors = Context.Constellation.Auditors;
-            for (var i = 0; i < Context.Constellation.Auditors.Count; i++)
+            var auditors = Context.GetAuditors();
+            for (var i = 0; i < auditors.Count; i++)
             {
-                if (TryGetConnection(auditors[i].PubKey, out IncomingConnectionBase auditorConnection))
+                if (TryGetConnection(auditors[i], out IncomingConnectionBase auditorConnection))
                     auditorConnections.Add((IncomingAuditorConnection)auditorConnection);
             }
             return auditorConnections;
@@ -61,9 +61,7 @@ namespace Centaurus.Domain
                 throw new ArgumentNullException(nameof(webSocket));
 
             var connection = default(IncomingConnectionBase);
-            var auditors = Context.Constellation == null
-                ? Context.Settings.GenesisAuditors.Select(a => (RawPubKey)a.PubKey)
-                : Context.Constellation.Auditors.Select(a => a.PubKey);
+            var auditors = Context.GetAuditors();
             if (auditors.Any(a => a.Equals(rawPubKey)))
                 connection = new IncomingAuditorConnection(Context, rawPubKey, webSocket, ip);
             else

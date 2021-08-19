@@ -43,7 +43,7 @@ namespace Centaurus.Domain
                     connection.ConnectionState.ToString(),
                     ValidConnectionStates.Select(s => s.ToString()).ToArray());
 
-            if (!message.Envelope.Signature.IsValid(connection.PubKey, message.MessageHash))
+            if (!message.Envelope.IsSignatureValid(connection.PubKey, message.MessageHash))
                 throw new UnauthorizedException();
 
             ValidateAuditor(connection);
@@ -121,13 +121,13 @@ namespace Centaurus.Domain
     public class IncomingMessage
     {
 
-        public IncomingMessage(MessageEnvelope envelope, byte[] messageHash)
+        public IncomingMessage(MessageEnvelopeBase envelope, byte[] messageHash)
         {
             Envelope = envelope ?? throw new ArgumentNullException(nameof(Envelope));
             MessageHash = messageHash ?? throw new ArgumentNullException(nameof(messageHash));
         }
 
-        public MessageEnvelope Envelope { get; }
+        public MessageEnvelopeBase Envelope { get; }
 
         public byte[] MessageHash { get; }
     }

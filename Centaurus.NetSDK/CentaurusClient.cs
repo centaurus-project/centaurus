@@ -77,7 +77,7 @@ namespace Centaurus.NetSDK
             var payloadHash = adr.ComputePayloadHash();
 
             //compare with specified one
-            if (!payloadHash.SequenceEqual(((AccountDataRequestQuantum)adr.Quantum).PayloadHash))
+            if (!payloadHash.SequenceEqual(adr.Quantum.PayloadHash))
                 throw new Exception("Computed payload hash isn't equal to quantum payload hash.");
 
             AccountState.AccountId = connection.AccountId;

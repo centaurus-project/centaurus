@@ -90,8 +90,10 @@ namespace Centaurus
                         i++;
                     }
                 }
-
-                data.Add(currentOption, currentArgValue);
+                if (!data.TryGetValue(currentOption, out var value))
+                    data.Add(currentOption, currentArgValue);
+                else //multiple value options are possible
+                    data[currentOption] = value += $";{currentArgValue}";
                 i++;
             }
             return data;

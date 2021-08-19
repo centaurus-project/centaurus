@@ -21,7 +21,7 @@ namespace Centaurus
             var mergedArgs = CommandLineHelper.GetMergedArgs<Settings>(args);
 
             var parser = new Parser(s => s.AllowMultiInstance = true);
-            parser.ParseArguments<Settings>(mergedArgs)
+            var errors = parser.ParseArguments<Settings>(mergedArgs)
                 .WithParsed(s => ConfigureAndRun(s));
         }
 
@@ -31,6 +31,7 @@ namespace Centaurus
             var isLoggerInited = false;
             try
             {
+
                 settings.Build();
 
                 Console.Title = $"CentaurusAuditor_{settings.KeyPair.AccountId}";

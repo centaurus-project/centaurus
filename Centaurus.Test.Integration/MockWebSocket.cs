@@ -64,16 +64,10 @@ namespace Centaurus.Test
             {
                 try
                 {
-                    NUnit.Framework.TestContext.Out.WriteLine($"Receive started. {secondPartyWebsocket.KeyPair.AccountId} -> {KeyPair.AccountId}.");
                     if (currentMessage == null)
                     {
-                        NUnit.Framework.TestContext.Out.WriteLine($"Start listen. {secondPartyWebsocket.KeyPair.AccountId} -> {KeyPair.AccountId}.");
                         currentMessage = pendingMessages.Take(listenToken.Token);
-                        NUnit.Framework.TestContext.Out.WriteLine($"After listen. {secondPartyWebsocket.KeyPair.AccountId} -> {KeyPair.AccountId}.");
                     }
-
-
-                    NUnit.Framework.TestContext.Out.WriteLine($"Message received. {secondPartyWebsocket.KeyPair.AccountId} -> {KeyPair.AccountId}.");
 
                     var startAt = currentMessage.ReadenDataLength;
                     var length = Math.Min(currentMessage.Data.Length - currentMessage.ReadenDataLength, buffer.Count);
@@ -110,7 +104,6 @@ namespace Centaurus.Test
             {
                 try
                 {
-                    NUnit.Framework.TestContext.Out.WriteLine($"Send started. {KeyPair.AccountId} -> {secondPartyWebsocket.KeyPair.AccountId}.");
                     if (!endOfMessage)
                         throw new InvalidOperationException("Only completed messages are supported.");
                     var message = XdrBufferFactory.Rent(buffer.Count);
@@ -118,13 +111,10 @@ namespace Centaurus.Test
                     buffer.CopyTo(segment);
                     message.Resize(buffer.Count);
 
-                    NUnit.Framework.TestContext.Out.WriteLine($"Message prepared. {KeyPair.AccountId} -> {secondPartyWebsocket.KeyPair.AccountId}.");
                     secondPartyPendingMessages.Add(new MockMessage(message, messageType, endOfMessage));
-                    NUnit.Framework.TestContext.Out.WriteLine($"Message sent. {KeyPair.AccountId} -> {secondPartyWebsocket.KeyPair.AccountId}.");
                 }
                 catch (Exception exc)
                 {
-                    NUnit.Framework.TestContext.Out.WriteLine($"Exception on send: {exc.Message} {KeyPair.AccountId} -> {secondPartyWebsocket.KeyPair.AccountId}.");
                     throw;
                 }
             }

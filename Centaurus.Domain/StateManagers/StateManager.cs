@@ -23,13 +23,25 @@ namespace Centaurus.Domain
     {
         private Logger logger = LogManager.GetCurrentClassLogger();
 
-        public StateManager(ExecutionContext context, State initState)
+        public StateManager(ExecutionContext context)
             : base(context)
         {
-            SetState(initState);
         }
 
         public State State { get; private set; }
+
+        public void Init(State state)
+        {
+            if (State != State.Undefined)
+                throw new InvalidOperationException("Context is already initialized.");
+
+            SetState(state);
+        }
+
+        public void Stopped()
+        {
+            SetState(State.Stopped);
+        }
 
         public void Failed(Exception exc)
         {
@@ -48,17 +60,20 @@ namespace Centaurus.Domain
                     State = state;
 
                     StateChanged?.Invoke(stateArgs);
+
+                    RefreshState();
                 }
             }
         }
 
         private Dictionary<RawPubKey, ConnectedAuditor> connectedAuditors = new Dictionary<RawPubKey, ConnectedAuditor>();
 
-        private bool HasMajority => Context.HasMajority(connectedAuditors.Count(a => a.Value.IsReady), false);
-
-        public void Stopped()
+        private bool HasMajority
         {
-            SetState(State.Stopped);
+            get
+            {
+                return Context.HasMajority(connectedAuditors.Count(a => a.Value.IsRunning), false);
+            }
         }
 
         public int ConnectedAuditorsCount => connectedAuditors.Count;
@@ -75,6 +90,19 @@ namespace Centaurus.Domain
                 if (!connectedAuditors.TryGetValue(pubKey, out var connectedAuditor))
                     return false;
                 return connectedAuditor.IsReady;
+            }
+        }
+
+        public bool IsAuditorRunning(RawPubKey pubKey)
+        {
+            if (pubKey == null)
+                throw new ArgumentNullException(nameof(pubKey));
+
+            lock (this)
+            {
+                if (!connectedAuditors.TryGetValue(pubKey, out var connectedAuditor))
+                    return false;
+                return connectedAuditor.IsRunning;
             }
         }
 
@@ -143,6 +171,8 @@ namespace Centaurus.Domain
                     SetState(State.Ready);
                 else if (State == State.Ready && !HasMajority)
                     SetState(State.Running);
+
+                Context.NotifyAuditors(new StateUpdateMessage { State = State }.CreateEnvelope<MessageEnvelopeSigneless>());
             }
         }
 
@@ -224,13 +254,19 @@ namespace Centaurus.Domain
 
         public State AuditorState { get; set; }
 
-        public bool IsReady => AuditorState == State.Ready || AuditorState == State.Running && isConnectionReady();
+        public bool IsReady => AuditorState == State.Ready && isConnectionReady();
 
-        private static ConnectionState[] validConnectionStates = new[] { ConnectionState.Ready };
+        public bool IsRunning => (AuditorState == State.Running || AuditorState == State.Ready) && isConnectionReady();
+
         private bool isConnectionReady()
         {
-            var connection = Context.IsAlpha ? (ConnectionBase)incoming : outgoing;
-            return validConnectionStates.Contains(connection.ConnectionState);
+            var connection = GetRelevantConnection();
+            return connection != null && connection.ConnectionState == ConnectionState.Ready;
+        }
+
+        public ConnectionBase GetRelevantConnection()
+        {
+            return Context.IsAlpha ? (ConnectionBase)incoming : outgoing;
         }
     }
 }

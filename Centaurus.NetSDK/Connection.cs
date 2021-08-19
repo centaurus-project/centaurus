@@ -44,7 +44,7 @@ namespace Centaurus.NetSDK
 
         public event Action OnClose;
 
-        private event Action<MessageEnvelope> OnMessage;
+        private event Action<MessageEnvelopeBase> OnMessage;
 
         private RentedBuffer readerBuffer = Rent();
 
@@ -78,7 +78,7 @@ namespace Centaurus.NetSDK
         /// </summary>
         /// <param name="envelope"></param>
         /// <returns></returns>
-        public async Task<QuantumResult> SendMessage(MessageEnvelope envelope)
+        public async Task<QuantumResult> SendMessage(MessageEnvelopeBase envelope)
         {
             if (!envelope.IsSignatureValid(Config.ClientKeyPair))
                 envelope.Sign(Config.ClientKeyPair);
@@ -216,7 +216,7 @@ namespace Centaurus.NetSDK
                     }
                     try
                     {
-                        var envelope = XdrConverter.Deserialize<MessageEnvelope>(new XdrBufferReader(readerBuffer.Buffer));
+                        var envelope = XdrConverter.Deserialize<MessageEnvelopeBase>(new XdrBufferReader(readerBuffer.Buffer));
                         OnMessage?.Invoke(envelope);
                     }
                     catch
@@ -260,7 +260,7 @@ namespace Centaurus.NetSDK
         /// Handle server quantum response messages.
         /// </summary>
         /// <param name="envelope"></param>
-        private void HandleMessage(MessageEnvelope envelope)
+        private void HandleMessage(MessageEnvelopeBase envelope)
         {
             collator.Resolve(envelope);
         }
@@ -269,7 +269,7 @@ namespace Centaurus.NetSDK
         /// Handle handshake initialization routine messages.
         /// </summary>
         /// <param name="envelope"></param>
-        private void HandleHandshakeMessage(MessageEnvelope envelope)
+        private void HandleHandshakeMessage(MessageEnvelopeBase envelope)
         {
             if (!(envelope.Message is HandshakeRequest handshakeRequest))
             {
