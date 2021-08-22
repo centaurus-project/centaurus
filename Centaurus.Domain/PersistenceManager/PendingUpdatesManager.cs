@@ -59,7 +59,7 @@ namespace Centaurus.Domain
                 {
                     var sw = new Stopwatch();
                     sw.Start();
-                    Context.PersistenceManager.ApplyUpdates(updates.UpdateModels);
+                    Context.PersistenceManager.ApplyUpdates(updates.GetUpdates());
                     sw.Stop();
 
                     var batchInfo = new BatchSavedInfo
@@ -71,6 +71,9 @@ namespace Centaurus.Domain
                     };
                     Task.Factory.StartNew(() => OnBatchSaved?.Invoke(batchInfo));
                     RemoveUpdates(updates.Id);
+
+                    Console.WriteLine($"Batch {updates.Id} saved.");
+
                     updates = GetFirstUpdates();
                 }
                 catch (Exception exc)
@@ -126,30 +129,25 @@ namespace Centaurus.Domain
                     Effects = eg.RawEffects
                 }).ToList(),
                 RawQuantum = result.RawQuantum,
-                TimeStamp = result.Timestamp
+                TimeStamp = result.Timestamp,
+                Signatures = new List<SignatureModel> { result.CurrentNodeSignature.ToPersistenModel() }
             };
 
-            qModel.Signatures = new List<SignatureModel> { result.CurrentNodeSignature.ToPersistenModel() };
-
-            pendingUpdates.AddQuantum(qModel);
-
-            if (result.HasCursorUpdate)
-                pendingUpdates.HasCursorUpdate = true;
-
-            if (result.HasSettingsUpdate)
-                pendingUpdates.Batch.Add(Context.Constellation.ToPesrsistentModel());
-
-            pendingUpdates.Batch.AddRange(result.Effects.Select(eg => new QuantumRefPersistentModel
+            pendingUpdates.AddQuantum(qModel, result.Effects.Sum(e => e.Effects.Effects.Count));
+            pendingUpdates.AddQuantumRefs(result.Effects.Select(eg => new QuantumRefPersistentModel
             {
                 AccountId = eg.Account,
                 Apex = result.Apex,
                 IsQuantumInitiator = eg.Account == result.Initiator
             }));
 
-            pendingUpdates.Accounts.UnionWith(result.AffectedAccounts.Keys);
+            if (result.HasSettingsUpdate)
+                pendingUpdates.AddConstellation(Context.Constellation.ToPesrsistentModel());
 
-            pendingUpdates.EffectsCount += result.Effects.Count;
-            pendingUpdates.QuantaCount++;
+            pendingUpdates.AddAffectedAccounts(result.AffectedAccounts.Keys);
+
+            if (result.HasCursorUpdate)
+                pendingUpdates.HasCursorUpdate = true;
 
             return pendingUpdates.Id;
         }
@@ -224,40 +222,67 @@ namespace Centaurus.Domain
 
             public uint Id { get; }
 
-            public List<IPersistentModel> Batch { get; } = new List<IPersistentModel>();
+            public bool IsCompleted { get; private set; }
+
+            private List<IPersistentModel> batch = new List<IPersistentModel>();
+
+            private HashSet<ulong> accounts = new HashSet<ulong>();
 
             public bool HasCursorUpdate { get; set; }
 
-            public HashSet<ulong> Accounts { get; } = new HashSet<ulong>();
+            public int QuantaCount { get; private set; }
 
-            public int QuantaCount { get; set; }
+            public int EffectsCount { get; private set; }
 
-            public int EffectsCount { get; set; }
+            private ulong MinApex;
+            private ulong MaxApex;
 
-            public List<IPersistentModel> UpdateModels { get; private set; }
-
-            public void AddQuantum(QuantumPersistentModel quantum)
+            public void AddAffectedAccounts(IEnumerable<ulong> accounts)
             {
-                Batch.Add(quantum);
+                this.accounts.UnionWith(accounts);
+            }
+
+            public void AddQuantum(QuantumPersistentModel quantum, int effectsCount)
+            {
+                if (PendingQuanta.Count == 0)
+                    MinApex = quantum.Apex;
                 lock (syncRoot)
+                {
                     PendingQuanta.Add(quantum.Apex, quantum);
+                    QuantaCount++;
+                    EffectsCount += effectsCount;
+                }
+            }
+
+            public void AddConstellation(IPersistentModel persistentModel)
+            {
+                batch.Add(persistentModel);
+            }
+
+            public void AddQuantumRefs(IEnumerable<QuantumRefPersistentModel> persistentModels)
+            {
+                batch.AddRange(persistentModels);
             }
 
             public void Complete(ExecutionContext context)
             {
-                if (UpdateModels != null)
+                if (IsCompleted)
                     throw new InvalidOperationException("Already completed.");
 
-                var updates = Batch.ToList();
-                if (Accounts.Count > 0)
-                    updates.AddRange(
-                        Accounts.Select(a => context.AccountStorage.GetAccount(a).Account.ToPersistentModel()).Cast<IPersistentModel>().ToList()
-                    );
+                lock (syncRoot)
+                {
+                    if (accounts.Count > 0)
+                        batch.AddRange(
+                            accounts.Select(a => context.AccountStorage.GetAccount(a).ToPersistentModel()).Cast<IPersistentModel>().ToList()
+                        );
 
-                if (HasCursorUpdate)
-                    updates.Add(new CursorsPersistentModel { Cursors = context.PaymentProvidersManager.GetAll().ToDictionary(k => k.Id, v => v.Cursor) });
+                    if (HasCursorUpdate)
+                        batch.Add(new CursorsPersistentModel { Cursors = context.PaymentProvidersManager.GetAll().ToDictionary(k => k.Id, v => v.Cursor) });
 
-                UpdateModels = updates;
+                    Console.WriteLine($"Completed. Quanta batch count: {QuantaCount}, effects count {EffectsCount}, persistent models count: {batch.Count + QuantaCount}, batch id: {Id}, from: {MinApex}, to: {MaxApex}");
+
+                    IsCompleted = true;
+                }
             }
 
             private object syncRoot = new { };
@@ -270,7 +295,15 @@ namespace Centaurus.Domain
                     if (!PendingQuanta.Remove(apex, out var quantum))
                         throw new InvalidOperationException($"Unable to find quantum with {apex} apex.");
                     quantum.Signatures = signatures.Select(s => s.Signature.ToPersistenModel()).ToList();
+                    batch.Add(quantum);
+                    if (PendingQuanta.Count == 0)
+                        MaxApex = quantum.Apex;
                 }
+            }
+
+            internal List<IPersistentModel> GetUpdates()
+            {
+                return batch;
             }
 
             public bool AreSignaturesCollected
@@ -281,8 +314,6 @@ namespace Centaurus.Domain
                         return PendingQuanta.Count == 0;
                 }
             }
-
-            public bool IsCompleted => UpdateModels != null;
         }
     }
 }

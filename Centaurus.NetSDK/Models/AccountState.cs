@@ -54,7 +54,6 @@ namespace Centaurus.NetSDK
                             Side = orderPlacedEffect.Side
                         };
                         orders.Add(orderPlacedEffect.OrderId, orderModel);
-                        var quoteAsset = ConstellationInfo.Assets.First();
                         if (orderModel.Side == OrderSide.Buy)
                             UpdateLiabilities(ConstellationInfo.QuoteAsset.Code, orderPlacedEffect.QuoteAmount, UpdateSign.Plus);
                         else

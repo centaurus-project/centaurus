@@ -39,7 +39,7 @@ namespace Centaurus.Domain
             if (context.CentaurusContext.StateManager.State == State.Undefined)
                 context.CentaurusContext.StateManager.Init(State.Running);
 
-            return Task.FromResult((QuantumResultMessageBase)context.Quantum.CreateEnvelope().CreateResult(ResultStatusCodes.Success));
+            return Task.FromResult((QuantumResultMessageBase)context.Quantum.CreateEnvelope<MessageEnvelopeSigneless>().CreateResult(ResultStatusCodes.Success));
         }
 
         private Dictionary<string, string> GetCursors(List<ProviderSettings> providers)
@@ -88,6 +88,9 @@ namespace Centaurus.Domain
 
             if (constellationUpdate.Assets.GroupBy(a => a.Code).Any(g => g.Count() > 1) || constellationUpdate.Assets.GroupBy(a => a.Code).Any(g => g.Count() > 1))
                 throw new ArgumentException("All asset values must be unique");
+
+            if (constellationUpdate.Assets.Count(a => a.IsQuoteAsset) != 1)
+                throw new ArgumentException("Constellation must contain one quote asset.");
 
             if (constellationUpdate.Assets.Any(a => a.Code.Length > 4))
                 throw new Exception("Asset code should not exceed 4 bytes");

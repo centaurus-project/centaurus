@@ -25,26 +25,28 @@ namespace Centaurus.Domain
             context.UpdateNonce();
 
             var resultMessage = (AccountDataResponse)context.Quantum.CreateEnvelope<MessageEnvelopeSigneless>().CreateResult(ResultStatusCodes.Success);
-            resultMessage.Balances = context.InitiatorAccount.Account.Balances
+            resultMessage.Balances = context.InitiatorAccount.Balances
+                .Values
                 .Select(balance => new Balance { Amount = balance.Amount, Asset = balance.Asset, Liabilities = balance.Liabilities })
                 .OrderBy(balance => balance.Asset)
                 .ToList();
 
-            resultMessage.Orders = context.CentaurusContext.Exchange.OrderMap.GetAllAccountOrders(context.InitiatorAccount)
+            resultMessage.Orders = context.InitiatorAccount.Orders
+                .Values
                 .Select(order =>
                     new Order
                     {
-                        Amount = order.Order.Amount,
-                        QuoteAmount = order.Order.QuoteAmount,
-                        Price = order.Order.Price,
+                        Amount = order.Amount,
+                        QuoteAmount = order.QuoteAmount,
+                        Price = order.Price,
                         OrderId = order.OrderId,
-                        Asset = order.Order.Asset,
-                        Side = order.Order.Side
+                        Asset = order.Asset,
+                        Side = order.Side
                     })
                 .OrderBy(order => order.OrderId)
                 .ToList();
 
-            resultMessage.Sequence = context.InitiatorAccount.Account.AccountSequence;
+            resultMessage.Sequence = context.InitiatorAccount.AccountSequence;
 
             quantum.PayloadHash = resultMessage.ComputePayloadHash();
 

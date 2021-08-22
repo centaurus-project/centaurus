@@ -10,7 +10,7 @@ namespace Centaurus.Domain
         public OrderMatcher(OrderRequest orderRequest, ProcessorContext processorContext)
         {
             this.processorContext = processorContext;
-            baseAsset = this.processorContext.Context.Constellation.GetBaseAsset();
+            baseAsset = this.processorContext.Context.Constellation.QuoteAsset.Code;
 
             takerOrder = new OrderWrapper(
                 new Order
@@ -31,7 +31,7 @@ namespace Centaurus.Domain
             market = this.processorContext.Context.Exchange.GetMarket(asset);
             orderbook = market.GetOrderbook(side.Inverse());
             //fetch balances
-            if (!takerOrder.AccountWrapper.Account.HasBalance(asset))
+            if (!takerOrder.AccountWrapper.HasBalance(asset))
                 this.processorContext.AddBalanceCreate(this.processorContext.InitiatorAccount, asset);
         }
 

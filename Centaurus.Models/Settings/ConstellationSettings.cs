@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Centaurus.Xdr;
 
 namespace Centaurus.Models
@@ -24,6 +25,17 @@ namespace Centaurus.Models
 
         [XdrField(5)]
         public List<AssetSettings> Assets { get; set; }
+
+        private AssetSettings quoteAsset;
+        public AssetSettings QuoteAsset
+        {
+            get
+            {
+                if (quoteAsset == null)
+                    quoteAsset = Assets.First(a => a.IsQuoteAsset);
+                return quoteAsset;
+            }
+        }
 
         [XdrField(6)]
         public RequestRateLimits RequestRateLimits { get; set; }

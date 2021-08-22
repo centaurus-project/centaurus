@@ -12,13 +12,14 @@ namespace Centaurus.NetSDK
 {
     internal class Connection : IDisposable
     {
-        public Connection(ConstellationConfig constellationConfig)
+        public Connection(CentaurusClient client)
         {
-            Config = constellationConfig;
+            this.client = client;
             webSocketWrapper = Config.OutgoingConnectionFactory.GetConnection();
         }
 
-        public readonly ConstellationConfig Config;
+        private readonly CentaurusClient client;
+        public ConstellationConfig Config => client.Config;
 
         public ConstellationInfo ConstellationInfo { get; private set; }
 
@@ -62,13 +63,13 @@ namespace Centaurus.NetSDK
             wsUri = uriBuilder.Uri;
 
             //fetch constellation info from the server
-            ConstellationInfo = await Config.GetConstellationInfo();
+            ConstellationInfo = await PublicApi.GetConstellationInfo(Config.AlphaServerAddress, Config.UseSecureConnection);
             //we expect that the first message from the server will start the handshake routine
             OnMessage += HandleHandshakeMessage;
-            //listen for incoming messages
-            _ = Task.Factory.StartNew(Listen, TaskCreationOptions.LongRunning).Unwrap();
             //connect the client websocket
             await webSocketWrapper.Connect(wsUri, cancellationTokenSource.Token);
+            //listen for incoming messages
+            _ = Task.Factory.StartNew(Listen, TaskCreationOptions.LongRunning).Unwrap();
 
             await HandshakeTask.Task;
         }
@@ -86,7 +87,7 @@ namespace Centaurus.NetSDK
             QuantumResult result = null;
             if (envelope.Message.MessageId != default)
             {
-                result = new QuantumResult(envelope, ConstellationInfo);
+                result = new QuantumResult(envelope, client);
                 result.ScheduleExpiration(RequestTimeout);
                 collator.Add(result);
             }
@@ -262,7 +263,8 @@ namespace Centaurus.NetSDK
         /// <param name="envelope"></param>
         private void HandleMessage(MessageEnvelopeBase envelope)
         {
-            collator.Resolve(envelope);
+            if (!collator.Resolve(envelope) && envelope.Message is IQuantumInfoContainer quantum)
+                client.HandleQuantumResult(quantum);
         }
 
         /// <summary>

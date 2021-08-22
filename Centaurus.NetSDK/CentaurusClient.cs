@@ -20,7 +20,7 @@ namespace Centaurus.NetSDK
 
         public AccountState AccountState { get; }
 
-        private Connection connection;
+        internal Connection connection;
 
         public bool IsConnected => connection != null && connection.IsConnected;
 
@@ -40,7 +40,7 @@ namespace Centaurus.NetSDK
                 if (connection?.IsConnected ?? false)
                     return;
                 //initialize a connection
-                connection = new Connection(Config);
+                connection = new Connection(this);
                 //subscribe to events
                 connection.OnClose += Connection_OnClose;
                 connection.OnException += Connection_OnException;
@@ -60,6 +60,14 @@ namespace Centaurus.NetSDK
                     await connection.CloseConnection(WebSocketCloseStatus.ProtocolError);
                 throw new Exception("Failed to connect to Centaurus Alpha server", e);
             }
+        }
+
+        public async Task Close()
+        {
+            if (!connection?.IsConnected ?? false)
+                return;
+
+            await connection.CloseConnection(WebSocketCloseStatus.NormalClosure);
         }
 
         /// <summary>
@@ -99,14 +107,7 @@ namespace Centaurus.NetSDK
             }
             foreach (var order in adr.Orders)
             {
-                AccountState.orders[order.OrderId] = new OrderModel
-                {
-                    OrderId = order.OrderId,
-                    Price = order.Price,
-                    Amount = order.Amount,
-                    Asset = order.Asset,
-                    Side = order.Side
-                };
+                AccountState.orders[order.OrderId] = OrderModel.FromOrder(order);
             }
 
             return AccountState;
@@ -130,11 +131,6 @@ namespace Centaurus.NetSDK
                 {
                     if (task.IsFaulted)
                         OnException?.Invoke(task.Exception);
-                    else
-                    {
-                        if (task.Result.Message is IQuantumInfoContainer quantumInfo)
-                            HandleQuantumResult(quantumInfo);
-                    }
                 });
             }
             return result;
@@ -218,9 +214,9 @@ namespace Centaurus.NetSDK
             return new DepositInstructions(Config.ClientKeyPair.AccountId, providerSettings.Vault, providerAsset.Token);
         }
 
-        private void HandleQuantumResult(IQuantumInfoContainer quantumInfo)
+        internal void HandleQuantumResult(IQuantumInfoContainer quantumInfo)
         {
-            if (!(quantumInfo == null || lastHandledApex >= quantumInfo.Apex))
+            if (quantumInfo == null || lastHandledApex >= quantumInfo.Apex)
                 return;
 
             try

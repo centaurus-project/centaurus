@@ -58,22 +58,22 @@ namespace Centaurus.Domain
 
     public abstract class AccountEffectProcessor : EffectProcessor
     {
-        public AccountEffectProcessor(AccountEffect clientEffect, AccountWrapper accountWrapper)
+        public AccountEffectProcessor(AccountEffect clientEffect, AccountWrapper account)
             :base(clientEffect)
         {
-            AccountWrapper = accountWrapper ?? throw new ArgumentNullException(nameof(accountWrapper));
+            Account = account ?? throw new ArgumentNullException(nameof(account));
         }
 
         public new AccountEffect Effect => (AccountEffect)base.Effect;
 
-        public AccountWrapper AccountWrapper { get; }
+        public AccountWrapper Account { get; }
     }
 
     public abstract class ClientEffectProcessor<T> : AccountEffectProcessor, IEffectProcessor<T>
         where T : AccountEffect
     {
-        public ClientEffectProcessor(T effect, AccountWrapper accountWrapper)
-            :base(effect, accountWrapper)
+        public ClientEffectProcessor(T effect, AccountWrapper account)
+            :base(effect, account)
         {
         }
 

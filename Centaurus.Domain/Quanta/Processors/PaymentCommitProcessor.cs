@@ -28,7 +28,7 @@ namespace Centaurus.Domain
 
             context.PaymentProvider.NotificationsManager.RemovePayment(depositNotification.Cursor);
 
-            return Task.FromResult((QuantumResultMessageBase)context.Quantum.CreateEnvelope().CreateResult(ResultStatusCodes.Success));
+            return Task.FromResult((QuantumResultMessageBase)context.Quantum.CreateEnvelope<MessageEnvelopeSigneless>().CreateResult(ResultStatusCodes.Success));
         }
 
         public override Task Validate(PaymentCommitProcessorContext context)
@@ -82,7 +82,7 @@ namespace Centaurus.Domain
             var account = context.CentaurusContext.AccountStorage.GetAccount(deposit.Destination);
             if (account == null)
             {
-                var baseAsset = context.CentaurusContext.Constellation.GetBaseAsset();
+                var baseAsset = context.CentaurusContext.Constellation.QuoteAsset.Code;
                 //ignore registration with non-base asset or with amount that is less than MinAccountBalance
                 if (deposit.Asset != baseAsset || deposit.Amount < context.CentaurusContext.Constellation.MinAccountBalance)
                     return;
@@ -91,7 +91,7 @@ namespace Centaurus.Domain
                 account = context.CentaurusContext.AccountStorage.GetAccount(accId);
             }
 
-            if (!account.Account.HasBalance(deposit.Asset))
+            if (!account.HasBalance(deposit.Asset))
                 context.AddBalanceCreate(account, deposit.Asset);
 
             context.AddBalanceUpdate(account, deposit.Asset, deposit.Amount, UpdateSign.Plus);

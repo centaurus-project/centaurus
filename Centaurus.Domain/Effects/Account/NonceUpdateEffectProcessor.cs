@@ -17,13 +17,13 @@ namespace Centaurus.Domain
         public override void CommitEffect()
         {
             MarkAsProcessed();
-            AccountWrapper.Account.Nonce = Effect.Nonce;
+            Account.Nonce = Effect.Nonce;
         }
 
         public override void RevertEffect()
         {
             MarkAsProcessed();
-            AccountWrapper.Account.Nonce = Effect.PrevNonce;
+            Account.Nonce = Effect.PrevNonce;
         }
     }
 }

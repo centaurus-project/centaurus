@@ -19,13 +19,11 @@ namespace Centaurus.Domain
 
         public override Task<QuantumResultMessageBase> Process(RequestContext context)
         {
-            var quantum = context.Request;
-
             context.UpdateNonce();
 
             context.CentaurusContext.Exchange.ExecuteOrder(context);
 
-            return Task.FromResult((QuantumResultMessageBase)context.Quantum.CreateEnvelope().CreateResult(ResultStatusCodes.Success));
+            return Task.FromResult((QuantumResultMessageBase)context.Quantum.CreateEnvelope<MessageEnvelopeSigneless>().CreateResult(ResultStatusCodes.Success));
         }
 
         private int MaxCrossOrdersCount = 100;
@@ -37,7 +35,11 @@ namespace Centaurus.Domain
             var quantum = context.Request;
             var orderRequest = quantum.RequestEnvelope.Message as OrderRequest;
 
-            if (!context.CentaurusContext.Constellation.Assets.Any(a => a.Code == orderRequest.Asset))
+            if (context.CentaurusContext.Constellation.QuoteAsset.Code == orderRequest.Asset)
+                throw new InvalidOperationException("Order asset must be different from quote asset.");
+
+            var orderAsset = context.CentaurusContext.Constellation.Assets.FirstOrDefault(a => a.Code == orderRequest.Asset);
+            if (orderAsset == null)
                 throw new InvalidOperationException("Invalid asset identifier: " + orderRequest.Asset);
 
             //estimate XLM amount
@@ -50,14 +52,14 @@ namespace Centaurus.Domain
             //check required balances
             if (orderRequest.Side == OrderSide.Sell)
             {
-                var balance = context.InitiatorAccount.Account.GetBalance(orderRequest.Asset);
+                var balance = context.InitiatorAccount.GetBalance(orderRequest.Asset);
                 if (!balance.HasSufficientBalance(orderRequest.Amount, 0))
                     throw new BadRequestException("Insufficient funds");
             }
             else
             {
-                var baseAsset = context.CentaurusContext.Constellation.Assets.First();
-                var balance = context.InitiatorAccount.Account.GetBalance(baseAsset.Code);
+                var baseAsset = context.CentaurusContext.Constellation.QuoteAsset;
+                var balance = context.InitiatorAccount.GetBalance(baseAsset.Code);
                 if (!balance.HasSufficientBalance(quoteAmount, context.CentaurusContext.Constellation.MinAccountBalance))
                     throw new BadRequestException("Insufficient funds");
             }

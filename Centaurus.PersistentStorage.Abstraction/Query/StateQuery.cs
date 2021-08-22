@@ -1,4 +1,6 @@
-﻿namespace Centaurus.PersistentStorage
+﻿using System;
+
+namespace Centaurus.PersistentStorage
 {
     public partial class StorageQuery
     {
@@ -19,7 +21,7 @@
 
         public SettingsPersistentModel LoadSettings(ulong fromApex)
         {
-            return storage.Find<SettingsPersistentModel>(ApexConverter.EncodeApex(fromApex)).Reverse().First();
+            return storage.Find<SettingsPersistentModel>(ApexConverter.EncodeApex(fromApex), QueryOrder.Desc).First();
         }
 
         public CursorsPersistentModel LoadCursors()

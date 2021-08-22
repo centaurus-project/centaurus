@@ -16,13 +16,13 @@ namespace Centaurus.Domain
         public override void CommitEffect()
         {
             MarkAsProcessed();
-            AccountWrapper.Account.CreateBalance(Effect.Asset);
+            Account.CreateBalance(Effect.Asset);
         }
 
         public override void RevertEffect()
         {
             MarkAsProcessed();
-            AccountWrapper.Account.Balances.Remove(AccountWrapper.Account.GetBalance(Effect.Asset));
+            Account.Balances.Remove(Effect.Asset);
         }
     }
 }

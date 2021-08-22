@@ -20,9 +20,7 @@ namespace Centaurus.PersistentStorage
             var fromBoundary = EncodeKeyPrefix(market, period, from);
             if (from > to)
             {
-                return storage.Find<PriceHistoryFramePersistentModel>(fromBoundary)
-                    .Reverse()
-                    .SetBoundaryCheck(key => key.AsSpan().SequenceCompareTo(toBoundary) > 0);
+                return storage.Find<PriceHistoryFramePersistentModel>(fromBoundary, toBoundary, QueryOrder.Desc);
             }
             return storage.Find<PriceHistoryFramePersistentModel>(fromBoundary, toBoundary);
         }

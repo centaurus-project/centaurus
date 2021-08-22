@@ -17,9 +17,15 @@ namespace Centaurus.Models
         public string Code { get; set; }
 
         /// <summary>
-        /// Is native asset or not.
+        /// Is asset suspended or not.
         /// </summary>
         [XdrField(1)]
         public bool IsSuspended { get; set; }
+
+        /// <summary>
+        /// Is quote asset or not.
+        /// </summary>
+        [XdrField(2)]
+        public bool IsQuoteAsset { get; set; }
     }
 }

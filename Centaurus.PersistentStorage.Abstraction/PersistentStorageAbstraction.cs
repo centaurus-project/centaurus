@@ -12,7 +12,7 @@ namespace Centaurus.PersistentStorage.Abstraction
         private PersistentStorage Storage => storage ?? throw new Exception("Storage is not connected.");
 
         private StorageQuery query;
-        private StorageQuery Query => query ?? throw new Exception("Storage is not connected.");
+        public StorageQuery Query => query ?? throw new Exception("Storage is not connected.");
 
         public void Connect(string path)
         {
@@ -55,12 +55,12 @@ namespace Centaurus.PersistentStorage.Abstraction
             return Query.LoadQuantaAboveApex(apex);
         }
 
-        public List<AccountQuantumDTO> LoadQuantaForAccount(byte[] accountPubkey, ulong apex, int limit, QueryResultsOrder order = QueryResultsOrder.Asc)
+        public List<AccountQuantumDTO> LoadQuantaForAccount(byte[] accountPubkey, ulong apex, int limit, QueryOrder order = QueryOrder.Asc)
         {
             return Query.LoadQuantaForAccount(accountPubkey, apex, limit, order);
         }
 
-        public List<AccountQuantumDTO> LoadQuantaForAccount(ulong accountId, ulong fromApex, int limit, QueryResultsOrder order = QueryResultsOrder.Asc)
+        public List<AccountQuantumDTO> LoadQuantaForAccount(ulong accountId, ulong fromApex, int limit, QueryOrder order = QueryOrder.Asc)
         {
             return Query.LoadQuantaForAccount(accountId, fromApex, limit, order);
         }

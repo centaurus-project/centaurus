@@ -17,12 +17,12 @@ namespace Centaurus.NetSDK
                 throw new Exception("Failed to schedule request collation.");
         }
 
-        public void Resolve(MessageEnvelopeBase envelope)
+        public bool Resolve(MessageEnvelopeBase envelope)
         {
             if (!(envelope.Message is ResultMessageBase resultMessage))
             {
                 logger.Trace("Request is not a quantum result message.");
-                return;
+                return false;
             }
             var messageId = resultMessage.OriginalMessage.Message is RequestQuantumBase requestQuantum ?
                 requestQuantum.RequestMessage.MessageId :
@@ -30,7 +30,7 @@ namespace Centaurus.NetSDK
             if (!Requests.TryGetValue(messageId, out var response))
             {
                 logger.Trace($"Unable set result for msg with id {envelope.Message.GetMessageType()}:{messageId}.");
-                return;
+                return false;
             }
             response.AssignResponse(envelope);
             if (response.IsFinalized)
@@ -39,7 +39,7 @@ namespace Centaurus.NetSDK
             }
 
             logger.Trace($"{envelope.Message.GetMessageType()}:{messageId} result was set.");
-            return;
+            return true;
         }
 
         static Logger logger = LogManager.GetCurrentClassLogger();

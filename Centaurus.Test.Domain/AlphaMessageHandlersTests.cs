@@ -208,7 +208,7 @@ namespace Centaurus.Test
 
             var envelope = new OrderRequest
             {
-                Account = account.Account.Id,
+                Account = account.Id,
                 RequestId = 1
             }.CreateEnvelope();
             envelope.Sign(TestEnvironment.Client1KeyPair);
@@ -273,13 +273,13 @@ namespace Centaurus.Test
             }
             var clientConnection = GetIncomingConnection(context, clientKeyPair.PublicKey, ConnectionState.Ready);
 
-            var minuteLimit = (account.Account.RequestRateLimits ?? context.Constellation.RequestRateLimits).MinuteLimit;
+            var minuteLimit = (account.RequestRateLimits ?? context.Constellation.RequestRateLimits).MinuteLimit;
             var minuteIterCount = minuteLimit + 1;
             for (var i = 0; i < minuteIterCount; i++)
             {
                 var envelope = new AccountDataRequest
                 {
-                    Account = account.Account.Id,
+                    Account = account.Id,
                     RequestId = i + 1
                 }.CreateEnvelope();
                 envelope.Sign(clientKeyPair);
@@ -310,7 +310,7 @@ namespace Centaurus.Test
 
             var clientConnection = GetIncomingConnection(context, client.PublicKey, state);
 
-            var envelope = new EffectsRequest { Account = account.Account.Id }.CreateEnvelope();
+            var envelope = new EffectsRequest { Account = account.Id }.CreateEnvelope();
             envelope.Sign(client);
 
             using var writer = new XdrBufferWriter();

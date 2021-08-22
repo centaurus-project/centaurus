@@ -63,7 +63,7 @@ namespace Centaurus.Domain
 
         public void RemoveOrder(RequestContext context, OrderbookBase orderbook, OrderWrapper order)
         {
-            context.AddOrderRemoved(orderbook, order, context.Context.Constellation.GetBaseAsset());
+            context.AddOrderRemoved(orderbook, order, context.Context.Constellation.QuoteAsset.Code);
             if (awaitedUpdates != null)
             {
                 var updateTime = new DateTime(context.Quantum.Timestamp, DateTimeKind.Utc);
@@ -108,7 +108,11 @@ namespace Centaurus.Domain
         {
             var exchange = new Exchange(observeTrades);
             foreach (var asset in assets)
+            {
+                if (asset.IsQuoteAsset)
+                    continue;
                 exchange.AddMarket(asset, useLegacyOrderbook);
+            }
 
             foreach (var order in orders)
             {

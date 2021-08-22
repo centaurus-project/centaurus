@@ -49,10 +49,5 @@ namespace Centaurus.NetSDK
         public readonly bool UseSecureConnection;
 
         internal OutgoingConnectionFactoryBase OutgoingConnectionFactory { get; }
-
-        public virtual async Task<ConstellationInfo> GetConstellationInfo()
-        {
-            return await PublicApi.GetConstellationInfo(this);
-        }
     }
 }

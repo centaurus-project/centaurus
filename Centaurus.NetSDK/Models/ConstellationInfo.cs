@@ -23,13 +23,24 @@ namespace Centaurus.NetSDK
 
         public RequestRateLimits RequestRateLimits { get; set; }
 
-        public Asset QuoteAsset => Assets.First();
+        private Asset quoteAsset;
+        public Asset QuoteAsset
+        {
+            get
+            {
+                if (quoteAsset == null)
+                    quoteAsset = Assets?.FirstOrDefault(a => a.IsQuoteAsset);
+                return quoteAsset;
+            }
+        }
 
         public class Asset
         {
             public string Code { get; set; }
 
             public bool IsSuspended { get; set; }
+
+            public bool IsQuoteAsset { get; set; }
         }
 
         public class ProviderSettings
@@ -49,6 +60,8 @@ namespace Centaurus.NetSDK
                 public string Token { get; set; }
 
                 public string CentaurusAsset { get; set; }
+
+                public bool IsVirtual { get; set; }
             }
         }
 
@@ -63,17 +76,13 @@ namespace Centaurus.NetSDK
         {
             Undefined = 0,
             /// <summary>
-            /// First start
-            /// </summary>
-            WaitingForInit = 1,
-            /// <summary>
             /// It has started, but not yet ready. If Alpha, then it waits for the majority to connect. If the Auditor, then it waits for a handshake
             /// </summary>
-            Running = 2,
+            Running = 1,
             /// <summary>
             /// Ready to process quanta
             /// </summary>
-            Ready = 3,
+            Ready = 2,
 
             Rising = 4,
 

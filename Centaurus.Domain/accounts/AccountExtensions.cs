@@ -1,4 +1,5 @@
-﻿using Centaurus.Models;
+﻿using Centaurus.Domain.Models;
+using Centaurus.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,9 +15,9 @@ namespace Centaurus.Domain
         /// <param name="account">Account record</param>
         /// <param name="asset">Asset id</param>
         /// <returns></returns>
-        public static bool HasBalance(this Account account, string asset)
+        public static bool HasBalance(this AccountWrapper account, string asset)
         {
-            return account.Balances.Any(b => b.Asset == asset);
+            return account.Balances.ContainsKey(asset);
         }
 
         /// <summary>
@@ -25,11 +26,10 @@ namespace Centaurus.Domain
         /// <param name="account">Account record</param>
         /// <param name="asset">Asset id</param>
         /// <returns>Created balance</returns>
-        public static Balance CreateBalance(this Account account, string asset)
+        public static Balance CreateBalance(this AccountWrapper account, string asset)
         {
             var balance = new Balance { Asset = asset };
-            account.Balances.Add(balance);
-            account.Balances = account.Balances.OrderBy(b => b.Asset).ToList();
+            account.Balances.Add(asset, balance);
             return balance;
         }
 
@@ -39,9 +39,10 @@ namespace Centaurus.Domain
         /// <param name="account">Account record</param>
         /// <param name="asset">Asset id</param>
         /// <returns></returns>
-        public static Balance GetBalance(this Account account, string asset)
+        public static Balance GetBalance(this AccountWrapper account, string asset)
         {
-            return account.Balances.Find(b => b.Asset == asset);
+            account.Balances.TryGetValue(asset, out var balance);
+            return balance;
         }
     }
 }

@@ -17,6 +17,7 @@ namespace Centaurus.Domain
             : base(context)
         {
             InitTimers();
+            currentPubKey = Context.Settings.KeyPair;
         }
 
         public void Add(QuantaProcessingResult processingResult)
@@ -132,6 +133,7 @@ namespace Centaurus.Domain
 
         private object pendingAggregatesSyncRoot = new { };
         private Dictionary<ulong, Aggregate> pendingAggregates = new Dictionary<ulong, Aggregate>();
+        private readonly RawPubKey currentPubKey;
 
         class Aggregate
         {
@@ -193,11 +195,9 @@ namespace Centaurus.Domain
                         resultMessages.Add(resultMessage);
 
                         //skip if current node signature, it already added
-                        if (!auditor.Equals(Manager.Context.Settings.KeyPair))
-                        {
+                        if (!auditor.Equals(Manager.currentPubKey))
                             //add signatures to cached quantum
                             Manager.Context.QuantumStorage.AddResult(resultMessage);
-                        }
                     }
 
                     var majorityResult = CheckMajority();
@@ -225,8 +225,6 @@ namespace Centaurus.Domain
                     if (IsProcessed || (isAcknowledgment && IsAcknowledgmentSent))
                         return;
 
-                    if (!isAcknowledgment)
-                    { }
                     var effectsProof = new PayloadProof
                     {
                         PayloadHash = Item.Result.PayloadHash,
@@ -236,7 +234,7 @@ namespace Centaurus.Domain
                     foreach (var notification in Item.Result.GetNotificationMessages(effectsProof))
                     {
                         var aPubKey = Item.Result.AffectedAccounts[notification.Key];
-                        Manager.Context.Notify(aPubKey, notification.Value.CreateEnvelope());
+                        Manager.Context.Notify(aPubKey, notification.Value.CreateEnvelope<MessageEnvelopeSigneless>());
                     }
 
                     if (Item.Result.Initiator != 0)
@@ -244,7 +242,7 @@ namespace Centaurus.Domain
                         var aPubKey = Item.Result.AffectedAccounts[Item.Result.Initiator];
                         Item.Result.ResultMessage.PayloadProof = effectsProof;
                         Item.Result.ResultMessage.Effects = Item.Result.Effects.GetAccountEffects(Item.Result.Initiator);
-                        Manager.Context.Notify(aPubKey, Item.Result.ResultMessage.CreateEnvelope());
+                        Manager.Context.Notify(aPubKey, Item.Result.ResultMessage.CreateEnvelope<MessageEnvelopeSigneless>());
                     }
                     IsAcknowledgmentSent = true;
                 }
@@ -346,20 +344,19 @@ namespace Centaurus.Domain
             {
                 Result = result ?? throw new ArgumentNullException(nameof(result));
 
-                //add current node signature
-                AddResultMessage(new AuditorResultMessage
+                //add current node signature to head
+                outrunSignatures.Insert(0, (aggregate.Manager.currentPubKey, new AuditorResultMessage
                 {
                     Apex = Result.Apex,
                     Signature = Result.CurrentNodeSignature
-                },
-                    aggregate.Manager.Context.Settings.KeyPair);
+                }));
             }
 
             public void AddResultMessage(AuditorResultMessage result, RawPubKey auditor)
             {
-                if (outrunSignatures.ContainsKey(auditor))
+                if (outrunSignatures.Any(s => s.pubKey.Equals(auditor)))
                     return;
-                outrunSignatures.Add(auditor, result);
+                outrunSignatures.Add((auditor, result));
             }
 
             public ulong Apex { get; }
@@ -368,12 +365,12 @@ namespace Centaurus.Domain
 
             public bool IsResultAssigned => Result != null;
 
-            Dictionary<RawPubKey, AuditorResultMessage> outrunSignatures { get; } = new Dictionary<RawPubKey, AuditorResultMessage>();
+            List<(RawPubKey pubKey, AuditorResultMessage resultMessage)> outrunSignatures { get; } = new List<(RawPubKey, AuditorResultMessage)>();
 
             public void ProcessOutrunSignatures(Aggregate aggregate)
             {
                 foreach (var result in outrunSignatures)
-                    aggregate.Add(result.Value, result.Key);
+                    aggregate.Add(result.resultMessage, result.pubKey);
             }
         }
     }

@@ -59,8 +59,8 @@ namespace Centaurus.Domain
                 //increment and set account sequence
                 if (effectProcessor is AccountEffectProcessor accountEffectProcessor)
                 {
-                    accountSequence = ++accountEffectProcessor.AccountWrapper.Account.AccountSequence;
-                    accountPubKey = accountEffectProcessor.AccountWrapper.Account.Pubkey;
+                    accountSequence = ++accountEffectProcessor.Account.AccountSequence;
+                    accountPubKey = accountEffectProcessor.Account.Pubkey;
                 }
                 effectsGroup = new EffectsGroup
                 {
@@ -79,7 +79,7 @@ namespace Centaurus.Domain
             if (accountId != 0 && !affectedAccounts.ContainsKey(accountId))
             {
                 if (accountPubKey == null)
-                    accountPubKey = Context.AccountStorage.GetAccount(accountId).Account.Pubkey;
+                    accountPubKey = Context.AccountStorage.GetAccount(accountId).Pubkey;
                 affectedAccounts.Add(accountId, accountPubKey);
             }
         }
@@ -112,17 +112,17 @@ namespace Centaurus.Domain
         void EnsureEffectsProof(List<RawEffectsDataContainer> rawEffects)
         {
             //compound effects hash
-            var effectsHash = rawEffects
+            var effectsProof = rawEffects
                 .SelectMany(e => e.Hash)
                 .ToArray()
                 .ComputeHash(buffer); //compute hash of concatenated effects groups hashes
 
             //if EffectsProof is null set it, otherwise validate equality
             if (Quantum.EffectsProof == null)
-                Quantum.EffectsProof = effectsHash;
+                Quantum.EffectsProof = effectsProof;
             else
             {
-                if (!ByteArrayComparer.Default.Equals(effectsHash, Quantum.EffectsProof) && !EnvironmentHelper.IsTest)
+                if (!ByteArrayComparer.Default.Equals(effectsProof, Quantum.EffectsProof) && !EnvironmentHelper.IsTest)
                     throw new Exception($"Effects hash for quantum {Apex} is not equal to provided by Alpha.");
             }
         }

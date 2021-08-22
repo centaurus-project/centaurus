@@ -12,7 +12,7 @@ namespace Centaurus.PaymentProvider.Models
 
         public string Vault { get; set; }
 
-        public string InitCursor { get; set; }
+        public string Cursor { get; set; }
 
         public List<AssetModel> Assets { get; set; }
 

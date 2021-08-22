@@ -1,4 +1,5 @@
-﻿using Centaurus.Models;
+﻿using Centaurus.Domain;
+using Centaurus.Models;
 using Centaurus.Xdr;
 using NUnit.Framework;
 using System;
@@ -209,7 +210,7 @@ namespace Centaurus.Test
             EnvironmentHelper.SetTestEnvironmentVariable();
 
             var amount = invalidBalance
-                ? client.Account.Balances[0].Amount + 1
+                ? client.GetBalance(environment.SDKConstellationInfo.QuoteAsset.Code).Amount + 1
                 : environment.AlphaWrapper.Context.Constellation.MinAllowedLotSize + 1;
             var sqamRequest = new OrderRequest
             {

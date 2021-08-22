@@ -5,15 +5,13 @@ namespace Centaurus.Domain.Models
 {
     public class AccountRequestCounter
     {
-        private Account account;
         private RequestCounter minuteCounter;
         private RequestCounter hourCounter;
 
         private RequestRateLimits requestRateLimits;
 
-        public AccountRequestCounter(Account _account, RequestRateLimits requestRateLimits)
+        public AccountRequestCounter(RequestRateLimits requestRateLimits)
         {
-            account = _account ?? throw new ArgumentNullException(nameof(_account));
             minuteCounter = new RequestCounter();
             hourCounter = new RequestCounter();
             SetLimits(requestRateLimits);

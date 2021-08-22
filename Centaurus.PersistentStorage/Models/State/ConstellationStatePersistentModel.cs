@@ -1,4 +1,5 @@
 ﻿using MessagePack;
+using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
 
@@ -8,22 +9,16 @@ namespace Centaurus.PersistentStorage
     /// Contains last processed payment token
     /// </summary>
     [MessagePackObject]
-    public class CursorsPersistentModel: IPersistentModel
+    public class CursorsPersistentModel : IPersistentModel
     {
         [Key(0)]
         public Dictionary<string, string> Cursors { get; set; }
 
         [IgnoreMember]
-        public byte[] Key 
-        { 
-            get
-            {
-                return new byte[] { };
-            }
-            set
-            {
-
-            }
+        public byte[] Key
+        {
+            get => new byte[0];
+            set { }
         }
 
         [IgnoreMember]

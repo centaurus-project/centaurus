@@ -37,10 +37,5 @@ namespace Centaurus.Domain
         {
             return map.Values;
         }
-
-        public IEnumerable<OrderWrapper> GetAllAccountOrders(AccountWrapper account)
-        {
-            return map.Values.Where(o => o.AccountWrapper == account);
-        }
     }
 }

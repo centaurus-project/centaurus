@@ -34,29 +34,31 @@ namespace Centaurus.Test
 
             var requestRateLimits = new RequestRateLimits { HourLimit = 1000, MinuteLimit = 100 };
 
-            var account1 = new AccountWrapper(new Account
+            var account1 = new AccountWrapper(requestRateLimits)
             {
                 Id = 1,
                 Pubkey = new RawPubKey() { Data = KeyPair.Random().PublicKey },
-                Balances = new List<Balance>()
-            }, requestRateLimits);
+                Balances = new Dictionary<string, Balance>(),
+                Orders = new Dictionary<ulong, Order>()
+            };
 
-            account1.Account.CreateBalance(baseAsset);
-            account1.Account.GetBalance(baseAsset).UpdateBalance(10000000000, UpdateSign.Plus);
-            account1.Account.CreateBalance(secondAsset);
-            account1.Account.GetBalance(secondAsset).UpdateBalance(10000000000, UpdateSign.Plus);
+            account1.CreateBalance(baseAsset);
+            account1.GetBalance(baseAsset).UpdateBalance(10000000000, UpdateSign.Plus);
+            account1.CreateBalance(secondAsset);
+            account1.GetBalance(secondAsset).UpdateBalance(10000000000, UpdateSign.Plus);
 
-            var account2 = new AccountWrapper(new Account
+            var account2 = new AccountWrapper(requestRateLimits)
             {
                 Id = 2,
                 Pubkey = new RawPubKey() { Data = KeyPair.Random().PublicKey },
-                Balances = new List<Balance>()
-            }, requestRateLimits);
+                Balances = new Dictionary<string, Balance>(),
+                Orders = new Dictionary<ulong, Order>()
+            };
 
-            account2.Account.CreateBalance(baseAsset);
-            account2.Account.GetBalance(baseAsset).UpdateBalance(10000000000, UpdateSign.Plus);
-            account2.Account.CreateBalance(secondAsset);
-            account2.Account.GetBalance(secondAsset).UpdateBalance(10000000000, UpdateSign.Plus);
+            account2.CreateBalance(baseAsset);
+            account2.GetBalance(baseAsset).UpdateBalance(10000000000, UpdateSign.Plus);
+            account2.CreateBalance(secondAsset);
+            account2.GetBalance(secondAsset).UpdateBalance(10000000000, UpdateSign.Plus);
 
             context.Setup(new Snapshot
             {
@@ -148,9 +150,9 @@ namespace Centaurus.Test
                 var processorContext = (RequestContext)orderRequestProcessor.GetContext(trade, initiator);
                 testTradeResults.Add(trade, processorContext);
             }
-            var baseAsset = context.Constellation.GetBaseAsset();
-            var xlmStartBalance = account1.Account.GetBalance(baseAsset).Amount + account2.Account.GetBalance(baseAsset).Amount;
-            var assetStartBalance = account1.Account.GetBalance(asset).Amount + account2.Account.GetBalance(asset).Amount;
+            var baseAsset = context.Constellation.QuoteAsset.Code;
+            var xlmStartBalance = account1.GetBalance(baseAsset).Amount + account2.GetBalance(baseAsset).Amount;
+            var assetStartBalance = account1.GetBalance(asset).Amount + account2.GetBalance(asset).Amount;
 
             executor(() =>
             {
@@ -163,27 +165,27 @@ namespace Centaurus.Test
             //cleanup orders
             foreach (var account in new[] { account1, account2 })
             {
-                var activeOrders = context.Exchange.OrderMap.GetAllAccountOrders(account);
-                foreach (var order in activeOrders)
+                var activeOrders = account.Orders;
+                foreach (var order in activeOrders.Values)
                 {
                     new OrderRemovedEffectProccessor(new OrderRemovedEffect
                     {
                         Account = account.Id,
                         OrderId = order.OrderId,
-                        Amount = order.Order.Amount,
-                        QuoteAmount = order.Order.QuoteAmount,
-                        Price = order.Order.Price,
-                        Asset = order.Order.Asset,
-                        Side = order.Order.Side
-                    }, account, market.GetOrderbook(order.Order.Side), baseAsset).CommitEffect();
+                        Amount = order.Amount,
+                        QuoteAmount = order.QuoteAmount,
+                        Price = order.Price,
+                        Asset = order.Asset,
+                        Side = order.Side
+                    }, account, market.GetOrderbook(order.Side), baseAsset).CommitEffect();
                 }
             }
-            Assert.AreEqual(xlmStartBalance, account1.Account.GetBalance(baseAsset).Amount + account2.Account.GetBalance(baseAsset).Amount);
-            Assert.AreEqual(assetStartBalance, account1.Account.GetBalance(asset).Amount + account2.Account.GetBalance(asset).Amount);
-            Assert.AreEqual(0, account1.Account.GetBalance(baseAsset).Liabilities);
-            Assert.AreEqual(0, account1.Account.GetBalance(asset).Liabilities);
-            Assert.AreEqual(0, account2.Account.GetBalance(baseAsset).Liabilities);
-            Assert.AreEqual(0, account2.Account.GetBalance(asset).Liabilities);
+            Assert.AreEqual(xlmStartBalance, account1.GetBalance(baseAsset).Amount + account2.GetBalance(baseAsset).Amount);
+            Assert.AreEqual(assetStartBalance, account1.GetBalance(asset).Amount + account2.GetBalance(asset).Amount);
+            Assert.AreEqual(0, account1.GetBalance(baseAsset).Liabilities);
+            Assert.AreEqual(0, account1.GetBalance(asset).Liabilities);
+            Assert.AreEqual(0, account2.GetBalance(baseAsset).Liabilities);
+            Assert.AreEqual(0, account2.GetBalance(asset).Liabilities);
         }
 
         [Test]
@@ -219,7 +221,7 @@ namespace Centaurus.Test
 
             var orderbook = context.Exchange.GetOrderbook(asset, side);
             var ordersCount = 1000;
-            var fakeAccountWrapper = new AccountWrapper(new Account(), new RequestRateLimits());
+            var fakeAccountWrapper = new AccountWrapper(new RequestRateLimits());
             for (var i = 1; i <= ordersCount; i++)
             {
                 if (isOrderedByPrice)

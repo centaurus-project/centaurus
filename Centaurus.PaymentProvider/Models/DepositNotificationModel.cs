@@ -12,5 +12,7 @@ namespace Centaurus.PaymentProvider.Models
         public List<DepositModel> Items { get; set; } = new List<DepositModel>();
 
         public DateTime DepositTime { get; set; }
+
+        public bool IsSend { get; set; }
     }
 }

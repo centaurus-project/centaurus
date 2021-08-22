@@ -5,6 +5,7 @@ using Centaurus.Xdr;
 using NLog;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 
 namespace Centaurus.Domain
@@ -27,7 +28,7 @@ namespace Centaurus.Domain
                 rawCursor = "0";
             if (!ulong.TryParse(rawCursor, out var apex))
                 throw new ArgumentException("Cursor is invalid.");
-            var order = isDesc ? QueryResultsOrder.Desc : QueryResultsOrder.Asc;
+            var order = isDesc ? QueryOrder.Desc : QueryOrder.Asc;
             var accountQuanta = Context.PermanentStorage.LoadQuantaForAccount(account, apex, limit, order);
             var accountQuantumInfos = new List<QuantumInfo>();
 
@@ -176,13 +177,16 @@ namespace Centaurus.Domain
             if (settings == null)
                 return null;
 
-            var cursors = Context.PermanentStorage.LoadCursors();
+            var cursors = Context.PermanentStorage.LoadCursors()?.Cursors ?? new Dictionary<string, string>();
 
-            var accounts = (GetAccounts(settings.GetBaseAsset())).Select(a => new AccountWrapper(a, settings.RequestRateLimits));
+            var accounts = GetAccounts(settings.QuoteAsset.Code, settings.RequestRateLimits);
 
             var accountStorage = new AccountStorage(accounts);
 
-            var orders = accounts.SelectMany(a => a.Account.Orders.Select(o => new OrderWrapper(o, a))).OrderBy(o => o.Order.OrderId).ToList();
+            var orders = accounts.SelectMany(a => a.Orders.Values.Select(o => new OrderWrapper(o, a)))
+                .OrderBy(o => o.Order.OrderId)
+                .ToList();
+
             var exchange = GetRestoredExchange(orders, settings);
 
             var quanta = Context.PermanentStorage.LoadQuantaAboveApex(apex);
@@ -228,7 +232,7 @@ namespace Centaurus.Domain
                         processor = new BalanceCreateEffectProcessor(balanceCreateEffect, account);
                         break;
                     case BalanceUpdateEffect balanceUpdateEffect:
-                        processor = new BalanceUpdateEffectProcesor(balanceUpdateEffect, account, balanceUpdateEffect.Sign);
+                        processor = new BalanceUpdateEffectProcesor(balanceUpdateEffect, account);
                         break;
                     case RequestRateLimitUpdateEffect requestRateLimitUpdateEffect:
                         processor = new RequestRateLimitUpdateEffectProcessor(requestRateLimitUpdateEffect, account, settings.RequestRateLimits);
@@ -237,13 +241,13 @@ namespace Centaurus.Domain
                         {
                             var orderBook = exchange.GetOrderbook(orderPlacedEffect.Asset, orderPlacedEffect.Side);
                             var order = exchange.OrderMap.GetOrder(orderPlacedEffect.Apex);
-                            processor = new OrderPlacedEffectProcessor(orderPlacedEffect, order.AccountWrapper, orderBook, order, settings.GetBaseAsset());
+                            processor = new OrderPlacedEffectProcessor(orderPlacedEffect, order.AccountWrapper, orderBook, order, settings.QuoteAsset.Code);
                         }
                         break;
                     case OrderRemovedEffect orderRemovedEffect:
                         {
                             var orderBook = exchange.GetOrderbook(orderRemovedEffect.Asset, orderRemovedEffect.Side);
-                            processor = new OrderRemovedEffectProccessor(orderRemovedEffect, accountStorage.GetAccount(orderRemovedEffect.Account), orderBook, settings.GetBaseAsset());
+                            processor = new OrderRemovedEffectProccessor(orderRemovedEffect, accountStorage.GetAccount(orderRemovedEffect.Account), orderBook, settings.QuoteAsset.Code);
                         }
                         break;
                     case TradeEffect tradeEffect:
@@ -251,7 +255,15 @@ namespace Centaurus.Domain
                             var order = exchange.OrderMap.GetOrder(tradeEffect.Apex);
                             if (order == null) //no need to revert trade if no order was created
                                 continue;
-                            processor = new TradeEffectProcessor(tradeEffect, order.AccountWrapper, order, settings.GetBaseAsset());
+                            processor = new TradeEffectProcessor(tradeEffect, order.AccountWrapper, order, settings.QuoteAsset.Code);
+                        }
+                        break;
+                    case CursorUpdateEffect cursorUpdateEffect:
+                        {
+                            if (cursorUpdateEffect.PrevCursor == null)
+                                cursors.Remove(cursorUpdateEffect.ProviderId);
+                            else
+                                cursors[cursorUpdateEffect.ProviderId] = cursorUpdateEffect.PrevCursor;
                         }
                         break;
                     default:
@@ -275,10 +287,11 @@ namespace Centaurus.Domain
             return new Snapshot
             {
                 Apex = apex,
-                Accounts = accountStorage.GetAll().OrderBy(a => a.Account.Id).ToList(),
+                Accounts = accountStorage.GetAll().OrderBy(a => a.Id).ToList(),
                 Orders = allOrders.OrderBy(o => o.OrderId).ToList(),
                 Settings = settings,
-                LastHash = lastQuantumData.ComputeHash()
+                LastHash = lastQuantumData.ComputeHash(),
+                Cursors = cursors
             };
         }
 
@@ -301,10 +314,10 @@ namespace Centaurus.Domain
             return Exchange.RestoreExchange(settings.Assets, orders, false);
         }
 
-        private List<Account> GetAccounts(string baseAsset)
+        private List<AccountWrapper> GetAccounts(string baseAsset, RequestRateLimits requestRateLimits)
         {
             return Context.PermanentStorage.LoadAccounts()
-                .Select(a => a.ToDomainModel(baseAsset))
+                .Select(a => a.ToDomainModel(baseAsset, requestRateLimits))
                 .ToList();
         }
     }

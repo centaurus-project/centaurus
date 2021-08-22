@@ -32,7 +32,7 @@ namespace Centaurus.Domain
                 context.AddAccountCreate(context.CentaurusContext.AccountStorage, accId, payment.Destination);
             }
 
-            if (!context.DestinationAccount.Account.HasBalance(payment.Asset))
+            if (!context.DestinationAccount.HasBalance(payment.Asset))
                 context.AddBalanceCreate(context.DestinationAccount, payment.Asset);
             context.AddBalanceUpdate(context.DestinationAccount, payment.Asset, payment.Amount, UpdateSign.Plus);
 
@@ -52,7 +52,7 @@ namespace Centaurus.Domain
             if (payment.Destination == null || payment.Destination.IsZero())
                 throw new BadRequestException("Destination should be valid public key");
 
-            var baseAsset = context.CentaurusContext.Constellation.GetBaseAsset();
+            var baseAsset = context.CentaurusContext.Constellation.QuoteAsset.Code;
             if (context.DestinationAccount == null)
             {
                 if (payment.Asset != baseAsset)
@@ -61,7 +61,7 @@ namespace Centaurus.Domain
                     throw new BadRequestException($"Min payment amount is {context.CentaurusContext.Constellation.MinAccountBalance} for this account.");
             }
 
-            if (payment.Destination.Equals(context.InitiatorAccount.Account.Pubkey))
+            if (payment.Destination.Equals(context.InitiatorAccount.Pubkey))
                 throw new BadRequestException("Source and destination must be different public keys");
 
             if (payment.Amount <= 0)
@@ -71,7 +71,7 @@ namespace Centaurus.Domain
                 throw new BadRequestException($"Asset {payment.Asset} is not supported");
 
             var minBalance = payment.Asset == baseAsset ? context.CentaurusContext.Constellation.MinAccountBalance : 0;
-            if (!(context.InitiatorAccount.Account.GetBalance(payment.Asset)?.HasSufficientBalance(payment.Amount, minBalance) ?? false))
+            if (!(context.InitiatorAccount.GetBalance(payment.Asset)?.HasSufficientBalance(payment.Amount, minBalance) ?? false))
                 throw new BadRequestException("Insufficient funds");
 
             return Task.CompletedTask;

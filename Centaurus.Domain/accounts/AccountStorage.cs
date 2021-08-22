@@ -13,8 +13,8 @@ namespace Centaurus.Domain
             if (accounts == null)
                 accounts = new AccountWrapper[] { };
 
-            this.accounts = new Dictionary<ulong, AccountWrapper>(accounts.ToDictionary(m => m.Account.Id));
-            this.accountIds = new Dictionary<RawPubKey, ulong>(accounts.ToDictionary(m => m.Account.Pubkey, v => v.Account.Id));
+            this.accounts = new Dictionary<ulong, AccountWrapper>(accounts.ToDictionary(m => m.Id));
+            this.accountIds = new Dictionary<RawPubKey, ulong>(accounts.ToDictionary(m => m.Pubkey, v => v.Id));
         }
         
         readonly Dictionary<RawPubKey, ulong> accountIds = new Dictionary<RawPubKey, ulong>();
@@ -55,15 +55,12 @@ namespace Centaurus.Domain
             if (accountIds.ContainsKey(pubkey))
                 throw new InvalidOperationException($"Account with public key {pubkey} already exists");
 
-            var acc = new AccountWrapper(new Account
-            {
+            var acc = new AccountWrapper(rateLimits) {
                 Id = id,
                 Pubkey = pubkey,
-                Balances = new List<Balance>(),
-                Orders = new List<Order>()
-            },
-                rateLimits
-            );
+                Balances = new Dictionary<string, Balance>(),
+                Orders = new Dictionary<ulong, Order>()
+            };
             accountIds.Add(pubkey, id);
             accounts.Add(id, acc);
 

@@ -1,5 +1,6 @@
 ﻿using Centaurus.Models;
 using Centaurus.PersistentStorage;
+using System;
 
 namespace Centaurus.Domain
 {
@@ -7,12 +8,26 @@ namespace Centaurus.Domain
     {
         public static AssetSettings ToDomainModel(this AssetPersistentModel asset)
         {
-            return new AssetSettings { Code = asset.Code, IsSuspended = asset.IsSuspended };
+            if (asset == null)
+                throw new ArgumentNullException(nameof(asset));
+            return new AssetSettings
+            {
+                Code = asset.Code,
+                IsSuspended = asset.IsSuspended,
+                IsQuoteAsset = asset.IsQuoteAsset
+            };
         }
 
         public static AssetPersistentModel ToPersistentModel(this AssetSettings asset)
         {
-            return new AssetPersistentModel { Code = asset.Code, IsSuspended = asset.IsSuspended };
+            if (asset == null)
+                throw new ArgumentNullException(nameof(asset));
+            return new AssetPersistentModel
+            {
+                Code = asset.Code,
+                IsSuspended = asset.IsSuspended,
+                IsQuoteAsset = asset.IsQuoteAsset
+            };
         }
     }
 }

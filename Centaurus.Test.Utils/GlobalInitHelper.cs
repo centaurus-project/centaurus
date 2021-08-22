@@ -94,7 +94,7 @@ namespace Centaurus.Test
         {
             var context = new ExecutionContext(settings, storage, new MockPaymentProviderFactory(), new DummyConnectionWrapperFactory());
 
-            var assets = new List<AssetSettings> { new AssetSettings { Code = "XLM" }, new AssetSettings { Code = "USD" } };
+            var assets = new List<AssetSettings> { new AssetSettings { Code = "XLM", IsQuoteAsset = true }, new AssetSettings { Code = "USD" } };
 
             var stellarProviderVault = KeyPair.Random().AccountId;
 
@@ -143,7 +143,7 @@ namespace Centaurus.Test
             {
                 var acc = context.AccountStorage.CreateAccount(context.AccountStorage.NextAccountId, clients[i].PublicKey, context.Constellation.RequestRateLimits);
                 for (var c = 0; c < assets.Count; c++)
-                    addAssetsFn(acc.Account.Pubkey, assets[c].Code);
+                    addAssetsFn(acc.Pubkey, assets[c].Code);
             }
 
             var providerId = PaymentProviderBase.GetProviderId(stellarProviderSettings.Provider, stellarProviderSettings.Name);

@@ -19,22 +19,26 @@ namespace Centaurus.PersistentStorage
 
         public StorageIterator<QuantumPersistentModel> LoadQuantaAboveApex(ulong apex)
         {
-            //find returns inclusive results
-            return storage.Find<QuantumPersistentModel>(ApexConverter.EncodeApex(apex + 1));
+            return storage.Find<QuantumPersistentModel>(ApexConverter.EncodeApex(apex));
         }
 
-        public List<AccountQuantumDTO> LoadQuantaForAccount(byte[] accountPubkey, ulong apex, int limit, QueryResultsOrder order = QueryResultsOrder.Asc)
+        public List<AccountQuantumDTO> LoadQuantaForAccount(byte[] accountPubkey, ulong apex, int limit, QueryOrder order = QueryOrder.Asc)
         {
             var account = LoadAccount(accountPubkey);
             if (account == null) return null;
             return LoadQuantaForAccount(account.AccountId, apex, limit, order);
         }
 
-        public List<AccountQuantumDTO> LoadQuantaForAccount(ulong accountId, ulong fromApex, int limit, QueryResultsOrder order = QueryResultsOrder.Asc)
+        public List<AccountQuantumDTO> LoadQuantaForAccount(ulong accountId, ulong fromApex, int limit, QueryOrder order = QueryOrder.Asc)
         {
             var startFrom = new QuantumRefPersistentModel
-            { AccountId = accountId, Apex = fromApex + (ulong)(order == QueryResultsOrder.Asc ? 1 : -1) }.Key;
-            var refs = storage.Find<QuantumRefPersistentModel>().Take(limit).ToDictionary(qr => qr.Apex, qr => qr);
+            { AccountId = accountId, Apex = fromApex + (ulong)(order == QueryOrder.Asc ? 1 : -1) }.Key;
+            var cursor = storage.Find<QuantumRefPersistentModel>(startFrom);
+            if (order == QueryOrder.Desc)
+            {
+                cursor.Reverse();
+            }
+            var refs = cursor.Take(limit).ToDictionary(qr => qr.Apex, qr => qr);
             if (refs.Count == 0)
                 return new List<AccountQuantumDTO>(); //nothing found
             var keys = refs.Select(r => ApexConverter.EncodeApex(r.Key)).ToArray();

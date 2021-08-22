@@ -32,6 +32,15 @@ namespace Centaurus.Domain
                 throw new ConnectionCloseException(WebSocketCloseStatus.InvalidPayloadData, "Handshake data is invalid.");
 
             incomingAuditorConnection.SetApexCursor(auditorHandshake.LastKnownApex);
+
+            //request quanta on rising
+            if (Context.StateManager.State == State.Rising)
+            {
+                await incomingAuditorConnection.SendMessage(new QuantaBatchRequest
+                {
+                    LastKnownApex = Context.QuantumStorage.CurrentApex
+                }.CreateEnvelope<MessageEnvelopeSigneless>());
+            }
         }
     }
 }

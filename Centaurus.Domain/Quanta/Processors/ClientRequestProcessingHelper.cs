@@ -14,7 +14,7 @@ namespace Centaurus.Domain
             var requestQuantum = (RequestQuantumBase)context.Quantum;
             var requestMessage = requestQuantum.RequestMessage;
 
-            context.AddNonceUpdate(context.InitiatorAccount, requestMessage.Nonce, context.InitiatorAccount.Account.Nonce);
+            context.AddNonceUpdate(context.InitiatorAccount, requestMessage.Nonce, context.InitiatorAccount.Nonce);
         }
 
         public static void ValidateNonce<T>(this T context)
@@ -28,8 +28,8 @@ namespace Centaurus.Domain
             if (requestMessage == null)
                 throw new BadRequestException($"Invalid message type. {typeof(RequestQuantumBase).Name} should contain message of type {typeof(SequentialRequestMessage).Name}.");
 
-            if (requestMessage.Nonce < 1 || context.InitiatorAccount.Account.Nonce >= requestMessage.Nonce)
-                throw new UnauthorizedException($"Specified nonce is invalid. Current nonce: {context.InitiatorAccount.Account}; request nonce: {requestMessage.Nonce}.");
+            if (requestMessage.Nonce < 1 || context.InitiatorAccount.Nonce >= requestMessage.Nonce)
+                throw new UnauthorizedException($"Specified nonce is invalid. Current nonce: {context.InitiatorAccount}; request nonce: {requestMessage.Nonce}.");
         }
     }
 }

@@ -25,7 +25,7 @@ namespace Centaurus.PersistentStorage
         public List<OrderPersistentModel> Orders { get; set; }
 
         [Key(5)]
-        public RequestRateLimitPersistentModel RequestRateLimits { get; set; } //TODO: make optional
+        public RequestRateLimitPersistentModel RequestRateLimits { get; set; }
 
         [IgnoreMember]
         public byte[] Key

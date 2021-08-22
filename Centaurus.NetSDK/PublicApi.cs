@@ -7,24 +7,34 @@ namespace Centaurus.NetSDK
 {
     public static class PublicApi
     {
-        public static async Task<ConstellationInfo> GetConstellationInfo(ConstellationConfig constellationConfig)
+        public static async Task<ConstellationInfo> GetConstellationInfo(string alphaAddress, bool useSecureConnection)
         {
-            return await GetAlphaEndpoint<ConstellationInfo>(constellationConfig);
+            if (!TryCreateUri(alphaAddress, out var uri))
+                throw new ArgumentException("Invalid address");
+
+            var uriBuilder = new UriBuilder(uri);
+            uriBuilder.Scheme = useSecureConnection ? Uri.UriSchemeHttps : Uri.UriSchemeHttp;
+
+            return await GetConstellationInfo<ConstellationInfo>(uriBuilder.Uri);
         }
 
-        private static async Task<T> GetAlphaEndpoint<T>(ConstellationConfig constellationConfig)
+        private static bool TryCreateUri(string address, out Uri uri)
         {
-            var origin = (constellationConfig.UseSecureConnection ? "https://" : "http://") +
-                         constellationConfig.AlphaServerAddress;
+            return Uri.TryCreate($"http://{address}", UriKind.Absolute, out uri);
+        }
+
+        public static async Task<T> GetConstellationInfo<T>(Uri uri)
+        {
             using (var httpClient = new HttpClient())
             {
-                var res = await httpClient.GetAsync($"{origin}/api/constellation/info");
+                var res = await httpClient.GetAsync(new Uri(uri, "/api/constellation/info"));
                 if (!res.IsSuccessStatusCode)
                     throw new Exception("Request failed with code: " + res.StatusCode);
 
                 var rawJson = await res.Content.ReadAsStringAsync();
 
-                return JsonSerializer.Deserialize<T>(rawJson);
+                var obj = JsonSerializer.Deserialize<T>(rawJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                return obj;
             }
         }
     }

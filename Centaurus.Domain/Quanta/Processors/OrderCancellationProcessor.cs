@@ -30,7 +30,7 @@ namespace Centaurus.Domain
 
             context.CentaurusContext.Exchange.RemoveOrder(context, context.Orderbook, context.OrderWrapper);
 
-            var resultMessage = context.Quantum.CreateEnvelope().CreateResult(ResultStatusCodes.Success);
+            var resultMessage = context.Quantum.CreateEnvelope<MessageEnvelopeSigneless>().CreateResult(ResultStatusCodes.Success);
             return Task.FromResult((QuantumResultMessageBase)resultMessage);
         }
 
@@ -48,18 +48,18 @@ namespace Centaurus.Domain
             context.Orderbook = context.CentaurusContext.Exchange.GetOrderbook(context.OrderWrapper.Order.Asset, context.OrderWrapper.Order.Side);
 
             //TODO: check that lot size is greater than minimum allowed lot
-            if (context.OrderWrapper.AccountWrapper.Account.Id != orderRequest.Account)
+            if (context.OrderWrapper.AccountWrapper.Id != orderRequest.Account)
                 throw new ForbiddenException();
 
             if (context.OrderWrapper.Order.Side == OrderSide.Buy)
             {
-                var balance = context.InitiatorAccount.Account.GetBalance(context.CentaurusContext.Constellation.GetBaseAsset());
+                var balance = context.InitiatorAccount.GetBalance(context.CentaurusContext.Constellation.QuoteAsset.Code);
                 if (balance.Liabilities < context.OrderWrapper.Order.QuoteAmount)
                     throw new BadRequestException("Quote liabilities is less than order size.");
             }
             else
             {
-                var balance = context.InitiatorAccount.Account.GetBalance(context.OrderWrapper.Order.Asset);
+                var balance = context.InitiatorAccount.GetBalance(context.OrderWrapper.Order.Asset);
                 if (balance == null)
                     throw new BadRequestException("Balance for asset not found.");
                 if (balance.Liabilities < context.OrderWrapper.Order.Amount)

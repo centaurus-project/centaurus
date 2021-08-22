@@ -67,16 +67,16 @@ namespace Centaurus.Test
             return quantaCollection.OrderBy(q => q.Apex).SkipWhile(q => q.Apex <= apex).ToList();
         }
 
-        public List<AccountQuantumDTO> LoadQuantaForAccount(byte[] accountPubkey, ulong apex, int limit, QueryResultsOrder order = QueryResultsOrder.Asc)
+        public List<AccountQuantumDTO> LoadQuantaForAccount(byte[] accountPubkey, ulong apex, int limit, QueryOrder order = QueryOrder.Asc)
         {
             var account = LoadAccount(accountPubkey);
             return LoadQuantaForAccount(account.AccountId, apex, limit, order);
         }
 
-        public List<AccountQuantumDTO> LoadQuantaForAccount(ulong accountId, ulong fromApex, int limit, QueryResultsOrder order = QueryResultsOrder.Asc)
+        public List<AccountQuantumDTO> LoadQuantaForAccount(ulong accountId, ulong fromApex, int limit, QueryOrder order = QueryOrder.Asc)
         {
             var quantaRefs = quantaRefCollection.Where(q => q.AccountId == accountId);
-            if (order == QueryResultsOrder.Asc)
+            if (order == QueryOrder.Asc)
             {
                 quantaRefs = quantaRefs.OrderBy(q => q.Apex);
                 if (fromApex > 0)

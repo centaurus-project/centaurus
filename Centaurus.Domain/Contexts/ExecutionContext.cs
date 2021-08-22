@@ -8,7 +8,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
@@ -25,6 +24,7 @@ namespace Centaurus.Domain
             PermanentStorage.Connect(settings.ConnectionString);
 
             Settings = settings ?? throw new ArgumentNullException(nameof(settings));
+
             PaymentProviderFactory = paymentProviderFactory ?? throw new ArgumentNullException(nameof(paymentProviderFactory));
 
             RoleManager = new RoleManager((CentaurusNodeParticipationLevel)Settings.ParticipationLevel);
@@ -63,15 +63,12 @@ namespace Centaurus.Domain
 
             DynamicSerializersInitializer.Init();
 
-            var state = State.Undefined;
             var lastSnapshot = PersistenceManager.GetLastSnapshot();
+            var state = State.Undefined;
             if (lastSnapshot != null)
             {
-                if (IsAlpha) //TODO: all auditors should walk trough rising routine
-                    state = State.Rising;//Alpha should ensure that it has all quanta from auditors
-                else
-                    state = State.Running;
                 Setup(lastSnapshot);
+                state = IsAlpha ? State.Rising : State.Running;
             }
             else if (lastSnapshot == null)
             {
@@ -105,7 +102,7 @@ namespace Centaurus.Domain
 
             Exchange?.Dispose(); Exchange = Exchange.RestoreExchange(snapshot.Settings.Assets, snapshot.Orders, IsAlpha, useLegacyOrderbook);
 
-            SetupPaymentProviders();
+            SetupPaymentProviders(snapshot.Cursors);
 
             AuditResultManager?.Dispose(); AuditResultManager = new ResultManager(this);
 
@@ -114,7 +111,7 @@ namespace Centaurus.Domain
             AnalyticsManager = new AnalyticsManager(
                 PermanentStorage,
                 DepthsSubscription.Precisions.ToList(),
-                Constellation.Assets.Skip(0).Select(a => a.Code).ToList(), //all but base asset
+                Constellation.Assets.Where(a => !a.IsQuoteAsset).Select(a => a.Code).ToList(), //all but base asset
                 snapshot.Orders.Select(o => o.Order.ToOrderInfo()).ToList()
             );
 
@@ -154,10 +151,19 @@ namespace Centaurus.Domain
                 RoleManager.SetRole(CentaurusNodeRole.Beta);
         }
 
-        private void SetupPaymentProviders()
+        private void SetupPaymentProviders(Dictionary<string, string> cursors)
         {
             PaymentProvidersManager?.Dispose();
-            PaymentProvidersManager = new PaymentProvidersManager(PaymentProviderFactory, Constellation.Providers.Select(p => p.ToProviderModel()).ToList(), Settings.PaymentConfigPath);
+
+            var settings = Constellation.Providers.Select(p =>
+            {
+                var providerId = PaymentProviderBase.GetProviderId(p.Provider, p.Name);
+                cursors.TryGetValue(providerId, out var cursor);
+                var settings = p.ToProviderModel(cursor);
+                return settings;
+            }).ToList();
+
+            PaymentProvidersManager = new PaymentProvidersManager(PaymentProviderFactory, settings, Settings.PaymentConfigPath);
 
             foreach (var paymentProvider in PaymentProvidersManager.GetAll())
             {

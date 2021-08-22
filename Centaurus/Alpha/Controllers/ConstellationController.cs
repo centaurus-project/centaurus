@@ -2,6 +2,7 @@
 using Centaurus.Models;
 using Microsoft.AspNetCore.Mvc;
 using System;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -37,7 +38,7 @@ namespace Centaurus.Controllers
                     State = Context.StateManager.State,
                     Providers = Context.Constellation.Providers.ToArray(),
                     Auditors = Context.Constellation.Auditors
-                        .Select(a => a)
+                        .Select(a => new ConstellationInfo.Auditor { PubKey = a.PubKey.GetAccountId(), Address = a.Address })
                         .ToArray(),
                     MinAccountBalance = Context.Constellation.MinAccountBalance,
                     MinAllowedLotSize = Context.Constellation.MinAllowedLotSize,

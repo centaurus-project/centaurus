@@ -20,17 +20,17 @@ namespace Centaurus.Domain
         {
             if (newValue == null)
             {
-                AccountWrapper.Account.RequestRateLimits = null;
-                AccountWrapper.Account.RequestRateLimits.Update(globalRateLimits);
+                Account.RequestRateLimits = null;
+                Account.RequestRateLimits.Update(globalRateLimits);
                 return;
             }
-            if (AccountWrapper.Account.RequestRateLimits == null)
+            if (Account.RequestRateLimits == null)
             {
-                AccountWrapper.Account.RequestRateLimits = new RequestRateLimits();
-                AccountWrapper.RequestCounter.SetLimits(AccountWrapper.Account.RequestRateLimits); //update reference
+                Account.RequestRateLimits = Effect.RequestRateLimits;
+                Account.RequestCounter.SetLimits(Account.RequestRateLimits); //update reference
             }
             //update values
-            AccountWrapper.Account.RequestRateLimits.Update(newValue);
+            Account.RequestRateLimits.Update(newValue);
         }
 
         public override void CommitEffect()

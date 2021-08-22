@@ -26,7 +26,7 @@ namespace Centaurus.Test
 
             var apex = context.QuantumStorage.CurrentApex;
 
-            var account1 = context.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair).Account;
+            var account1 = context.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
 
             var clientAccountBalance = account1.GetBalance(asset);
 
@@ -82,10 +82,10 @@ namespace Centaurus.Test
         [TestCase(1, "USD", 98ul, OrderSide.Buy, null)]
         public async Task OrderQuantumTest(int nonce, string asset, ulong amount, OrderSide side, Type excpectedException)
         {
-            var accountWrapper = context.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
+            var account = context.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
             var order = new OrderRequest
             {
-                Account = accountWrapper.Account.Id,
+                Account = account.Id,
                 RequestId = nonce,
                 Amount = amount,
                 Asset = asset,
@@ -123,7 +123,7 @@ namespace Centaurus.Test
 
             var order = new OrderRequest
             {
-                Account = acc.Account.Id,
+                Account = acc.Id,
                 RequestId = 1,
                 Amount = amount,
                 Asset = asset,
@@ -142,7 +142,7 @@ namespace Centaurus.Test
 
             var orderCancellation = new OrderCancellationRequest
             {
-                Account = acc.Account.Id,
+                Account = acc.Id,
                 RequestId = 2,
                 OrderId = apex
             };
@@ -174,10 +174,10 @@ namespace Centaurus.Test
             var providerSettings = context.Constellation.Providers.First();
             var withdrawal = new WithdrawalRequest
             {
-                Account = account.Account.Id,
+                Account = account.Id,
                 RequestId = 1,
                 Amount = amount,
-                Asset = context.Constellation.GetBaseAsset(),
+                Asset = context.Constellation.QuoteAsset.Code,
                 Destination = KeyPair.Random().PublicKey,
                 Provider = PaymentProviderBase.GetProviderId(providerSettings.Provider, providerSettings.Name)
             };
@@ -201,9 +201,9 @@ namespace Centaurus.Test
 
             var withdrawal = new PaymentRequest
             {
-                Account = account.Account.Id,
+                Account = account.Id,
                 RequestId = 1,
-                Asset = context.Constellation.GetBaseAsset(),
+                Asset = context.Constellation.QuoteAsset.Code,
                 Destination = TestEnvironment.Client2KeyPair,
                 Amount = amount
             };
@@ -213,14 +213,14 @@ namespace Centaurus.Test
 
             var quantum = new RequestQuantum { RequestEnvelope = envelope };
 
-            var baseAsset = context.Constellation.GetBaseAsset();
-            var expextedBalance = account.Account.GetBalance(baseAsset).Amount - amount;
+            var baseAsset = context.Constellation.QuoteAsset.Code;
+            var expextedBalance = account.GetBalance(baseAsset).Amount - amount;
 
             await AssertQuantumHandling(quantum, excpectedException);
 
             if (excpectedException == null)
             {
-                Assert.AreEqual(account.Account.GetBalance(baseAsset).Amount, expextedBalance);
+                Assert.AreEqual(account.GetBalance(baseAsset).Amount, expextedBalance);
             }
         }
 
@@ -230,10 +230,10 @@ namespace Centaurus.Test
         public async Task AccountDataRequestTest(int nonce, Type excpectedException)
         {
             context.SetState(State.Ready);
-            var accountWrapper = context.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
+            var account = context.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
             var order = new AccountDataRequest
             {
-                Account = accountWrapper.Account.Id,
+                Account = account.Id,
                 RequestId = nonce
             };
 
@@ -259,15 +259,15 @@ namespace Centaurus.Test
 
             var account = context.AccountStorage.GetAccount(clientKeyPair);
             if (requestLimit.HasValue)
-                account.Account.RequestRateLimits = new RequestRateLimits { HourLimit = (uint)requestLimit.Value, MinuteLimit = (uint)requestLimit.Value };
+                account.RequestRateLimits = new RequestRateLimits { HourLimit = (uint)requestLimit.Value, MinuteLimit = (uint)requestLimit.Value };
 
-            var minuteLimit = (account.Account.RequestRateLimits ?? context.Constellation.RequestRateLimits).MinuteLimit;
+            var minuteLimit = (account.RequestRateLimits ?? context.Constellation.RequestRateLimits).MinuteLimit;
             var minuteIterCount = minuteLimit + 1;
             for (var i = 0; i < minuteIterCount; i++)
             {
                 var envelope = new AccountDataRequest
                 {
-                    Account = account.Account.Id,
+                    Account = account.Id,
                     RequestId = i + 1
                 }.CreateEnvelope();
                 envelope.Sign(clientKeyPair);

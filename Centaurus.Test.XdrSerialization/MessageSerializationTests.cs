@@ -56,10 +56,11 @@ namespace Centaurus.Test
         [Test]
         public void AccountNullValueSerializationTest()
         {
-            var account = new Account { Id = 1, Balances = new List<Balance>(), Nonce = 1, Orders = new List<Order>(), Pubkey = KeyPair.Random() };
-            var rawData = XdrConverter.Serialize(account);
-            account = XdrConverter.Deserialize<Account>(rawData);
-            Assert.AreEqual(null, account.RequestRateLimits);
+            //var account = new Account { Id = 1, Balances = new List<Balance>(), Nonce = 1, Orders = new List<Order>(), Pubkey = KeyPair.Random() };
+            //var rawData = XdrConverter.Serialize(account);
+            //account = XdrConverter.Deserialize<Account>(rawData);
+            //Assert.AreEqual(null, account.RequestRateLimits);
+            Assert.Fail();
         }
 
         [Test]

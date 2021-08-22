@@ -12,7 +12,7 @@ namespace Centaurus.PaymentProvider
         public PaymentProviderBase(SettingsModel settings, string rawConfig)
         {
             Settings = settings ?? throw new ArgumentNullException(nameof(settings));
-            NotificationsManager = new DepositNotificationManager(settings.InitCursor, this);
+            NotificationsManager = new DepositNotificationManager(settings.Cursor, this);
         }
 
         public event Action<PaymentProviderBase, DepositNotificationModel> OnPaymentCommit;

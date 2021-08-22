@@ -10,5 +10,8 @@ namespace Centaurus.PersistentStorage
 
         [Key(1)]
         public bool IsSuspended { get; set; }
+
+        [Key(2)]
+        public bool IsQuoteAsset { get; set; }
     }
 }

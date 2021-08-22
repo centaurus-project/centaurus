@@ -24,7 +24,7 @@ namespace Centaurus
                     .Select(a => new SdkAsset { Code = a.Code, IsSuspended = a.IsSuspended })
                     .ToList(),
                 Auditors = info.Auditors.Select(a =>
-                    new SdkAuditor { Address = a.Address, PubKey = KeyPair.FromPublicKey(a.PubKey.Data).AccountId }).ToList(),
+                    new SdkAuditor { Address = a.Address, PubKey = a.PubKey }).ToList(),
                 MinAccountBalance = info.MinAccountBalance,
                 MinAllowedLotSize = info.MinAllowedLotSize,
                 RequestRateLimits = info.RequestRateLimits,

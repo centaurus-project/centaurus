@@ -18,22 +18,19 @@ namespace Centaurus
         {
             this.auditor = auditor ?? throw new ArgumentNullException(nameof(auditor));
             CurrentApexCursor = apexCursor;
-            cancellationTokenSource = new CancellationTokenSource();
-            cancellationToken = cancellationTokenSource.Token;
             Task.Factory.StartNew(SendQuantums, TaskCreationOptions.LongRunning);
         }
 
         private readonly ConnectionBase auditor;
 
-        private CancellationTokenSource cancellationTokenSource;
-        private CancellationToken cancellationToken;
+        private CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
 
         public ulong CurrentApexCursor { get; private set; }
 
         private async Task SendQuantums()
         {
             var batchSize = Context.Settings.SyncBatchSize;
-            while (!cancellationToken.IsCancellationRequested)
+            while (!cancellationTokenSource.Token.IsCancellationRequested)
             {
                 var apexDiff = Context.QuantumStorage.CurrentApex - CurrentApexCursor;
                 if (apexDiff < 0)
@@ -43,12 +40,11 @@ namespace Centaurus
                     return;
                 }
 
-                if (!Context.IsAlpha || auditor.ConnectionState != ConnectionState.Ready || apexDiff == 0)
+                if (!Context.IsAlpha || auditor.ConnectionState != ConnectionState.Ready || apexDiff == 0 || Context.StateManager.State == State.Rising)
                 {
                     Thread.Sleep(50);
                     continue;
                 }
-
                 try
                 {
                     List<PendingQuantum> quanta = null;
@@ -84,9 +80,8 @@ namespace Centaurus
 
         public void Dispose()
         {
-            cancellationTokenSource?.Cancel();
-            cancellationTokenSource?.Dispose();
-            cancellationTokenSource = null;
+            cancellationTokenSource.Cancel();
+            cancellationTokenSource.Dispose();
         }
     }
 }

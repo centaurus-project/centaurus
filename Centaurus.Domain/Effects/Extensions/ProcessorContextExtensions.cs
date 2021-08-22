@@ -41,10 +41,10 @@ namespace Centaurus.Domain
                     Account = account.Id,
                     Amount = amount,
                     Asset = asset,
-                    Apex = processorContext.Apex
+                    Apex = processorContext.Apex,
+                    Sign = sign
                 },
-                account,
-                sign
+                account
             ));
         }
 

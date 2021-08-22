@@ -26,9 +26,9 @@ namespace Centaurus.Domain
                 throw new Exception($"Unable to remove order with id {Effect.Apex}");
 
             if (Effect.Side == OrderSide.Buy)
-                AccountWrapper.Account.GetBalance(baseAsset).UpdateLiabilities(Effect.QuoteAmount, UpdateSign.Minus);
+                Account.GetBalance(baseAsset).UpdateLiabilities(Effect.QuoteAmount, UpdateSign.Minus);
             else
-                AccountWrapper.Account.GetBalance(Effect.Asset).UpdateLiabilities(Effect.Amount, UpdateSign.Minus);
+                Account.GetBalance(Effect.Asset).UpdateLiabilities(Effect.Amount, UpdateSign.Minus);
         }
 
         public override void RevertEffect()
@@ -36,9 +36,9 @@ namespace Centaurus.Domain
             MarkAsProcessed();
 
             if (Effect.Side == OrderSide.Buy)
-                AccountWrapper.Account.GetBalance(baseAsset).UpdateLiabilities(Effect.QuoteAmount, UpdateSign.Plus);
+                Account.GetBalance(baseAsset).UpdateLiabilities(Effect.QuoteAmount, UpdateSign.Plus);
             else
-                AccountWrapper.Account.GetBalance(Effect.Asset).UpdateLiabilities(Effect.Amount, UpdateSign.Plus);
+                Account.GetBalance(Effect.Asset).UpdateLiabilities(Effect.Amount, UpdateSign.Plus);
 
             var order = new OrderWrapper(
                 new Order
@@ -50,7 +50,7 @@ namespace Centaurus.Domain
                     Asset = Effect.Asset,
                     Side = Effect.Side
                 },
-                AccountWrapper
+                Account
             );
             orderbook.InsertOrder(order);
         }

@@ -23,31 +23,33 @@ namespace Centaurus.Test.Exchange.Analytics
             context = new ExecutionContext(settings, new MockStorage(), new MockPaymentProviderFactory(), new DummyConnectionWrapperFactory());
             var requestsLimit = new RequestRateLimits();
 
-            account1 = new AccountWrapper(new Models.Account
+            account1 = new AccountWrapper(requestsLimit)
             {
                 Id = 1,
                 Pubkey = new RawPubKey() { Data = KeyPair.Random().PublicKey },
-                Balances = new List<Balance>()
-            }, requestsLimit);
+                Balances = new Dictionary<string, Balance>(),
+                Orders = new Dictionary<ulong, Order>()
+            };
 
-            account1.Account.CreateBalance("XLM");
-            account1.Account.GetBalance("XLM").UpdateBalance(10000000000, UpdateSign.Plus);
+            account1.CreateBalance("XLM");
+            account1.GetBalance("XLM").UpdateBalance(10000000000, UpdateSign.Plus);
 
-            account1.Account.CreateBalance("USD");
-            account1.Account.GetBalance("USD").UpdateBalance(10000000000, UpdateSign.Plus);
+            account1.CreateBalance("USD");
+            account1.GetBalance("USD").UpdateBalance(10000000000, UpdateSign.Plus);
 
-            account2 = new AccountWrapper(new Models.Account
+            account2 = new AccountWrapper(requestsLimit)
             {
                 Id = 2,
                 Pubkey = new RawPubKey() { Data = KeyPair.Random().PublicKey },
-                Balances = new List<Balance>()
-            }, requestsLimit);
+                Balances = new Dictionary<string, Balance>(),
+                Orders = new Dictionary<ulong, Order>()
+            };
 
-            account2.Account.CreateBalance("XLM");
-            account2.Account.GetBalance("XLM").UpdateBalance(10000000000, UpdateSign.Plus);
+            account2.CreateBalance("XLM");
+            account2.GetBalance("XLM").UpdateBalance(10000000000, UpdateSign.Plus);
 
-            account2.Account.CreateBalance("USD");
-            account2.Account.GetBalance("USD").UpdateBalance(10000000000, UpdateSign.Plus);
+            account2.CreateBalance("USD");
+            account2.GetBalance("USD").UpdateBalance(10000000000, UpdateSign.Plus);
 
             var stellarPaymentProviderVault = KeyPair.Random().AccountId;
             var stellarPaymentProvider = new ProviderSettings
@@ -95,7 +97,6 @@ namespace Centaurus.Test.Exchange.Analytics
             for (var i = 1; i < iterations; i++)
             {
                 var price = useNormalDistribution ? rnd.NextNormallyDistributed() + 50 : rnd.NextDouble() * 100;
-                var accountWrapper = context.AccountStorage.GetAccount(account1.Account.Pubkey);
                 var trade = new RequestQuantum
                 {
                     Apex = (ulong)i,
@@ -103,7 +104,7 @@ namespace Centaurus.Test.Exchange.Analytics
                     {
                         Message = new OrderRequest
                         {
-                            Account = accountWrapper.Account.Id,
+                            Account = account1.Id,
                             RequestId = i,
                             Amount = (ulong)rnd.Next(1, 20),
                             Asset = "USD",
@@ -115,7 +116,7 @@ namespace Centaurus.Test.Exchange.Analytics
                     Timestamp = DateTime.UtcNow.Ticks
                 };
 
-                var orderContext = (RequestContext)orderRequestProcessor.GetContext(trade, context.AccountStorage.GetAccount(account1.Account.Pubkey));
+                var orderContext = (RequestContext)orderRequestProcessor.GetContext(trade, context.AccountStorage.GetAccount(account1.Pubkey));
                 testTradeResults.Add(trade, orderContext);
             }
 

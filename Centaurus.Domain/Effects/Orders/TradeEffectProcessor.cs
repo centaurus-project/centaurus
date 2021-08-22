@@ -9,13 +9,13 @@ namespace Centaurus.Domain
     public class TradeEffectProcessor : ClientEffectProcessor<TradeEffect>
     {
         private OrderWrapper order;
-        private string baseAsset;
+        private string quoteAsset;
 
-        public TradeEffectProcessor(TradeEffect effect, AccountWrapper account, OrderWrapper order, string baseAsset)
+        public TradeEffectProcessor(TradeEffect effect, AccountWrapper account, OrderWrapper order, string quoteAsset)
             : base(effect, account)
         {
             this.order = order ?? throw new ArgumentNullException(nameof(order));
-            this.baseAsset = baseAsset ?? throw new ArgumentNullException(nameof(baseAsset));
+            this.quoteAsset = quoteAsset ?? throw new ArgumentNullException(nameof(quoteAsset));
         }
 
         public override void CommitEffect()
@@ -25,8 +25,8 @@ namespace Centaurus.Domain
             if (!Effect.IsNewOrder) //new order doesn't have this value yet
                 order.Order.QuoteAmount -= Effect.QuoteAmount;
 
-            var quoteBalance = AccountWrapper.Account.GetBalance(baseAsset);
-            var assetBalance = AccountWrapper.Account.GetBalance(order.Order.Asset);
+            var quoteBalance = Account.GetBalance(quoteAsset);
+            var assetBalance = Account.GetBalance(order.Order.Asset);
             if (order.Order.Side == OrderSide.Buy)
             {
                 if (!Effect.IsNewOrder) //liabilities wasn't locked for new order yet
@@ -47,8 +47,8 @@ namespace Centaurus.Domain
         {
             MarkAsProcessed();
 
-            var quoteBalance = AccountWrapper.Account.GetBalance(baseAsset);
-            var assetBalance = AccountWrapper.Account.GetBalance(order.Order.Asset);
+            var quoteBalance = Account.GetBalance(quoteAsset);
+            var assetBalance = Account.GetBalance(order.Order.Asset);
             if (order.Order.Side == OrderSide.Buy)
             {
                 if (!Effect.IsNewOrder)

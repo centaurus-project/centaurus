@@ -24,9 +24,9 @@ namespace Centaurus.PersistentStorage.Abstraction
 
         IEnumerable<QuantumPersistentModel> LoadQuantaAboveApex(ulong apex);
 
-        List<AccountQuantumDTO> LoadQuantaForAccount(byte[] accountPubkey, ulong apex, int limit, QueryResultsOrder order = QueryResultsOrder.Asc);
+        List<AccountQuantumDTO> LoadQuantaForAccount(byte[] accountPubkey, ulong apex, int limit, QueryOrder order = QueryOrder.Asc);
 
-        List<AccountQuantumDTO> LoadQuantaForAccount(ulong accountId, ulong fromApex, int limit, QueryResultsOrder order = QueryResultsOrder.Asc);
+        List<AccountQuantumDTO> LoadQuantaForAccount(ulong accountId, ulong fromApex, int limit, QueryOrder order = QueryOrder.Asc);
 
         IEnumerable<PriceHistoryFramePersistentModel> GetPriceHistory(string market, int period, int from, int to);
 

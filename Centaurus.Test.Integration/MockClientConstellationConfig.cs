@@ -13,10 +13,5 @@ namespace Centaurus.Test
         {
             this.constellationInfo = constellationInfo ?? throw new ArgumentNullException(nameof(constellationInfo));
         }
-
-        public override Task<NetSDK.ConstellationInfo> GetConstellationInfo()
-        {
-            return Task.FromResult(constellationInfo);
-        }
     }
 }

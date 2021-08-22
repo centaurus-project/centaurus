@@ -1,27 +1,38 @@
-﻿using System;
+﻿using RocksDbSharp;
+using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Text;
-using RocksDbSharp;
 
 namespace Centaurus.PersistentStorage
 {
     public class StorageIterator<T> : IDisposable, IEnumerable<T> where T : IPersistentModel, new()
     {
-        internal StorageIterator(Iterator iterator)
+        internal StorageIterator(Iterator iterator, QueryOrder queryOrder = QueryOrder.Asc)
         {
             this.iterator = iterator;
+            IsReversed = queryOrder == QueryOrder.Desc;
+            if (IsReversed)
+            {
+                iterator.SeekToLast();
+            }
+            else
+            {
+                iterator.SeekToFirst();
+            }
         }
 
         private readonly Iterator iterator;
 
+        public readonly bool IsReversed;
+
         private Func<byte[], bool> isKeyWithinBoundaries;
 
-        public bool IsReversed { get; private set; }
+        private byte[] toBoundary;
 
-        private T ParseCurrent()
+
+        private T ParseCurrent(byte[] key)
         {
-            return IPersistentModel.Deserialize<T>(iterator.Key(), iterator.Value());
+            return IPersistentModel.Deserialize<T>(key, iterator.Value());
         }
 
         private void Next()
@@ -40,35 +51,31 @@ namespace Centaurus.PersistentStorage
         {
             while (iterator.Valid())
             {
-                if (isKeyWithinBoundaries != null && !isKeyWithinBoundaries(iterator.Key())) break;
-                yield return ParseCurrent();
+                var key = iterator.Key();
+                if (toBoundary != null)
+                {
+                    if (IsReversed)
+                    {
+                        if (key.AsSpan().SequenceCompareTo(toBoundary) < 0) break;
+                    }
+                    else
+                    {
+                        if (key.AsSpan().SequenceCompareTo(toBoundary) > 0) break;
+                    }
+                }
+                yield return ParseCurrent(key);
                 Next();
             }
         }
 
         public T First()
         {
-            var res = ParseCurrent();
+            var res = ParseCurrent(iterator.Key());
             Next();
             return res;
         }
 
-        public StorageIterator<T> Reverse()
-        {
-            if (IsReversed)
-            {
-                IsReversed = false;
-                iterator.SeekToFirst();
-            }
-            else
-            {
-                IsReversed = true;
-                iterator.SeekToLast();
-            }
-            return this;
-        }
-
-        public StorageIterator<T> SetBoundaryCheck(Func<byte[], bool> checkKeyIsWithinBoundaries)
+        private StorageIterator<T> SetBoundaryCheck(Func<byte[], bool> checkKeyIsWithinBoundaries)
         {
             isKeyWithinBoundaries = checkKeyIsWithinBoundaries;
             return this;
@@ -84,6 +91,23 @@ namespace Centaurus.PersistentStorage
                 if (res.Count >= count) break;
             }
             return res;
+        }
+
+        internal StorageIterator<T> To(byte[] toBoundary)
+        {
+            this.toBoundary = toBoundary;
+            return this;
+        }
+
+        internal StorageIterator<T> From(byte[] from)
+        {
+            iterator.Seek(from);
+            if (IsReversed || iterator.Key().AsSpan().SequenceEqual(from))
+            {
+                if (iterator.Valid())
+                    Next();
+            }
+            return this;
         }
 
         IEnumerator IEnumerable.GetEnumerator()

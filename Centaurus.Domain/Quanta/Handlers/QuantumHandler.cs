@@ -107,7 +107,7 @@ namespace Centaurus.Domain
             {
                 if (result == null)
                     result = requestQuantum.RequestEnvelope.CreateResult(exc);
-                Context.OnMessageProcessResult(result, Context.AccountStorage.GetAccount(requestQuantum.RequestMessage.Account).Account.Pubkey);
+                Context.OnMessageProcessResult(result, Context.AccountStorage.GetAccount(requestQuantum.RequestMessage.Account).Pubkey);
             }
         }
 
@@ -192,14 +192,14 @@ namespace Centaurus.Domain
 
         void ValidateAccountRequestSignature(RequestQuantumBase request, AccountWrapper accountWrapper)
         {
-            if (!request.RequestEnvelope.IsSignatureValid(accountWrapper.Account.Pubkey))
+            if (!request.RequestEnvelope.IsSignatureValid(accountWrapper.Pubkey))
                 throw new UnauthorizedAccessException("Request quantum has invalid signature.");
         }
 
         void ValidateAccountRequestRate(RequestQuantumBase request, AccountWrapper accountWrapper)
         {
             if (!accountWrapper.RequestCounter.IncRequestCount(request.Timestamp, out string error))
-                throw new TooManyRequestsException($"Request limit reached for account {accountWrapper.Account.Pubkey}.");
+                throw new TooManyRequestsException($"Request limit reached for account {accountWrapper.Pubkey}.");
         }
 
         /// <summary>

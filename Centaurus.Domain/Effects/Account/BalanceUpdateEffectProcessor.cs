@@ -8,26 +8,23 @@ namespace Centaurus.Domain
 {
     public class BalanceUpdateEffectProcesor : BaseAccountEffectProcessor<BalanceUpdateEffect>
     {
-        private UpdateSign sign;
-
-        public BalanceUpdateEffectProcesor(BalanceUpdateEffect effect, AccountWrapper account, UpdateSign sign)
+        public BalanceUpdateEffectProcesor(BalanceUpdateEffect effect, AccountWrapper account)
             : base(effect, account)
         {
-            this.sign = sign;
         }
 
         public override void CommitEffect()
         {
             MarkAsProcessed();
-            var balance = AccountWrapper.Account.GetBalance(Effect.Asset);
-            balance.UpdateBalance(Effect.Amount, sign);
+            var balance = Account.GetBalance(Effect.Asset);
+            balance.UpdateBalance(Effect.Amount, Effect.Sign);
         }
 
         public override void RevertEffect()
         {
             MarkAsProcessed();
-            var balance = AccountWrapper.Account.GetBalance(Effect.Asset);
-            balance.UpdateBalance(Effect.Amount, sign.Opposite());
+            var balance = Account.GetBalance(Effect.Asset);
+            balance.UpdateBalance(Effect.Amount, Effect.Sign.Opposite());
         }
     }
 }

@@ -10,11 +10,11 @@ namespace Centaurus.NetSDK
     /// </summary>
     public class QuantumResult
     {
-        public QuantumResult(MessageEnvelopeBase requestEnvelope, ConstellationInfo constellationInfo)
+        public QuantumResult(MessageEnvelopeBase requestEnvelope, CentaurusClient client)
         {
             Request = requestEnvelope ?? throw new ArgumentNullException(nameof(requestEnvelope));
             IsFinalizationRequired = requestEnvelope.Message is SequentialRequestMessage;
-            ConstellationInfo = constellationInfo ?? throw new ArgumentNullException(nameof(constellationInfo));
+            this.client = client ?? throw new ArgumentNullException(nameof(client));
         }
 
         internal readonly TaskCompletionSource<MessageEnvelopeBase> Acknowledged = new TaskCompletionSource<MessageEnvelopeBase>();
@@ -23,7 +23,9 @@ namespace Centaurus.NetSDK
 
         internal bool IsFinalizationRequired { get; private set; }
 
-        internal ConstellationInfo ConstellationInfo;
+        private CentaurusClient client;
+
+        private ConstellationInfo ConstellationInfo => client.connection.ConstellationInfo;
 
         /// <summary>
         /// Event that resolves when the server returns the acknowledgment confirmation for the client request.
@@ -78,6 +80,9 @@ namespace Centaurus.NetSDK
                             throw new RequestException(resultEnvelope, "Finalize result message has been already received.");
                         if (!Acknowledged.Task.IsCompleted) //complete acknowledgment task if it's not completed yet
                             Acknowledged.TrySetResult(resultEnvelope);
+
+                        if (resultEnvelope.Message is QuantumResultMessageBase quantumResult)
+                            client.HandleQuantumResult(quantumResult);
                         Finalized.TrySetResult(resultEnvelope);
                     }
                     else
@@ -136,9 +141,8 @@ namespace Centaurus.NetSDK
         /// <param name="requestTimeout"></param>
         internal void ScheduleExpiration(int requestTimeout)
         {
-#if !DEBUG
-            Task.Delay(requestTimeout).ContinueWith(task => SetException(new TimeoutException("Request timed out.")));
-#endif
+            Task.Delay(requestTimeout)
+                .ContinueWith(task => SetException(new TimeoutException("Request timed out.")));
         }
     }
 }

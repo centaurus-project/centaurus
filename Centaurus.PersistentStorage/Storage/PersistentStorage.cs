@@ -36,23 +36,52 @@ namespace Centaurus.PersistentStorage
             }
         }
 
-        public StorageIterator<T> Find<T>() where T : IPersistentModel, new()
+        /// <summary>
+        /// Unbounded iteration
+        /// </summary>
+        /// <typeparam name="T">Model type</typeparam>
+        /// <param name="queryOrder">Search direction</param>
+        /// <returns>Models iterator</returns>
+        public StorageIterator<T> Find<T>(QueryOrder queryOrder = QueryOrder.Asc) where T : IPersistentModel, new()
         {
             var iterator = db.NewIterator(ResolveColumnFamily<T>(), new ReadOptions().SetTotalOrderSeek(true));
-            return new StorageIterator<T>(iterator);
+            return new StorageIterator<T>(iterator, queryOrder);
         }
 
-        public StorageIterator<T> Find<T>(byte[] prefix) where T : IPersistentModel, new()
+        /// <summary>
+        /// Range-restricted iteration
+        /// </summary>
+        /// <typeparam name="T">Model type</typeparam>
+        /// <param name="from">Exclusive lower boundary (supports prefixed search)</param>
+        /// <param name="queryOrder">Search direction</param>
+        /// <returns>Models iterator</returns>
+        public StorageIterator<T> Find<T>(byte[] from, QueryOrder queryOrder = QueryOrder.Asc) where T : IPersistentModel, new()
         {
-            var iterator = db.NewIterator(ResolveColumnFamily<T>(), new ReadOptions().SetPrefixSameAsStart(true).SetTotalOrderSeek(false));
-            return new StorageIterator<T>(iterator.Seek(prefix));
+            return Find<T>(from, null, queryOrder);
         }
 
         //TODO: fork the rocksdb wrapper and add rocksdb_readoptions_set_iterate_lower_bound support,as well as NET 5.0 deploy fix (see https://github.com/curiosity-ai/rocksdb-sharp/pulls)
-        public StorageIterator<T> Find<T>(byte[] prefix, byte[] upperBound) where T : IPersistentModel, new()
+        /// <summary>
+        /// Range-restricted iteration
+        /// </summary>
+        /// <typeparam name="T">Model type</typeparam>
+        /// <param name="from">Exclusive lower boundary (supports prefixed search)</param>
+        /// <param name="upperBound">Inclusive upper boundary</param>
+        /// <param name="queryOrder">Search direction</param>
+        /// <returns>Models iterator</returns>
+        public StorageIterator<T> Find<T>(byte[] from, byte[] upperBound, QueryOrder queryOrder = QueryOrder.Asc) where T : IPersistentModel, new()
         {
-            var iterator = db.NewIterator(ResolveColumnFamily<T>(), new ReadOptions().SetPrefixSameAsStart(true).SetTotalOrderSeek(false).SetIterateUpperBound(upperBound));
-            return new StorageIterator<T>(iterator.Seek(prefix));
+            var opts = new ReadOptions();
+            if (typeof(IPrefixedPersistentModel).IsAssignableFrom(typeof(T)) && (new T() as IPrefixedPersistentModel).PrefixLength == from.Length)
+            {
+                opts = opts.SetPrefixSameAsStart(true).SetTotalOrderSeek(false);
+            }
+            else
+            {
+                opts = opts.SetTotalOrderSeek(true);
+            }
+            var iterator = db.NewIterator(ResolveColumnFamily<T>(), opts);
+            return new StorageIterator<T>(iterator, queryOrder).From(from).To(upperBound);
         }
 
         public T First<T>() where T : IPersistentModel, new()
@@ -60,6 +89,7 @@ namespace Centaurus.PersistentStorage
             using (var iterator = db.NewIterator(ResolveColumnFamily<T>(),
                 new ReadOptions().SetReadaheadSize(0).SetTotalOrderSeek(true)))
             {
+                iterator.SeekToFirst();
                 if (!iterator.Valid()) return default(T); //not found - return null
                 return IPersistentModel.Deserialize<T>(iterator.Key(), iterator.Value());
             }

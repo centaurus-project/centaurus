@@ -2,6 +2,7 @@
 using Centaurus.Models;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace Centaurus.Domain
@@ -26,24 +27,26 @@ namespace Centaurus.Domain
 
             //lock order reserve
             if (order.Order.Side == OrderSide.Buy)
-                AccountWrapper.Account.GetBalance(baseAsset).UpdateLiabilities(order.Order.QuoteAmount, UpdateSign.Plus);
+                Account.GetBalance(baseAsset).UpdateLiabilities(order.Order.QuoteAmount, UpdateSign.Plus);
             else
-                AccountWrapper.Account.GetBalance(order.Order.Asset).UpdateLiabilities(order.Order.Amount, UpdateSign.Plus);
+                Account.GetBalance(order.Order.Asset).UpdateLiabilities(order.Order.Amount, UpdateSign.Plus);
 
             //add order to the orderbook
             orderBook.InsertOrder(order);
+            Account.Orders.Add(order.OrderId, order.Order);
         }
 
         public override void RevertEffect()
         {
             MarkAsProcessed();
 
+            Account.Orders.Remove(Effect.OrderId);
             orderBook.RemoveOrder(Effect.OrderId, out _);
 
             if (order.Order.Side == OrderSide.Buy)
-                AccountWrapper.Account.GetBalance(baseAsset).UpdateLiabilities(order.Order.QuoteAmount, UpdateSign.Minus);
+                Account.GetBalance(baseAsset).UpdateLiabilities(order.Order.QuoteAmount, UpdateSign.Minus);
             else
-                AccountWrapper.Account.GetBalance(order.Order.Asset).UpdateLiabilities(order.Order.Amount, UpdateSign.Minus);
+                Account.GetBalance(order.Order.Asset).UpdateLiabilities(order.Order.Amount, UpdateSign.Minus);
         }
     }
 }

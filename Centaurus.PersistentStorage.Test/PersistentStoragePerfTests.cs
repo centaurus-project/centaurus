@@ -1,8 +1,10 @@
+using NUnit.Framework;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Reflection;
-using NUnit.Framework;
 
 namespace Centaurus.PersistentStorage
 {
@@ -34,6 +36,30 @@ namespace Centaurus.PersistentStorage
                 //Console.WriteLine("--- db stats ---");
                 //Console.WriteLine(storage.GetStats());
                 Console.WriteLine("Total time: " + sw.Elapsed.TotalSeconds.ToString("0") + "s");
+            }
+
+        }
+
+        [Test, Explicit]
+        public void QuantaLoadTest()
+        {
+            var path = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "db");
+            Console.WriteLine("Opening db " + path);
+
+            using (var storage = new PersistentStorage(path))
+            {
+                var quantaBatch = new List<QuantumPersistentModel> {
+                    new QuantumPersistentModel { Apex = 1 },
+                    new QuantumPersistentModel { Apex = 2 },
+                    new QuantumPersistentModel { Apex = 101 },
+                };
+
+                storage.SaveBatch(quantaBatch.Cast<IPersistentModel>().ToList());
+
+                var allQuanta = storage.Find<QuantumPersistentModel>();
+                Assert.AreEqual(quantaBatch.Count, allQuanta.Count());
+                var aboveApexQuanta = storage.Find<QuantumPersistentModel>(ApexConverter.EncodeApex(1));
+                Assert.AreEqual(quantaBatch.Count - 1, aboveApexQuanta.Count());
             }
         }
     }

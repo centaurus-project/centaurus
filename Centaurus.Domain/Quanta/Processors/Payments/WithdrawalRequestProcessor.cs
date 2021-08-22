@@ -22,14 +22,14 @@ namespace Centaurus.Domain
 
             context.AddBalanceUpdate(context.InitiatorAccount, context.WithdrawalRequest.Asset, context.WithdrawalRequest.Amount, UpdateSign.Minus);
 
-            return Task.FromResult((QuantumResultMessageBase)context.Quantum.CreateEnvelope().CreateResult(ResultStatusCodes.Success));
+            return Task.FromResult((QuantumResultMessageBase)context.Quantum.CreateEnvelope<MessageEnvelopeSigneless>().CreateResult(ResultStatusCodes.Success));
         }
 
         public override Task Validate(WithdrawalProcessorContext context)
         {
             context.ValidateNonce();
 
-            var sourceAccount = context.InitiatorAccount.Account;
+            var sourceAccount = context.InitiatorAccount;
 
             var centaurusAsset = context.CentaurusContext.Constellation.Assets.FirstOrDefault(a => a.Code == context.WithdrawalRequest.Asset);
             if (centaurusAsset == null || centaurusAsset.IsSuspended)
@@ -39,7 +39,7 @@ namespace Centaurus.Domain
             if (providerAsset == null)
                 throw new BadRequestException($"Current provider doesn't support withdrawal of asset {centaurusAsset.Code}.");
 
-            var baseAsset = context.CentaurusContext.Constellation.GetBaseAsset();
+            var baseAsset = context.CentaurusContext.Constellation.QuoteAsset.Code;
 
             var minBalance = centaurusAsset.Code == baseAsset ? context.CentaurusContext.Constellation.MinAccountBalance : 0;
             if (!(sourceAccount.GetBalance(centaurusAsset.Code)?.HasSufficientBalance(context.WithdrawalRequest.Amount, minBalance) ?? false))

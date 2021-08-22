@@ -5,7 +5,6 @@ using stellar_dotnet_sdk;
 using stellar_dotnet_sdk.xdr;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Text.Json;
 using System.Threading;
@@ -30,8 +29,26 @@ namespace Centaurus.Stellar.PaymentProvider
 
             secret = KeyPair.FromSecretSeed(configObject.Secret);
 
+            //wait while all missed transactions will be loaded
+            LoadLastTxs().Wait();
+
             Task.Factory.StartNew(ListenTransactions, TaskCreationOptions.LongRunning);
             InitTimer();
+        }
+
+        private async Task LoadLastTxs()
+        {
+            var pageSize = 200;
+            while (true)
+            {
+                var txs = await dataSource.GetTransactions(Vault, long.Parse(LastRegisteredCursor), pageSize);
+                foreach (var tx in txs)
+                {
+                    ProcessTransaction(tx);
+                }
+                if (txs.Count < pageSize)
+                    break;
+            }
         }
 
         public override bool IsTransactionValid(byte[] rawTransaction, WithdrawalRequestModel withdrawalRequest, out string error)
@@ -167,7 +184,7 @@ namespace Centaurus.Stellar.PaymentProvider
             return ledgerPayments;
         }
 
-        void ProcessTransactionTx(TxModel tx)
+        void ProcessTransaction(TxModel tx)
         {
             try
             {
@@ -208,7 +225,7 @@ namespace Centaurus.Stellar.PaymentProvider
                     listener = dataSource.GetTransactionListener(
                         Vault,
                         long.Parse(LastRegisteredCursor),
-                        ProcessTransactionTx
+                        ProcessTransaction
                     );
 
                     await listener.Connect();
@@ -281,8 +298,14 @@ namespace Centaurus.Stellar.PaymentProvider
 
         void SubmitTimer_Elapsed(object sender, ElapsedEventArgs e)
         {
-            CommitPayments();
-
+            try
+            {
+                CommitPayments();
+            }
+            catch (Exception exc)
+            {
+                //TODO: log
+            }
             StartTimer();
         }
 
@@ -302,7 +325,12 @@ namespace Centaurus.Stellar.PaymentProvider
             {
                 if (DateTime.UtcNow - payment.DepositTime < commitDelay)
                     break;
+                if (payment.IsSend)
+                    continue;
+
                 RaiseOnPaymentCommit(payment);
+                //mark as send
+                payment.IsSend = true;
             }
         }
 

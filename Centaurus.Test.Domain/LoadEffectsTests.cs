@@ -55,7 +55,7 @@ namespace Centaurus.Test
             //check reverse fetching
             allEffectsResult.Reverse();
             allEffectsResult.ForEach(ae => ae.Items.Reverse());
-            TestFetching(allEffectsResult, zeroCursor, !isDesc, limit, account.Account.Id, true);
+            TestFetching(allEffectsResult, zeroCursor, !isDesc, limit, account.Id, true);
         }
 
         private void TestFetching(List<QuantumInfo> allEffects, string cursor, bool isDesc, int limit, ulong account, bool isReverseDirection = false)
