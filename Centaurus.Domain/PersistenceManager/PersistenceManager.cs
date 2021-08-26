@@ -58,7 +58,10 @@ namespace Centaurus.Domain
                 {
                     Apex = accountQuantum.Quantum.Apex,
                     Items = effects,
-                    Proof = quantum.Signatures.Select(s => new TinySignature { Data = s.PayloadSignature }).ToList(),
+                    Proof = quantum.Signatures.Select(s => new TinySignature
+                    {
+                        Data = s.PayloadSignature
+                    }).ToList(),
                     Request = accountQuantum.IsInitiator
                         ? (RequestInfoBase)new RequestInfo { Request = quantum.RawQuantum }
                         : new RequestHashInfo { Request = quantumHash }

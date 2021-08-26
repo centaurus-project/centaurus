@@ -32,12 +32,14 @@ namespace Centaurus.Domain
             if (context == null)
                 throw new ArgumentNullException(nameof(context));
             context.ExtensionsManager.BeforeNotifyAuditors(envelope);
-            var auditors = context.IncomingConnectionManager.GetAuditorConnections();
-            for (var i = 0; i < auditors.Count; i++)
+            if (context.RoleManager.ParticipationLevel == CentaurusNodeParticipationLevel.Prime) //if Prime node than send message to all incoming connection
             {
-                var auditor = auditors[i];
-                Task.Factory.StartNew(async () => await auditor.SendMessage(envelope)).Unwrap();
+                var auditors = context.IncomingConnectionManager.GetAuditorConnections();
+                foreach (var auditor in auditors)
+                    Task.Factory.StartNew(async () => await auditor.SendMessage(envelope)).Unwrap();
             }
+            else //notify all connected auditors
+                context.OutgoingConnectionManager.EnqueueMessage(envelope);
         }
 
         /// <summary>
@@ -52,7 +54,7 @@ namespace Centaurus.Domain
                 throw new ArgumentNullException(nameof(context));
             if (rawPubKey == null)
                 throw new ArgumentNullException(nameof(rawPubKey));
-            
+
             context.Notify(rawPubKey, result.CreateEnvelope());
         }
     }

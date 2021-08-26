@@ -33,7 +33,7 @@ namespace Centaurus.Domain
             aggregate.Item.ProcessOutrunSignatures(aggregate);
         }
 
-        public void Add(AuditorResultMessage resultMessage, RawPubKey auditor)
+        public void Add(AuditorResult resultMessage)
         {
             var aggregate = default(Aggregate);
             lock (pendingAggregatesSyncRoot)
@@ -41,7 +41,7 @@ namespace Centaurus.Domain
                 //result message could be received before quantum was processed
                 if (!pendingAggregates.TryGetValue(resultMessage.Apex, out aggregate))
                 {
-                    aggregate = new Aggregate(resultMessage, auditor, this);
+                    aggregate = new Aggregate(resultMessage, this);
                     //if result apex is less than or equal to last processed apex, then the result is no more relevant
                     if (resultMessage.Apex > Context.QuantumStorage.CurrentApex)
                         pendingAggregates.Add(resultMessage.Apex, aggregate);
@@ -50,7 +50,7 @@ namespace Centaurus.Domain
             }
 
             //add the signature to the aggregate
-            aggregate.Add(resultMessage, auditor);
+            aggregate.Add(resultMessage);
         }
 
         /// <summary>
@@ -151,10 +151,10 @@ namespace Centaurus.Domain
                 Item.ProcessOutrunSignatures(this);
             }
 
-            public Aggregate(AuditorResultMessage resultMessage, RawPubKey auditor, ResultManager resultManager)
+            public Aggregate(AuditorResult resultMessage, ResultManager resultManager)
                 : this(resultManager)
             {
-                Item = new AggregateItem(resultMessage, auditor);
+                Item = new AggregateItem(resultMessage);
             }
 
             public bool IsProcessed { get; private set; }
@@ -168,26 +168,30 @@ namespace Centaurus.Domain
             public ResultManager Manager { get; }
 
             private object syncRoot = new { };
-            private HashSet<RawPubKey> processedAuditors = new HashSet<RawPubKey>();
-            private List<AuditorResultMessage> resultMessages = new List<AuditorResultMessage>();
+            private HashSet<int> processedAuditors = new HashSet<int>();
+            private List<AuditorResult> resultMessages = new List<AuditorResult>();
 
-            public void Add(AuditorResultMessage resultMessage, RawPubKey auditor)
+            public void Add(AuditorResult resultMessage)
             {
                 lock (syncRoot)
                 {
                     //skip if processed or current auditor already sent the result
-                    if (IsProcessed || processedAuditors.Contains(auditor))
+                    if (IsProcessed || processedAuditors.Contains(resultMessage.Signature.AuditorId))
                         return;
 
                     //if current server is not Alpha than it can delay
                     if (!Item.IsResultAssigned)
                     {
-                        Item.AddResultMessage(resultMessage, auditor);
+                        Item.AddResultMessage(resultMessage);
                         return;
                     }
 
-                    //add current auditor to processed
-                    processedAuditors.Add(auditor);
+                    //obtain auditor from constellation
+                    if (!Manager.Context.AuditorIds.TryGetValue((byte)resultMessage.Signature.AuditorId, out var auditor))
+                        return;
+
+                    //TODO: add extra validations. Auditors can send invalid results
+                    processedAuditors.Add(resultMessage.Signature.AuditorId);
 
                     //check if signature is valid and tx signature is presented for TxResultMessage
                     if (resultMessage.Signature.PayloadSignature.IsValid(auditor, Item.Result.PayloadHash))
@@ -248,7 +252,7 @@ namespace Centaurus.Domain
                 }
             }
 
-            public void SubmitTransaction()
+            private void SubmitTransaction()
             {
                 try
                 {
@@ -328,10 +332,10 @@ namespace Centaurus.Domain
 
         class AggregateItem
         {
-            public AggregateItem(AuditorResultMessage result, RawPubKey auditor)
+            public AggregateItem(AuditorResult result)
             {
                 Apex = result.Apex;
-                AddResultMessage(result, auditor);
+                AddResultMessage(result);
             }
 
             public AggregateItem(QuantaProcessingResult processingResult, Aggregate aggregate)
@@ -345,18 +349,16 @@ namespace Centaurus.Domain
                 Result = result ?? throw new ArgumentNullException(nameof(result));
 
                 //add current node signature to head
-                outrunSignatures.Insert(0, (aggregate.Manager.currentPubKey, new AuditorResultMessage
+                outrunResults.Insert(0, new AuditorResult
                 {
                     Apex = Result.Apex,
                     Signature = Result.CurrentNodeSignature
-                }));
+                });
             }
 
-            public void AddResultMessage(AuditorResultMessage result, RawPubKey auditor)
+            public void AddResultMessage(AuditorResult result)
             {
-                if (outrunSignatures.Any(s => s.pubKey.Equals(auditor)))
-                    return;
-                outrunSignatures.Add((auditor, result));
+                outrunResults.Add(result);
             }
 
             public ulong Apex { get; }
@@ -365,12 +367,12 @@ namespace Centaurus.Domain
 
             public bool IsResultAssigned => Result != null;
 
-            List<(RawPubKey pubKey, AuditorResultMessage resultMessage)> outrunSignatures { get; } = new List<(RawPubKey, AuditorResultMessage)>();
+            List<AuditorResult> outrunResults { get; } = new List<AuditorResult>();
 
             public void ProcessOutrunSignatures(Aggregate aggregate)
             {
-                foreach (var result in outrunSignatures)
-                    aggregate.Add(result.resultMessage, result.pubKey);
+                foreach (var result in outrunResults)
+                    aggregate.Add(result);
             }
         }
     }

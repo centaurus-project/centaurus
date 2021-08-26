@@ -20,9 +20,9 @@ namespace Centaurus.PersistentStorage
             var fromBoundary = EncodeKeyPrefix(market, period, from);
             if (from > to)
             {
-                return storage.Find<PriceHistoryFramePersistentModel>(fromBoundary, toBoundary, QueryOrder.Desc);
+                return storage.Find<PriceHistoryFramePersistentModel>(fromBoundary, QueryOrder.Desc);
             }
-            return storage.Find<PriceHistoryFramePersistentModel>(fromBoundary, toBoundary);
+            return storage.Find<PriceHistoryFramePersistentModel>(fromBoundary).To(toBoundary);
         }
 
         private byte[] EncodeKeyPrefix(string market, int period, int timestamp)

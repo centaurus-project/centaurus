@@ -7,6 +7,7 @@ using NLog;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 
 namespace Centaurus.Domain
@@ -20,16 +21,17 @@ namespace Centaurus.Domain
         /// <param name="useLegacyOrderbook"></param>
         public ExecutionContext(Settings settings, IPersistentStorage storage, PaymentProvidersFactoryBase paymentProviderFactory, OutgoingConnectionFactoryBase connectionFactory, bool useLegacyOrderbook = false)
         {
-            PermanentStorage = storage ?? throw new ArgumentNullException(nameof(storage));
-            PermanentStorage.Connect(settings.ConnectionString);
 
             Settings = settings ?? throw new ArgumentNullException(nameof(settings));
+
+            PermanentStorage = storage ?? throw new ArgumentNullException(nameof(storage));
+            PermanentStorage.Connect(GetAbsolutePath(Settings.ConnectionString));
 
             PaymentProviderFactory = paymentProviderFactory ?? throw new ArgumentNullException(nameof(paymentProviderFactory));
 
             RoleManager = new RoleManager((CentaurusNodeParticipationLevel)Settings.ParticipationLevel);
 
-            ExtensionsManager = new ExtensionsManager(Settings.ExtensionsConfigFilePath);
+            ExtensionsManager = new ExtensionsManager(GetAbsolutePath(Settings.ExtensionsConfigFilePath));
 
             PersistenceManager = new PersistenceManager(this);
 
@@ -82,10 +84,14 @@ namespace Centaurus.Domain
             QuantumHandler.Start();
         }
 
-        /// <summary>
-        /// Delay in seconds
-        /// </summary>
-        public const int MaxTxSubmitDelay = 5 * 60; //5 minutes
+        private string GetAbsolutePath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+                return path;
+            return Path.IsPathRooted(path) 
+                ? path 
+                : Path.GetFullPath(Path.Combine(Settings.CWD, path.Trim('.').Trim('\\').Trim('/')));
+        }
 
         readonly bool useLegacyOrderbook;
 
@@ -95,6 +101,9 @@ namespace Centaurus.Domain
                 Exchange.OnUpdates -= Exchange_OnUpdates;
 
             Constellation = snapshot.Settings;
+
+            AuditorIds = Constellation.Auditors.ToDictionary(a => Constellation.GetAuditorId(a.PubKey), a => a.PubKey);
+            AuditorPubKeys = AuditorIds.ToDictionary(a => a.Value, a => a.Key);
 
             SetRole();
 
@@ -163,7 +172,7 @@ namespace Centaurus.Domain
                 return settings;
             }).ToList();
 
-            PaymentProvidersManager = new PaymentProvidersManager(PaymentProviderFactory, settings, Settings.PaymentConfigPath);
+            PaymentProvidersManager = new PaymentProvidersManager(PaymentProviderFactory, settings, GetAbsolutePath(Settings.PaymentConfigPath));
 
             foreach (var paymentProvider in PaymentProvidersManager.GetAll())
             {
@@ -259,5 +268,8 @@ namespace Centaurus.Domain
 
         public ConstellationSettings Constellation { get; private set; }
 
+        public Dictionary<byte, RawPubKey> AuditorIds { get; private set; }
+
+        public Dictionary<RawPubKey, byte> AuditorPubKeys { get; private set; }
     }
 }

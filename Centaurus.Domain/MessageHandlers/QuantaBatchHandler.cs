@@ -1,5 +1,7 @@
 ﻿using Centaurus.Models;
 using NLog;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading.Tasks;
 
 namespace Centaurus.Domain
@@ -34,7 +36,7 @@ namespace Centaurus.Domain
             var quanta = quantaBatch.Quanta;
             foreach (var processedQuantum in quanta)
             {
-                var quantum = processedQuantum.Quantum;
+                var quantum = (Quantum)processedQuantum;
                 //get last known apex
                 var lastKnownApex = quantumHandler.LastAddedQuantumApex == 0 ? Context.QuantumStorage.CurrentApex : quantumHandler.LastAddedQuantumApex;
                 if (quantum.Apex <= lastKnownApex)
@@ -43,11 +45,25 @@ namespace Centaurus.Domain
                 if (quantum.Apex != lastKnownApex + 1)
                 {
                     logger.Warn($"Batch has invalid quantum apexes (current: {quantumHandler.LastAddedQuantumApex}, received: {quantum.Apex}). New apex cursor request will be send.");
-                    await connection.SendMessage(new QuantaBatchRequest { LastKnownApex = quantumHandler.LastAddedQuantumApex });
+                    await connection.SendMessage(new QuantaBatchRequest
+                    {
+                        QuantaCursor = quantumHandler.LastAddedQuantumApex,
+                        ResultCursor = Context.RoleManager.ParticipationLevel == CentaurusNodeParticipationLevel.Prime ? ulong.MaxValue : Context.PendingUpdatesManager.LastSavedApex
+                    }.CreateEnvelope<MessageEnvelopeSigneless>());
                     return;
                 }
-                _ = Context.QuantumHandler.HandleAsync(processedQuantum.Quantum);
+
+                //if Init quantum than wait for handling
+                if (quantum.Apex == 1)
+                    await Context.QuantumHandler.HandleAsync(quantum);
+                else
+                    _ = Context.QuantumHandler.HandleAsync(quantum);
             }
+            var signatures = quantaBatch.Signatures;
+            if (signatures != null)
+                foreach (var apexSignatures in signatures)
+                    foreach (var signature in apexSignatures.Signatures)
+                        Context.AuditResultManager.Add(new AuditorResult { Apex = apexSignatures.Apex, Signature = signature });
         }
 
         private async Task AddAuditorState(ConnectionBase connection, IncomingMessage message)

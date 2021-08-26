@@ -278,7 +278,7 @@ namespace Centaurus.Test
 
             context.QuantumStorage.AddQuantum(new PendingQuantum { 
                 Quantum = quantum, 
-                Signatures = new List<AuditorSignature>() }, 
+                Signatures = new List<AuditorSignatureInternal>() }, 
             quantum.ComputeHash());
 
             return res;

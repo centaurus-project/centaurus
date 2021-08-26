@@ -33,7 +33,9 @@ namespace Centaurus.Domain
 
                 foreach (var auditor in auditors)
                 {
-                    if (connections.ContainsKey(auditor.PubKey) || auditor.PubKey.Equals(Context.Settings.KeyPair))
+                    if (!auditor.IsPrime //not prime server
+                        || connections.ContainsKey(auditor.PubKey) //already connected
+                        || auditor.PubKey.Equals(Context.Settings.KeyPair)) //current server
                         continue;
 
                     var connection = new AtomicConnection(this, auditor.PubKey, GetCentaurusConnection(auditor, Context.Settings.UseSecureConnection));
@@ -57,10 +59,15 @@ namespace Centaurus.Domain
 
         private void CloseInvalidConnections(List<Settings.Auditor> auditors)
         {
-            var connectionsToDrop = connections.Values
-                .Where(c => !auditors.Any(a => a.PubKey.Equals(c.PubKey) && GetCentaurusConnection(a, Context.Settings.UseSecureConnection) == c.Address))
-                .Select(c => c.PubKey)
-                .ToList();
+            var connectionsToDrop = new List<RawPubKey>();
+            foreach (var connection in connections.Values)
+            {
+                var auditor = auditors.FirstOrDefault(a => a.PubKey.Equals(connection.PubKey));
+                if (auditor == null //not in address book
+                    || !auditor.IsPrime //not prime server
+                    || GetCentaurusConnection(auditor, Context.Settings.UseSecureConnection) != connection.Address) //address changed
+                    connectionsToDrop.Add(connection.PubKey);
+            }
             foreach (var connectionKey in connectionsToDrop)
             {
                 if (!connections.Remove(connectionKey, out var connection))
@@ -74,7 +81,7 @@ namespace Centaurus.Domain
             return new Uri(auditor.GetWsConnection(useSecureConnection), WebSocketConstants.CentaurusWebSocketEndPoint);
         }
 
-        public void EnqueueResult(AuditorResultMessage result)
+        public void EnqueueResult(AuditorResult result)
         {
             foreach (var connection in connections)
                 connection.Value.OutgoingResultsStorage.EnqueueResult(result);

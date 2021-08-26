@@ -164,7 +164,7 @@ namespace Centaurus.Domain
             Context.QuantumStorage.AddQuantum(new PendingQuantum
             {
                 Quantum = processingResult.ResultMessage.Quantum,
-                Signatures = new List<AuditorSignature> { processingResult.CurrentNodeSignature }
+                Signatures = new List<AuditorSignatureInternal> { processingResult.CurrentNodeSignature }
             }, processingResult.QuantumHash);
         }
 
@@ -174,7 +174,7 @@ namespace Centaurus.Domain
             Context.AuditResultManager.Add(processorContext.ProcessingResult);
 
             //send result to auditors
-            Context.OutgoingConnectionManager.EnqueueResult(new AuditorResultMessage
+            Context.OutgoingConnectionManager.EnqueueResult(new AuditorResult
             {
                 Apex = processorContext.Quantum.Apex,
                 Signature = processorContext.ProcessingResult.CurrentNodeSignature
@@ -192,7 +192,7 @@ namespace Centaurus.Domain
 
         void ValidateAccountRequestSignature(RequestQuantumBase request, AccountWrapper accountWrapper)
         {
-            if (!request.RequestEnvelope.IsSignatureValid(accountWrapper.Pubkey))
+            if (!request.RequestEnvelope.IsSignatureValid(accountWrapper.Pubkey, false))
                 throw new UnauthorizedAccessException("Request quantum has invalid signature.");
         }
 

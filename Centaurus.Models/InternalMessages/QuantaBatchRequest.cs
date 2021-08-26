@@ -9,6 +9,9 @@ namespace Centaurus.Models
     public class QuantaBatchRequest : Message
     {
         [XdrField(0)]
-        public ulong LastKnownApex { get; set; }
+        public ulong QuantaCursor { get; set; }
+
+        [XdrField(1)]
+        public ulong ResultCursor { get; set; }
     }
 }

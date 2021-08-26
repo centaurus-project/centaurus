@@ -23,8 +23,8 @@ namespace Centaurus.Domain
         private static Logger logger = LogManager.GetCurrentClassLogger();
 
         private SemaphoreSlim semaphoreSlim = new SemaphoreSlim(1);
-        private Dictionary<RawPubKey, QuantaBatch> allAuditorStates = new Dictionary<RawPubKey, QuantaBatch>();
-        private Dictionary<RawPubKey, QuantaBatch> validAuditorStates = new Dictionary<RawPubKey, QuantaBatch>();
+        private Dictionary<RawPubKey, PendingQuantaBatch> allAuditorStates = new Dictionary<RawPubKey, PendingQuantaBatch>();
+        private Dictionary<RawPubKey, PendingQuantaBatch> validAuditorStates = new Dictionary<RawPubKey, PendingQuantaBatch>();
         private System.Timers.Timer applyDataTimer;
 
         public async Task AddAuditorState(RawPubKey pubKey, QuantaBatch auditorState)
@@ -43,20 +43,19 @@ namespace Centaurus.Domain
                 if (!applyDataTimer.Enabled) //start timer
                     applyDataTimer.Start();
 
-                if (!allAuditorStates.TryGetValue(pubKey, out var pendingAuditorState))
+                if (!allAuditorStates.TryGetValue(pubKey, out var pendingAuditorBatch))
                 {
-                    pendingAuditorState = new QuantaBatch
+                    pendingAuditorBatch = new PendingQuantaBatch
                     {
-                        Quanta = new List<PendingQuantum>(),
                         HasMorePendingQuanta = true
                     };
-                    allAuditorStates.Add(pubKey, pendingAuditorState);
+                    allAuditorStates.Add(pubKey, pendingAuditorBatch);
                     logger.Trace($"Auditor state from {((KeyPair)pubKey).AccountId} added.");
                 }
 
-                if (AddQuanta(pubKey, pendingAuditorState, auditorState)) //check if auditor sent all quanta already
+                if (PendingQuantaBatch.TryCreate(auditorState, out var quantaBatch) && AddQuanta(pubKey, pendingAuditorBatch, quantaBatch)) //check if auditor sent all quanta already
                 {
-                    if (pendingAuditorState.HasMorePendingQuanta) //wait while auditor will send all quanta it has
+                    if (pendingAuditorBatch.HasMorePendingQuanta) //wait while auditor will send all quanta it has
                     {
                         logger.Trace($"Auditor {((KeyPair)pubKey).AccountId} has more quanta. Timer is reset.");
                         applyDataTimer.Reset(); //if timer is running reset it. We need to try to wait all possible auditors data 
@@ -64,7 +63,7 @@ namespace Centaurus.Domain
                     }
                     logger.Trace($"Auditor {((KeyPair)pubKey).AccountId} state is validated.");
 
-                    validAuditorStates.Add(pubKey, pendingAuditorState);
+                    validAuditorStates.Add(pubKey, pendingAuditorBatch);
                 }
 
                 int majority = Context.GetMajorityCount(),
@@ -97,7 +96,7 @@ namespace Centaurus.Domain
             }
         }
 
-        private bool AddQuanta(RawPubKey pubKey, QuantaBatch currentState, QuantaBatch newAuditorState)
+        private bool AddQuanta(RawPubKey pubKey, PendingQuantaBatch currentState, PendingQuantaBatch newAuditorState)
         {
             if (!currentState.HasMorePendingQuanta
                 || newAuditorState.HasMorePendingQuanta && newAuditorState.Quanta.Count < 1) //prevent spamming
@@ -188,14 +187,14 @@ namespace Centaurus.Domain
             alphaStateManager.Rised();
         }
 
-        private async Task ApplyQuanta(List<(Quantum quantum, Dictionary<RawPubKey, AuditorResultMessage> signatures)> quanta)
+        private async Task ApplyQuanta(List<(Quantum quantum, List<AuditorResult> signatures)> quanta)
         {
             var quantaCount = quanta.Count;
             foreach (var quantumItem in quanta)
             {
                 foreach (var signature in quantumItem.signatures)
                 {
-                    Context.AuditResultManager.Add(signature.Value, signature.Key);
+                    Context.AuditResultManager.Add(signature);
                 }
                 var resultMessage = await Context.QuantumHandler.HandleAsync(quantumItem.quantum);
                 var processedQuantum = (Quantum)resultMessage.OriginalMessage.Message;
@@ -205,7 +204,7 @@ namespace Centaurus.Domain
             }
         }
 
-        private List<(Quantum quantum, Dictionary<RawPubKey, AuditorResultMessage> signatures)> GetValidQuanta()
+        private List<(Quantum quantum, List<AuditorResult> signatures)> GetValidQuanta()
         {
             //group all quanta by their apex
             var quanta = allAuditorStates.Values
@@ -213,27 +212,24 @@ namespace Centaurus.Domain
                 .GroupBy(q => q.Quantum.Apex)
                 .OrderBy(q => q.Key);
 
-            var validQuanta = new List<(Quantum quantum, Dictionary<RawPubKey, AuditorResultMessage> signatures)>();
+            var validQuanta = new List<(Quantum quantum, List<AuditorResult> signatures)>();
 
             if (quanta.Count() == 0)
                 return validQuanta;
 
             //get last known apex
             var lastQuantumApex = Context.PersistenceManager.GetLastApex();
-            //get current constellation settings
-            var constellation = Context.Constellation;
-            var auditors = constellation.Auditors
-                .Select(a => new RawPubKey(a.PubKey))
-                .ToList();
+            //get current auditors settings
+            var auditorsSettings = GetAuditorsSettings(Context.Constellation);
 
             foreach (var currentQuantaGroup in quanta)
             {
                 if (lastQuantumApex + 1 != currentQuantaGroup.Key)
                     throw new Exception("A quantum is missing");
 
-                var (quantum, signatures) = GetQuantumData(currentQuantaGroup.Key, currentQuantaGroup.ToList(), constellation.Alpha, auditors);
+                var (quantum, signatures) = GetQuantumData(currentQuantaGroup.Key, currentQuantaGroup.ToList(), auditorsSettings.alphaId, auditorsSettings.auditors);
 
-                if (!signatures.ContainsKey(constellation.Alpha))
+                if (!signatures.Any(s => s.Signature.AuditorId == auditorsSettings.alphaId))
                     throw new Exception("Quantum must contain at least Alpha signature");
 
                 validQuanta.Add((quantum, signatures));
@@ -244,21 +240,30 @@ namespace Centaurus.Domain
                 if (quantum is ConstellationQuantum constellationQuantum
                     && constellationQuantum.RequestMessage is ConstellationUpdate constellationUpdate)
                 {
-                    constellation = constellationUpdate.ToConstellationSettings(currentQuantaGroup.Key);
-                    constellation.Auditors
-                     .Select(a => new RawPubKey(a.PubKey))
-                     .ToList();
+                    auditorsSettings = GetAuditorsSettings(constellationUpdate.ToConstellationSettings(currentQuantaGroup.Key));
                 }
             }
 
             return validQuanta;
         }
 
-        private (Quantum quantum, Dictionary<RawPubKey, AuditorResultMessage> signatures) GetQuantumData(ulong apex, List<PendingQuantum> allQuanta, RawPubKey alphaPubKey, List<RawPubKey> auditors)
+        private (int alphaId, List<RawPubKey> auditors) GetAuditorsSettings(ConstellationSettings constellation)
+        {
+            var auditors = constellation.Auditors
+             .Select(a => new RawPubKey(a.PubKey))
+             .ToList();
+            var alphaId = constellation.GetAuditorId(constellation.Alpha);
+            if (alphaId < 0)
+                throw new ArgumentNullException("Unable to find Alpha id.");
+
+            return (alphaId, auditors);
+        }
+
+        private (Quantum quantum, List<AuditorResult> signatures) GetQuantumData(ulong apex, List<PendingQuantum> allQuanta, int alphaId, List<RawPubKey> auditors)
         {
             var payloadHash = default(byte[]);
             var quantum = default(Quantum);
-            var signatures = new Dictionary<RawPubKey, AuditorResultMessage>();
+            var signatures = new List<AuditorResult>();
             foreach (var currentQuantum in allQuanta)
             {
                 //compute current quantum payload hash
@@ -267,26 +272,21 @@ namespace Centaurus.Domain
                 //validate each signature
                 foreach (var signature in currentQuantum.Signatures)
                 {
+                    if (signatures.Any(s => s.Signature.AuditorId == signature.AuditorId))
+                        continue;
+
                     //try get auditor
-                    var signer = default(RawPubKey);
-                    foreach (var auditor in auditors)
-                    {
-                        if (signature.PayloadSignature.IsValid(auditor, payloadHash))
-                        {
-                            signer = auditor;
-                            break;
-                        }
-                    }
+                    var signer = auditors.ElementAtOrDefault(signature.AuditorId);
 
                     //if auditor is not found or it's signature already added, move to the next signature
-                    if (signer == null || signatures.ContainsKey(signer))
+                    if (signer == null || !signature.PayloadSignature.IsValid(signer, payloadHash))
                         continue;
 
                     if (payloadHash != null && !ByteArrayPrimitives.Equals(payloadHash, currentPayloadHash))
                     {
                         //if there are several quanta with same apex but with different hash signed by Alpha
-                        if (signer == alphaPubKey)
-                            throw new Exception($"Alpha {alphaPubKey.GetAccountId()} private key is compromised. Apex {apex}.");
+                        if (alphaId == signature.AuditorId)
+                            throw new Exception($"Alpha {signer.GetAccountId()} private key is compromised. Apex {apex}.");
                         //skip invalid signature
                         continue;
                     }
@@ -302,7 +302,7 @@ namespace Centaurus.Domain
                             //skip invalid signature
                             continue;
                     }
-                    signatures.Add(signer, new AuditorResultMessage { Apex = quantum.Apex, Signature = signature });
+                    signatures.Add(new AuditorResult { Apex = quantum.Apex, Signature = signature });
                 }
 
                 //continue if quantum already set
@@ -320,6 +320,31 @@ namespace Centaurus.Domain
         {
             applyDataTimer?.Dispose();
             applyDataTimer = null;
+        }
+
+        class PendingQuantaBatch
+        {
+            public List<PendingQuantum> Quanta { get; } = new List<PendingQuantum>();
+
+            public bool HasMorePendingQuanta { get; set; }
+
+            public static bool TryCreate(QuantaBatch quantaBatch, out PendingQuantaBatch pendingQuantaBatch)
+            {
+                pendingQuantaBatch = null;
+                if (quantaBatch == null || quantaBatch.Quanta.Count != quantaBatch.Signatures.Count)
+                    return false;
+
+                pendingQuantaBatch = new PendingQuantaBatch();
+                for (var i = 0; i < quantaBatch.Quanta.Count; i++)
+                {
+                    var quantum = (Quantum)quantaBatch.Quanta[i];
+                    var signatures = quantaBatch.Signatures[i];
+                    if (quantum.Apex != signatures.Apex)
+                        return false;
+                    pendingQuantaBatch.Quanta.Add(new PendingQuantum { Quantum = quantum, Signatures = signatures.Signatures });
+                }
+                return true;
+            }
         }
     }
 }

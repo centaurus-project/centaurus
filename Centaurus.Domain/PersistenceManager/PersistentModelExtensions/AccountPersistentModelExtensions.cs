@@ -18,6 +18,7 @@ namespace Centaurus.Domain
             var acc = new AccountWrapper(defaultRequestRateLimits)
             {
                 Id = accountModel.AccountId,
+                AccountSequence = accountModel.AccountSequence,
                 Nonce = accountModel.Nonce,
                 Pubkey = accountModel.AccountPubkey,
                 Balances = accountModel.Balances.Select(b => b.ToDomainModel()).ToDictionary(b => b.Asset, b => b),
@@ -52,6 +53,7 @@ namespace Centaurus.Domain
             var acc = new AccountPersistentModel
             {
                 AccountId = accountModel.Id,
+                AccountSequence = accountModel.AccountSequence,
                 Nonce = accountModel.Nonce,
                 AccountPubkey = accountModel.Pubkey,
                 Balances = accountModel.Balances.Values.Select(b => b.ToPersistentModel()).ToList(),

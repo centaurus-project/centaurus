@@ -46,7 +46,7 @@ namespace Centaurus.Domain
 
         static Logger logger = LogManager.GetCurrentClassLogger();
         readonly OutgoingMessageStorage outgoingMessageStorage;
-        readonly List<AuditorResultMessage> results = new List<AuditorResultMessage>();
+        readonly List<AuditorResult> results = new List<AuditorResult>();
 
         public OutgoingResultsStorage(OutgoingMessageStorage outgoingMessageStorage)
         {
@@ -64,7 +64,7 @@ namespace Centaurus.Domain
                 {
                     try
                     {
-                        var resultsBatch = default(List<AuditorResultMessage>);
+                        var resultsBatch = default(List<AuditorResult>);
                         lock (results)
                         {
                             if (results.Count != 0)
@@ -94,7 +94,7 @@ namespace Centaurus.Domain
         /// </summary>
         /// <param name="result"></param>
         /// <param name="buffer">Buffer to use for serialization</param>
-        public void EnqueueResult(AuditorResultMessage result)
+        public void EnqueueResult(AuditorResult result)
         {
             if (result == null)
                 throw new ArgumentNullException(nameof(result));

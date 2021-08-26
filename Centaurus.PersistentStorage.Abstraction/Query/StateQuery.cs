@@ -21,7 +21,7 @@ namespace Centaurus.PersistentStorage
 
         public SettingsPersistentModel LoadSettings(ulong fromApex)
         {
-            return storage.Find<SettingsPersistentModel>(ApexConverter.EncodeApex(fromApex), QueryOrder.Desc).First();
+            return storage.Find<SettingsPersistentModel>(QueryOrder.Desc).From(UlongConverter.Encode(fromApex)).First();
         }
 
         public CursorsPersistentModel LoadCursors()

@@ -2,6 +2,7 @@
 using NLog;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -9,7 +10,7 @@ namespace Centaurus.Domain
 {
     public class ResultBatchHandler : MessageHandlerBase
     {
-        public ResultBatchHandler(ExecutionContext context) 
+        public ResultBatchHandler(ExecutionContext context)
             : base(context)
         {
         }
@@ -25,7 +26,7 @@ namespace Centaurus.Domain
         {
             var resultsBatch = (AuditorResultsBatch)message.Envelope.Message;
             foreach (var result in resultsBatch.AuditorResultMessages)
-                Context.AuditResultManager.Add(result, connection.PubKey);
+                Context.AuditResultManager.Add(result);
             return Task.CompletedTask;
         }
     }

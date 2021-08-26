@@ -36,7 +36,7 @@ namespace Centaurus.Domain
                 {
                     result = message.Envelope.CreateResult(exc.GetStatusCode());
                 }
-                await connection.SendMessage(result);
+                await connection.SendMessage(result.CreateEnvelope<MessageEnvelopeSigneless>());
             }
             catch (Exception exc)
             {

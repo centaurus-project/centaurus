@@ -63,7 +63,7 @@ namespace Centaurus
         /// </summary>
         /// <param name="envelope">Target envelope</param>
         /// <returns>True if signature is valid, otherwise false</returns>
-        public static bool IsSignatureValid(this MessageEnvelopeBase envelope, KeyPair keyPair)
+        public static bool IsSignatureValid(this MessageEnvelopeBase envelope, KeyPair keyPair, bool allowSignless = true)
         {
             if (envelope == null)
                 throw new ArgumentNullException(nameof(envelope));
@@ -75,7 +75,7 @@ namespace Centaurus
                 return true;
 
             var messageHash = envelope.Message.ComputeHash();
-            return envelope.IsSignatureValid(keyPair, messageHash);
+            return envelope.IsSignatureValid(keyPair, messageHash, allowSignless);
         }
 
         /// <summary>
@@ -83,7 +83,7 @@ namespace Centaurus
         /// </summary>
         /// <param name="envelope">Target envelope</param>
         /// <returns>True if signature is valid, otherwise false</returns>
-        public static bool IsSignatureValid(this MessageEnvelopeBase envelope, KeyPair keyPair, byte[] messageHash)
+        public static bool IsSignatureValid(this MessageEnvelopeBase envelope, KeyPair keyPair, byte[] messageHash, bool allowSignless = true)
         {
             if (envelope == null)
                 throw new ArgumentNullException(nameof(envelope));
@@ -95,7 +95,7 @@ namespace Centaurus
                 throw new ArgumentNullException(nameof(keyPair));
 
             if (envelope is MessageEnvelopeSigneless)
-                return true;
+                return allowSignless;
 
             if (envelope is MessageEnvelope messageEnvelope && messageEnvelope.Signature != null)
             {

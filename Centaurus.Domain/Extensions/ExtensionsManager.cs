@@ -9,17 +9,16 @@ namespace Centaurus.Domain
 {
     public class ExtensionsManager : IDisposable
     {
-        public ExtensionsManager(string extensionsConfigFilePath)
+        public ExtensionsManager(string configFilePath)
         {
-            if (string.IsNullOrWhiteSpace(extensionsConfigFilePath))
+            if (string.IsNullOrWhiteSpace(configFilePath))
                 return;
 
-            var configFilePath = Path.GetFullPath(extensionsConfigFilePath);
             if (!File.Exists(configFilePath))
                 throw new Exception("Extensions config file is not found.");
 
             var extensionConfig = JsonSerializer.Deserialize<ExtensionConfig>(File.ReadAllText(configFilePath));
-            var extensionsDirectory = Path.GetDirectoryName(extensionsConfigFilePath);
+            var extensionsDirectory = Path.GetDirectoryName(configFilePath);
             foreach (var configItem in extensionConfig.Extensions)
             {
                 var extension = ExtensionItem.Load(configItem, extensionsDirectory);

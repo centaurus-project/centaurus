@@ -42,6 +42,7 @@ namespace Centaurus.Models
 
         [XdrField(7)]
         public RawPubKey Alpha { get; set; }
+        public object FindIndex { get; set; }
     }
 
     [XdrContract]

@@ -3,6 +3,7 @@ using Centaurus.Models;
 using Centaurus.Xdr;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 
@@ -123,7 +124,11 @@ namespace Centaurus.Domain
             else
             {
                 if (!ByteArrayComparer.Default.Equals(effectsProof, Quantum.EffectsProof) && !EnvironmentHelper.IsTest)
+                {
+                    if (Context.Settings.KeyPair.AccountId == "GAAB4NX3SI76FAGEHFXIYXE53FLMV5CDX3SFETLWX5HKH2UR37RCFT4Z")
+                        Debugger.Launch();
                     throw new Exception($"Effects hash for quantum {Apex} is not equal to provided by Alpha.");
+                }
             }
         }
 
@@ -177,10 +182,13 @@ namespace Centaurus.Domain
             ProcessingResult = result;
         }
 
-        AuditorSignature GetSignature(byte[] payloadHash)
+        AuditorSignatureInternal GetSignature(byte[] payloadHash)
         {
-            var currentAuditorSignature = new AuditorSignature
+            if (!Context.AuditorPubKeys.TryGetValue(Context.Settings.KeyPair, out var auditorId))
+                throw new Exception("Unable to find current auditor id.");
+            var currentAuditorSignature = new AuditorSignatureInternal
             {
+                AuditorId = auditorId,
                 PayloadSignature = payloadHash.Sign(Context.Settings.KeyPair)
             };
 

@@ -7,6 +7,7 @@ namespace Centaurus.Models
 {
     public class PendingQuantum : Message
     {
+        //TODO: replace with Quantum after migrating to MessagePack
         [XdrField(0)]
         public Message Message { get; set; }
 
@@ -17,19 +18,6 @@ namespace Centaurus.Models
         }
 
         [XdrField(1)]
-        public List<AuditorSignature> Signatures { get; set; }
-    }
-
-    [XdrContract]
-    public class AuditorSignature
-    {
-        [XdrField(0)]
-        public TinySignature PayloadSignature { get; set; }
-
-        [XdrField(1, Optional = true)]
-        public byte[] TxSigner { get; set; }
-
-        [XdrField(2, Optional = true)]
-        public byte[] TxSignature { get; set; }
+        public List<AuditorSignatureInternal> Signatures { get; set; }
     }
 }

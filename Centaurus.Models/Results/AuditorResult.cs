@@ -6,12 +6,12 @@ using System.Text;
 namespace Centaurus.Models
 {
     [XdrContract]
-    public class AuditorResultMessage
+    public class AuditorResult
     {
         [XdrField(0)]
         public ulong Apex { get; set; }
 
         [XdrField(1)]
-        public AuditorSignature Signature { get; set; }
+        public AuditorSignatureInternal Signature { get; set; }
     }
 }

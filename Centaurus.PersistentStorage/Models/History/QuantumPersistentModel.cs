@@ -6,7 +6,7 @@ using MessagePack;
 namespace Centaurus.PersistentStorage
 {
     [MessagePackObject]
-    public class QuantumPersistentModel : IPersistentModel, IPrefixedPersistentModel
+    public class QuantumPersistentModel : IPersistentModel, IBloomFilteredPersistentModel
     {
         /**
          * Quantum apex.
@@ -35,27 +35,27 @@ namespace Centaurus.PersistentStorage
         [IgnoreMember]
         public byte[] Key
         {
-            get => ApexConverter.EncodeApex(Apex);
-            set => Apex = ApexConverter.DecodeApex(value);
+            get => UlongConverter.Encode(Apex);
+            set => Apex = UlongConverter.Decode(value);
         }
 
         [IgnoreMember]
         public string ColumnFamily => "quanta";
-
-        [IgnoreMember]
-        public uint PrefixLength => 8;
     }
 
     [MessagePackObject]
     public class SignatureModel
     {
         [Key(0)]
-        public byte[] PayloadSignature { get; set; }
+        public byte AuditorId { get; set; }
 
         [Key(1)]
-        public byte[] TxSigner { get; set; }
+        public byte[] PayloadSignature { get; set; }
 
         [Key(2)]
+        public byte[] TxSigner { get; set; }
+
+        [Key(3)]
         public byte[] TxSignature { get; set; }
     }
 

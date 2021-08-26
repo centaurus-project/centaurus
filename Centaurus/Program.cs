@@ -20,7 +20,12 @@ namespace Centaurus
         {
             var mergedArgs = CommandLineHelper.GetMergedArgs<Settings>(args);
 
-            var parser = new Parser(s => s.AllowMultiInstance = true);
+            var parser = new Parser(s => { 
+                s.AllowMultiInstance = true;
+                s.AutoHelp = true;
+                s.AutoVersion = true;
+                s.HelpWriter = Parser.Default.Settings.HelpWriter;
+            });
             var errors = parser.ParseArguments<Settings>(mergedArgs)
                 .WithParsed(s => ConfigureAndRun(s));
         }

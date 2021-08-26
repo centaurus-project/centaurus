@@ -48,10 +48,8 @@ namespace Centaurus
         [Option("payment_config", Required = false, HelpText = "Payment providers config path.")]
         public string PaymentConfigPath { get; set; }
 
-        /// <summary>
-        /// If current server configured to use secure connection than we assume that all constellation nodes are configure secure connection
-        /// </summary>
-        public bool UseSecureConnection => !string.IsNullOrWhiteSpace(TlsCertificatePath);
+        [Option("use_secure_connection", Default = false, HelpText = "Use https/wss or not.")]
+        public bool UseSecureConnection { get; set; }
 
         public void Build()
         {
@@ -69,47 +67,62 @@ namespace Centaurus
                 if (!parseResult.res)
                     throw new ArgumentNullException("Invalid genesis_domains options.");
 
-                UriBuilder = new UriBuilder(parseResult.uri);
                 PubKey = parseResult.keyPair;
+                Address = parseResult.address;
             }
 
             public Auditor(KeyPair pubKey, string address)
             {
                 PubKey = pubKey ?? throw new ArgumentNullException(nameof(pubKey));
-                if (!TryCreateUri(address, out var uri))
+
+                if (address == null)
+                    return;
+                if (!TryCreateUri(address, false, out _))
                     throw new ArgumentException("Invalid address");
-                UriBuilder = new UriBuilder(uri);
+                Address = address;
             }
 
             public KeyPair PubKey { get; }
+            public string Address { get; }
 
-            private readonly UriBuilder UriBuilder;
-
-            private (bool res, KeyPair keyPair, Uri uri) TryParse(string settings)
+            private (bool res, KeyPair keyPair, string address) TryParse(string settings)
             {
                 var splitted = settings.Split('=');
+                var pubkeySeed = splitted[0];
+                var address = splitted[1];
+                var uri = default(Uri);
                 if (splitted.Length != 2
-                    || !StrKey.IsValidEd25519PublicKey(splitted[0])
-                    || !TryCreateUri(splitted[1], out var uri))
+                    || !StrKey.IsValidEd25519PublicKey(pubkeySeed)
+                    || !string.IsNullOrEmpty(address) && !TryCreateUri(address, false, out _))
                     return (false, null, null);
-                return (true, KeyPair.FromAccountId(splitted[0]), uri);
+                return (true, KeyPair.FromAccountId(pubkeySeed), address);
             }
 
-            private bool TryCreateUri(string address, out Uri uri)
+            private bool TryCreateUri(string address, bool useSecureConnection, out Uri uri)
             {
-                return Uri.TryCreate($"http://{address}", UriKind.Absolute, out uri);
+                return Uri.TryCreate($"{(useSecureConnection? Uri.UriSchemeHttps: Uri.UriSchemeHttp)}://{address}", UriKind.Absolute, out uri);
+            }
+
+            public bool IsPrime => !string.IsNullOrEmpty(Address);
+
+            private UriBuilder GetUriBuilder(bool useSecureConnection)
+            {
+                TryCreateUri(Address, useSecureConnection, out var uri);
+                return new UriBuilder(uri);
             }
 
             public Uri GetWsConnection(bool isSecureConnection)
             {
-                UriBuilder.Scheme = isSecureConnection ? "wss" : "ws";
-                return UriBuilder.Uri;
+                var uriBuilder = GetUriBuilder(isSecureConnection);
+                uriBuilder.Scheme = isSecureConnection ? "wss" : "ws";
+                return uriBuilder.Uri;
             }
 
             public Uri GetHttpConnection(bool isSecureConnection)
             {
-                UriBuilder.Scheme = isSecureConnection ? Uri.UriSchemeHttps : Uri.UriSchemeHttp;
-                return UriBuilder.Uri;
+                var uriBuilder = GetUriBuilder(isSecureConnection);
+                uriBuilder.Scheme = isSecureConnection ? Uri.UriSchemeHttps : Uri.UriSchemeHttp;
+                return uriBuilder.Uri;
             }
         }
     }

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using RocksDbSharp;
 
@@ -25,14 +26,34 @@ namespace Centaurus.PersistentStorage
 
         public void SaveBatch(List<IPersistentModel> modelsToSave)
         {
-            using (var batch = new WriteBatch())
+            try
             {
-                foreach (var obj in modelsToSave)
+                using (var batch = new WriteBatch())
                 {
-                    batch.Put(obj.Key, obj.SerializeValue(), columnFamilies[obj.ColumnFamily]);
+                    foreach (var obj in modelsToSave)
+                    {
+                        try
+                        {
+                            batch.Put(obj.Key, obj.SerializeValue(), columnFamilies[obj.ColumnFamily]);
+                        }
+                        catch (Exception exc)
+                        {
+                            Debugger.Launch();
+                        }
+                    }
+                    try
+                    {
+                        db.Write(batch, new WriteOptions());
+                    }
+                    catch (Exception exc)
+                    {
+                        Debugger.Launch();
+                    }
                 }
-
-                db.Write(batch, new WriteOptions());
+            }
+            catch (Exception exc)
+            {
+                Debugger.Launch();
             }
         }
 
@@ -48,40 +69,18 @@ namespace Centaurus.PersistentStorage
             return new StorageIterator<T>(iterator, queryOrder);
         }
 
-        /// <summary>
-        /// Range-restricted iteration
-        /// </summary>
-        /// <typeparam name="T">Model type</typeparam>
-        /// <param name="from">Exclusive lower boundary (supports prefixed search)</param>
-        /// <param name="queryOrder">Search direction</param>
-        /// <returns>Models iterator</returns>
-        public StorageIterator<T> Find<T>(byte[] from, QueryOrder queryOrder = QueryOrder.Asc) where T : IPersistentModel, new()
-        {
-            return Find<T>(from, null, queryOrder);
-        }
-
         //TODO: fork the rocksdb wrapper and add rocksdb_readoptions_set_iterate_lower_bound support,as well as NET 5.0 deploy fix (see https://github.com/curiosity-ai/rocksdb-sharp/pulls)
         /// <summary>
-        /// Range-restricted iteration
+        /// Run prefixed search
         /// </summary>
         /// <typeparam name="T">Model type</typeparam>
-        /// <param name="from">Exclusive lower boundary (supports prefixed search)</param>
-        /// <param name="upperBound">Inclusive upper boundary</param>
+        /// <param name="prefix">Exclusive lower boundary (supports prefixed search)</param>
         /// <param name="queryOrder">Search direction</param>
         /// <returns>Models iterator</returns>
-        public StorageIterator<T> Find<T>(byte[] from, byte[] upperBound, QueryOrder queryOrder = QueryOrder.Asc) where T : IPersistentModel, new()
+        public StorageIterator<T> Find<T>(byte[] prefix, QueryOrder queryOrder = QueryOrder.Asc) where T : IPersistentModel, IPrefixedPersistentModel, new()
         {
-            var opts = new ReadOptions();
-            if (typeof(IPrefixedPersistentModel).IsAssignableFrom(typeof(T)) && (new T() as IPrefixedPersistentModel).PrefixLength == from.Length)
-            {
-                opts = opts.SetPrefixSameAsStart(true).SetTotalOrderSeek(false);
-            }
-            else
-            {
-                opts = opts.SetTotalOrderSeek(true);
-            }
-            var iterator = db.NewIterator(ResolveColumnFamily<T>(), opts);
-            return new StorageIterator<T>(iterator, queryOrder).From(from).To(upperBound);
+            var iterator = db.NewIterator(ResolveColumnFamily<T>(), new ReadOptions().SetPrefixSameAsStart(true).SetTotalOrderSeek(false));
+            return new StorageIterator<T>(iterator, queryOrder).From(prefix);
         }
 
         public T First<T>() where T : IPersistentModel, new()

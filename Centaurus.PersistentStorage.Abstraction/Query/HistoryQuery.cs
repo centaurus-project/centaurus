@@ -9,7 +9,7 @@ namespace Centaurus.PersistentStorage
     {
         public QuantumPersistentModel LoadQuantum(ulong apex)
         {
-            return storage.Get<QuantumPersistentModel>(ApexConverter.EncodeApex(apex));
+            return storage.Get<QuantumPersistentModel>(UlongConverter.Encode(apex));
         }
 
         public List<QuantumPersistentModel> LoadQuanta(params ulong[] apexes)
@@ -19,7 +19,7 @@ namespace Centaurus.PersistentStorage
 
         public StorageIterator<QuantumPersistentModel> LoadQuantaAboveApex(ulong apex)
         {
-            return storage.Find<QuantumPersistentModel>(ApexConverter.EncodeApex(apex));
+            return storage.Find<QuantumPersistentModel>().From(UlongConverter.Encode(apex));
         }
 
         public List<AccountQuantumDTO> LoadQuantaForAccount(byte[] accountPubkey, ulong apex, int limit, QueryOrder order = QueryOrder.Asc)
@@ -32,16 +32,14 @@ namespace Centaurus.PersistentStorage
         public List<AccountQuantumDTO> LoadQuantaForAccount(ulong accountId, ulong fromApex, int limit, QueryOrder order = QueryOrder.Asc)
         {
             var startFrom = new QuantumRefPersistentModel
-            { AccountId = accountId, Apex = fromApex + (ulong)(order == QueryOrder.Asc ? 1 : -1) }.Key;
-            var cursor = storage.Find<QuantumRefPersistentModel>(startFrom);
-            if (order == QueryOrder.Desc)
-            {
-                cursor.Reverse();
-            }
-            var refs = cursor.Take(limit).ToDictionary(qr => qr.Apex, qr => qr);
+            { AccountId = accountId, Apex = fromApex }.Key;
+            var refs = storage.Find<QuantumRefPersistentModel>(UlongConverter.Encode(accountId), order)
+                .From(startFrom)
+                .Take(limit)
+                .ToDictionary(qr => qr.Apex, qr => qr);
             if (refs.Count == 0)
                 return new List<AccountQuantumDTO>(); //nothing found
-            var keys = refs.Select(r => ApexConverter.EncodeApex(r.Key)).ToArray();
+            var keys = refs.Select(r => UlongConverter.Encode(r.Key)).ToArray();
             return storage.MutliGet<QuantumPersistentModel>(keys)
                 .Select(q => new AccountQuantumDTO { Quantum = q, IsInitiator = refs[q.Apex].IsQuantumInitiator })
                 .ToList();

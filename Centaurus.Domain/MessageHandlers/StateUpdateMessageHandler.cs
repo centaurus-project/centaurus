@@ -17,7 +17,7 @@ namespace Centaurus.Domain
 
         public override Task HandleMessage(ConnectionBase connection, IncomingMessage message)
         {
-            Context.StateManager.SetAuditorState(connection.PubKey, ((StateUpdateMessage)message.Envelope.Message).State);
+            Context.StateManager.SetAuditorState(connection.PubKey, (StateUpdateMessage)message.Envelope.Message);
             return Task.CompletedTask;
         }
     }

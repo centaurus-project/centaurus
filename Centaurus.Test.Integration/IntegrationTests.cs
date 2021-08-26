@@ -160,7 +160,7 @@ namespace Centaurus.Test
             //change quantum
             environment.AuditorWrappers.Values.ToList().ForEach(a =>
             {
-                a.Context.QuantumStorage.GetQuantaBacth(lastApex + 1, 1, out var quanta);
+                a.Context.QuantumStorage.GetQuantaBacth(lastApex, 1, out var quanta);
                 var quantum = quanta.First();
                 if (invalidHash)
                     quantum.Quantum.Timestamp = DateTime.UtcNow.Ticks;
@@ -232,7 +232,7 @@ namespace Centaurus.Test
                 Timestamp = DateTime.UtcNow.Ticks
             };
 
-            quantaStorage.AddQuantum(new PendingQuantum { Quantum = requestQuantum, Signatures = new List<AuditorSignature>() }, requestQuantum.ComputeHash());
+            quantaStorage.AddQuantum(new PendingQuantum { Quantum = requestQuantum, Signatures = new List<AuditorSignatureInternal>() }, requestQuantum.ComputeHash());
 
             var expectedState = useFakeClient || useFakeAlpha || invalidBalance ? State.Failed : State.Ready;
 

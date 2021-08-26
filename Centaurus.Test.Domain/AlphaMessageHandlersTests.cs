@@ -152,7 +152,7 @@ namespace Centaurus.Test
 
             var clientConnection = GetIncomingConnection(context, clientKeyPair.PublicKey, state);
 
-            var envelope = new QuantaBatchRequest { LastKnownApex = 1 }.CreateEnvelope();
+            var envelope = new QuantaBatchRequest { QuantaCursor = 1 }.CreateEnvelope();
             envelope.Sign(clientKeyPair);
             using var writer = new XdrBufferWriter();
             var inMessage = envelope.ToIncomingMessage(writer);
@@ -178,7 +178,7 @@ namespace Centaurus.Test
 
             var envelope = new QuantaBatch
             {
-                Quanta = new List<PendingQuantum>()
+                Quanta = new List<Message>()
             }.CreateEnvelope();
             envelope.Sign(clientKeyPair);
 

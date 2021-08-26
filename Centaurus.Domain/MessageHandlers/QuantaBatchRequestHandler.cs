@@ -27,7 +27,7 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
         {
             var batchRequest = (QuantaBatchRequest)message.Envelope.Message;
             if (connection is IncomingAuditorConnection incomingAuditorConnection)
-                incomingAuditorConnection.SetApexCursor(batchRequest.LastKnownApex);
+                incomingAuditorConnection.SetSyncCursor(batchRequest.QuantaCursor, batchRequest.ResultCursor);
             else if (connection is OutgoingConnection)
                 await SendQuanta(connection, batchRequest);
             else
@@ -37,11 +37,11 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
         private async Task SendQuanta(ConnectionBase connection, QuantaBatchRequest batchRequest)
         {
             var hasQuanta = true;
-            var aboveApex = batchRequest.LastKnownApex;
+            var aboveApex = batchRequest.QuantaCursor;
             var batchSize = 50;
             while (hasQuanta)
             {
-                if (!Context.QuantumStorage.GetQuantaBacth(aboveApex + 1, batchSize, out var currentBatch)
+                if (!Context.QuantumStorage.GetQuantaBacth(aboveApex, batchSize, out var currentBatch)
                     && (aboveApex + 1 < Context.QuantumStorage.CurrentApex))
                 {
                     currentBatch = Context.PersistenceManager.GetQuantaAboveApex(aboveApex, batchSize); //quanta are not found in the in-memory storage
@@ -53,14 +53,22 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
                     currentBatch = new List<PendingQuantum>();
 
                 hasQuanta = currentBatch.Count == batchSize;
-                var state = new QuantaBatch
+                var batch = new QuantaBatch
                 {
-                    Quanta = currentBatch,
+                    Quanta = new List<Message>(),
+                    Signatures = new List<QuantumSignatures>(),
                     HasMorePendingQuanta = hasQuanta
                 };
-                await connection.SendMessage(state);
+
+                foreach (var quantum in currentBatch)
+                {
+                    batch.Quanta.Add(quantum.Quantum);
+                    batch.Signatures.Add(new QuantumSignatures { Apex = quantum.Quantum.Apex, Signatures = quantum.Signatures });
+                }
+
+                await connection.SendMessage(batch.CreateEnvelope<MessageEnvelopeSigneless>());
                 var lastQuantum = currentBatch.LastOrDefault();
-                aboveApex = (ulong)(lastQuantum?.Quantum.MessageId ?? 0);
+                aboveApex = lastQuantum?.Quantum.Apex ?? 0;
             };
         }
     }

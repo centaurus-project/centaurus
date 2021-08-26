@@ -43,8 +43,10 @@ namespace Centaurus.Domain
                     connection.ConnectionState.ToString(),
                     ValidConnectionStates.Select(s => s.ToString()).ToArray());
 
-            if (!message.Envelope.IsSignatureValid(connection.PubKey, message.MessageHash))
+            if (!message.Envelope.IsSignatureValid(connection.PubKey, message.MessageHash, connection.IsAuditor && connection.ConnectionState == ConnectionState.Ready))
+            {
                 throw new UnauthorizedException();
+            }
 
             ValidateAuditor(connection);
             ValidateClient(connection);

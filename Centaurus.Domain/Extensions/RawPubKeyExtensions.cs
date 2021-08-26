@@ -12,7 +12,7 @@ namespace Centaurus.Domain
             if (pubKey == null)
                 throw new ArgumentNullException(nameof(pubKey));
 
-            return ((KeyPair)pubKey).AccountId;
+            return StrKey.EncodeStellarAccountId(pubKey);
         }
     }
 }

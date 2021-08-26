@@ -93,19 +93,40 @@ namespace Centaurus.PersistentStorage
             return res;
         }
 
-        internal StorageIterator<T> To(byte[] toBoundary)
+        /// <summary>
+        /// Set inclusive upper boundary for the search
+        /// </summary>
+        /// <param name="to">Inclusive upper boundary</param>
+        public StorageIterator<T> To(byte[] to)
         {
-            this.toBoundary = toBoundary;
+            this.toBoundary = to;
             return this;
         }
 
-        internal StorageIterator<T> From(byte[] from)
+        /// <summary>
+        /// Set exclusive lower boundary and jump to the next entry
+        /// </summary>
+        /// <param name="from">Key to search from</param>
+        public StorageIterator<T> From(byte[] from)
         {
             iterator.Seek(from);
-            if (IsReversed || iterator.Key().AsSpan().SequenceEqual(from))
+            if (iterator.Valid())
             {
-                if (iterator.Valid())
+                if (IsReversed || iterator.Key().AsSpan().SequenceEqual(from))
+                {
                     Next();
+                }
+            }
+            else
+            {
+                if (IsReversed)
+                {
+                    iterator.SeekToLast();
+                }
+                //else
+                //{
+                //    throw new NotSupportedException();
+                //}
             }
             return this;
         }

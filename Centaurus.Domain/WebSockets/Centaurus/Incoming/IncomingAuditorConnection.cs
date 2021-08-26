@@ -12,6 +12,7 @@ namespace Centaurus
         public IncomingAuditorConnection(ExecutionContext context, KeyPair keyPair, WebSocket webSocket, string ip)
             : base(context, keyPair, webSocket, ip)
         {
+            quantumWorker = new QuantumSyncWorker(Context, this);
             SendHandshake();
         }
 
@@ -21,27 +22,25 @@ namespace Centaurus
 
         protected override int outBufferSize => AuditorBufferSize;
 
-        public QuantumSyncWorker QuantumWorker { get; private set; }
-        private readonly object apexCursorSyncRoot = new { };
+        private QuantumSyncWorker quantumWorker;
 
-        public void SetApexCursor(ulong newApexCursor)
+        public ulong CurrentCursor => quantumWorker.CurrentQuantaCursor;
+
+        public void SetSyncCursor(ulong newQuantumCursor, ulong newResultCursor)
         {
-            lock (apexCursorSyncRoot)
-            {
-                logger.Trace($"Connection {PubKeyAddress}, apex cursor reset requested. New apex cursor {newApexCursor}");
-                //cancel current quantum worker
-                QuantumWorker?.Dispose();
+            var resultCursor = newResultCursor == ulong.MaxValue ? (ulong?)null : newResultCursor;
 
-                //set new apex cursor, and start quantum worker
-                QuantumWorker = new QuantumSyncWorker(Context, newApexCursor, this);
-                logger.Trace($"Connection {PubKeyAddress}, apex cursor reseted. New apex cursor {newApexCursor}");
-            }
+            logger.Trace($"Connection {PubKeyAddress}, apex cursor reset requested. New quantum cursor {newQuantumCursor}, new result cursor {(resultCursor.HasValue ? newResultCursor.ToString() : "null")}");
+
+            //set new quantum and result cursors
+            quantumWorker.SetCursors(newQuantumCursor, resultCursor);
+            logger.Trace($"Connection {PubKeyAddress}, cursors reseted.");
         }
 
         public override void Dispose()
         {
             base.Dispose();
-            QuantumWorker?.Dispose();
+            quantumWorker.Dispose();
         }
     }
 }

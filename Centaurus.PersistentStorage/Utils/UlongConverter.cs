@@ -3,16 +3,16 @@ using System.Buffers.Binary;
 
 namespace Centaurus.PersistentStorage
 {
-    public static class ApexConverter
+    public static class UlongConverter
     {
-        public static byte[] EncodeApex(ulong apex)
+        public static byte[] Encode(ulong apex)
         {
             var res = new byte[8];
             BinaryPrimitives.WriteUInt64BigEndian(res, apex);
             return res;
         }
 
-        public static ulong DecodeApex(byte[] value)
+        public static ulong Decode(byte[] value)
         {
             return BinaryPrimitives.ReadUInt64BigEndian(value);
         }

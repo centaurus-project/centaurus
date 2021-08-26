@@ -13,13 +13,14 @@ namespace Centaurus.Domain
             var quantum = new PendingQuantum
             {
                 Quantum = (Quantum)XdrConverter.Deserialize<Message>(quantumPersistentModel.RawQuantum),
-                Signatures = new List<AuditorSignature>()
+                Signatures = new List<AuditorSignatureInternal>()
             };
 
             foreach (var signature in quantumPersistentModel.Signatures)
             {
-                quantum.Signatures.Add(new AuditorSignature
+                quantum.Signatures.Add(new AuditorSignatureInternal
                 {
+                    AuditorId = signature.AuditorId,
                     PayloadSignature = new TinySignature { Data = signature.PayloadSignature },
                     TxSignature = signature.TxSignature,
                     TxSigner = signature.TxSigner

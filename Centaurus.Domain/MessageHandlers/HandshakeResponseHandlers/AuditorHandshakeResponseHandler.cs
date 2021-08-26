@@ -31,14 +31,14 @@ namespace Centaurus.Domain
             if (!incomingAuditorConnection.TryValidate(auditorHandshake.HandshakeData))
                 throw new ConnectionCloseException(WebSocketCloseStatus.InvalidPayloadData, "Handshake data is invalid.");
 
-            incomingAuditorConnection.SetApexCursor(auditorHandshake.LastKnownApex);
+            incomingAuditorConnection.SetSyncCursor(auditorHandshake.QuantaCursor, auditorHandshake.ResultCursor);
 
             //request quanta on rising
             if (Context.StateManager.State == State.Rising)
             {
                 await incomingAuditorConnection.SendMessage(new QuantaBatchRequest
                 {
-                    LastKnownApex = Context.QuantumStorage.CurrentApex
+                    QuantaCursor = Context.QuantumStorage.CurrentApex
                 }.CreateEnvelope<MessageEnvelopeSigneless>());
             }
         }

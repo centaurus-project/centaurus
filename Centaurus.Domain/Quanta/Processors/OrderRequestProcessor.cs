@@ -34,8 +34,9 @@ namespace Centaurus.Domain
 
             var quantum = context.Request;
             var orderRequest = quantum.RequestEnvelope.Message as OrderRequest;
+            var baseAsset = context.CentaurusContext.Constellation.QuoteAsset;
 
-            if (context.CentaurusContext.Constellation.QuoteAsset.Code == orderRequest.Asset)
+            if (baseAsset.Code == orderRequest.Asset)
                 throw new InvalidOperationException("Order asset must be different from quote asset.");
 
             var orderAsset = context.CentaurusContext.Constellation.Assets.FirstOrDefault(a => a.Code == orderRequest.Asset);
@@ -58,7 +59,6 @@ namespace Centaurus.Domain
             }
             else
             {
-                var baseAsset = context.CentaurusContext.Constellation.QuoteAsset;
                 var balance = context.InitiatorAccount.GetBalance(baseAsset.Code);
                 if (!balance.HasSufficientBalance(quoteAmount, context.CentaurusContext.Constellation.MinAccountBalance))
                     throw new BadRequestException("Insufficient funds");

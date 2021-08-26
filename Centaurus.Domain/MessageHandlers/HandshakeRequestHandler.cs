@@ -22,11 +22,16 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
         {
             var handshakeRequest = (HandshakeRequest)message.Envelope.Message;
 
-            var lastKnownApex = Math.Max(Context.QuantumHandler.LastAddedQuantumApex, Context.QuantumStorage.CurrentApex);
+            var quantaCursor = Math.Max(Context.QuantumHandler.LastAddedQuantumApex, Context.QuantumStorage.CurrentApex);
+            //if Prime than the node will receive results from auditors
+            var resultCursor = Context.RoleManager.ParticipationLevel == CentaurusNodeParticipationLevel.Prime 
+                ? ulong.MaxValue 
+                : Context.PendingUpdatesManager.LastSavedApex;
             await connection.SendMessage(new AuditorHandshakeResponse
             {
                 HandshakeData = handshakeRequest.HandshakeData,
-                LastKnownApex = lastKnownApex
+                QuantaCursor = quantaCursor,
+                ResultCursor = resultCursor
             });
 
             //after sending auditor handshake the connection become ready

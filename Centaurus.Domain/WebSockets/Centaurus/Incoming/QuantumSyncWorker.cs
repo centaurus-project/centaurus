@@ -3,6 +3,7 @@ using Centaurus.Models;
 using NLog;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,69 +14,137 @@ namespace Centaurus
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public QuantumSyncWorker(Domain.ExecutionContext context, ulong apexCursor, ConnectionBase auditor)
-            :base(context)
+        public QuantumSyncWorker(Domain.ExecutionContext context, ConnectionBase auditor)
+            : base(context)
         {
             this.auditor = auditor ?? throw new ArgumentNullException(nameof(auditor));
-            CurrentApexCursor = apexCursor;
+            batchSize = Context.Settings.SyncBatchSize;
             Task.Factory.StartNew(SendQuantums, TaskCreationOptions.LongRunning);
         }
 
         private readonly ConnectionBase auditor;
-
+        private readonly int batchSize;
         private CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
 
-        public ulong CurrentApexCursor { get; private set; }
+        private SemaphoreSlim syncRoot = new SemaphoreSlim(1);
+
+        public ulong CurrentQuantaCursor { get; private set; }
+        public ulong? CurrentResultCursor { get; private set; }
+
+        public void SetCursors(ulong quantaCursor, ulong? resultCursor)
+        {
+            syncRoot.Wait();
+            try
+            {
+                CurrentQuantaCursor = quantaCursor;
+                CurrentResultCursor = resultCursor;
+            }
+            finally
+            {
+                syncRoot.Release();
+            }
+        }
 
         private async Task SendQuantums()
         {
-            var batchSize = Context.Settings.SyncBatchSize;
             while (!cancellationTokenSource.Token.IsCancellationRequested)
             {
-                var apexDiff = Context.QuantumStorage.CurrentApex - CurrentApexCursor;
-                if (apexDiff < 0)
-                {
-                    logger.Error($"Auditor {((KeyPair)auditor.PubKey).AccountId} is above current constellation state.");
-                    await auditor.CloseConnection(System.Net.WebSockets.WebSocketCloseStatus.ProtocolError, "Auditor is above all constellation.");
-                    return;
-                }
-
-                if (!Context.IsAlpha || auditor.ConnectionState != ConnectionState.Ready || apexDiff == 0 || Context.StateManager.State == State.Rising)
-                {
-                    Thread.Sleep(50);
-                    continue;
-                }
+                await syncRoot.WaitAsync();
                 try
                 {
-                    List<PendingQuantum> quanta = null;
-                    if (!Context.QuantumStorage.GetQuantaBacth(CurrentApexCursor + 1, batchSize, out quanta))
+                    if (CurrentQuantaCursor > Context.QuantumStorage.CurrentApex)
                     {
-                        quanta = Context.PersistenceManager.GetQuantaAboveApex(CurrentApexCursor, batchSize); //quanta are not found in the in-memory storage
-                        if (quanta.Count < 1)
-                            throw new Exception("No quanta from database.");
+                        logger.Error($"Auditor {auditor.PubKey.GetAccountId()} is above current constellation state.");
+                        await auditor.CloseConnection(System.Net.WebSockets.WebSocketCloseStatus.ProtocolError, "Auditor is above all constellation.");
+                        return;
                     }
 
-                    if (quanta.Count < 1)
-                        throw new Exception("No quanta from storage.");
+                    var quantaDiff = Context.QuantumStorage.CurrentApex - CurrentQuantaCursor;
+                    var resultDiff = (Context.PendingUpdatesManager.LastSavedApex - CurrentResultCursor) ?? 0;
 
-                    var firstApex = quanta.First().Quantum.Apex;
-                    var lastApex = quanta.Last().Quantum.Apex;
+                    if (!Context.IsAlpha //only Alpha should broadcast quanta
+                        || auditor.ConnectionState != ConnectionState.Ready //connection is not validated yet
+                        || (quantaDiff == 0 && resultDiff == 0) //nothing to sync
+                        || Context.StateManager.State == State.Rising) //wait for Running state
+                    {
+                        Thread.Sleep(50);
+                        continue;
+                    }
 
-                    logger.Trace($"About to sent {quanta.Count} quanta. Apex from {firstApex} to {lastApex}");
+                    var quantaBatch = quantaDiff > 0
+                        ? GetPendingQuanta(CurrentQuantaCursor, batchSize)
+                        : new List<PendingQuantum>();
 
-                    var batchMessage = new QuantaBatch { Quanta = quanta };
-                    await auditor.SendMessage(batchMessage);
+                    var batchMessage = new QuantaBatch
+                    {
+                        Quanta = quantaBatch.Select(q => (Message)q.Quantum).ToList(),
+                        HasMorePendingQuanta = true
+                    };
 
-                    CurrentApexCursor = lastApex;
+                    var firstQuantumApex = quantaBatch.FirstOrDefault()?.Quantum.Apex;
+                    var lastQuantumApex = quantaBatch.LastOrDefault()?.Quantum.Apex;
+
+                    if (resultDiff != 0)
+                    {
+                        var resultCursor = CurrentResultCursor.Value;
+                        var count = Math.Min(batchSize, (int)(Context.PendingUpdatesManager.LastSavedApex - resultCursor));
+
+                        var signaturesQuanta = default(IEnumerable<PendingQuantum>);
+                        if (quantaBatch.Count > 0 && firstQuantumApex <= resultCursor && resultCursor + (ulong)count <= lastQuantumApex)
+                        {
+                            signaturesQuanta = quantaBatch
+                                .SkipWhile(q => q.Quantum.Apex != resultCursor + 1)
+                                .Take(count);
+                        }
+                        else
+                            //TODO:intersect with loaded already quanta
+                            signaturesQuanta = GetPendingQuanta(resultCursor, count);
+
+                        batchMessage.Signatures = signaturesQuanta
+                            .Select(q => new QuantumSignatures
+                            {
+                                Apex = q.Quantum.Apex,
+                                Signatures = q.Signatures
+                            })
+                            .ToList();
+                    }
+
+                    var lastResultApex = batchMessage.Signatures?.LastOrDefault()?.Apex;
+
+                    logger.Trace($"About to sent {batchMessage.Quanta.Count} quanta and {batchMessage.Signatures?.Count} results. Quanta from {firstQuantumApex} to {lastQuantumApex}.");
+
+                    await auditor.SendMessage(batchMessage.CreateEnvelope<MessageEnvelopeSigneless>());
+
+                    if (lastQuantumApex.HasValue)
+                        CurrentQuantaCursor = lastQuantumApex.Value;
+
+                    if (lastResultApex.HasValue)
+                        CurrentResultCursor = lastResultApex;
                 }
                 catch (Exception exc)
                 {
                     if (exc is ObjectDisposedException
                     || exc.GetBaseException() is ObjectDisposedException)
                         throw;
-                    logger.Error(exc, $"Unable to get quanta. Cursor: {CurrentApexCursor}; CurrentApex: {Context.QuantumStorage.CurrentApex}");
+                    logger.Error(exc, $"Unable to get quanta. Cursor: {CurrentQuantaCursor}; CurrentApex: {Context.QuantumStorage.CurrentApex}");
+                }
+                finally
+                {
+                    syncRoot.Release();
                 }
             }
+        }
+
+        private List<PendingQuantum> GetPendingQuanta(ulong from, int count)
+        {
+            if (!Context.QuantumStorage.GetQuantaBacth(from, count, out var quanta))
+            {
+                //quanta are not found in the in-memory storage
+                quanta = Context.PersistenceManager.GetQuantaAboveApex(from, count);
+                if (quanta.Count < 1)
+                    throw new Exception("No quanta from database.");
+            }
+            return quanta;
         }
 
         public void Dispose()

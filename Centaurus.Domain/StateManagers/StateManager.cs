@@ -72,7 +72,10 @@ namespace Centaurus.Domain
         {
             get
             {
-                return Context.HasMajority(connectedAuditors.Count(a => a.Value.IsRunning), false);
+                if (Context.RoleManager.ParticipationLevel == CentaurusNodeParticipationLevel.Prime)
+                    return Context.HasMajority(connectedAuditors.Count(a => a.Value.IsRunning), false);
+                //refactor it
+                return true;
             }
         }
 
@@ -152,13 +155,15 @@ namespace Centaurus.Domain
             }
         }
 
-        public void SetAuditorState(RawPubKey auditorPubKey, State state)
+        public void SetAuditorState(RawPubKey auditorPubKey, StateUpdateMessage stateMessage)
         {
             lock (this)
             {
-                if (!connectedAuditors.TryGetValue(auditorPubKey, out var auditor) || auditor.AuditorState == state)
+                if (!connectedAuditors.TryGetValue(auditorPubKey, out var auditor) 
+                    || auditor.AuditorState == stateMessage.State)
                     return;
-                auditor.AuditorState = state;
+                auditor.AuditorState = stateMessage.State;
+                auditor.IsPrime = stateMessage.IsPrime;
                 RefreshState();
             }
         }
@@ -172,7 +177,10 @@ namespace Centaurus.Domain
                 else if (State == State.Ready && !HasMajority)
                     SetState(State.Running);
 
-                Context.NotifyAuditors(new StateUpdateMessage { State = State }.CreateEnvelope<MessageEnvelopeSigneless>());
+                Context.NotifyAuditors(new StateUpdateMessage { 
+                    State = State, 
+                    IsPrime = Context.RoleManager.ParticipationLevel == CentaurusNodeParticipationLevel.Prime
+                }.CreateEnvelope<MessageEnvelopeSigneless>());
             }
         }
 
@@ -253,6 +261,8 @@ namespace Centaurus.Domain
         public bool HasAnyConnection => incoming != null || outgoing != null;
 
         public State AuditorState { get; set; }
+
+        public bool IsPrime { get; set; }
 
         public bool IsReady => AuditorState == State.Ready && isConnectionReady();
 

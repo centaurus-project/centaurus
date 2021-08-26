@@ -75,7 +75,7 @@ namespace Centaurus.Domain
                     var accountId = auditorConnection?.PubKeyAddress;
                     if (!auditorsStatistics.TryGetValue(accountId, out var statistics))
                         continue;
-                    var auditorApex = auditorConnection?.QuantumWorker?.CurrentApexCursor ?? 0;
+                    var auditorApex = auditorConnection.CurrentCursor;
                     if (auditorApex >= 0)
                         statistics.Delay = (int)(Context.QuantumStorage.CurrentApex - auditorApex);
                 }

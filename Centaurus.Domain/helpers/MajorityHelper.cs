@@ -51,5 +51,20 @@ namespace Centaurus
                 auditorsCount++;
             return auditorsCount >= context.GetMajorityCount();
         }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="context">Current execution context.</param>
+        /// <param name="auditorsCount">Auditors count.</param>
+        /// <param name="isCurrentIncluded">Specifies if current server is included to auditors count.</param>
+        /// <returns></returns>
+        public static bool HasMajority(int totalAuditorsCount, int auditorsCount, bool isCurrentIncluded = true)
+        {
+            if (!isCurrentIncluded)
+                //+1 is current auditor
+                auditorsCount++;
+            return auditorsCount >= GetMajorityCount(totalAuditorsCount);
+        }
     }
 }

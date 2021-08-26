@@ -114,7 +114,7 @@ namespace Centaurus.NetSDK
             }
             else
             {
-                var isSignedByAuditor = ConstellationInfo.Auditors.Any(a => resultEnvelope.IsSignatureValid(new RawPubKey(a.PubKey)));
+                var isSignedByAuditor = ConstellationInfo.Auditors.Any(a => resultEnvelope.IsSignatureValid(new RawPubKey(a.PubKey), false));
                 return (isSignedByAuditor, false);
             }
         }

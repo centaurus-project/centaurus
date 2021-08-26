@@ -39,9 +39,9 @@ namespace Centaurus.Domain
         }
 
         /// <summary>
-        /// Returns batch of quanta from specified apex (including).
+        /// 
         /// </summary>
-        /// <param name="apexFrom">Batch start.</param>
+        /// <param name="apexFrom">Batch start excluding.</param>
         /// <param name="maxCount">Batch max size.</param>
         /// <param name="quanta">Batch itself. Can be null.</param>
         /// <returns>True if data presented in the storage, otherwise false.</returns>
@@ -50,7 +50,7 @@ namespace Centaurus.Domain
             lock (syncRoot)
             {
                 quantaBatch = null;
-                var apexIndex = apexes.IndexOf(apexFrom);
+                var apexIndex = apexes.IndexOf(apexFrom + 1);
                 if (apexIndex == -1)
                     return false;
                 quantaBatch = quanta.Skip(apexIndex).Take(maxCount).ToList();
@@ -58,7 +58,7 @@ namespace Centaurus.Domain
             }
         }
 
-        public void AddResult(AuditorResultMessage resultMessage)
+        public void AddResult(AuditorResult resultMessage)
         {
             lock (syncRoot)
             {

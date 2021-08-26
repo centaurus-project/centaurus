@@ -8,6 +8,6 @@ namespace Centaurus.Models
     public class AuditorResultsBatch : Message
     {
         [XdrField(0)]
-        public List<AuditorResultMessage> AuditorResultMessages { get; set; }
+        public List<AuditorResult> AuditorResultMessages { get; set; }
     }
 }

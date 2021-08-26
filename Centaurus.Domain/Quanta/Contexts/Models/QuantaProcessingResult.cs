@@ -26,7 +26,7 @@ namespace Centaurus.Domain
 
         public long Timestamp { get; set; }
 
-        public AuditorSignature CurrentNodeSignature { get; set; }
+        public AuditorSignatureInternal CurrentNodeSignature { get; set; }
 
         public QuantumResultMessageBase ResultMessage { get; set; }
 

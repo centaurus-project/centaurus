@@ -6,5 +6,8 @@ namespace Centaurus.Models
     {
         [XdrField(0)]
         public State State { get; set; }
+
+        [XdrField(1)]
+        public bool IsPrime { get; set; }
     }
 }

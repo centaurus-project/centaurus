@@ -33,8 +33,8 @@ namespace Centaurus.PersistentStorage
         [IgnoreMember]
         public byte[] Key
         {
-            get => ApexConverter.EncodeApex(Apex);
-            set => Apex = ApexConverter.DecodeApex(value);
+            get => UlongConverter.Encode(Apex);
+            set => Apex = UlongConverter.Decode(value);
         }
 
         [IgnoreMember]
