@@ -65,7 +65,11 @@ namespace Centaurus.Domain
                 var subsUpdate = update.Value;
                 foreach (var connection in connections)
                 {
-                    Task.Factory.StartNew(async () => await SendSubscriptionUpdate(subs, subsUpdate, connection.Value));
+                    try
+                    {
+                        _ = SendSubscriptionUpdate(subs, subsUpdate, connection.Value);
+                    }
+                    catch { }
                 }
             }
         }
@@ -74,7 +78,11 @@ namespace Centaurus.Domain
         {
             foreach (var connection in connections)
             {
-                Task.Factory.StartNew(async () => await SendSubscriptionUpdate(subscription, subsUpdates, connection.Value));
+                try
+                {
+                    _ = SendSubscriptionUpdate(subscription, subsUpdates, connection.Value);
+                }
+                catch { }
             }
         }
 

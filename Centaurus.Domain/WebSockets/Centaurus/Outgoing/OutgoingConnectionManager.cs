@@ -3,6 +3,7 @@ using Centaurus.Models;
 using NLog;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -13,6 +14,8 @@ namespace Centaurus.Domain
 {
     public class OutgoingConnectionManager : ContextualBase
     {
+        static Logger logger = LogManager.GetCurrentClassLogger();
+
         private readonly Dictionary<RawPubKey, AtomicConnection> connections = new Dictionary<RawPubKey, AtomicConnection>();
 
         private OutgoingConnectionFactoryBase connectionFactory;
@@ -91,8 +94,7 @@ namespace Centaurus.Domain
         {
             foreach (var connection in connections)
             {
-                if (Context.StateManager.IsAuditorRunning(connection.Key))
-                    connection.Value.OutgoingMessageStorage.EnqueueMessage(message);
+                connection.Value.OutgoingMessageStorage.EnqueueMessage(message);
             }
         }
 
@@ -161,7 +163,6 @@ namespace Centaurus.Domain
                             Subscribe(_auditor);
                             await _auditor.EstablishConnection(connectionUri);
                             auditor = _auditor;
-                            Context.StateManager.SetConnection(auditor);
                             break;
                         }
                         catch (Exception exc)
@@ -170,7 +171,7 @@ namespace Centaurus.Domain
                             await CloseConnection(_auditor);
 
                             if (!(exc is OperationCanceledException))
-                                logger.Info(exc, $"Unable establish connection with {connectionUri}. Retry in 5000ms");
+                                logger.Info($"Unable establish connection with {connectionUri}. Retry in 1000ms");
                             Thread.Sleep(1000);
                         }
                     }
@@ -206,7 +207,6 @@ namespace Centaurus.Domain
                 if (_auditor != null)
                 {
                     await _auditor.CloseConnection();
-                    Context.StateManager.RemoveConnection(_auditor);
                     _auditor.Dispose();
                 }
             }

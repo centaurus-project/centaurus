@@ -59,8 +59,13 @@ namespace Centaurus.Domain
 
         void UpdateTimer_Elapsed(object sender, ElapsedEventArgs e)
         {
-            lock (syncRoot)
-                CollectStatistics();
+            if (Context.StateManager.State == State.Running 
+                || Context.StateManager.State == State.Ready 
+                || Context.StateManager.State == State.Chasing)
+            {
+                lock (syncRoot)
+                    CollectStatistics();
+            }
             updateTimer?.Start();
         }
 
@@ -92,7 +97,8 @@ namespace Centaurus.Domain
                     BatchInfos = GetBatchInfos().Select(b => b.ToBatchSavedInfoModel()).ToList(),
                     QuantaPerSecond = GetItemsPerSecond(),
                     QuantaQueueLength = GetQuantaAvgLength(),
-                    UpdateDate = DateTime.UtcNow.Ticks
+                    UpdateDate = DateTime.UtcNow.Ticks,
+                    State = Context.StateManager.State
                 };
                 AddAuditorStatistics(Context.Settings.KeyPair.AccountId, current);
 
@@ -116,7 +122,8 @@ namespace Centaurus.Domain
                 Throttling = GetThrottling(),
                 AuditorStatistics = GetAuditorsStatistics(),
                 BatchInfos = GetBatchInfos(),
-                UpdateDate = DateTime.UtcNow
+                UpdateDate = DateTime.UtcNow,
+                State = (int)Context.StateManager.State
             };
             Context.InfoConnectionManager.SendSubscriptionUpdate(subscription, PerformanceStatisticsUpdate.Generate(statistics, PerformanceStatisticsSubscription.SubscriptionName));
         }

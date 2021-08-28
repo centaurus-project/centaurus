@@ -2,6 +2,7 @@
 using NLog;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 
 namespace Centaurus.Domain
@@ -32,67 +33,104 @@ namespace Centaurus.Domain
 
         public void Init(State state)
         {
-            if (State != State.Undefined)
-                throw new InvalidOperationException("Context is already initialized.");
+            lock (syncRoot)
+            {
+                if (State != State.Undefined)
+                    throw new InvalidOperationException("Context is already initialized.");
 
-            SetState(state);
+                SetState(state);
+            }
         }
 
         public void Stopped()
         {
-            SetState(State.Stopped);
+            lock (syncRoot)
+                SetState(State.Stopped);
         }
 
         public void Failed(Exception exc)
         {
-            SetState(State.Failed, exc);
+            lock (syncRoot)
+                SetState(State.Failed, exc);
         }
 
+        private object syncRoot = new { };
         private void SetState(State state, Exception exc = null)
         {
-            lock (this)
+            if (exc != null)
+                logger.Error(exc);
+            if (State != state)
             {
-                if (exc != null)
-                    logger.Error(exc);
-                if (State != state)
-                {
-                    var stateArgs = new StateChangedEventArgs(state, State);
-                    State = state;
+                logger.Trace($"State update: new state: {state}, prev state: {State}");
+                var stateArgs = new StateChangedEventArgs(state, State);
+                State = state;
 
-                    StateChanged?.Invoke(stateArgs);
+                StateChanged?.Invoke(stateArgs);
 
-                    RefreshState();
-                }
+                Context.NotifyAuditors(new StateUpdateMessage { State = State }.CreateEnvelope<MessageEnvelopeSigneless>());
+                logger.Trace($"State update {state} sent.");
             }
         }
 
-        private Dictionary<RawPubKey, ConnectedAuditor> connectedAuditors = new Dictionary<RawPubKey, ConnectedAuditor>();
+        private object statesSyncRoot = new { };
+        private Dictionary<RawPubKey, State> connectedAuditors = new Dictionary<RawPubKey, State>();
 
-        private bool HasMajority
+        private bool IsConstellationReady()
+        {
+            //get
+            //{
+                lock (statesSyncRoot)
+                {
+                    //if Prime node than it must be connected with other nodes
+                    if (Context.RoleManager.ParticipationLevel == CentaurusNodeParticipationLevel.Prime)
+                    {
+                        //if current server is 
+                        var isAlphaReady = Context.IsAlpha && (State == State.Ready || State == State.Running);
+                        var connectedCount = 0;
+                        foreach (var auditorState in connectedAuditors)
+                        {
+                            if (auditorState.Value != State.Ready && auditorState.Value != State.Running)
+                                continue;
+                            if (Context.Constellation.Alpha == auditorState.Key)
+                                isAlphaReady = true;
+                            connectedCount++;
+                        }
+                        return isAlphaReady && Context.HasMajority(connectedCount, false);
+                    }
+                    else
+                        return connectedAuditors.TryGetValue(Context.Constellation.Alpha, out var alphaState) && (alphaState == State.Ready || alphaState == State.Running);
+                }
+            //}
+        }
+
+        public int ConnectedAuditorsCount
         {
             get
             {
-                if (Context.RoleManager.ParticipationLevel == CentaurusNodeParticipationLevel.Prime)
-                    return Context.HasMajority(connectedAuditors.Count(a => a.Value.IsRunning), false);
-                //refactor it
-                return true;
+                lock (statesSyncRoot)
+                    return connectedAuditors.Count;
             }
         }
 
-        public int ConnectedAuditorsCount => connectedAuditors.Count;
-
-        public List<RawPubKey> ConnectedAuditors => connectedAuditors.Keys.ToList();
+        public List<RawPubKey> ConnectedAuditors
+        {
+            get
+            {
+                lock (statesSyncRoot)
+                    return connectedAuditors.Keys.ToList();
+            }
+        }
 
         public bool IsAuditorReady(RawPubKey pubKey)
         {
             if (pubKey == null)
                 throw new ArgumentNullException(nameof(pubKey));
 
-            lock (this)
+            lock (statesSyncRoot)
             {
-                if (!connectedAuditors.TryGetValue(pubKey, out var connectedAuditor))
+                if (!connectedAuditors.TryGetValue(pubKey, out var state))
                     return false;
-                return connectedAuditor.IsReady;
+                return state == State.Ready;
             }
         }
 
@@ -101,182 +139,76 @@ namespace Centaurus.Domain
             if (pubKey == null)
                 throw new ArgumentNullException(nameof(pubKey));
 
-            lock (this)
+            lock (statesSyncRoot)
             {
-                if (!connectedAuditors.TryGetValue(pubKey, out var connectedAuditor))
+                if (!connectedAuditors.TryGetValue(pubKey, out var state))
                     return false;
-                return connectedAuditor.IsRunning;
-            }
-        }
-
-        public void SetConnection(IAuditorConnection connection)
-        {
-            if (connection == null)
-                throw new ArgumentNullException(nameof(connection));
-
-            lock (this)
-            {
-                if (!connectedAuditors.TryGetValue(connection.PubKey, out var connectedAuditor))
-                {
-                    connectedAuditor = new ConnectedAuditor(Context, connection.PubKey);
-                    connectedAuditors.Add(connection.PubKey, connectedAuditor);
-                }
-                connectedAuditor.SetConnection(connection);
-                RefreshState();
-            }
-        }
-
-        public void RemoveConnection(IAuditorConnection connection)
-        {
-            if (connection == null)
-                throw new ArgumentNullException(nameof(connection));
-
-            lock (this)
-            {
-
-                if (!connectedAuditors.TryGetValue(connection.PubKey, out var auditor))
-                    return;
-
-                auditor.RemoveConnection(connection);
-                if (!auditor.HasAnyConnection)
-                    connectedAuditors.Remove(connection.PubKey);
-                RefreshState();
+                return state == State.Running || state == State.Ready || state == State.Chasing;
             }
         }
 
         public void Rised()
         {
-            lock (this)
+            lock (syncRoot)
             {
-                if (HasMajority)
+                if (IsConstellationReady())
                     SetState(State.Ready);
                 else
                     SetState(State.Running);
             }
         }
 
-        public void SetAuditorState(RawPubKey auditorPubKey, StateUpdateMessage stateMessage)
+        public void SetAuditorState(RawPubKey auditorPubKey, State state)
         {
-            lock (this)
+            lock (statesSyncRoot)
             {
-                if (!connectedAuditors.TryGetValue(auditorPubKey, out var auditor) 
-                    || auditor.AuditorState == stateMessage.State)
+                logger.Trace($"Auditor's {auditorPubKey.GetAccountId()} state {state} received.");
+                if (!connectedAuditors.TryGetValue(auditorPubKey, out var currentState) && state == currentState)
                     return;
-                auditor.AuditorState = stateMessage.State;
-                auditor.IsPrime = stateMessage.IsPrime;
-                RefreshState();
+                connectedAuditors[auditorPubKey] = state;
+                logger.Trace($"Auditor's {auditorPubKey.GetAccountId()} state {state} set.");
+                UpdateState();
             }
         }
 
-        public void RefreshState()
+        public void RemoveAuditorState(RawPubKey auditorPubKey)
         {
-            lock (this)
+            lock (statesSyncRoot)
             {
-                if (State == State.Running && HasMajority)
-                    SetState(State.Ready);
-                else if (State == State.Ready && !HasMajority)
-                    SetState(State.Running);
+                if (connectedAuditors.Remove(auditorPubKey, out _))
+                {
+                    //remove state from catchup if presented
+                    Context.Catchup.RemoveState(auditorPubKey);
+                    UpdateState();
+                }
+            }
+        }
 
-                Context.NotifyAuditors(new StateUpdateMessage { 
-                    State = State, 
-                    IsPrime = Context.RoleManager.ParticipationLevel == CentaurusNodeParticipationLevel.Prime
-                }.CreateEnvelope<MessageEnvelopeSigneless>());
+        const ulong ChasingDelayTreshold = 10_000;
+        const ulong RunningDelayTreshold = 1_000;
+
+        public void UpdateDelay(ulong apexDiff)
+        {
+            lock (syncRoot)
+            {
+                if (apexDiff > ChasingDelayTreshold && State == State.Ready)
+                    SetState(State.Chasing); //node is too behind the Alpha
+                else if (apexDiff < RunningDelayTreshold && State == State.Chasing)
+                    SetState(State.Running); //node riched Alpha
+            }
+        }
+
+        private void UpdateState()
+        {
+            lock (syncRoot)
+            {
+                if (State == State.Running && IsConstellationReady())
+                    SetState(State.Ready);
+                else if (State == State.Ready && !IsConstellationReady())
+                    SetState(State.Running);
             }
         }
 
         public event Action<StateChangedEventArgs> StateChanged;
-    }
-
-    class ConnectedAuditor : ContextualBase
-    {
-        public ConnectedAuditor(ExecutionContext context, RawPubKey pubKey)
-            : base(context)
-        {
-            PubKey = pubKey ?? throw new ArgumentNullException(nameof(pubKey));
-        }
-
-        public RawPubKey PubKey { get; }
-
-        private IncomingAuditorConnection incoming;
-
-        private OutgoingConnection outgoing;
-
-        public void SetConnection(IAuditorConnection newConnection)
-        {
-            if (newConnection == null)
-                throw new ArgumentNullException(nameof(newConnection));
-
-            if (newConnection is IncomingAuditorConnection inConnection)
-                SetConnection(inConnection);
-            else if (newConnection is OutgoingConnection outConnection)
-                SetConnection(outConnection);
-            else
-                throw new InvalidOperationException($"Unsupported type {newConnection.GetType().Name}.");
-        }
-
-        private void SetConnection(IncomingAuditorConnection connection)
-        {
-            if (connection == null)
-                throw new ArgumentNullException(nameof(connection));
-
-            if (incoming == connection)
-                return;
-
-            if (incoming != null)
-                throw new InvalidOperationException($"Incoming connection for {PubKey.GetAccountId()} is already registered.");
-
-            if (!connection.PubKey.Equals(PubKey))
-                throw new InvalidOperationException($"Incoming connection has invalid public key {connection.PubKey.GetAccountId()}.");
-
-            incoming = connection;
-        }
-
-        private void SetConnection(OutgoingConnection connection)
-        {
-            if (connection == null)
-                throw new ArgumentNullException(nameof(connection));
-
-            if (outgoing == connection)
-                return;
-
-            if (outgoing != null)
-                throw new InvalidOperationException($"Incoming connection for {PubKey.GetAccountId()} is already registered.");
-
-            if (!connection.PubKey.Equals(PubKey))
-                throw new InvalidOperationException($"Incoming connection has invalid public key {connection.PubKey.GetAccountId()}.");
-
-            outgoing = connection;
-        }
-
-        public void RemoveConnection(IAuditorConnection connection)
-        {
-            if (connection == incoming)
-                incoming = null;
-            else if (connection == outgoing)
-                outgoing = null;
-            else
-                throw new InvalidOperationException($"Unsupported type {connection.GetType().Name}.");
-        }
-
-        public bool HasAnyConnection => incoming != null || outgoing != null;
-
-        public State AuditorState { get; set; }
-
-        public bool IsPrime { get; set; }
-
-        public bool IsReady => AuditorState == State.Ready && isConnectionReady();
-
-        public bool IsRunning => (AuditorState == State.Running || AuditorState == State.Ready) && isConnectionReady();
-
-        private bool isConnectionReady()
-        {
-            var connection = GetRelevantConnection();
-            return connection != null && connection.ConnectionState == ConnectionState.Ready;
-        }
-
-        public ConnectionBase GetRelevantConnection()
-        {
-            return Context.IsAlpha ? (ConnectionBase)incoming : outgoing;
-        }
     }
 }

@@ -1,6 +1,7 @@
 ﻿using Centaurus.Domain;
 using Centaurus.Domain.Models;
 using Centaurus.Models;
+using Centaurus.PaymentProvider;
 using NUnit.Framework;
 using System;
 using System.Collections.Generic;
@@ -74,17 +75,18 @@ namespace Centaurus.Test.Exchange.Analytics
                 Settings = new ConstellationSettings
                 {
                     Providers = new List<ProviderSettings> { stellarPaymentProvider },
-                    Assets = new List<AssetSettings> { new AssetSettings { Code = "XLM" }, new AssetSettings { Code = "USD" } },
+                    Assets = new List<AssetSettings> { new AssetSettings { Code = "XLM", IsQuoteAsset = true }, new AssetSettings { Code = "USD" } },
                     RequestRateLimits = new RequestRateLimits { HourLimit = 1000, MinuteLimit = 100 },
                     Alpha = TestEnvironment.AlphaKeyPair,
                     Auditors = new[] { TestEnvironment.AlphaKeyPair, TestEnvironment.Auditor1KeyPair }
                         .Select(pk => new Auditor
                         {
-                            PubKey = TestEnvironment.AlphaKeyPair,
-                            Address = $"{TestEnvironment.AlphaKeyPair.AccountId}.com"
+                            PubKey = pk,
+                            Address = $"{pk.AccountId}.com"
                         })
                         .ToList()
-                }
+                },
+                Cursors = new[] { stellarPaymentProvider }.ToDictionary(p => PaymentProviderBase.GetProviderId(p.Provider, p.Name), p => p.InitCursor)
             });
         }
 

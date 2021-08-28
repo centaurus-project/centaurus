@@ -78,7 +78,7 @@ namespace Centaurus
                     var batchMessage = new QuantaBatch
                     {
                         Quanta = quantaBatch.Select(q => (Message)q.Quantum).ToList(),
-                        HasMorePendingQuanta = true
+                        LastKnownApex = Context.QuantumStorage.CurrentApex
                     };
 
                     var firstQuantumApex = quantaBatch.FirstOrDefault()?.Quantum.Apex;

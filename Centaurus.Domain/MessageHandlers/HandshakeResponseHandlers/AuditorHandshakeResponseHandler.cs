@@ -31,6 +31,13 @@ namespace Centaurus.Domain
             if (!incomingAuditorConnection.TryValidate(auditorHandshake.HandshakeData))
                 throw new ConnectionCloseException(WebSocketCloseStatus.InvalidPayloadData, "Handshake data is invalid.");
 
+            //send current state
+            await incomingAuditorConnection.SendMessage(new StateUpdateMessage
+            {
+                State = Context.StateManager.State
+            }.CreateEnvelope<MessageEnvelopeSigneless>());
+
+            Context.StateManager.SetAuditorState(connection.PubKey, auditorHandshake.State);
             incomingAuditorConnection.SetSyncCursor(auditorHandshake.QuantaCursor, auditorHandshake.ResultCursor);
 
             //request quanta on rising

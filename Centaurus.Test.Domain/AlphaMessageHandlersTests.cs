@@ -164,7 +164,6 @@ namespace Centaurus.Test
         {
             new object[] { TestEnvironment.Client1KeyPair, ConnectionState.Ready, typeof(UnauthorizedException) },
             new object[] { TestEnvironment.Auditor1KeyPair, ConnectionState.Connected, typeof(InvalidStateException) },
-            new object[] { TestEnvironment.Auditor1KeyPair, ConnectionState.Ready, null },
             new object[] { TestEnvironment.Auditor1KeyPair, ConnectionState.Ready, null }
         };
 
@@ -178,7 +177,8 @@ namespace Centaurus.Test
 
             var envelope = new QuantaBatch
             {
-                Quanta = new List<Message>()
+                Quanta = new List<Message>(),
+                Signatures = new List<QuantumSignatures>()
             }.CreateEnvelope();
             envelope.Sign(clientKeyPair);
 

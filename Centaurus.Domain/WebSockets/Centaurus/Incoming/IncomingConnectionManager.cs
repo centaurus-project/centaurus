@@ -163,22 +163,14 @@ namespace Centaurus.Domain
                     //avoid multiple validation event firing
                     if (args.prev == ConnectionState.Connected)
                         AddConnection(connection);
-                    TrySetAuditorState(connection);
                     break;
                 case ConnectionState.Closed:
-                    RemoveConnection(connection);
+                    //if prev connection wasn't validated than the validated connection could be dropped
+                    if (args.prev == ConnectionState.Ready)
+                        RemoveConnection(connection);
                     break;
                 default:
                     break;
-            }
-        }
-
-        void TrySetAuditorState(IncomingConnectionBase connection)
-        {
-            if (connection.IsAuditor)
-            {
-                Context.StateManager.SetConnection((IAuditorConnection)connection);
-                logger.Trace($"Auditor {connection.PubKey} is connected.");
             }
         }
 
@@ -188,15 +180,9 @@ namespace Centaurus.Domain
             {
                 _ = UnsubscribeAndClose(connection);
 
-                //if it wasn't validated than quit. Otherwise we can close another connection
-                if (!connection.IsValidated)
-                    return;
                 connections.TryRemove(connection.PubKey, out _);
                 if (connection.IsAuditor)
-                {
-                    Context.StateManager.RemoveConnection((IAuditorConnection)connection);
-                    Context.Catchup.RemoveState(connection.PubKey);
-                }
+                    Context.StateManager.RemoveAuditorState(connection.PubKey);
             }
         }
 

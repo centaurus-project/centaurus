@@ -206,7 +206,6 @@ namespace Centaurus.Domain
             var prevState = stateChangedEventArgs.PrevState;
             if (state != State.Ready && prevState == State.Ready) //close all connections (except auditors)
                 IncomingConnectionManager.CloseAllConnections(false).Wait();
-            this.NotifyAuditors(new StateUpdateMessage { State = state }.CreateEnvelope());
         }
 
         private void PendingUpdatesManager_OnBatchSaved(BatchSavedInfo batchInfo)

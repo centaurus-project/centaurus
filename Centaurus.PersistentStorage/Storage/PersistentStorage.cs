@@ -26,34 +26,11 @@ namespace Centaurus.PersistentStorage
 
         public void SaveBatch(List<IPersistentModel> modelsToSave)
         {
-            try
+            using (var batch = new WriteBatch())
             {
-                using (var batch = new WriteBatch())
-                {
-                    foreach (var obj in modelsToSave)
-                    {
-                        try
-                        {
-                            batch.Put(obj.Key, obj.SerializeValue(), columnFamilies[obj.ColumnFamily]);
-                        }
-                        catch (Exception exc)
-                        {
-                            Debugger.Launch();
-                        }
-                    }
-                    try
-                    {
-                        db.Write(batch, new WriteOptions());
-                    }
-                    catch (Exception exc)
-                    {
-                        Debugger.Launch();
-                    }
-                }
-            }
-            catch (Exception exc)
-            {
-                Debugger.Launch();
+                foreach (var obj in modelsToSave)
+                    batch.Put(obj.Key, obj.SerializeValue(), columnFamilies[obj.ColumnFamily]);
+                db.Write(batch, new WriteOptions());
             }
         }
 

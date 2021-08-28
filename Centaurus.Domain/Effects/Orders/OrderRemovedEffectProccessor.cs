@@ -22,8 +22,8 @@ namespace Centaurus.Domain
         public override void CommitEffect()
         {
             MarkAsProcessed();
-            if (!orderbook.RemoveOrder(Effect.OrderId, out _))
-                throw new Exception($"Unable to remove order with id {Effect.Apex}");
+            if (!(Account.Orders.Remove(Effect.OrderId) && orderbook.RemoveOrder(Effect.OrderId, out _)))
+                throw new Exception($"Unable to remove order with id {Effect.OrderId}");
 
             if (Effect.Side == OrderSide.Buy)
                 Account.GetBalance(baseAsset).UpdateLiabilities(Effect.QuoteAmount, UpdateSign.Minus);
@@ -52,6 +52,7 @@ namespace Centaurus.Domain
                 },
                 Account
             );
+            Account.Orders.Add(order.OrderId, order.Order);
             orderbook.InsertOrder(order);
         }
     }

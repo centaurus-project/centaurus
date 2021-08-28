@@ -125,8 +125,6 @@ namespace Centaurus.Domain
             {
                 if (!ByteArrayComparer.Default.Equals(effectsProof, Quantum.EffectsProof) && !EnvironmentHelper.IsTest)
                 {
-                    if (Context.Settings.KeyPair.AccountId == "GAAB4NX3SI76FAGEHFXIYXE53FLMV5CDX3SFETLWX5HKH2UR37RCFT4Z")
-                        Debugger.Launch();
                     throw new Exception($"Effects hash for quantum {Apex} is not equal to provided by Alpha.");
                 }
             }

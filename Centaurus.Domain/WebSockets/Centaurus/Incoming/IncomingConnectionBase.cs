@@ -30,20 +30,12 @@ namespace Centaurus.Domain
 
         private HandshakeData handshakeData = new HandshakeData().Randomize();
 
-        /// <summary>
-        /// When closing the connection we need to know if it was validated 
-        /// </summary>
-        public bool IsValidated { get; private set; }
-
         public bool TryValidate(HandshakeData handshakeData)
         {
             if (handshakeData == null
                 || !handshakeData.Equals(this.handshakeData))
                 return false;
 
-            IsValidated = true;
-
-            //auditor Ready state would be set after success quanta delay inspection
             ConnectionState = ConnectionState.Ready;
             return true;
         }

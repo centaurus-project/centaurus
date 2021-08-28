@@ -22,5 +22,8 @@ namespace Centaurus.Models
 
         [XdrField(1)]
         public ulong ResultCursor { get; set; }
+
+        [XdrField(2)]
+        public State State { get; set; }
     }
 }

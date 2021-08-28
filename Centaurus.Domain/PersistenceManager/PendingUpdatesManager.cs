@@ -39,6 +39,8 @@ namespace Centaurus.Domain
                         pendingUpdates.Complete(Context);
                         lastUpdateTime = DateTime.UtcNow;
 
+                        logger.Trace($"Batch update. Id: {pendingUpdates.Id}, apex range: {pendingUpdates.FirstApex}-{pendingUpdates.LastApex}, quanta: {pendingUpdates.QuantaCount}, effects: {pendingUpdates.EffectsCount}");
+
                         pendingUpdates = new UpdatesContainer(unchecked(pendingUpdates.Id + 1));
                         RegisterUpdates(pendingUpdates);
                         ApplyUpdatesAsync();
@@ -59,7 +61,7 @@ namespace Centaurus.Domain
         }
 
         //last saved quantum apex
-        public ulong LastSavedApex {get; private set; }
+        public ulong LastSavedApex { get; private set; }
 
         public void ApplyUpdates(bool force = false)
         {
@@ -72,7 +74,7 @@ namespace Centaurus.Domain
                     {
                         var sw = new Stopwatch();
                         sw.Start();
-                        Context.PersistenceManager.ApplyUpdates(updates.GetUpdates());
+                        Context.PersistenceManager.ApplyUpdates(updates.GetUpdates(force));
                         sw.Stop();
 
                         LastSavedApex = updates.LastApex;
@@ -87,7 +89,7 @@ namespace Centaurus.Domain
                         Task.Factory.StartNew(() => OnBatchSaved?.Invoke(batchInfo));
                         RemoveUpdates(updates.Id);
 
-                        Console.WriteLine($"Batch {updates.Id} saved in {sw.ElapsedMilliseconds}.");
+                        logger.Trace($"Batch {updates.Id} saved in {sw.ElapsedMilliseconds}.");
 
                         updates = GetFirstUpdates();
                     }
@@ -271,6 +273,8 @@ namespace Centaurus.Domain
                     pendingQuanta.Add(quantum.Apex, quantum);
                     QuantaCount++;
                     EffectsCount += effectsCount;
+                    if (FirstApex == 0)
+                        FirstApex = quantum.Apex;
                     LastApex = quantum.Apex;
                 }
             }
@@ -312,26 +316,34 @@ namespace Centaurus.Domain
 
             public void AddSignatures(ulong apex, List<AuditorResult> signatures)
             {
-                //if (LastAdded + 1 != apex)
-                //    Console.WriteLine($"Adding {apex}, prev was {LastAdded}");
-                LastAdded = apex;
                 lock (pendingQuantaSyncRoot)
                 {
                     if (!pendingQuanta.Remove(apex, out var quantum))
                         throw new InvalidOperationException($"Unable to find quantum with {apex} apex.");
-                    quantum.Signatures = signatures.Select(s => s.Signature.ToPersistenModel()).ToList();
+                    if (signatures != null) //it could be null on force save
+                        quantum.Signatures = signatures.Select(s => s.Signature.ToPersistenModel()).ToList();
 
                     lock (batchSyncRoot)
                         batch.Add(quantum);
+
+                    logger.Trace($"Quantum {apex} signatures received. Batch {Id} awaits for {pendingQuanta.Count} signatures.");
                 }
             }
 
-            static ulong LastAdded;
-
-            internal List<IPersistentModel> GetUpdates()
+            internal List<IPersistentModel> GetUpdates(bool force = true)
             {
                 lock (batchSyncRoot)
+                {
+                    //force all quanta adding to batch
+                    if (force)
+                        lock (pendingQuantaSyncRoot)
+                        {
+                            var pendingApexes = pendingQuanta.Keys.ToList();
+                            foreach (var apex in pendingApexes)
+                                AddSignatures(apex, null);
+                        }
                     return batch;
+                }
             }
 
             public bool AreSignaturesCollected

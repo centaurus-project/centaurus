@@ -3,6 +3,7 @@ using Centaurus.PaymentProvider.Models;
 using NLog;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -33,7 +34,7 @@ namespace Centaurus.Domain
             try
             {
 
-                logger.Trace($"Auditor state from {((KeyPair)pubKey).AccountId} received by AlphaCatchup.");
+                logger.Trace($"Auditor state from {pubKey.GetAccountId()} received by AlphaCatchup.");
                 if (Context.StateManager.State != State.Rising)
                 {
                     logger.Warn($"Auditor state messages can be only handled when Alpha is in rising state. State sent by {((KeyPair)pubKey).AccountId}");
@@ -50,18 +51,18 @@ namespace Centaurus.Domain
                         HasMorePendingQuanta = true
                     };
                     allAuditorStates.Add(pubKey, pendingAuditorBatch);
-                    logger.Trace($"Auditor state from {((KeyPair)pubKey).AccountId} added.");
+                    logger.Trace($"Auditor state from {pubKey.GetAccountId()} added.");
                 }
 
                 if (PendingQuantaBatch.TryCreate(auditorState, out var quantaBatch) && AddQuanta(pubKey, pendingAuditorBatch, quantaBatch)) //check if auditor sent all quanta already
                 {
                     if (pendingAuditorBatch.HasMorePendingQuanta) //wait while auditor will send all quanta it has
                     {
-                        logger.Trace($"Auditor {((KeyPair)pubKey).AccountId} has more quanta. Timer is reset.");
+                        logger.Trace($"Auditor {pubKey.GetAccountId()} has more quanta. Timer is reset.");
                         applyDataTimer.Reset(); //if timer is running reset it. We need to try to wait all possible auditors data 
                         return;
                     }
-                    logger.Trace($"Auditor {((KeyPair)pubKey).AccountId} state is validated.");
+                    logger.Trace($"Auditor {pubKey.GetAccountId()} state is validated.");
 
                     validAuditorStates.Add(pubKey, pendingAuditorBatch);
                 }
@@ -101,7 +102,7 @@ namespace Centaurus.Domain
             if (!currentState.HasMorePendingQuanta
                 || newAuditorState.HasMorePendingQuanta && newAuditorState.Quanta.Count < 1) //prevent spamming
             {
-                logger.Trace($"Unable to add auditor's {((KeyPair)pubKey).AccountId} quanta.");
+                logger.Trace($"Unable to add auditor's {pubKey.GetAccountId()} quanta.");
                 currentState.HasMorePendingQuanta = false;
                 return false;
             }
@@ -115,7 +116,7 @@ namespace Centaurus.Domain
                 lastAddedApex = currentQuantum.Apex;
                 currentState.Quanta.Add(processedQuantum);
             }
-            logger.Trace($"Auditor's {((KeyPair)pubKey).AccountId} quanta added.");
+            logger.Trace($"Auditor's {pubKey.GetAccountId()} quanta added.");
             return true;
         }
 
@@ -139,9 +140,9 @@ namespace Centaurus.Domain
                 }
                 else
                 {
-                    var connectedAccounts = allAuditorStates.Keys.Select(a => ((KeyPair)a).AccountId);
-                    var validatedAccounts = validAuditorStates.Keys.Select(a => ((KeyPair)a).AccountId);
-                    throw new Exception($"Unable to raise. Connected auditors: {string.Join(',', connectedAccounts)}; validated auditors: {validatedAccounts}; majority is {majority}.");
+                    var connectedAccounts = allAuditorStates.Keys.Select(a => a.GetAccountId());
+                    var validatedAccounts = validAuditorStates.Keys.Select(a => a.GetAccountId());
+                    throw new Exception($"Unable to raise. Connected auditors: {string.Join(',', connectedAccounts)}; validated auditors: {string.Join(',', validatedAccounts)}; majority is {majority}.");
                 }
             }
             catch (Exception exc)
@@ -343,6 +344,10 @@ namespace Centaurus.Domain
                         return false;
                     pendingQuantaBatch.Quanta.Add(new PendingQuantum { Quantum = quantum, Signatures = signatures.Signatures });
                 }
+
+                var lastQuantum = pendingQuantaBatch.Quanta.LastOrDefault();
+
+                pendingQuantaBatch.HasMorePendingQuanta = lastQuantum != null && lastQuantum.Quantum.Apex != quantaBatch.LastKnownApex;
                 return true;
             }
         }

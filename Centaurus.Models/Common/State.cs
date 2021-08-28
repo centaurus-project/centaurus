@@ -18,6 +18,11 @@ namespace Centaurus.Models
 
         Rising = 3,
 
+        /// <summary>
+        /// Auditor is delayed
+        /// </summary>
+        Chasing = 4,
+
         Failed = 10,
 
         Stopped = 20

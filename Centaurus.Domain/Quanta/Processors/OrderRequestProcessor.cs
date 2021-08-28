@@ -37,11 +37,11 @@ namespace Centaurus.Domain
             var baseAsset = context.CentaurusContext.Constellation.QuoteAsset;
 
             if (baseAsset.Code == orderRequest.Asset)
-                throw new InvalidOperationException("Order asset must be different from quote asset.");
+                throw new BadRequestException("Order asset must be different from quote asset.");
 
             var orderAsset = context.CentaurusContext.Constellation.Assets.FirstOrDefault(a => a.Code == orderRequest.Asset);
             if (orderAsset == null)
-                throw new InvalidOperationException("Invalid asset identifier: " + orderRequest.Asset);
+                throw new BadRequestException("Invalid asset identifier: " + orderRequest.Asset);
 
             //estimate XLM amount
             var quoteAmount = OrderMatcher.EstimateQuoteAmount(orderRequest.Amount, orderRequest.Price, orderRequest.Side);

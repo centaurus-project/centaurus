@@ -15,8 +15,8 @@ namespace Centaurus.Models
         [XdrField(1, Optional = true)]
         public List<QuantumSignatures> Signatures { get; set; }
 
-        [XdrField(1)]
-        public bool HasMorePendingQuanta { get; set; }
+        [XdrField(2)]
+        public ulong LastKnownApex { get; set; }
     }
 
     [XdrContract]

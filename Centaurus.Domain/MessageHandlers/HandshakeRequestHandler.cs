@@ -31,7 +31,8 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
             {
                 HandshakeData = handshakeRequest.HandshakeData,
                 QuantaCursor = quantaCursor,
-                ResultCursor = resultCursor
+                ResultCursor = resultCursor,
+                State = Context.StateManager.State
             });
 
             //after sending auditor handshake the connection become ready

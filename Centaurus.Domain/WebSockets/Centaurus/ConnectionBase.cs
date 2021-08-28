@@ -147,7 +147,8 @@ namespace Centaurus
 
                 Context.ExtensionsManager.BeforeSendMessage(this, envelope);
 
-                logger.Trace($"Connection {PubKeyAddress}, about to send {envelope.Message.GetMessageType()} message.");
+                if (!(envelope.Message is AuditorPerfStatistics))
+                    logger.Trace($"Connection {PubKeyAddress}, about to send {envelope.Message.GetMessageType()} message.");
 
                 using (var writer = new XdrBufferWriter(outgoingBuffer.Buffer))
                 {
@@ -158,7 +159,8 @@ namespace Centaurus
                         await webSocket.SendAsync(outgoingBuffer.Buffer.AsMemory(0, writer.Length), WebSocketMessageType.Binary, true, cancellationToken);
                     Context.ExtensionsManager.AfterSendMessage(this, envelope);
 
-                    logger.Trace($"Connection {PubKeyAddress}, message {envelope.Message.GetMessageType()} sent. Size: {writer.Length}");
+                    if (!(envelope.Message is AuditorPerfStatistics))
+                        logger.Trace($"Connection {PubKeyAddress}, message {envelope.Message.GetMessageType()} sent. Size: {writer.Length}");
                 }
             }
             catch (Exception exc)
@@ -211,10 +213,12 @@ namespace Centaurus
                                 var reader = new XdrBufferReader(incommingBuffer.Buffer, incommingBuffer.Length);
                                 envelope = XdrConverter.Deserialize<MessageEnvelopeBase>(reader);
 
-                                logger.Trace($"Connection {PubKeyAddress}, message {envelope.Message.GetMessageType()} received.");
+                                if (!(envelope.Message is AuditorPerfStatistics))
+                                    logger.Trace($"Connection {PubKeyAddress}, message {envelope.Message.GetMessageType()} received.");
                                 if (!await HandleMessage(envelope))
                                     throw new UnexpectedMessageException($"No handler registered for message type {envelope.Message.GetMessageType()}.");
-                                logger.Trace($"Connection {PubKeyAddress}, message {envelope.Message.GetMessageType()} handled.");
+                                if (!(envelope.Message is AuditorPerfStatistics))
+                                    logger.Trace($"Connection {PubKeyAddress}, message {envelope.Message.GetMessageType()} handled.");
                             }
                             catch (BaseClientException exc)
                             {

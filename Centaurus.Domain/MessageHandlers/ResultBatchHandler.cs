@@ -24,9 +24,12 @@ namespace Centaurus.Domain
         //TODO: run result aggregation in separate thread
         public override Task HandleMessage(ConnectionBase connection, IncomingMessage message)
         {
-            var resultsBatch = (AuditorResultsBatch)message.Envelope.Message;
-            foreach (var result in resultsBatch.AuditorResultMessages)
-                Context.AuditResultManager.Add(result);
+            if (Context.StateManager.State != State.Undefined)
+            {
+                var resultsBatch = (AuditorResultsBatch)message.Envelope.Message;
+                foreach (var result in resultsBatch.AuditorResultMessages)
+                    Context.AuditResultManager.Add(result);
+            }
             return Task.CompletedTask;
         }
     }

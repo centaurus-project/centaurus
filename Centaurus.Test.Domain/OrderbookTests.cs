@@ -77,19 +77,20 @@ namespace Centaurus.Test
                             Vault = KeyPair.Random().AccountId
                         }
                     },
-                    Assets = new List<AssetSettings> { new AssetSettings { Code = baseAsset }, new AssetSettings { Code = secondAsset } },
+                    Assets = new List<AssetSettings> { new AssetSettings { Code = baseAsset, IsQuoteAsset = true }, new AssetSettings { Code = secondAsset } },
                     Alpha = TestEnvironment.AlphaKeyPair,
                     Auditors = new[] { TestEnvironment.AlphaKeyPair, TestEnvironment.Auditor1KeyPair }
                         .Select(pk => new Auditor
                         {
-                            PubKey = TestEnvironment.AlphaKeyPair,
-                            Address = $"{TestEnvironment.AlphaKeyPair.AccountId}.com"
+                            PubKey = pk,
+                            Address = $"{pk.AccountId}.com"
                         })
                         .ToList(),
                     MinAccountBalance = 1,
                     MinAllowedLotSize = 1,
                     RequestRateLimits = requestRateLimits
-                }
+                },
+                Cursors = new Dictionary<string, string> { { "Stellar-Main", "0" } }
             });
 
             this.account1 = context.AccountStorage.GetAccount(account1.Id);

@@ -90,7 +90,6 @@ namespace Centaurus
                 var splitted = settings.Split('=');
                 var pubkeySeed = splitted[0];
                 var address = splitted[1];
-                var uri = default(Uri);
                 if (splitted.Length != 2
                     || !StrKey.IsValidEd25519PublicKey(pubkeySeed)
                     || !string.IsNullOrEmpty(address) && !TryCreateUri(address, false, out _))
@@ -100,7 +99,7 @@ namespace Centaurus
 
             private bool TryCreateUri(string address, bool useSecureConnection, out Uri uri)
             {
-                return Uri.TryCreate($"{(useSecureConnection? Uri.UriSchemeHttps: Uri.UriSchemeHttp)}://{address}", UriKind.Absolute, out uri);
+                return Uri.TryCreate($"{(useSecureConnection ? Uri.UriSchemeHttps : Uri.UriSchemeHttp)}://{address}", UriKind.Absolute, out uri);
             }
 
             public bool IsPrime => !string.IsNullOrEmpty(Address);

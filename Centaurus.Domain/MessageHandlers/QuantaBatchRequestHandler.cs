@@ -36,13 +36,12 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
 
         private async Task SendQuanta(ConnectionBase connection, QuantaBatchRequest batchRequest)
         {
-            var hasQuanta = true;
             var aboveApex = batchRequest.QuantaCursor;
             var batchSize = 50;
-            while (hasQuanta)
+            while (true)
             {
                 if (!Context.QuantumStorage.GetQuantaBacth(aboveApex, batchSize, out var currentBatch)
-                    && (aboveApex + 1 < Context.QuantumStorage.CurrentApex))
+                    && (aboveApex < Context.QuantumStorage.CurrentApex))
                 {
                     currentBatch = Context.PersistenceManager.GetQuantaAboveApex(aboveApex, batchSize); //quanta are not found in the in-memory storage
                     if (currentBatch.Count < 1)
@@ -52,12 +51,11 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
                 if (currentBatch == null)
                     currentBatch = new List<PendingQuantum>();
 
-                hasQuanta = currentBatch.Count == batchSize;
                 var batch = new QuantaBatch
                 {
                     Quanta = new List<Message>(),
                     Signatures = new List<QuantumSignatures>(),
-                    HasMorePendingQuanta = hasQuanta
+                    LastKnownApex = Context.QuantumStorage.CurrentApex
                 };
 
                 foreach (var quantum in currentBatch)
@@ -69,6 +67,8 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
                 await connection.SendMessage(batch.CreateEnvelope<MessageEnvelopeSigneless>());
                 var lastQuantum = currentBatch.LastOrDefault();
                 aboveApex = lastQuantum?.Quantum.Apex ?? 0;
+                if (aboveApex == Context.QuantumStorage.CurrentApex)
+                    break;
             };
         }
     }

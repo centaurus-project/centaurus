@@ -20,7 +20,11 @@ namespace Centaurus.Domain
                 throw new ArgumentNullException(nameof(context));
             context.ExtensionsManager.BeforeNotify(account, envelope);
             if (context.IncomingConnectionManager.TryGetConnection(account, out IncomingConnectionBase connection))
-                Task.Factory.StartNew(async () => await connection.SendMessage(envelope)).Unwrap();
+                try
+                {
+                    _ = connection.SendMessage(envelope);
+                }
+                catch { }
         }
 
         /// <summary>
@@ -36,7 +40,11 @@ namespace Centaurus.Domain
             {
                 var auditors = context.IncomingConnectionManager.GetAuditorConnections();
                 foreach (var auditor in auditors)
-                    Task.Factory.StartNew(async () => await auditor.SendMessage(envelope)).Unwrap();
+                    try
+                    {
+                        _ = auditor.SendMessage(envelope);
+                    }
+                    catch { }
             }
             else //notify all connected auditors
                 context.OutgoingConnectionManager.EnqueueMessage(envelope);
