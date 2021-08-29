@@ -161,7 +161,7 @@ namespace Centaurus.Domain
                                     Error = (int)statusCode < 500 ? exc.Message : statusCode.ToString()
                                 });
 
-                                if (statusCode == ResultStatusCodes.InternalError)
+                                if (statusCode == ResultStatusCode.InternalError)
                                     logger.Error(exc);
                             }
                         }

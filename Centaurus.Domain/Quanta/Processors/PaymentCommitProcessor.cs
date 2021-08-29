@@ -21,14 +21,14 @@ namespace Centaurus.Domain
             var depositQuantum = (DepositQuantum)context.Quantum;
             var depositNotification = depositQuantum.Source;
 
-            context.AddCursorUpdate(context.PaymentProvider.NotificationsManager, depositNotification.ProviderId, depositNotification.Cursor, context.PaymentProvider.Cursor);
+            context.AddCursorUpdate(context.PaymentProvider.NotificationsManager, depositNotification.Provider, depositNotification.Cursor, context.PaymentProvider.Cursor);
 
             foreach (var payment in depositNotification.Items)
                 ProcessDeposit(payment, context);
 
             context.PaymentProvider.NotificationsManager.RemovePayment(depositNotification.Cursor);
 
-            return Task.FromResult((QuantumResultMessageBase)context.Quantum.CreateEnvelope<MessageEnvelopeSigneless>().CreateResult(ResultStatusCodes.Success));
+            return Task.FromResult((QuantumResultMessageBase)context.Quantum.CreateEnvelope<MessageEnvelopeSignless>().CreateResult(ResultStatusCode.Success));
         }
 
         public override Task Validate(PaymentCommitProcessorContext context)

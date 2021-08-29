@@ -8,7 +8,7 @@ namespace Centaurus.Domain
 {
     public static class QuantumPersistentModelExtensions
     {
-        public static PendingQuantum ToInProgressQuantum(this QuantumPersistentModel quantumPersistentModel)
+        public static PendingQuantum ToPendingQuantum(this QuantumPersistentModel quantumPersistentModel)
         {
             var quantum = new PendingQuantum
             {

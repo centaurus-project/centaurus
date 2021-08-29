@@ -228,8 +228,8 @@ namespace Centaurus
 
                                 //prevent recursive error sending
                                 if (!IsAuditor && !(envelope == null || envelope.Message is ResultMessage))
-                                    _ = SendMessage(envelope.CreateResult(statusCode).CreateEnvelope<MessageEnvelopeSigneless>());
-                                if (statusCode == ResultStatusCodes.InternalError || !Context.IsAlpha)
+                                    _ = SendMessage(envelope.CreateResult(statusCode).CreateEnvelope<MessageEnvelopeSignless>());
+                                if (statusCode == ResultStatusCode.InternalError || !Context.IsAlpha)
                                     logger.Error(exc);
                             }
                         }

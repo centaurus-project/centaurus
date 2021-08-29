@@ -35,7 +35,7 @@ namespace Centaurus.Domain
             await incomingAuditorConnection.SendMessage(new StateUpdateMessage
             {
                 State = Context.StateManager.State
-            }.CreateEnvelope<MessageEnvelopeSigneless>());
+            }.CreateEnvelope<MessageEnvelopeSignless>());
 
             Context.StateManager.SetAuditorState(connection.PubKey, auditorHandshake.State);
             incomingAuditorConnection.SetSyncCursor(auditorHandshake.QuantaCursor, auditorHandshake.ResultCursor);
@@ -46,7 +46,7 @@ namespace Centaurus.Domain
                 await incomingAuditorConnection.SendMessage(new QuantaBatchRequest
                 {
                     QuantaCursor = Context.QuantumStorage.CurrentApex
-                }.CreateEnvelope<MessageEnvelopeSigneless>());
+                }.CreateEnvelope<MessageEnvelopeSignless>());
             }
         }
     }

@@ -49,7 +49,7 @@ namespace Centaurus.Domain
                     {
                         QuantaCursor = quantumHandler.LastAddedQuantumApex,
                         ResultCursor = Context.RoleManager.ParticipationLevel == CentaurusNodeParticipationLevel.Prime ? ulong.MaxValue : Context.PendingUpdatesManager.LastSavedApex
-                    }.CreateEnvelope<MessageEnvelopeSigneless>());
+                    }.CreateEnvelope<MessageEnvelopeSignless>());
                     return;
                 }
 

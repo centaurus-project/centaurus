@@ -12,7 +12,7 @@ namespace Centaurus.Models
         public MessageEnvelopeBase OriginalMessage { get; set; }
 
         [XdrField(1)]
-        public ResultStatusCodes Status { get; set; }
+        public ResultStatusCode Status { get; set; }
 
         [XdrField(3, Optional = true)]
         public string ErrorMessage { get; set; }

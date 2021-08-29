@@ -76,7 +76,7 @@ namespace Centaurus.Domain
                         }
                         if (resultsBatch != default)
                         {
-                            outgoingMessageStorage.EnqueueMessage(new AuditorResultsBatch { AuditorResultMessages = resultsBatch }.CreateEnvelope<MessageEnvelopeSigneless>());
+                            outgoingMessageStorage.EnqueueMessage(new AuditorResultsBatch { AuditorResultMessages = resultsBatch }.CreateEnvelope<MessageEnvelopeSignless>());
                             continue;
                         }
                         Thread.Sleep(50);

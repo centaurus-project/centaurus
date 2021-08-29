@@ -39,7 +39,7 @@ namespace Centaurus.Domain
             if (context.CentaurusContext.StateManager.State == State.Undefined)
                 context.CentaurusContext.StateManager.Init(State.Running);
 
-            return Task.FromResult((QuantumResultMessageBase)context.Quantum.CreateEnvelope<MessageEnvelopeSigneless>().CreateResult(ResultStatusCodes.Success));
+            return Task.FromResult((QuantumResultMessageBase)context.Quantum.CreateEnvelope<MessageEnvelopeSignless>().CreateResult(ResultStatusCode.Success));
         }
 
         private Dictionary<string, string> GetCursors(List<ProviderSettings> providers)

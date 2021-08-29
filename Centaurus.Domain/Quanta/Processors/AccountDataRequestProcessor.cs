@@ -24,7 +24,7 @@ namespace Centaurus.Domain
 
             context.UpdateNonce();
 
-            var resultMessage = (AccountDataResponse)context.Quantum.CreateEnvelope<MessageEnvelopeSigneless>().CreateResult(ResultStatusCodes.Success);
+            var resultMessage = (AccountDataResponse)context.Quantum.CreateEnvelope<MessageEnvelopeSignless>().CreateResult(ResultStatusCode.Success);
             resultMessage.Balances = context.InitiatorAccount.Balances
                 .Values
                 .Select(balance => new Balance { Amount = balance.Amount, Asset = balance.Asset, Liabilities = balance.Liabilities })

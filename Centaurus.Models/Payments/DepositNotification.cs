@@ -11,7 +11,7 @@ namespace Centaurus.Models
     public class DepositNotification
     {
         [XdrField(0)]
-        public string ProviderId { get; set; }
+        public string Provider { get; set; }
 
         /// <summary>
         /// Payment cursor

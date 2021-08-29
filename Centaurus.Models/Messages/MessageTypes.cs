@@ -46,7 +46,7 @@ namespace Centaurus.Models
         /// <summary>
         /// A client requested account's effects.
         /// </summary>
-        EffectsRequest = 50,
+        QuantumInfoRequest = 50,
         /// <summary>
         /// Initiate connection handshake.
         /// </summary>
@@ -98,7 +98,7 @@ namespace Centaurus.Models
         /// <summary>
         /// Account's effects request result.
         /// </summary>
-        EffectsResponse = 152,
+        QuantumInfoResponse = 152,
         /// <summary>
         /// Update quorum, add/remove auditors, apply new settings etc.
         /// </summary>

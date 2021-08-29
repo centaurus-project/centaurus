@@ -107,7 +107,7 @@ namespace Centaurus.Domain
                 return false;
             }
             currentState.HasMorePendingQuanta = newAuditorState.HasMorePendingQuanta;
-            var lastAddedApex = (ulong)(currentState.Quanta.LastOrDefault()?.MessageId ?? 0);
+            var lastAddedApex = (ulong)(currentState.Quanta.LastOrDefault()?.Quantum.Apex ?? 0);
             foreach (var processedQuantum in newAuditorState.Quanta)
             {
                 var currentQuantum = processedQuantum.Quantum;
@@ -295,7 +295,7 @@ namespace Centaurus.Domain
                     //check transaction and it's signatures
                     if (currentQuantum.Quantum is WithdrawalRequestQuantum transactionQuantum)
                     {
-                        var provider = Context.PaymentProvidersManager.GetManager(transactionQuantum.ProviderId);
+                        var provider = Context.PaymentProvidersManager.GetManager(transactionQuantum.Provider);
                         if (!provider.IsTransactionValid(transactionQuantum.Transaction, transactionQuantum.WithdrawalRequest.ToProviderModel(), out var error))
                             throw new Exception($"Transaction is invalid.\nReason: {error}");
 

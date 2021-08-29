@@ -12,6 +12,6 @@ namespace Centaurus
 
         }
 
-        public override ResultStatusCodes StatusCode => ResultStatusCodes.UnexpectedMessage;
+        public override ResultStatusCode StatusCode => ResultStatusCode.UnexpectedMessage;
     }
 }

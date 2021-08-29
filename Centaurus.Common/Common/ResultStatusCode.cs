@@ -1,6 +1,6 @@
 ﻿namespace Centaurus
 {
-    public enum ResultStatusCodes
+    public enum ResultStatusCode
     {
         Success = 200,
 

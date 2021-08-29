@@ -23,7 +23,7 @@ namespace Centaurus.Domain
 
             context.CentaurusContext.Exchange.ExecuteOrder(context);
 
-            return Task.FromResult((QuantumResultMessageBase)context.Quantum.CreateEnvelope<MessageEnvelopeSigneless>().CreateResult(ResultStatusCodes.Success));
+            return Task.FromResult((QuantumResultMessageBase)context.Quantum.CreateEnvelope<MessageEnvelopeSignless>().CreateResult(ResultStatusCode.Success));
         }
 
         private int MaxCrossOrdersCount = 100;

@@ -38,7 +38,7 @@ namespace Centaurus.Domain
 
             context.AddBalanceUpdate(context.InitiatorAccount, payment.Asset, payment.Amount, UpdateSign.Minus);
 
-            var result = context.Quantum.CreateEnvelope<MessageEnvelopeSigneless>().CreateResult(ResultStatusCodes.Success);
+            var result = context.Quantum.CreateEnvelope<MessageEnvelopeSignless>().CreateResult(ResultStatusCode.Success);
 
             return Task.FromResult((QuantumResultMessageBase)result);
         }

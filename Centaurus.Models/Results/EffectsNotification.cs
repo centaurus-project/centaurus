@@ -7,7 +7,6 @@ namespace Centaurus.Models
 {
     public class EffectsNotification : Message, IQuantumInfoContainer
     {
-
         [XdrField(0)]
         public ulong Apex { get; set; }
 

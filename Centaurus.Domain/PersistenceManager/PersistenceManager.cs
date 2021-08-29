@@ -76,7 +76,7 @@ namespace Centaurus.Domain
             return new QuantumInfoResponse
             {
                 CurrentPagingToken = rawCursor,
-                Order = isDesc ? EffectsRequest.Desc : EffectsRequest.Asc,
+                Order = isDesc ? QuantumInfoRequest.Desc : QuantumInfoRequest.Asc,
                 Items = accountQuantumInfos,
                 NextPageToken = accountQuantumInfos.LastOrDefault()?.Apex.ToString(),
                 PrevPageToken = accountQuantumInfos.FirstOrDefault()?.Apex.ToString(),
@@ -102,7 +102,7 @@ namespace Centaurus.Domain
             var query = (IEnumerable<QuantumPersistentModel>)quantaModels.OrderBy(q => q.Apex);
             if (count > 0)
                 query = query.Take(count);
-            return query.Select(q => q.ToInProgressQuantum()).ToList();
+            return query.Select(q => q.ToPendingQuantum()).ToList();
         }
 
         public ulong GetLastApex()

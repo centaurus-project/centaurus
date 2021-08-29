@@ -67,7 +67,7 @@ namespace Centaurus.Domain
 
                 StateChanged?.Invoke(stateArgs);
 
-                Context.NotifyAuditors(new StateUpdateMessage { State = State }.CreateEnvelope<MessageEnvelopeSigneless>());
+                Context.NotifyAuditors(new StateUpdateMessage { State = State }.CreateEnvelope<MessageEnvelopeSignless>());
                 logger.Trace($"State update {state} sent.");
             }
         }

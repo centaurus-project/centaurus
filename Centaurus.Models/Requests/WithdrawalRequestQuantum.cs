@@ -11,7 +11,7 @@ namespace Centaurus.Models
         public byte[] Transaction { get; set; }
 
         [XdrField(1)]
-        public string ProviderId { get; set; }
+        public string Provider { get; set; }
 
         public WithdrawalRequest WithdrawalRequest => (WithdrawalRequest)RequestEnvelope.Message;
     }

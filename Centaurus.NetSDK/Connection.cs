@@ -296,7 +296,7 @@ namespace Centaurus.NetSDK
                     await result.OnAcknowledged;
 
                     var handshakeInitResult = result.Result.Message as ClientConnectionSuccess;
-                    if (handshakeInitResult.Status != ResultStatusCodes.Success)
+                    if (handshakeInitResult.Status != ResultStatusCode.Success)
                         throw new Exception("Server rejected handshake confirmation.");
                     AccountId = handshakeInitResult.AccountId;
                     logger.Trace("Handshake routine finalized successfully.");

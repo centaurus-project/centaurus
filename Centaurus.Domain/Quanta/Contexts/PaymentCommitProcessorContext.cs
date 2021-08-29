@@ -13,8 +13,8 @@ namespace Centaurus.Domain
             : base(context, quantum, account)
         {
             var payment = (DepositQuantum)Quantum;
-            if (!CentaurusContext.PaymentProvidersManager.TryGetManager(payment.Source.ProviderId, out var paymentProvider))
-                throw new Exception($"Unable to find payment provider {payment.Source.ProviderId}");
+            if (!CentaurusContext.PaymentProvidersManager.TryGetManager(payment.Source.Provider, out var paymentProvider))
+                throw new Exception($"Unable to find payment provider {payment.Source.Provider}");
             PaymentProvider = paymentProvider;
         }
 

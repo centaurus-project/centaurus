@@ -113,7 +113,7 @@ namespace Centaurus
 
                     logger.Trace($"About to sent {batchMessage.Quanta.Count} quanta and {batchMessage.Signatures?.Count} results. Quanta from {firstQuantumApex} to {lastQuantumApex}.");
 
-                    await auditor.SendMessage(batchMessage.CreateEnvelope<MessageEnvelopeSigneless>());
+                    await auditor.SendMessage(batchMessage.CreateEnvelope<MessageEnvelopeSignless>());
 
                     if (lastQuantumApex.HasValue)
                         CurrentQuantaCursor = lastQuantumApex.Value;

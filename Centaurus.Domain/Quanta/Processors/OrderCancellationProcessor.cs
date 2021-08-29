@@ -30,7 +30,7 @@ namespace Centaurus.Domain
 
             context.CentaurusContext.Exchange.RemoveOrder(context, context.Orderbook, context.OrderWrapper);
 
-            var resultMessage = context.Quantum.CreateEnvelope<MessageEnvelopeSigneless>().CreateResult(ResultStatusCodes.Success);
+            var resultMessage = context.Quantum.CreateEnvelope<MessageEnvelopeSignless>().CreateResult(ResultStatusCode.Success);
             return Task.FromResult((QuantumResultMessageBase)resultMessage);
         }
 

@@ -4,11 +4,11 @@ namespace Centaurus.Domain
 {
     public static class ExceptionExtensions
     {
-        public static ResultStatusCodes GetStatusCode(this Exception exception)
+        public static ResultStatusCode GetStatusCode(this Exception exception)
         {
             if (exception is BaseClientException)
                 return ((BaseClientException)exception).StatusCode;
-            return ResultStatusCodes.InternalError;
+            return ResultStatusCode.InternalError;
         }
     }
 }

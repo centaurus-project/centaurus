@@ -5,7 +5,7 @@ using System.Text;
 
 namespace Centaurus.Models
 {
-    public class EffectsRequest : RequestMessage
+    public class QuantumInfoRequest : RequestMessage
     {
         public const string Desc = "DESC";
 

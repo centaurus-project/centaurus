@@ -5,7 +5,7 @@ using Centaurus.Xdr;
 namespace Centaurus.Models
 {
     [XdrContract]
-    [XdrUnion(0, typeof(MessageEnvelopeSigneless))]
+    [XdrUnion(0, typeof(MessageEnvelopeSignless))]
     [XdrUnion(1, typeof(MessageEnvelope))]
     [XdrUnion(2, typeof(ConstellationMessageEnvelope))]
     public abstract class MessageEnvelopeBase
@@ -14,7 +14,7 @@ namespace Centaurus.Models
         public Message Message { get; set; }
     }
 
-    public class MessageEnvelopeSigneless : MessageEnvelopeBase
+    public class MessageEnvelopeSignless : MessageEnvelopeBase
     {
     }
 

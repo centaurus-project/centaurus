@@ -310,7 +310,7 @@ namespace Centaurus.Test
 
             var clientConnection = GetIncomingConnection(context, client.PublicKey, state);
 
-            var envelope = new EffectsRequest { Account = account.Id }.CreateEnvelope();
+            var envelope = new QuantumInfoRequest { Account = account.Id }.CreateEnvelope();
             envelope.Sign(client);
 
             using var writer = new XdrBufferWriter();

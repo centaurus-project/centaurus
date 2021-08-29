@@ -18,6 +18,6 @@ namespace Centaurus
         }
 
 
-        public override ResultStatusCodes StatusCode => ResultStatusCodes.TooManyRequests;
+        public override ResultStatusCode StatusCode => ResultStatusCode.TooManyRequests;
     }
 }

@@ -22,7 +22,7 @@ namespace Centaurus.Domain
 
             context.AddBalanceUpdate(context.InitiatorAccount, context.WithdrawalRequest.Asset, context.WithdrawalRequest.Amount, UpdateSign.Minus);
 
-            return Task.FromResult((QuantumResultMessageBase)context.Quantum.CreateEnvelope<MessageEnvelopeSigneless>().CreateResult(ResultStatusCodes.Success));
+            return Task.FromResult((QuantumResultMessageBase)context.Quantum.CreateEnvelope<MessageEnvelopeSignless>().CreateResult(ResultStatusCode.Success));
         }
 
         public override Task Validate(WithdrawalProcessorContext context)
@@ -49,7 +49,7 @@ namespace Centaurus.Domain
             if (context.CentaurusContext.IsAlpha) //if it's Alpha than we need to build transaction
             {
                 context.WithdrawalRequestQuantum.Transaction = context.PaymentProvider.BuildTransaction(withdrawal);
-                context.WithdrawalRequestQuantum.ProviderId = context.PaymentProvider.Id;
+                context.WithdrawalRequestQuantum.Provider = context.PaymentProvider.Id;
             }
             //should we validate signatures here?
             else if (!context.PaymentProvider.IsTransactionValid(context.WithdrawalRequestQuantum.Transaction, withdrawal, out var error))

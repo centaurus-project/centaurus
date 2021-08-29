@@ -27,7 +27,7 @@ namespace Centaurus.Domain
             if (connection.Account == null)
                 throw new UnauthorizedException();
 
-            var result = (ClientConnectionSuccess)message.Envelope.CreateResult(ResultStatusCodes.Success);
+            var result = (ClientConnectionSuccess)message.Envelope.CreateResult(ResultStatusCode.Success);
             result.AccountId = connection.Account.Id;
             await connection.SendMessage(result);
         }

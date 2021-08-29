@@ -18,7 +18,7 @@ namespace Centaurus.Domain
             {
                 Cursor = notificationModel.Cursor,
                 Items = notificationModel.Items.Select(i => i.ToDomainModel()).ToList(),
-                ProviderId = notificationModel.ProviderId
+                Provider = notificationModel.ProviderId
             };
         }
 

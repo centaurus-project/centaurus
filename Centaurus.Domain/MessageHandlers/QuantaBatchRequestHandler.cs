@@ -64,7 +64,7 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
                     batch.Signatures.Add(new QuantumSignatures { Apex = quantum.Quantum.Apex, Signatures = quantum.Signatures });
                 }
 
-                await connection.SendMessage(batch.CreateEnvelope<MessageEnvelopeSigneless>());
+                await connection.SendMessage(batch.CreateEnvelope<MessageEnvelopeSignless>());
                 var lastQuantum = currentBatch.LastOrDefault();
                 aboveApex = lastQuantum?.Quantum.Apex ?? 0;
                 if (aboveApex == Context.QuantumStorage.CurrentApex)

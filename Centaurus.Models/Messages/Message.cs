@@ -28,9 +28,8 @@ namespace Centaurus.Models
     [XdrUnion((int)MessageTypes.ConstellationQuantum, typeof(ConstellationQuantum))]
     [XdrUnion((int)MessageTypes.QuantaBatchRequest, typeof(QuantaBatchRequest))]
     [XdrUnion((int)MessageTypes.QuantaBatch, typeof(QuantaBatch))]
-    [XdrUnion((int)MessageTypes.EffectsRequest, typeof(EffectsRequest))]
-    [XdrUnion((int)MessageTypes.EffectsResponse, typeof(QuantumInfoResponse))]
-    [XdrUnion((int)MessageTypes.PendingQuantum, typeof(PendingQuantum))]
+    [XdrUnion((int)MessageTypes.QuantumInfoRequest, typeof(QuantumInfoRequest))]
+    [XdrUnion((int)MessageTypes.QuantumInfoResponse, typeof(QuantumInfoResponse))]
     public abstract class Message 
     {
         public virtual long MessageId { get { return 0; } }

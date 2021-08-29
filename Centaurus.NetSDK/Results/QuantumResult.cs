@@ -65,7 +65,7 @@ namespace Centaurus.NetSDK
             if (!(resultEnvelope.Message is ResultMessageBase resultMessage))
                 SetException(new RequestException(resultEnvelope, "Received message is not result message."));
             //handle failed quantum case
-            else if (resultMessage.Status != ResultStatusCodes.Success)
+            else if (resultMessage.Status != ResultStatusCode.Success)
                 SetException(new RequestException(resultEnvelope, resultMessage.Status.ToString()));
             else
                 //handle quantum result

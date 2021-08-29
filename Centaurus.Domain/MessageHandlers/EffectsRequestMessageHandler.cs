@@ -15,7 +15,7 @@ namespace Centaurus.Domain
         {
         }
 
-        public override string SupportedMessageType { get; } = typeof(EffectsRequest).Name;
+        public override string SupportedMessageType { get; } = typeof(QuantumInfoRequest).Name;
 
         public override ConnectionState[] ValidConnectionStates => new ConnectionState[] { ConnectionState.Ready };
 
@@ -26,17 +26,17 @@ namespace Centaurus.Domain
                 ResultMessageBase result;
                 try
                 {
-                    var request = message.Envelope.Message as EffectsRequest;
+                    var request = message.Envelope.Message as QuantumInfoRequest;
                     var effectsResponse = connection.Context.PersistenceManager.LoadEffects(request.Cursor, request.IsDesc, request.Limit, connection.Account.Id);
                     effectsResponse.OriginalMessage = message.Envelope;
-                    effectsResponse.Status = ResultStatusCodes.Success;
+                    effectsResponse.Status = ResultStatusCode.Success;
                     result = effectsResponse;
                 }
                 catch (Exception exc)
                 {
                     result = message.Envelope.CreateResult(exc.GetStatusCode());
                 }
-                await connection.SendMessage(result.CreateEnvelope<MessageEnvelopeSigneless>());
+                await connection.SendMessage(result.CreateEnvelope<MessageEnvelopeSignless>());
             }
             catch (Exception exc)
             {

@@ -86,7 +86,7 @@ namespace Centaurus.Domain
 
                 Context.PendingUpdatesManager.UpdateBatch();
                 result = await HandleQuantum(handleItem.Quantum);
-                if (result.Status != ResultStatusCodes.Success)
+                if (result.Status != ResultStatusCode.Success)
                     throw new Exception("Failed to handle quantum.");
                 tcs.SetResult(result);
             }

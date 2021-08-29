@@ -36,7 +36,7 @@ namespace Centaurus
             if (keyPair == null)
                 throw new ArgumentNullException(nameof(keyPair));
 
-            if (messageEnvelope is MessageEnvelopeSigneless)
+            if (messageEnvelope is MessageEnvelopeSignless)
                 return messageEnvelope;
 
             var writer = default(XdrBufferWriter);
@@ -71,7 +71,7 @@ namespace Centaurus
             if (keyPair == null)
                 throw new ArgumentNullException(nameof(keyPair));
 
-            if (envelope is MessageEnvelopeSigneless)
+            if (envelope is MessageEnvelopeSignless)
                 return true;
 
             var messageHash = envelope.Message.ComputeHash();
@@ -94,7 +94,7 @@ namespace Centaurus
             if (keyPair == null)
                 throw new ArgumentNullException(nameof(keyPair));
 
-            if (envelope is MessageEnvelopeSigneless)
+            if (envelope is MessageEnvelopeSignless)
                 return allowSignless;
 
             if (envelope is MessageEnvelope messageEnvelope && messageEnvelope.Signature != null)
@@ -107,7 +107,7 @@ namespace Centaurus
             return false;
         }
 
-        private static TResultMessage CreateResult<TResultMessage>(this MessageEnvelopeBase envelope, ResultStatusCodes status = ResultStatusCodes.InternalError)
+        private static TResultMessage CreateResult<TResultMessage>(this MessageEnvelopeBase envelope, ResultStatusCode status = ResultStatusCode.InternalError)
             where TResultMessage : ResultMessageBase
         {
             if (envelope == null)
@@ -118,7 +118,7 @@ namespace Centaurus
             return resultMessage;
         }
 
-        public static ResultMessageBase CreateResult(this MessageEnvelopeBase envelope, ResultStatusCodes status = ResultStatusCodes.InternalError)
+        public static ResultMessageBase CreateResult(this MessageEnvelopeBase envelope, ResultStatusCode status = ResultStatusCode.InternalError)
         {
             if (envelope == null)
                 throw new ArgumentNullException(nameof(envelope));
@@ -128,7 +128,7 @@ namespace Centaurus
                 messageType = ((RequestQuantumBase)envelope.Message).RequestEnvelope.Message;
 
             //for not Success result return generic message
-            if (status == ResultStatusCodes.Success)
+            if (status == ResultStatusCode.Success)
                 switch (messageType)
                 {
                     case HandshakeResponse _:
@@ -143,7 +143,7 @@ namespace Centaurus
             {
                 var quantumResult = CreateResult<QuantumResultMessage>(envelope, status);
                 //TODO: remove it after migrating to another serializer
-                if (status != ResultStatusCodes.Success)
+                if (status != ResultStatusCode.Success)
                 {
                     quantumResult.Effects = new List<EffectsInfoBase>();
                     quantumResult.PayloadProof = new PayloadProof
@@ -164,7 +164,7 @@ namespace Centaurus
             if (exc == null)
                 throw new ArgumentNullException(nameof(exc));
             var result = envelope.CreateResult(exc.GetStatusCode());
-            if (!(result.Status == ResultStatusCodes.InternalError || string.IsNullOrWhiteSpace(exc.Message)))
+            if (!(result.Status == ResultStatusCode.InternalError || string.IsNullOrWhiteSpace(exc.Message)))
                 result.ErrorMessage = exc.Message;
             else
                 result.ErrorMessage = result.Status.ToString();

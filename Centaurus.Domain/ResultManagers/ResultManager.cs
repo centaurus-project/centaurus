@@ -238,7 +238,7 @@ namespace Centaurus.Domain
                     foreach (var notification in Item.Result.GetNotificationMessages(effectsProof))
                     {
                         var aPubKey = Item.Result.AffectedAccounts[notification.Key];
-                        Manager.Context.Notify(aPubKey, notification.Value.CreateEnvelope<MessageEnvelopeSigneless>());
+                        Manager.Context.Notify(aPubKey, notification.Value.CreateEnvelope<MessageEnvelopeSignless>());
                     }
 
                     if (Item.Result.Initiator != 0)
@@ -246,7 +246,7 @@ namespace Centaurus.Domain
                         var aPubKey = Item.Result.AffectedAccounts[Item.Result.Initiator];
                         Item.Result.ResultMessage.PayloadProof = effectsProof;
                         Item.Result.ResultMessage.Effects = Item.Result.Effects.GetAccountEffects(Item.Result.Initiator);
-                        Manager.Context.Notify(aPubKey, Item.Result.ResultMessage.CreateEnvelope<MessageEnvelopeSigneless>());
+                        Manager.Context.Notify(aPubKey, Item.Result.ResultMessage.CreateEnvelope<MessageEnvelopeSignless>());
                     }
                     IsAcknowledgmentSent = true;
                 }
@@ -258,8 +258,8 @@ namespace Centaurus.Domain
                 {
                     if (Item.Result.ResultMessage.Quantum is WithdrawalRequestQuantum transactionQuantum)
                     {
-                        if (!Manager.Context.PaymentProvidersManager.TryGetManager(transactionQuantum.ProviderId, out var paymentProvider))
-                            throw new Exception($"Unable to find manager {transactionQuantum.ProviderId}");
+                        if (!Manager.Context.PaymentProvidersManager.TryGetManager(transactionQuantum.Provider, out var paymentProvider))
+                            throw new Exception($"Unable to find manager {transactionQuantum.Provider}");
                         var signatures = resultMessages
                             .Where(r => r.Signature.TxSignature != null)
                             .Select(r => new SignatureModel { Signature = r.Signature.TxSignature, Signer = r.Signature.TxSigner })
