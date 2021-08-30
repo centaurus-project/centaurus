@@ -9,7 +9,7 @@ namespace Centaurus.Domain
 {
     public class PaymentCommitProcessorContext : ProcessorContext
     {
-        public PaymentCommitProcessorContext(ExecutionContext context, Quantum quantum, AccountWrapper account) 
+        public PaymentCommitProcessorContext(ExecutionContext context, Quantum quantum, Account account) 
             : base(context, quantum, account)
         {
             var payment = (DepositQuantum)Quantum;

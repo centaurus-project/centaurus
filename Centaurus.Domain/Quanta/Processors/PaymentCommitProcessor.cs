@@ -97,7 +97,7 @@ namespace Centaurus.Domain
             context.AddBalanceUpdate(account, deposit.Asset, deposit.Amount, UpdateSign.Plus);
         }
 
-        public override ProcessorContext GetContext(Quantum quantum, AccountWrapper account)
+        public override ProcessorContext GetContext(Quantum quantum, Account account)
         {
             return new PaymentCommitProcessorContext(Context, quantum, account);
         }

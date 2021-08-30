@@ -9,7 +9,7 @@ namespace Centaurus.Domain
     public abstract class BaseAccountEffectProcessor<T>: ClientEffectProcessor<T>
         where T: AccountEffect
     {
-        public BaseAccountEffectProcessor(T effect, AccountWrapper account)
+        public BaseAccountEffectProcessor(T effect, Account account)
             :base(effect, account)
         {
         }

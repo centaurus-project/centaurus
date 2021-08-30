@@ -17,7 +17,7 @@ namespace Centaurus.Domain
     {
         static byte[] buffer = new byte[256 * 1024];
 
-        public ProcessorContext(ExecutionContext context, Quantum quantum, AccountWrapper account)
+        public ProcessorContext(ExecutionContext context, Quantum quantum, Account account)
             : base(context)
         {
             Quantum = quantum ?? throw new ArgumentNullException(nameof(quantum));
@@ -31,7 +31,7 @@ namespace Centaurus.Domain
 
         public Quantum Quantum { get; }
 
-        public AccountWrapper InitiatorAccount { get; }
+        public Account InitiatorAccount { get; }
 
         public ulong Apex => Quantum.Apex;
 

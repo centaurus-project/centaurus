@@ -12,7 +12,7 @@ namespace Centaurus.Domain
         private OrderbookBase orderbook;
         private string baseAsset;
 
-        public OrderRemovedEffectProccessor(OrderRemovedEffect effect, AccountWrapper account, OrderbookBase orderbook, string baseAsset)
+        public OrderRemovedEffectProccessor(OrderRemovedEffect effect, Account account, OrderbookBase orderbook, string baseAsset)
             : base(effect, account)
         {
             this.orderbook = orderbook ?? throw new ArgumentNullException(nameof(orderbook));

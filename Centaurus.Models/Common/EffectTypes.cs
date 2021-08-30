@@ -20,8 +20,7 @@ namespace Centaurus.Models
         OrderRemoved = 11,
         Trade = 12,
 
-        ConstellationInit = 31,
-        ConstellationUpdate = 32,
+        ConstellationUpdate = 31,
 
         TxCursorUpdate = 51
     }

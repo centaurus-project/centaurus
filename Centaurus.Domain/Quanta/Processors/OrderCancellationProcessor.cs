@@ -19,7 +19,7 @@ namespace Centaurus.Domain
 
         public override string SupportedMessageType { get; } = typeof(OrderCancellationRequest).Name;
 
-        public override ProcessorContext GetContext(Quantum quantum, AccountWrapper account)
+        public override ProcessorContext GetContext(Quantum quantum, Account account)
         {
             return new OrderCancellationProcessorContext(Context, quantum, account);
         }
@@ -48,7 +48,7 @@ namespace Centaurus.Domain
             context.Orderbook = context.CentaurusContext.Exchange.GetOrderbook(context.OrderWrapper.Order.Asset, context.OrderWrapper.Order.Side);
 
             //TODO: check that lot size is greater than minimum allowed lot
-            if (context.OrderWrapper.AccountWrapper.Id != orderRequest.Account)
+            if (context.OrderWrapper.Account.Id != orderRequest.Account)
                 throw new ForbiddenException();
 
             if (context.OrderWrapper.Order.Side == OrderSide.Buy)

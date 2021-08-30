@@ -219,7 +219,7 @@ namespace Centaurus.Domain
                 return validQuanta;
 
             //get last known apex
-            var lastQuantumApex = Context.PersistenceManager.GetLastApex();
+            var lastQuantumApex = Context.DataProvider.GetLastApex();
             //get current auditors settings
             var auditorsSettings = GetAuditorsSettings(Context.Constellation);
 

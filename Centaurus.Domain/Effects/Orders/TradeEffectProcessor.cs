@@ -11,7 +11,7 @@ namespace Centaurus.Domain
         private OrderWrapper order;
         private string quoteAsset;
 
-        public TradeEffectProcessor(TradeEffect effect, AccountWrapper account, OrderWrapper order, string quoteAsset)
+        public TradeEffectProcessor(TradeEffect effect, Account account, OrderWrapper order, string quoteAsset)
             : base(effect, account)
         {
             this.order = order ?? throw new ArgumentNullException(nameof(order));

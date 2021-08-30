@@ -8,24 +8,24 @@ namespace Centaurus.Domain
 {
     public class AccountStorage
     {
-        public AccountStorage(IEnumerable<AccountWrapper> accounts)
+        public AccountStorage(IEnumerable<Account> accounts)
         {
             if (accounts == null)
-                accounts = new AccountWrapper[] { };
+                accounts = new Account[] { };
 
-            this.accounts = new Dictionary<ulong, AccountWrapper>(accounts.ToDictionary(m => m.Id));
+            this.accounts = new Dictionary<ulong, Account>(accounts.ToDictionary(m => m.Id));
             this.accountIds = new Dictionary<RawPubKey, ulong>(accounts.ToDictionary(m => m.Pubkey, v => v.Id));
         }
         
         readonly Dictionary<RawPubKey, ulong> accountIds = new Dictionary<RawPubKey, ulong>();
-        readonly Dictionary<ulong, AccountWrapper> accounts = new Dictionary<ulong, AccountWrapper>();
+        readonly Dictionary<ulong, Account> accounts = new Dictionary<ulong, Account>();
 
         /// <summary>
         /// Retrieve account record by its public key.
         /// </summary>
         /// <param name="pubkey">Account public key</param>
         /// <returns>Account record, or null if not found</returns>
-        public AccountWrapper GetAccount(RawPubKey pubkey)
+        public Account GetAccount(RawPubKey pubkey)
         {
             if (pubkey == null)
                 throw new ArgumentNullException(nameof(pubkey));
@@ -40,14 +40,14 @@ namespace Centaurus.Domain
         /// </summary>
         /// <param name="id">Account id</param>
         /// <returns>Account record, or null if not found</returns>
-        public AccountWrapper GetAccount(ulong id)
+        public Account GetAccount(ulong id)
         {
             if (id == default)
                 throw new ArgumentNullException(nameof(id));
             return accounts.GetValueOrDefault(id);
         }
 
-        public AccountWrapper CreateAccount(ulong id, RawPubKey pubkey, RequestRateLimits rateLimits)
+        public Account CreateAccount(ulong id, RawPubKey pubkey, RequestRateLimits rateLimits)
         {
             if (pubkey == null)
                 throw new ArgumentNullException(nameof(pubkey));
@@ -55,7 +55,7 @@ namespace Centaurus.Domain
             if (accountIds.ContainsKey(pubkey))
                 throw new InvalidOperationException($"Account with public key {pubkey} already exists");
 
-            var acc = new AccountWrapper(rateLimits) {
+            var acc = new Account(rateLimits) {
                 Id = id,
                 Pubkey = pubkey,
                 Balances = new Dictionary<string, Balance>(),
@@ -88,7 +88,7 @@ namespace Centaurus.Domain
                 throw new Exception($"Account with public key {pubkey} doesn't exist");
         }
 
-        public IEnumerable<AccountWrapper> GetAll()
+        public IEnumerable<Account> GetAll()
         {
             return accounts.Values;
         }

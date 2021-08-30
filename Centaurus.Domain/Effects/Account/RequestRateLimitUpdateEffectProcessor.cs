@@ -10,7 +10,7 @@ namespace Centaurus.Domain
     {
         private RequestRateLimits globalRateLimits;
 
-        public RequestRateLimitUpdateEffectProcessor(RequestRateLimitUpdateEffect effect, AccountWrapper account, RequestRateLimits globalRateLimits)
+        public RequestRateLimitUpdateEffectProcessor(RequestRateLimitUpdateEffect effect, Account account, RequestRateLimits globalRateLimits)
             : base(effect, account)
         {
             this.globalRateLimits = globalRateLimits ?? throw new ArgumentNullException(nameof(globalRateLimits)); 

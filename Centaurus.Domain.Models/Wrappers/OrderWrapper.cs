@@ -7,17 +7,17 @@ namespace Centaurus.Domain.Models
 {
     public class OrderWrapper
     {
-        public OrderWrapper(Order order, AccountWrapper account)
+        public OrderWrapper(Order order, Account account)
         {
             Order = order ?? throw new ArgumentNullException(nameof(order));
-            AccountWrapper = account ?? throw new ArgumentNullException(nameof(account));
+            Account = account ?? throw new ArgumentNullException(nameof(account));
         }
 
         public ulong OrderId => Order.OrderId;
 
         public Order Order { get; }
 
-        public AccountWrapper AccountWrapper { get; }
+        public Account Account { get; }
 
         public OrderWrapper Next { get; set; }
 

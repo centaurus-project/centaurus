@@ -20,7 +20,7 @@ namespace Centaurus.Domain
             ));
         }
 
-        public static void AddBalanceCreate(this ProcessorContext processorContext, AccountWrapper account, string asset)
+        public static void AddBalanceCreate(this ProcessorContext processorContext, Account account, string asset)
         {
             processorContext.AddEffectProcessor(new BalanceCreateEffectProcessor(
                 new BalanceCreateEffect
@@ -33,7 +33,7 @@ namespace Centaurus.Domain
             ));
         }
 
-        public static void AddBalanceUpdate(this ProcessorContext processorContext, AccountWrapper account, string asset, ulong amount, UpdateSign sign)
+        public static void AddBalanceUpdate(this ProcessorContext processorContext, Account account, string asset, ulong amount, UpdateSign sign)
         {
             processorContext.AddEffectProcessor(new BalanceUpdateEffectProcesor(
                 new BalanceUpdateEffect
@@ -53,7 +53,7 @@ namespace Centaurus.Domain
             var effect = new OrderPlacedEffect
             {
                 Apex = processorContext.Apex,
-                Account = order.AccountWrapper.Id,
+                Account = order.Account.Id,
                 Asset = order.Order.Asset,
                 Amount = order.Order.Amount,
                 QuoteAmount = order.Order.QuoteAmount,
@@ -61,7 +61,7 @@ namespace Centaurus.Domain
                 Side = order.Order.Side
             };
 
-            processorContext.AddEffectProcessor(new OrderPlacedEffectProcessor(effect, order.AccountWrapper, orderBook, order, baseAsset));
+            processorContext.AddEffectProcessor(new OrderPlacedEffectProcessor(effect, order.Account, orderBook, order, baseAsset));
         }
 
         public static void AddTrade(this ProcessorContext processorContext, OrderWrapper order, ulong assetAmount, ulong quoteAmount, string baseAsset, bool isNewOrder)
@@ -72,13 +72,13 @@ namespace Centaurus.Domain
                 Asset = order.Order.Asset,
                 Side = order.Order.Side,
                 Apex = processorContext.Apex,
-                Account = order.AccountWrapper.Id,
+                Account = order.Account.Id,
                 AssetAmount = assetAmount,
                 QuoteAmount = quoteAmount,
                 IsNewOrder = isNewOrder
             };
 
-            processorContext.AddEffectProcessor(new TradeEffectProcessor(trade, order.AccountWrapper, order, baseAsset));
+            processorContext.AddEffectProcessor(new TradeEffectProcessor(trade, order.Account, order, baseAsset));
         }
 
 
@@ -88,7 +88,7 @@ namespace Centaurus.Domain
                 new OrderRemovedEffect
                 {
                     Apex = processorContext.Apex,
-                    Account = order.AccountWrapper.Id,
+                    Account = order.Account.Id,
                     Amount = order.Order.Amount,
                     QuoteAmount = order.Order.QuoteAmount,
                     Price = order.Order.Price,
@@ -96,7 +96,7 @@ namespace Centaurus.Domain
                     Asset = order.Order.Asset,
                     OrderId = order.OrderId
                 },
-                order.AccountWrapper,
+                order.Account,
                 orderbook,
                 baseAsset
             ));
@@ -104,7 +104,7 @@ namespace Centaurus.Domain
 
 
 
-        public static void AddNonceUpdate(this ProcessorContext processorContext, AccountWrapper account, ulong newNonce, ulong currentNonce)
+        public static void AddNonceUpdate(this ProcessorContext processorContext, Account account, ulong newNonce, ulong currentNonce)
         {
             processorContext.AddEffectProcessor(new NonceUpdateEffectProcessor(
                 new NonceUpdateEffect
@@ -126,7 +126,7 @@ namespace Centaurus.Domain
                     Apex = processorContext.Apex,
                     Cursor = newCursor,
                     PrevCursor = prevCursor,
-                    ProviderId = providerId
+                    Provider = providerId
                 },
                 notificationManager
             ));

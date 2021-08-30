@@ -10,12 +10,12 @@ namespace Centaurus.Domain
 {
     public static class AccountPersistentModelExtensions
     {
-        public static AccountWrapper ToDomainModel(this AccountPersistentModel accountModel, string asset, RequestRateLimits defaultRequestRateLimits)
+        public static Account ToDomainModel(this AccountPersistentModel accountModel, string asset, RequestRateLimits defaultRequestRateLimits)
         {
             if (accountModel == null)
                 throw new ArgumentNullException(nameof(accountModel));
 
-            var acc = new AccountWrapper(defaultRequestRateLimits)
+            var acc = new Account(defaultRequestRateLimits)
             {
                 Id = accountModel.AccountId,
                 AccountSequence = accountModel.AccountSequence,
@@ -45,7 +45,7 @@ namespace Centaurus.Domain
             return acc;
         }
 
-        public static AccountPersistentModel ToPersistentModel(this AccountWrapper accountModel)
+        public static AccountPersistentModel ToPersistentModel(this Account accountModel)
         {
             if (accountModel == null)
                 throw new ArgumentNullException(nameof(accountModel));

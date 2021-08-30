@@ -1,6 +1,8 @@
 ﻿using Centaurus.PaymentProvider.Models;
 using System;
 using System.Collections.Generic;
+using System.Threading;
+using System.Timers;
 
 namespace Centaurus.PaymentProvider
 {
@@ -13,6 +15,10 @@ namespace Centaurus.PaymentProvider
         {
             Settings = settings ?? throw new ArgumentNullException(nameof(settings));
             NotificationsManager = new DepositNotificationManager(settings.Cursor, this);
+
+            commitDelay = TimeSpan.FromSeconds(settings.PaymentSubmitDelay);
+            submitTimerInterval = TimeSpan.FromSeconds(5).TotalMilliseconds;
+            InitTimer();
         }
 
         public event Action<PaymentProviderBase, DepositNotificationModel> OnPaymentCommit;
@@ -74,7 +80,80 @@ namespace Centaurus.PaymentProvider
         /// </returns>
         public abstract int CompareCursors(string left, string right);
 
-        public abstract void Dispose();
+
+        public virtual void Dispose()
+        {
+            if (!cancellationTokenSource.IsCancellationRequested)
+            {
+                cancellationTokenSource.Cancel();
+                cancellationTokenSource.Dispose();
+
+                lock (submitTimer)
+                {
+                    submitTimer.Stop();
+                    submitTimer.Dispose();
+                }
+            }
+        }
+
+
+        protected readonly TimeSpan commitDelay;
+
+        protected CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
+
+        readonly System.Timers.Timer submitTimer = new System.Timers.Timer();
+
+        readonly double submitTimerInterval;
+
+        void StartTimer()
+        {
+
+            lock (submitTimer)
+            {
+                if (!cancellationTokenSource.IsCancellationRequested)
+                    submitTimer.Start();
+            }
+        }
+
+        void CommitPayments()
+        {
+            foreach (var payment in NotificationsManager.GetAll())
+            {
+                if (DateTime.UtcNow - payment.DepositTime < commitDelay)
+                    break;
+                if (payment.IsSend)
+                    continue;
+
+                RaiseOnPaymentCommit(payment);
+                //mark as send
+                payment.IsSend = true;
+            }
+        }
+
+
+        void InitTimer()
+        {
+            lock (submitTimer)
+            {
+                submitTimer.Interval = submitTimerInterval;
+                submitTimer.AutoReset = false;
+                submitTimer.Elapsed += SubmitTimer_Elapsed;
+                StartTimer();
+            }
+        }
+
+        void SubmitTimer_Elapsed(object sender, ElapsedEventArgs e)
+        {
+            try
+            {
+                CommitPayments();
+            }
+            catch (Exception exc)
+            {
+                //TODO: log
+            }
+            StartTimer();
+        }
 
         public static string GetProviderId(string provider, string name)
         {

@@ -4,9 +4,9 @@ using System.Collections.Generic;
 
 namespace Centaurus.Domain.Models
 {
-    public class AccountWrapper
+    public class Account
     {
-        public AccountWrapper(RequestRateLimits requestRateLimits)
+        public Account(RequestRateLimits requestRateLimits)
         {
             RequestCounter = new AccountRequestCounter(requestRateLimits);
         }

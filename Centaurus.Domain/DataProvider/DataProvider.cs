@@ -10,24 +10,29 @@ using System.Linq;
 
 namespace Centaurus.Domain
 {
-    //TODO: rename and separate it.
-    public class PersistenceManager : ContextualBase
+    public class DataProvider : ContextualBase
     {
-        private static Logger logger = LogManager.GetCurrentClassLogger();
-
         private object syncRoot = new { };
 
-        public PersistenceManager(ExecutionContext context)
+        public DataProvider(ExecutionContext context)
             : base(context)
         {
         }
 
-        public QuantumInfoResponse LoadEffects(string rawCursor, bool isDesc, int limit, ulong account)
+        /// <summary>
+        /// Loads account's quantum info data.
+        /// </summary>
+        /// <param name="cursor">Query cursor.</param>
+        /// <param name="isDesc">Is descending direction.</param>
+        /// <param name="limit">Maximum items in batch.</param>
+        /// <param name="account">Current account</param>
+        /// <returns></returns>
+        public QuantumInfoResponse LoadQuantaInfo(string cursor, bool isDesc, int limit, ulong account)
         {
-            if (string.IsNullOrEmpty(rawCursor))
-                rawCursor = "0";
-            if (!ulong.TryParse(rawCursor, out var apex))
-                throw new ArgumentException("Cursor is invalid.");
+            if (account == 0)
+                throw new ArgumentException("Account must be specified.");
+
+            ulong.TryParse(cursor, out var apex);
             var order = isDesc ? QueryOrder.Desc : QueryOrder.Asc;
             var accountQuanta = Context.PermanentStorage.LoadQuantaForAccount(account, apex, limit, order);
             var accountQuantumInfos = new List<QuantumInfo>();
@@ -38,21 +43,14 @@ namespace Centaurus.Domain
 
                 var quantum = accountQuantum.Quantum;
 
-                var effectsBytes = (IEnumerable<byte>)new byte[] { };
                 foreach (var effectsGroup in quantum.Effects)
                 {
-                    var effectHash = effectsGroup.Effects.ComputeHash();
+                    //send effects group object if the account is initiator, otherwise send hash
                     if (effectsGroup.Account == account)
                         effects.Add(new EffectsInfo { EffectsGroupData = effectsGroup.Effects });
                     else
-                        effects.Add(new EffectsHashInfo { EffectsGroupData = effectHash });
-
-                    effectsBytes.Concat(effectHash);
+                        effects.Add(new EffectsHashInfo { EffectsGroupData = effectsGroup.Effects.ComputeHash() });
                 }
-
-                var quantumHash = quantum.RawQuantum.ComputeHash();
-
-                var payloadHash = ByteArrayExtensions.ComputeQuantumPayloadHash(quantum.Apex, quantumHash, effectsBytes.ComputeHash());
 
                 accountQuantumInfos.Add(new QuantumInfo
                 {
@@ -63,11 +61,13 @@ namespace Centaurus.Domain
                         Data = s.PayloadSignature
                     }).ToList(),
                     Request = accountQuantum.IsInitiator
+                        //send full quantum if the account is initiator, otherwise send hash
                         ? (RequestInfoBase)new RequestInfo { Request = quantum.RawQuantum }
-                        : new RequestHashInfo { Request = quantumHash }
+                        : new RequestHashInfo { Request = quantum.RawQuantum.ComputeHash() }
                 });
             }
 
+            //reverse results for desc request
             if (isDesc)
             {
                 accountQuantumInfos.Reverse();
@@ -75,19 +75,13 @@ namespace Centaurus.Domain
             }
             return new QuantumInfoResponse
             {
-                CurrentPagingToken = rawCursor,
+                CurrentPagingToken = cursor,
                 Order = isDesc ? QuantumInfoRequest.Desc : QuantumInfoRequest.Asc,
                 Items = accountQuantumInfos,
                 NextPageToken = accountQuantumInfos.LastOrDefault()?.Apex.ToString(),
                 PrevPageToken = accountQuantumInfos.FirstOrDefault()?.Apex.ToString(),
                 Limit = limit
             };
-        }
-
-        public void ApplyUpdates(List<IPersistentModel> updates)
-        {
-            lock (syncRoot)
-                Context.PermanentStorage.SaveBatch(updates);
         }
 
         /// <summary>
@@ -105,50 +99,13 @@ namespace Centaurus.Domain
             return query.Select(q => q.ToPendingQuantum()).ToList();
         }
 
+        /// <summary>
+        /// Get last persisted apex
+        /// </summary>
+        /// <returns></returns>
         public ulong GetLastApex()
         {
             return Context.PermanentStorage.GetLastApex();
-        }
-
-        public MessageEnvelopeBase GetQuantum(ulong apex)
-        {
-            var quantumModel = Context.PermanentStorage.LoadQuantum(apex);
-            return XdrConverter.Deserialize<MessageEnvelopeBase>(quantumModel.RawQuantum);
-        }
-
-        /// <summary>
-        /// Creates snapshot
-        /// </summary>
-        /// <returns></returns>
-        public static Snapshot GetSnapshot(ulong apex, ConstellationSettings settings, List<AccountWrapper> accounts, List<OrderWrapper> orders, Dictionary<string, string> cursors, byte[] quantumHash)
-        {
-            if (apex < 1)
-                throw new ArgumentException("Apex must be greater than zero.");
-
-            var snapshot = new Snapshot
-            {
-                Apex = apex,
-                Accounts = accounts ?? throw new ArgumentNullException(nameof(accounts)),
-                Orders = orders ?? throw new ArgumentNullException(nameof(orders)),
-                Settings = settings ?? throw new ArgumentNullException(nameof(settings)),
-                Cursors = cursors ?? throw new ArgumentNullException(nameof(cursors)),
-                LastHash = quantumHash ?? throw new ArgumentNullException(nameof(quantumHash))
-            };
-            return snapshot;
-        }
-
-        /// <summary>
-        /// Fetches settings for the specified apex
-        /// </summary>
-        /// <param name="apex"></param>
-        /// <returns></returns>
-        public ConstellationSettings GetConstellationSettings()
-        {
-            var settingsModel = Context.PermanentStorage.LoadSettings(ulong.MaxValue);
-            if (settingsModel == null)
-                return null;
-
-            return settingsModel.ToDomainModel();
         }
 
         public Snapshot GetLastSnapshot()
@@ -159,7 +116,6 @@ namespace Centaurus.Domain
             return GetSnapshot(lastApex);
         }
 
-        //TODO: move it to separate class
         /// <summary>
         /// Builds snapshot for specified apex
         /// </summary>
@@ -244,7 +200,7 @@ namespace Centaurus.Domain
                         {
                             var orderBook = exchange.GetOrderbook(orderPlacedEffect.Asset, orderPlacedEffect.Side);
                             var order = exchange.OrderMap.GetOrder(orderPlacedEffect.Apex);
-                            processor = new OrderPlacedEffectProcessor(orderPlacedEffect, order.AccountWrapper, orderBook, order, settings.QuoteAsset.Code);
+                            processor = new OrderPlacedEffectProcessor(orderPlacedEffect, order.Account, orderBook, order, settings.QuoteAsset.Code);
                         }
                         break;
                     case OrderRemovedEffect orderRemovedEffect:
@@ -258,15 +214,15 @@ namespace Centaurus.Domain
                             var order = exchange.OrderMap.GetOrder(tradeEffect.Apex);
                             if (order == null) //no need to revert trade if no order was created
                                 continue;
-                            processor = new TradeEffectProcessor(tradeEffect, order.AccountWrapper, order, settings.QuoteAsset.Code);
+                            processor = new TradeEffectProcessor(tradeEffect, order.Account, order, settings.QuoteAsset.Code);
                         }
                         break;
                     case CursorUpdateEffect cursorUpdateEffect:
                         {
                             if (cursorUpdateEffect.PrevCursor == null)
-                                cursors.Remove(cursorUpdateEffect.ProviderId);
+                                cursors.Remove(cursorUpdateEffect.Provider);
                             else
-                                cursors[cursorUpdateEffect.ProviderId] = cursorUpdateEffect.PrevCursor;
+                                cursors[cursorUpdateEffect.Provider] = cursorUpdateEffect.PrevCursor;
                         }
                         break;
                     default:
@@ -298,11 +254,31 @@ namespace Centaurus.Domain
             };
         }
 
+        public void SaveBatch(List<IPersistentModel> updates)
+        {
+            lock (syncRoot)
+                Context.PermanentStorage.SaveBatch(updates);
+        }
+
+        /// <summary>
+        /// Fetches settings for the specified apex
+        /// </summary>
+        /// <param name="apex"></param>
+        /// <returns></returns>
+        private ConstellationSettings GetConstellationSettings()
+        {
+            var settingsModel = Context.PermanentStorage.LoadSettings(ulong.MaxValue);
+            if (settingsModel == null)
+                return null;
+
+            return settingsModel.ToDomainModel();
+        }
+
         /// <summary>
         /// Returns minimal apex a snapshot can be reverted to
         /// </summary>
         /// <returns></returns>
-        public ulong GetMinRevertApex()
+        private ulong GetMinRevertApex()
         {
             //obtain min apex we can revert to
             var minApex = Context.PermanentStorage.LoadQuanta().FirstOrDefault()?.Apex ?? 0;
@@ -317,7 +293,7 @@ namespace Centaurus.Domain
             return Exchange.RestoreExchange(settings.Assets, orders, false);
         }
 
-        private List<AccountWrapper> GetAccounts(string baseAsset, RequestRateLimits requestRateLimits)
+        private List<Account> GetAccounts(string baseAsset, RequestRateLimits requestRateLimits)
         {
             return Context.PermanentStorage.LoadAccounts()
                 .Select(a => a.ToDomainModel(baseAsset, requestRateLimits))

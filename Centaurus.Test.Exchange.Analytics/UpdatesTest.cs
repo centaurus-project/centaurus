@@ -11,8 +11,8 @@ namespace Centaurus.Test.Exchange.Analytics
 {
     public class UpdatesTest
     {
-        AccountWrapper account1;
-        AccountWrapper account2;
+        Account account1;
+        Account account2;
         private ExecutionContext context;
 
         [SetUp]
@@ -24,7 +24,7 @@ namespace Centaurus.Test.Exchange.Analytics
             context = new ExecutionContext(settings, new MockStorage(), new MockPaymentProviderFactory(), new DummyConnectionWrapperFactory());
             var requestsLimit = new RequestRateLimits();
 
-            account1 = new AccountWrapper(requestsLimit)
+            account1 = new Account(requestsLimit)
             {
                 Id = 1,
                 Pubkey = new RawPubKey() { Data = KeyPair.Random().PublicKey },
@@ -38,7 +38,7 @@ namespace Centaurus.Test.Exchange.Analytics
             account1.CreateBalance("USD");
             account1.GetBalance("USD").UpdateBalance(10000000000, UpdateSign.Plus);
 
-            account2 = new AccountWrapper(requestsLimit)
+            account2 = new Account(requestsLimit)
             {
                 Id = 2,
                 Pubkey = new RawPubKey() { Data = KeyPair.Random().PublicKey },
@@ -69,7 +69,7 @@ namespace Centaurus.Test.Exchange.Analytics
 
             context.Setup(new Snapshot
             {
-                Accounts = new List<AccountWrapper> { account1, account2 },
+                Accounts = new List<Account> { account1, account2 },
                 Apex = 0,
                 Orders = new List<OrderWrapper>(),
                 Settings = new ConstellationSettings

@@ -11,7 +11,6 @@ namespace Centaurus.Models
     [XdrUnion((int)EffectTypes.OrderRemoved, typeof(OrderRemovedEffect))]
     [XdrUnion((int)EffectTypes.Trade, typeof(TradeEffect))]
     [XdrUnion((int)EffectTypes.TxCursorUpdate, typeof(CursorUpdateEffect))]
-    [XdrUnion((int)EffectTypes.ConstellationInit, typeof(ConstellationUpdateEffect))]
     [XdrUnion((int)EffectTypes.ConstellationUpdate, typeof(ConstellationUpdateEffect))]
     [XdrUnion((int)EffectTypes.RequestRateLimitUpdate, typeof(RequestRateLimitUpdateEffect))]
     public abstract class Effect

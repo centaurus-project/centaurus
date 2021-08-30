@@ -1,4 +1,5 @@
 ﻿using Centaurus.Client;
+using Centaurus.Domain.Models;
 using Centaurus.Exchange.Analytics;
 using Centaurus.Models;
 using Centaurus.PaymentProvider;
@@ -33,11 +34,11 @@ namespace Centaurus.Domain
 
             ExtensionsManager = new ExtensionsManager(GetAbsolutePath(Settings.ExtensionsConfigFilePath));
 
-            PersistenceManager = new PersistenceManager(this);
+            DataProvider = new DataProvider(this);
 
             QuantumProcessor = new QuantumProcessorsStorage(this);
 
-            PendingUpdatesManager = new PendingUpdatesManager(this);
+            PendingUpdatesManager = new UpdatesManager(this);
             PendingUpdatesManager.OnBatchSaved += PendingUpdatesManager_OnBatchSaved;
 
             QuantumStorage = new QuantumStorage();
@@ -65,7 +66,7 @@ namespace Centaurus.Domain
 
             DynamicSerializersInitializer.Init();
 
-            var lastSnapshot = PersistenceManager.GetLastSnapshot();
+            var lastSnapshot = DataProvider.GetLastSnapshot();
             var state = State.Undefined;
             if (lastSnapshot != null)
             {
@@ -213,9 +214,9 @@ namespace Centaurus.Domain
             PerformanceStatisticsManager?.OnBatchSaved(batchInfo);
         }
 
-        public PersistenceManager PersistenceManager { get; }
+        public DataProvider DataProvider { get; }
 
-        public PendingUpdatesManager PendingUpdatesManager { get; }
+        public UpdatesManager PendingUpdatesManager { get; }
 
         public bool IsAlpha => RoleManager.Role == CentaurusNodeRole.Alpha;
 

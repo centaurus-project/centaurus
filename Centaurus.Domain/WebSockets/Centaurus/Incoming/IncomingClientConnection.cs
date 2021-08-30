@@ -16,6 +16,6 @@ namespace Centaurus
             SendHandshake();
         }
 
-        public AccountWrapper Account { get; }
+        public Account Account { get; }
     }
 }

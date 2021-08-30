@@ -37,7 +37,7 @@ namespace Centaurus.Domain
         /// <summary>
         /// Generates context for the processor.
         /// </summary>
-        public abstract ProcessorContext GetContext(Quantum quantum, AccountWrapper account);
+        public abstract ProcessorContext GetContext(Quantum quantum, Account account);
     }
 
     public abstract class QuantumProcessorBase<T> : QuantumProcessorBase
@@ -73,7 +73,7 @@ namespace Centaurus.Domain
 
         }
 
-        public override ProcessorContext GetContext(Quantum quantum, AccountWrapper account)
+        public override ProcessorContext GetContext(Quantum quantum, Account account)
         {
             return new ProcessorContext(Context, quantum, account);
         }
@@ -87,7 +87,7 @@ namespace Centaurus.Domain
 
         }
 
-        public override ProcessorContext GetContext(Quantum quantum, AccountWrapper account)
+        public override ProcessorContext GetContext(Quantum quantum, Account account)
         {
             return new RequestContext(Context, quantum, account);
         }

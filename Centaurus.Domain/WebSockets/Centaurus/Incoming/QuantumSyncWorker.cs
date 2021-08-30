@@ -140,7 +140,7 @@ namespace Centaurus
             if (!Context.QuantumStorage.GetQuantaBacth(from, count, out var quanta))
             {
                 //quanta are not found in the in-memory storage
-                quanta = Context.PersistenceManager.GetQuantaAboveApex(from, count);
+                quanta = Context.DataProvider.GetQuantaAboveApex(from, count);
                 if (quanta.Count < 1)
                     throw new Exception("No quanta from database.");
             }

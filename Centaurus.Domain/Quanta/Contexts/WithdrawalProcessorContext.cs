@@ -6,7 +6,7 @@ namespace Centaurus.Domain
 {
     public class WithdrawalProcessorContext : RequestContext, ITransactionProcessorContext
     {
-        public WithdrawalProcessorContext(ExecutionContext context, Quantum quantum, AccountWrapper account)
+        public WithdrawalProcessorContext(ExecutionContext context, Quantum quantum, Account account)
             : base(context, quantum, account)
         {
             if (!CentaurusContext.PaymentProvidersManager.TryGetManager(WithdrawalRequest.Provider, out var provider))

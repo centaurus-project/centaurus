@@ -29,9 +29,9 @@ namespace Centaurus.Test
             var account = context.AccountStorage.GetAccount(accountKey);
 
             var allLimit = 1000;
-            var allEffectsResult = context.PersistenceManager.LoadEffects(null, isDesc, allLimit, account.Id).Items;
+            var allEffectsResult = context.DataProvider.LoadQuantaInfo(null, isDesc, allLimit, account.Id).Items;
 
-            var opositeOrderedResult = context.PersistenceManager.LoadEffects(null, !isDesc, allLimit, account.Id).Items;
+            var opositeOrderedResult = context.DataProvider.LoadQuantaInfo(null, !isDesc, allLimit, account.Id).Items;
 
             //check ordering
             for (int i = 0, opI = allEffectsResult.Count - 1; i < allEffectsResult.Count; i++, opI--)
@@ -64,7 +64,7 @@ namespace Centaurus.Test
             var totalCount = 0;
             while (nextCursor != null)
             {
-                var currentEffectsResult = context.PersistenceManager.LoadEffects(nextCursor, isDesc, limit, account);
+                var currentEffectsResult = context.DataProvider.LoadQuantaInfo(nextCursor, isDesc, limit, account);
                 if (totalCount == allEffects.Count)
                 {
                     Assert.AreEqual(0, currentEffectsResult.Items.Count, "Some extra effects were loaded.");

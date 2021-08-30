@@ -83,7 +83,7 @@ namespace Centaurus.Test
             await AssertDuringPeriod(
                 func,
                 timeOut,
-                $"Unable to rich {string.Join(',', validStates.Select(s => s.ToString()))} state."
+                $"Unable to reach {string.Join(',', validStates.Select(s => s.ToString()))} state."
             );
         }
 
@@ -98,7 +98,7 @@ namespace Centaurus.Test
             await AssertDuringPeriod(
                 func,
                 timeOut,
-                $"Unable to rich auditor {targetState} state."
+                $"Unable to reach auditor {targetState} state."
             );
         }
 
@@ -236,13 +236,13 @@ namespace Centaurus.Test
             var context = new Domain.ExecutionContext(environment.AlphaWrapper.Context.Settings, new MockStorage(), new MockPaymentProviderFactory(), new MockOutgoingConnectionFactory(new Dictionary<string, StartupWrapper>()));
 
             //wait while all pending updates will be saved
-            while (environment.AlphaWrapper.Context.PersistenceManager.GetLastApex() != environment.AlphaWrapper.Context.QuantumStorage.CurrentApex)
+            while (environment.AlphaWrapper.Context.DataProvider.GetLastApex() != environment.AlphaWrapper.Context.QuantumStorage.CurrentApex)
                 Thread.Sleep(100);
 
-            context.Setup(environment.AlphaWrapper.Context.PersistenceManager.GetSnapshot(environment.AlphaWrapper.Context.QuantumStorage.CurrentApex));
+            context.Setup(environment.AlphaWrapper.Context.DataProvider.GetSnapshot(environment.AlphaWrapper.Context.QuantumStorage.CurrentApex));
 
             var messageType = quantum.GetType().Name;
-            var account = default(AccountWrapper);
+            var account = default(Account);
             if (quantum is RequestQuantum requestQuantum)
             {
                 messageType = requestQuantum.RequestMessage.GetMessageType();
@@ -263,7 +263,7 @@ namespace Centaurus.Test
         public static async Task<QuantumResultMessageBase> ProcessQuantumWithoutValidation(Domain.ExecutionContext context, Quantum quantum)
         {
             var messageType = quantum.GetType().Name;
-            var account = default(AccountWrapper);
+            var account = default(Account);
             if (quantum is RequestQuantum requestQuantum)
             {
                 messageType = requestQuantum.RequestMessage.GetMessageType();

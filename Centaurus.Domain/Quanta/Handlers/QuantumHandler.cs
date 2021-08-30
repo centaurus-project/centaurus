@@ -111,7 +111,7 @@ namespace Centaurus.Domain
             }
         }
 
-        void ValidateQuantum(Quantum quantum, AccountWrapper account)
+        void ValidateQuantum(Quantum quantum, Account account)
         {
             if (quantum.Apex == 0)
             {
@@ -130,7 +130,7 @@ namespace Centaurus.Domain
             }
         }
 
-        AccountWrapper GetAccountWrapper(Quantum quantum)
+        Account GetAccountWrapper(Quantum quantum)
         {
             if (quantum is RequestQuantumBase requestQuantum)
                 return Context.AccountStorage.GetAccount(requestQuantum.RequestMessage.Account);
@@ -181,7 +181,7 @@ namespace Centaurus.Domain
             });
         }
 
-        void ValidateRequestQuantum(Quantum quantum, AccountWrapper accountWrapper)
+        void ValidateRequestQuantum(Quantum quantum, Account accountWrapper)
         {
             var request = quantum as RequestQuantumBase;
             if (request == null)
@@ -190,13 +190,13 @@ namespace Centaurus.Domain
             ValidateAccountRequestRate(request, accountWrapper);
         }
 
-        void ValidateAccountRequestSignature(RequestQuantumBase request, AccountWrapper accountWrapper)
+        void ValidateAccountRequestSignature(RequestQuantumBase request, Account accountWrapper)
         {
             if (!request.RequestEnvelope.IsSignatureValid(accountWrapper.Pubkey, false))
                 throw new UnauthorizedAccessException("Request quantum has invalid signature.");
         }
 
-        void ValidateAccountRequestRate(RequestQuantumBase request, AccountWrapper accountWrapper)
+        void ValidateAccountRequestRate(RequestQuantumBase request, Account accountWrapper)
         {
             if (!accountWrapper.RequestCounter.IncRequestCount(request.Timestamp, out string error))
                 throw new TooManyRequestsException($"Request limit reached for account {accountWrapper.Pubkey}.");

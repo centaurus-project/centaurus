@@ -1,11 +1,7 @@
-﻿using System;
+﻿using Centaurus.Models;
 using System.Collections.Generic;
-using Centaurus.Domain.Models;
-using Centaurus.Models;
-using Centaurus.PaymentProvider;
-using Centaurus.Xdr;
 
-namespace Centaurus.Domain
+namespace Centaurus.Domain.Models
 {
     public class Snapshot
     {
@@ -15,7 +11,7 @@ namespace Centaurus.Domain
 
         public ConstellationSettings Settings { get; set; }
 
-        public List<AccountWrapper> Accounts { get; set; }
+        public List<Account> Accounts { get; set; }
 
         public List<OrderWrapper> Orders { get; set; }
 

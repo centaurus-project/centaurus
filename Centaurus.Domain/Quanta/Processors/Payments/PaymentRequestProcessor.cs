@@ -15,7 +15,7 @@ namespace Centaurus.Domain
 
         public override string SupportedMessageType { get; } = typeof(PaymentRequest).Name;
 
-        public override ProcessorContext GetContext(Quantum quantum, AccountWrapper account)
+        public override ProcessorContext GetContext(Quantum quantum, Account account)
         {
             return new PaymentProcessorContext(Context, quantum, account);
         }

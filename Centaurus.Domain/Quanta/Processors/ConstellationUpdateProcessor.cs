@@ -26,10 +26,9 @@ namespace Centaurus.Domain
 
             context.AddConstellationUpdate(settings, Context.Constellation);
 
-            var updateSnapshot = PersistenceManager.GetSnapshot(
+            var updateSnapshot = settings.ToSnapshot(
                 context.Apex,
-                settings,
-                Context.AccountStorage?.GetAll().ToList() ?? new List<AccountWrapper>(),
+                Context.AccountStorage?.GetAll().ToList() ?? new List<Account>(),
                 Context.Exchange?.OrderMap.GetAllOrders().ToList() ?? new List<OrderWrapper>(),
                 GetCursors(settings.Providers),
                 context.Quantum.ComputeHash()
@@ -62,7 +61,6 @@ namespace Centaurus.Domain
 
         public override Task Validate(ProcessorContext context)
         {
-
             ((ConstellationQuantum)context.Quantum).Validate(Context);
 
             var requestEnvelope = ((ConstellationQuantum)context.Quantum).RequestEnvelope;

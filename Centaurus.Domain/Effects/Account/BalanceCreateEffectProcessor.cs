@@ -8,7 +8,7 @@ namespace Centaurus.Domain
 {
     public class BalanceCreateEffectProcessor : BaseAccountEffectProcessor<BalanceCreateEffect>
     {
-        public BalanceCreateEffectProcessor(BalanceCreateEffect effect, AccountWrapper account)
+        public BalanceCreateEffectProcessor(BalanceCreateEffect effect, Account account)
             : base(effect, account)
         {
 

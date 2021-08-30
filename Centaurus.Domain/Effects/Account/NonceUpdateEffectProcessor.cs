@@ -9,7 +9,7 @@ namespace Centaurus.Domain
 {
     public class NonceUpdateEffectProcessor : BaseAccountEffectProcessor<NonceUpdateEffect>
     {
-        public NonceUpdateEffectProcessor(NonceUpdateEffect effect, AccountWrapper account)
+        public NonceUpdateEffectProcessor(NonceUpdateEffect effect, Account account)
             : base(effect, account)
         {
         }

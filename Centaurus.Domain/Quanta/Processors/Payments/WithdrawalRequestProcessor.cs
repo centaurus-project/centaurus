@@ -58,7 +58,7 @@ namespace Centaurus.Domain
             return Task.CompletedTask;
         }
 
-        public override ProcessorContext GetContext(Quantum quantum, AccountWrapper account)
+        public override ProcessorContext GetContext(Quantum quantum, Account account)
         {
             return new WithdrawalProcessorContext(Context, quantum, account);
         }

@@ -13,7 +13,7 @@ namespace Centaurus.Domain
         private OrderWrapper order;
         private string baseAsset;
 
-        public OrderPlacedEffectProcessor(OrderPlacedEffect effect, AccountWrapper account, OrderbookBase orderBook, OrderWrapper order, string baseAsset)
+        public OrderPlacedEffectProcessor(OrderPlacedEffect effect, Account account, OrderbookBase orderBook, OrderWrapper order, string baseAsset)
             :base(effect, account)
         {
             this.orderBook = orderBook ?? throw new ArgumentNullException(nameof(orderBook));

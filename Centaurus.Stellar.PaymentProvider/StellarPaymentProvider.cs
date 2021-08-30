@@ -18,9 +18,6 @@ namespace Centaurus.Stellar.PaymentProvider
         public StellarPaymentProvider(SettingsModel settings, string config)
             : base(settings, config)
         {
-            commitDelay = TimeSpan.FromSeconds(settings.PaymentSubmitDelay);
-            submitTimerInterval = TimeSpan.FromSeconds(5).TotalMilliseconds;
-
             if (config == null)
                 throw new ArgumentNullException(nameof(config));
             var configObject = JsonSerializer.Deserialize<Config>(config);
@@ -33,7 +30,6 @@ namespace Centaurus.Stellar.PaymentProvider
             LoadLastTxs().Wait();
 
             Task.Factory.StartNew(ListenTransactions, TaskCreationOptions.LongRunning);
-            InitTimer();
         }
 
         private async Task LoadLastTxs()
@@ -259,80 +255,9 @@ namespace Centaurus.Stellar.PaymentProvider
             return Comparer<long>.Default.Compare(leftLong, rightLong);
         }
 
-        public override void Dispose()
-        {
-            if (!cancellationTokenSource.IsCancellationRequested)
-            {
-                cancellationTokenSource.Cancel();
-                cancellationTokenSource.Dispose();
-
-                lock (submitTimer)
-                {
-                    submitTimer.Stop();
-                    submitTimer.Dispose();
-                }
-            }
-        }
-
-
-        CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
-        readonly System.Timers.Timer submitTimer = new System.Timers.Timer();
-
-        readonly TimeSpan commitDelay;
-        readonly double submitTimerInterval;
-
         private readonly DataSource dataSource;
 
         private readonly KeyPair secret;
-
-        void InitTimer()
-        {
-            lock (submitTimer)
-            {
-                submitTimer.Interval = submitTimerInterval;
-                submitTimer.AutoReset = false;
-                submitTimer.Elapsed += SubmitTimer_Elapsed;
-                StartTimer();
-            }
-        }
-
-        void SubmitTimer_Elapsed(object sender, ElapsedEventArgs e)
-        {
-            try
-            {
-                CommitPayments();
-            }
-            catch (Exception exc)
-            {
-                //TODO: log
-            }
-            StartTimer();
-        }
-
-        void StartTimer()
-        {
-
-            lock (submitTimer)
-            {
-                if (!cancellationTokenSource.IsCancellationRequested)
-                    submitTimer.Start();
-            }
-        }
-
-        void CommitPayments()
-        {
-            foreach (var payment in NotificationsManager.GetAll())
-            {
-                if (DateTime.UtcNow - payment.DepositTime < commitDelay)
-                    break;
-                if (payment.IsSend)
-                    continue;
-
-                RaiseOnPaymentCommit(payment);
-                //mark as send
-                payment.IsSend = true;
-            }
-        }
 
         public override bool AreSignaturesValid(byte[] transaction, params SignatureModel[] signatures)
         {

@@ -17,8 +17,8 @@ namespace Centaurus.Test
             this.useLegacyOrderbook = useLegacyOrderbook;
         }
 
-        AccountWrapper account1;
-        AccountWrapper account2;
+        Account account1;
+        Account account2;
         private bool useLegacyOrderbook;
         private ExecutionContext context;
         string baseAsset = "XLM";
@@ -34,7 +34,7 @@ namespace Centaurus.Test
 
             var requestRateLimits = new RequestRateLimits { HourLimit = 1000, MinuteLimit = 100 };
 
-            var account1 = new AccountWrapper(requestRateLimits)
+            var account1 = new Account(requestRateLimits)
             {
                 Id = 1,
                 Pubkey = new RawPubKey() { Data = KeyPair.Random().PublicKey },
@@ -47,7 +47,7 @@ namespace Centaurus.Test
             account1.CreateBalance(secondAsset);
             account1.GetBalance(secondAsset).UpdateBalance(10000000000, UpdateSign.Plus);
 
-            var account2 = new AccountWrapper(requestRateLimits)
+            var account2 = new Account(requestRateLimits)
             {
                 Id = 2,
                 Pubkey = new RawPubKey() { Data = KeyPair.Random().PublicKey },
@@ -62,7 +62,7 @@ namespace Centaurus.Test
 
             context.Setup(new Snapshot
             {
-                Accounts = new List<AccountWrapper> { account1, account2 },
+                Accounts = new List<Account> { account1, account2 },
                 Apex = 0,
                 Orders = new List<OrderWrapper>(),
                 Settings = new ConstellationSettings
@@ -123,7 +123,7 @@ namespace Centaurus.Test
                     Asset = asset,
                     Price = Math.Round(price * 27) / 13
                 };
-                var initiator = default(AccountWrapper);
+                var initiator = default(Account);
                 if (rnd.NextDouble() >= 0.5)
                 {
                     initiator = account1;
@@ -222,7 +222,7 @@ namespace Centaurus.Test
 
             var orderbook = context.Exchange.GetOrderbook(asset, side);
             var ordersCount = 1000;
-            var fakeAccountWrapper = new AccountWrapper(new RequestRateLimits());
+            var fakeAccountWrapper = new Account(new RequestRateLimits());
             for (var i = 1; i <= ordersCount; i++)
             {
                 if (isOrderedByPrice)

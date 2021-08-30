@@ -8,7 +8,7 @@ namespace Centaurus.Models
     public class CursorUpdateEffect : Effect
     {
         [XdrField(0)]
-        public string ProviderId { get; set; }
+        public string Provider { get; set; }
 
         [XdrField(1)]
         public string Cursor { get; set; }

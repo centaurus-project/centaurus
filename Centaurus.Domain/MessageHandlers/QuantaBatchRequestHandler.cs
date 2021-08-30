@@ -43,7 +43,7 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
                 if (!Context.QuantumStorage.GetQuantaBacth(aboveApex, batchSize, out var currentBatch)
                     && (aboveApex < Context.QuantumStorage.CurrentApex))
                 {
-                    currentBatch = Context.PersistenceManager.GetQuantaAboveApex(aboveApex, batchSize); //quanta are not found in the in-memory storage
+                    currentBatch = Context.DataProvider.GetQuantaAboveApex(aboveApex, batchSize); //quanta are not found in the in-memory storage
                     if (currentBatch.Count < 1)
                         throw new Exception("No quanta from database.");
                 }

@@ -9,7 +9,7 @@ namespace Centaurus.Domain.Quanta.Contexts
 {
     public class OrderCancellationProcessorContext : RequestContext
     {
-        public OrderCancellationProcessorContext(ExecutionContext context, Quantum quantum, AccountWrapper account) 
+        public OrderCancellationProcessorContext(ExecutionContext context, Quantum quantum, Account account) 
             : base(context, quantum, account)
         {
         }

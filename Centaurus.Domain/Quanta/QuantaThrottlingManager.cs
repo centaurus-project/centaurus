@@ -19,8 +19,11 @@ namespace Centaurus.Domain
         {
             lock (batchQueueLengthHistory)
             {
+                //TODO: refactor it
+                //don't need to start throttling yet, batch queue length is less than maximum allowed
                 if (batchQueueLengthHistory.Count == 0 && batchQueueLength < maxAllowedBatchLength)
                     return;
+
                 if (batchQueueLength <= 3) //stop throttling if the queue is 3 or less
                 {
                     Reset();
@@ -28,7 +31,7 @@ namespace Centaurus.Domain
                 }
 
                 batchQueueLengthHistory.Add(batchQueueLength);
-                if (batchQueueLengthHistory.Count == 1
+                if (batchQueueLengthHistory.Count == 1 
                     || (batchQueueLengthHistory.Count >= 3 && batchQueueLengthHistory.First() - batchQueueLengthHistory.Last() < 2))
                     Throttle();
             }
