@@ -55,7 +55,7 @@ All result messages inherit **ResultMessageBase**. For all requests that is not 
 
 
 **QuantumResultMessageBase** is abstract base result class for all quantum results, it implements 
-**IQuantumInfoContainer** interface. All quantum result messages you can find in [**quantum flow doc**](docs/messages.md). 
+**IQuantumInfoContainer** interface. All quantum result messages you can find in [**quantum flow doc**](quantum-flow.md). 
 **IQuantumInfoContainer** structure:
 
 - **`apex`** (`UInt64`) - Quantum apex.
@@ -81,7 +81,7 @@ client, alpha will send **EffectsInfo**. It contains serialized **EffectsGroup**
 
 - **`account`** (`UInt64`) - Account id.
 - **`accountSequence`** (`UInt64`) - Account sequence.
-- **`effects`** (`Array<Effect>`) - Array of effects ([**Effects**](docs/effects.md))
+- **`effects`** (`Array<Effect>`) - Array of effects ([**Effects**](effects.md))
 
 
 Client can request own quanta infos with **QuantumInfoRequest**. Structure:

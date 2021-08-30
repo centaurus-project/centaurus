@@ -2,7 +2,7 @@
 
 ### Quantum structure
 
-All messages are inherited from [**Message**](docs/messages.md). All quantum messages are inherited from 
+All messages are inherited from [**Message**](messages.md). All quantum messages are inherited from 
 **Quantum**. 
 
 **Quantum** structure: 
@@ -64,7 +64,7 @@ described below.
 **RequestQuantumBase** structure: 
 
 - **`requestEnvelope`** (`MessageEnvelopeBase`) - Original operation request received from a 
-client ([**MessageEnvelopeBase**](docs/messages.md)).
+client ([**MessageEnvelopeBase**](messages.md)).
 
 **AccountDataRequest** doesn't have any fields, but it will be wrapped with **AccountDataRequestQuantum** 
 with following structure:
@@ -108,10 +108,7 @@ with following structure:
 All constellation quantum requests are wrapped with **ConstellationQuantum** that is inherited from 
 **Quantum**.
 
-**AlphaUpdate** structure:
-- **`alpha`** (`Array<byte>`) - Alpha public ed25519 key.
-
-**ConstellationUpdate** (inherits **AlphaUpdate**) structure:
+**ConstellationUpdate** structure:
 
 - **`providers`** (`Array<ProviderSettings>`) - Array of providers settings.
 - **`auditors`** (`Array<Auditor>`) - Array of auditor settings.
@@ -119,6 +116,7 @@ All constellation quantum requests are wrapped with **ConstellationQuantum** tha
 - **`minAllowedLotSize`** (`UInt64`) - Minimal order size.
 - **`assets`** (`Array<AssetSettings>`) - Array of asset settings.
 - **`requestRateLimits`** (`RequestRateLimits`) - Default client request rate limit settings.
+- **`alpha`** (`Array<byte>`) - Alpha public ed25519 key.
 
 **ProviderSettings** structure:
 - **`provider`** (`string`) - Provider type (Stellar, Bitcoin, Ethereum etc).
@@ -148,4 +146,4 @@ All constellation quantum requests are wrapped with **ConstellationQuantum** tha
   
 **ConstellationQuantum** structure:
 - **`requestEnvelope`** (`ConstellationMessageEnvelope`) - Original operation request received from a 
-constellation ([**ConstellationMessageEnvelope**](docs/messages.md)).
+constellation ([**ConstellationMessageEnvelope**](messages.md)).

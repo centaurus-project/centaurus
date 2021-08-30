@@ -2,7 +2,7 @@
 
 ## Internal malicious actors
 
-Due to the multisig scheme applied to the vault Stellar account, any attack on the consensus 
+??Due to the multisig scheme applied to the vault Stellar account, any attack on the consensus 
 mechanism requires more than a half of all constellation auditors to agree on the operation. 
 A client can't transfer, trade, or withdraw funds without confirmation from the majority of 
 auditors. Since the auditors will be run by public entities, we can assume that it would be 
@@ -20,10 +20,7 @@ For example, a setup with 5 auditor nodes can survive 1 node failing out of cons
 A constellation with 7 auditors will keep functioning despite the outage of 2 nodes, and so on.
 
 Auditor servers can't forge/mutate a quantum received from alpha or submit fake quantum requests 
-on behalf of a client, as each auditor always verifies cryptographic client signature. One auditor 
-also can't flood or DDoS another constellation auditors because they do not communicate directly 
-and the malicious server doesn't know IP addresses of another constellation members except 
-the alpha server.
+on behalf of a client, as each auditor always verifies cryptographic client signature. 
 
 **Malicious alpha**
 
@@ -50,16 +47,16 @@ clients about the new alpha endpoint.
 In the situation when clients do not pay transaction fees, the only possible way to prevent 
 DDoS/flooding attacks is to enforce strict rate-limiting rules on the alpha server 
 (for example, 5 requests per second with configurable burst window) and request a substantial 
-amount of XLM reserve, say 1000 XLM locked on the account. Both parameters can be changed over 
-time using the constellation members voting mechanism. Also each client will have a limit of 
+amount of quote asset reserve, say 1000 quote asset token locked on the account. Both parameters can be changed 
+over time using the constellation members voting mechanism. Also each client will have a limit of 
 open orders, approximately 100 per account. 
 
 **Man-in-the-middle and replay attacks**
 
 Clients use ed25519-based cryptography to sign the requests. The private key is stored 
 exclusively on the client side.  Each quantum request sent by a client contains a sequential 
-`nonce` (Int64) which is a part of hashed and signed data. For the quantum to be valid, 
-the nonce must be exactly one greater than the nonce of the previously processed quantum. 
+`nonce` (UInt64) which is a part of hashed and signed data. For the quantum to be valid, 
+the nonce must be greater than the nonce of the previously processed quantum. 
 As the quantum is applied, the account state on the server is updated with the new value. 
 Every constellation server tracks and verifies the order of the account nonce independently. 
 MitM attackers can't modify the signed quantum contents without access to the client private key. 

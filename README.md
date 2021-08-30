@@ -63,10 +63,9 @@ Every 5 seconds or 50 000 quanta each server initiates batch update. All changes
 (quanta, constellation settings, payment provider cursors, account states, orderbooks) are stored 
 in the batch and queued for saving. After all quanta in the batch are finalized (majority of signatures are 
 received), the batch is saved to DB. When the auditor can't reach consensus with the constellation, it stop 
-all operations, rollbacks to the last quantum confirmed by the majority, and starts processing only 
-withdrawal requests. In case if alpha is down, auditors may choose to deploy a new alpha server and proceed 
-from the last known quantum or initiate an emergency refund, returning all funds back to the client 
-accounts.
+all operations, and saves pending batches. In case if alpha is down, auditors may choose to deploy a new 
+alpha server and proceed from the last known quantum or initiate an emergency refund, returning all funds 
+back to the client accounts.
 
 It only takes a fraction of second for a client to receive **quantum** processing result. Typically 
 the client will receive the **finality** result. The **finality** (100% confidence) means that the quantum 
