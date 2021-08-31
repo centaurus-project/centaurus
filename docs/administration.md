@@ -1,73 +1,75 @@
 # Administration
 
-## Constellation bootstrap 
+## Installation Instructions
 
-**1. Configure Centaurus.Alpha**
+To install Centaurus you need to download the latest release for your operating system or download source code 
+and build an application on your own. Also you need to prepare you payment providers libraries. Make sure that 
+application has rights to access to  
+For UNIX operation systems, you need to install  [RocksDB](https://github.com/facebook/rocksdb/blob/master/INSTALL.md). 
 
-`app.settings` example:
+## Node launching
 
-```
-{
-  "IsAlpha": true,
-  "Auditors": [ "GC2Z2GVUXJFGU3SIC6S2RVVH35TUSNL7ZQPZXGTHEBFFNMMEGPIBTLTT" ], //should contain at least one auditor
-  "AppUrls": [ "http://*:5000", "https://*:5001" ], //addresses to bind to
-  "StellarNetwork": {
-    "Horizon": "https://horizon-testnet.stellar.org",
-    "Passphrase": "Test SDF Network ; September 2015"
-  },
-  "Vault": "GB2C7ZJZDDOCAA75E5JZVC343WCWJUIJZCXQXW4T7IKR4TYLUA6FZT6Z", //valid and active Stellar account address
-  "SupportedAssets": { //an asset key (except native, it should be just "XLM") //symbol in format {assetCode}:{assetIssuer} and value should be an integer
-    "XLM": 0,
-    "USD:GAWJ5J3GRGHDRTQSJSUNLIBBRB47YMUWTS7TCNGIUWMJUML22Q2BJYFJ": 1,
-    "TEST1:GA7JKJ5AKYBA3KW4EYULFNUJUBSXT2VUXAPSTTSRQDRRXSGTM5ZL66A7": 2
-  },
-  "MinAccountBalance": 100,
-  "SnapshotsDirectory": "/snapshots", //should be a valid path to snapshot directory
-  "GenesisLedger": 1457416 //ledger sequence from which we will start listening to Stellar network updates
-}
-```
+To start the node you need to pass valid arguments on Centaurus startup. 
 
-**2. Start Centaurus.Alpha**
+Arguments for a startup:
 
-**3. Configure Centaurus.Auditor**
+- **`s, secret`** - Current node ed25519 secret seed. **Required**.
+- **`cwd`** - Working directory. **Required**.
+- **`participation_level`** - Node participation level. `1` = `Prime` and `2` = `Auditor`. **Required**.
+- **`connection_string`** - Path to the database folder. **Required**.
+- **`payment_config`** - Path to the payment configuration file. **Required**.
+- **`auditor`** - This parameter is only required for a new constellation. It is required for an initial connection to alpha server.
+- **`listening_port`** - Port the node will listen on.
+- **`cert_path`** - Certificate path.
+- **`cert_pk_path`** - Certificate private key file path.
+- **`use_secure_connection`** - Use wss/https to connect to auditors.
+- **`sync_batch_size`** - Maximum quanta per batch on sync between auditors. Default: 500.
+- **`verbose`** - Add this argument to log in verbose mode.
+- **`silent`** - Add this argument to log only errors.
+- **`extensions_config_file_path`** - Path to extensions configuration file.
+- **`help`** - Display help screen.
+- **`version`** - Display version information.
+ 
+All specified paths must be an absolute path or relative path to the working directory folder.
 
-`app.settings` example:
+Alpha server launch example:
 
-```
-{
-  "Secret": "SCT2UXYJUV5R2OVP5SPTYFSDZZY24EADL3XGABWLYQBGYZMMIUA5SHDA", //current auditor secret. Public key should be in Auditors array
-  "AlphaAddress": "ws://localhost:5000/ws", //Alpha server url
-  "Vault": "GB2C7ZJZDDOCAA75E5JZVC343WCWJUIJZCXQXW4T7IKR4TYLUA6FZT6Z", 
-  "StellarNetwork": {
-    "Horizon": "https://horizon-testnet.stellar.org",
-    "Passphrase": "Test SDF Network ; September 2015"
-  },
-  "Auditors": [ "GC2Z2GVUXJFGU3SIC6S2RVVH35TUSNL7ZQPZXGTHEBFFNMMEGPIBTLTT" ], 
-  "SnapshotsDirectory": "//auditor-snapshots", 
-  "GenesisLedger": 1457416, 
-  "SupportedAssets": { 
-    "XLM": 0,
-    "USD:GAWJ5J3GRGHDRTQSJSUNLIBBRB47YMUWTS7TCNGIUWMJUML22Q2BJYFJ": 1,
-    "TEST1:GA7JKJ5AKYBA3KW4EYULFNUJUBSXT2VUXAPSTTSRQDRRXSGTM5ZL66A7": 2
-  }
-}
-```
+`./Centaurus --secret SBY...ER --participation_level 1 --connection_string db --cwd appData --payment_config payment-providers.config --listening_port 5000` 
 
-**4. Start Centaurus.Auditor**
+And auditor launch will look like this:
 
-Once auditors majority is connected to Alpha, the constellation is ready to process requests.
+`./Centaurus --secret SD6...G3  --participation_level 2 --connection_string db --cwd appData --payment_config payment-providers.config --auditor GC8...BJ=alpha.domain:5000` 
 
-**5. Configure Centaurus.Test.Client**
+## Constellation initialization
 
-`app.settings` example:
+Constellation must consist of 5-19 nodes. One of them is elected to be alpha. Each node must have the same 
+Centaurus version and the same set of payment providers. After all servers are started, auditors connect to 
+alpha and await for initialization quantum. Auditors create constellation update quantum and post it to alpha. 
+If quantum is valid it's processed and broadcasted to all auditors. After auditors process the quantum the 
+constellation becomes ready to process quantum requests. 
 
-```
-{
-  "Secret": "SCR6C6STGV7RKURFGV7XA76WRUZYAKRYFICLWBHTI7NAW3VXVRA5T75E", //current secret
-  "AlphaAddress": "ws://localhost:5000/ws" //alpha server url
-}
-```
+## Constellation restart
 
-**6. Start Centaurus.Test.Client**
+### Alpha restart
 
-For now it only supports place order operations. Details will be displayed in console after the start.
+On alpha restart, it loads the last snapshot from the database and applies it. Then alpha requests auditors for 
+quanta with apex above last alpha apex. If there is no majority of connected auditors, alpha shuts down. After 
+auditors sent their quanta, alpha starts the aggregation process. All quanta group by the apex. Each quantum in 
+the group must have alpha signature, if it doesn't these quantum signatures are not aggregated. If quantum with 
+same apex has different payload hash and do have valid alpha signature, than alpha secret key is compromised, 
+and alpha shuts down. If all quanta aggregated successfully, alpha processes it one by one. After quanta are 
+processed constellation switches to `Ready` state.
+
+### Auditor restart
+
+Auditor restart procedure is much simpler. On the restart, the auditor sends to alpha his quantum and result 
+cursors. Alpha starts broadcasting all quanta and results that have greater apex than the specified by the 
+auditor. If the auditor is far behind alpha, it switches to `Chasing` mode. After the auditor reaches alpha's 
+apex (with some delay threshold), it becomes `Ready`. 
+
+## Changing constellation settings
+
+At some point auditors can decide that they need to change constellation settings: add/suspend assets, register 
+new payment providers, change auditors, assign a new alpha, etc. Centaurus provides an easy way to do it. All 
+you need is to compound [**ConstellationUpdate**](quantum-flow.md) request, sign it with majority of auditors 
+and submit. If the quantum is valid, constellation will apply new settings.

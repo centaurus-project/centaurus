@@ -30,7 +30,7 @@ namespace Centaurus
         [Option("auditor", Required = false, HelpText = "Genesis auditor settings. Each item must contain auditor's public key and domain in format {publicKey}={domain:port}. The option can be set multiple times.", Separator = ';')]
         public IEnumerable<Auditor> GenesisAuditors { get; set; }
 
-        [Option("listening_port", Required = false, HelpText = "Port the alpha will listen on.")]
+        [Option("listening_port", Required = false, HelpText = "Port the node will listen on.")]
         public int ListeningPort { get; set; }
 
         [Option("cert_path", Required = false, HelpText = "Certificate path.")]
