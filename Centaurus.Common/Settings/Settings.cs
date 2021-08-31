@@ -42,10 +42,10 @@ namespace Centaurus
         [Option("sync_batch_size", Default = 500, HelpText = "Max quanta sync batch size.")]
         public int SyncBatchSize { get; set; }
 
-        [Option("participation_level", Default = 0, HelpText = "Centaurus node participation level.")]
+        [Option("participation_level", Required = true, HelpText = "Centaurus node participation level. '1' = Prime and '2' = Auditor")]
         public int ParticipationLevel { get; set; }
 
-        [Option("payment_config", Required = false, HelpText = "Payment providers config path.")]
+        [Option("payment_config", Required = true, HelpText = "Payment providers config path.")]
         public string PaymentConfigPath { get; set; }
 
         [Option("use_secure_connection", Default = false, HelpText = "Use https/wss or not.")]

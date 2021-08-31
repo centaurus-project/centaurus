@@ -64,7 +64,7 @@ namespace Centaurus.Test
             foreach (var a in environment.AuditorWrappers.Values)
                 constellationInit.Sign(a.Context.Settings.KeyPair);
 
-            var res = await environment.AlphaWrapper.ConstellationController.Init(constellationInit);
+            var res = await environment.AlphaWrapper.ConstellationController.Update(constellationInit);
 
             var result = (ConstellationController.InitResult)((JsonResult)res).Value;
 

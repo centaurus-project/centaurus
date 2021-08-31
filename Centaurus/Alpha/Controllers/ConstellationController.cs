@@ -53,11 +53,16 @@ namespace Centaurus.Controllers
         [HttpPost("[action]")]
         public async Task<IActionResult> Init(ConstellationMessageEnvelope constellationInitEnvelope)
         {
+            return await Update(constellationInitEnvelope);
+        }
+
+        [HttpPost("[action]")]
+        public async Task<IActionResult> Update(ConstellationMessageEnvelope constellationInitEnvelope)
+        {
             try
             {
                 if (constellationInitEnvelope == null)
                     return StatusCode(415);
-                //TODO: move all validations to helper class
 
                 var constellationQuantum = new ConstellationQuantum { RequestEnvelope = constellationInitEnvelope };
 
