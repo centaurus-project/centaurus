@@ -13,7 +13,6 @@
 
         InternalError = 500,
 
-        SnapshotValidationFailed = 550,
         UnexpectedMessage = 551
     }
 }
