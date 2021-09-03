@@ -98,7 +98,8 @@ namespace Centaurus.Domain
                     lock (batchSyncRoot)
                         batch.Add(quantum);
 
-                    logger.Trace($"Quantum {apex} signatures received. Batch {Id} awaits for {pendingQuanta.Count} signatures.");
+                    if (IsCompleted)
+                        logger.Trace($"Quantum {apex} signatures received. Batch {Id} awaits for {pendingQuanta.Count} signatures.");
                 }
             }
 

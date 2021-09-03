@@ -65,7 +65,7 @@ namespace Centaurus
                     if (!Context.IsAlpha //only Alpha should broadcast quanta
                         || auditor.ConnectionState != ConnectionState.Ready //connection is not validated yet
                         || (quantaDiff == 0 && resultDiff == 0) //nothing to sync
-                        || Context.StateManager.State == State.Rising) //wait for Running state
+                        || Context.StateManager.State == State.Rising || Context.StateManager.State == State.Undefined) //wait for Running state
                     {
                         Thread.Sleep(50);
                         continue;

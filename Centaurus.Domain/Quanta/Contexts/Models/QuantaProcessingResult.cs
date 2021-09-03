@@ -8,9 +8,11 @@ namespace Centaurus.Domain
 {
     public class QuantaProcessingResult
     {
+        public Quantum Quantum { get; set; }
+
         public ulong Initiator { get; set; }
 
-        public ulong Apex { get; set; }
+        public ulong Apex => Quantum.Apex;
 
         public byte[] RawQuantum { get; set; }
 
@@ -38,20 +40,16 @@ namespace Centaurus.Domain
         /// Creates message notifications for accounts that were affected by quantum
         /// </summary>
         /// <returns></returns>
-        public Dictionary<ulong, Message> GetNotificationMessages(PayloadProof payloadProof)
+        public Dictionary<ulong, Message> GetNotificationMessages(ulong initiator, PayloadProof payloadProof)
         {
             if (payloadProof == null)
                 throw new ArgumentNullException(nameof(payloadProof));
-
-            var requestAccount = 0ul;
-            if (ResultMessage.Quantum is RequestQuantumBase request)
-                requestAccount = request.RequestMessage.Account;
 
             var result = new Dictionary<ulong, EffectsNotification>();
             foreach (var effectsGroup in Effects)
             {
                 //initiator will receive result message
-                if (effectsGroup.Account == requestAccount || effectsGroup.Account == 0)
+                if (effectsGroup.Account == initiator || effectsGroup.Account == 0)
                     continue;
                 var notification = new EffectsNotification
                 {

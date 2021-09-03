@@ -77,7 +77,7 @@ namespace Centaurus
 
                 if (address == null)
                     return;
-                if (!TryCreateUri(address, false, out _))
+                if (!UriHelper.TryCreateUri(address, false, out _))
                     throw new ArgumentException("Invalid address");
                 Address = address;
             }
@@ -92,36 +92,23 @@ namespace Centaurus
                 var address = splitted[1];
                 if (splitted.Length != 2
                     || !StrKey.IsValidEd25519PublicKey(pubkeySeed)
-                    || !string.IsNullOrEmpty(address) && !TryCreateUri(address, false, out _))
+                    || !string.IsNullOrEmpty(address) && !UriHelper.TryCreateUri(address, false, out _))
                     return (false, null, null);
                 return (true, KeyPair.FromAccountId(pubkeySeed), address);
             }
 
-            private bool TryCreateUri(string address, bool useSecureConnection, out Uri uri)
-            {
-                return Uri.TryCreate($"{(useSecureConnection ? Uri.UriSchemeHttps : Uri.UriSchemeHttp)}://{address}", UriKind.Absolute, out uri);
-            }
-
             public bool IsPrime => !string.IsNullOrEmpty(Address);
-
-            private UriBuilder GetUriBuilder(bool useSecureConnection)
-            {
-                TryCreateUri(Address, useSecureConnection, out var uri);
-                return new UriBuilder(uri);
-            }
 
             public Uri GetWsConnection(bool isSecureConnection)
             {
-                var uriBuilder = GetUriBuilder(isSecureConnection);
-                uriBuilder.Scheme = isSecureConnection ? "wss" : "ws";
-                return uriBuilder.Uri;
+                UriHelper.TryCreateWsConnection(Address, isSecureConnection, out var uri);
+                return uri;
             }
 
             public Uri GetHttpConnection(bool isSecureConnection)
             {
-                var uriBuilder = GetUriBuilder(isSecureConnection);
-                uriBuilder.Scheme = isSecureConnection ? Uri.UriSchemeHttps : Uri.UriSchemeHttp;
-                return uriBuilder.Uri;
+                UriHelper.TryCreateHttpConnection(Address, isSecureConnection, out var uri);
+                return uri;
             }
         }
     }

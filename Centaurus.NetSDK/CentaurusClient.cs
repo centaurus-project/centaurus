@@ -5,6 +5,9 @@ using Centaurus.Models;
 using NLog;
 using System.Linq;
 using Centaurus.Xdr;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Collections.Concurrent;
 
 namespace Centaurus.NetSDK
 {
@@ -24,8 +27,7 @@ namespace Centaurus.NetSDK
 
         public bool IsConnected => connection != null && connection.IsConnected;
 
-        private ulong lastHandledApex;
-        private ulong lastHandledAccountSequence;
+        private ulong? lastHandledAccountSequence;
 
         public event Action<Exception> OnException;
 
@@ -84,17 +86,20 @@ namespace Centaurus.NetSDK
             //compute payload hash
             var payloadHash = adr.ComputePayloadHash();
 
+            if (adr.Request is RequestHashInfo)
+                throw new Exception($"Account quantum hash was received instead of full quantum data.");
+
+            var accountQuantumRequest = XdrConverter.Deserialize<AccountDataRequestQuantum>(adr.Request.Data);
+
             //compare with specified one
-            if (!payloadHash.SequenceEqual(adr.Quantum.PayloadHash))
+            if (!payloadHash.SequenceEqual(accountQuantumRequest.PayloadHash))
                 throw new Exception("Computed payload hash isn't equal to quantum payload hash.");
 
             AccountState.AccountId = connection.AccountId;
             AccountState.ConstellationInfo = connection.ConstellationInfo;
 
-            lastHandledApex = adr.Quantum.Apex;
             //get last account sequence
             var effects = XdrConverter.Deserialize<EffectsGroup>(adr.Effects.First().EffectsGroupData);
-            lastHandledAccountSequence = effects.AccountSequence;
 
             foreach (var balance in adr.Balances)
             {
@@ -109,6 +114,11 @@ namespace Centaurus.NetSDK
             {
                 AccountState.orders[order.OrderId] = OrderModel.FromOrder(order);
             }
+
+            //set sequence
+            lastHandledAccountSequence = effects.AccountSequence - 1;
+            //process quantum effects
+            ProcessQuantumInfos();
 
             return AccountState;
         }
@@ -214,40 +224,83 @@ namespace Centaurus.NetSDK
             return new DepositInstructions(Config.ClientKeyPair.AccountId, providerSettings.Vault, providerAsset.Token);
         }
 
-        internal void HandleQuantumResult(IQuantumInfoContainer quantumInfo)
+        private object quantaQueueSyncRoot = new { };
+        private SortedDictionary<ulong, (ulong apex, EffectsGroup effectsGroup)> quantaQueue = new SortedDictionary<ulong, (ulong, EffectsGroup)>();
+
+        private object accountUpdateSyncRoot = new { };
+
+        internal void HandleQuantumNotification(IQuantumInfoContainer quantumInfo)
         {
-            if (quantumInfo == null || lastHandledApex >= quantumInfo.Apex)
-                return;
-
-            try
+            //find current account effects group
+            var currentAccountEffects = quantumInfo.Effects.FirstOrDefault(eg => eg is EffectsInfo);
+            if (currentAccountEffects == null)
             {
-                foreach (var effectsInfo in quantumInfo.Effects)
+                return; //log it
+            }
+
+            //deserialize effects group
+            var accountEffects = XdrConverter.Deserialize<EffectsGroup>(currentAccountEffects.EffectsGroupData);
+            lock (quantaQueueSyncRoot)
+            {
+                quantaQueue.Add(accountEffects.AccountSequence, (quantumInfo.Apex, accountEffects));
+                if (quantaQueue.Count > 1_000)
                 {
-                    if (effectsInfo is EffectsHashInfo)
-                        continue;
+                    throw new Exception("Effects notification length is to big.");
+                }
 
-                    var accountEffects = XdrConverter.Deserialize<EffectsGroup>(effectsInfo.EffectsGroupData);
+                if (quantaQueue.Count > 20)
+                    Console.WriteLine($"{Config.ClientKeyPair.AccountId}-{quantaQueue.Count}");
+            }
+            ProcessQuantumInfos();
+        }
 
-                    if (accountEffects.AccountSequence != lastHandledAccountSequence + 1)
-                        throw new Exception("Account sequence is invalid. At least one quantum result is missing.");
+        private void ProcessQuantumInfos()
+        {
 
-                    //apply effects to the client-side state
-                    foreach (var effect in accountEffects.Effects)
+            lock (accountUpdateSyncRoot)
+            {
+                //sequence wasn't initialized yet
+                if (!lastHandledAccountSequence.HasValue)
+                    return;
+                try
+                {
+                    var accountEffects = default((ulong apex, EffectsGroup effectsGroup));
+                    lock (quantaQueueSyncRoot)
+                        accountEffects = quantaQueue.FirstOrDefault().Value;
+
+                    while (accountEffects != default && accountEffects.effectsGroup.AccountSequence == lastHandledAccountSequence.Value + 1)
                     {
-                        AccountState.ApplyAccountStateChanges(effect);
-                    }
+                        var apex = accountEffects.apex;
+                        var effectsGroup = accountEffects.effectsGroup;
+                        //apply effects to the client-side state
+                        foreach (var effect in effectsGroup.Effects)
+                        {
+                            //assign apex and account
+                            effect.Apex = apex;
+                            if (effect is AccountEffect accountEffect)
+                                accountEffect.Account = effectsGroup.Account;
+                            AccountState.ApplyAccountStateChanges(effect);
+                        }
 
-                    //set apex and account sequence
-                    lastHandledApex = quantumInfo.Apex;
-                    lastHandledAccountSequence = accountEffects.AccountSequence;
+                        //set account sequence
+                        lastHandledAccountSequence = effectsGroup.AccountSequence;
+
+                        lock (quantaQueueSyncRoot)
+                        {
+                            //remove current effects group from queue
+                            quantaQueue.Remove(effectsGroup.AccountSequence);
+                            //try get next effects group
+                            accountEffects = quantaQueue.FirstOrDefault().Value;
+                        }
+                    }
 
                     //notify subscribers about the account state update
                     OnAccountUpdate?.Invoke(AccountState);
                 }
-            }
-            catch (Exception e)
-            {
-                OnException?.Invoke(e);
+                catch (Exception e)
+                {
+                    OnException?.Invoke(e);
+                }
             }
         }
 

@@ -5,6 +5,7 @@ using NUnit.Framework;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Centaurus.Test
@@ -22,6 +23,7 @@ namespace Centaurus.Test
         [TestCase(10, 10)]
         public async Task BaseTest(int auditorsCount, int clientsCount)
         {
+            ThreadPool.SetMinThreads(1000, 1000);
 
             TestContext.Out.WriteLine("BaseTest started");
             var environment = new IntegrationTestEnvironment();

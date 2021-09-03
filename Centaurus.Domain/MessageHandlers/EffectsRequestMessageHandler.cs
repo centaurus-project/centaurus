@@ -28,7 +28,7 @@ namespace Centaurus.Domain
                 {
                     var request = message.Envelope.Message as QuantumInfoRequest;
                     var effectsResponse = connection.Context.DataProvider.LoadQuantaInfo(request.Cursor, request.IsDesc, request.Limit, connection.Account.Id);
-                    effectsResponse.OriginalMessage = message.Envelope;
+                    effectsResponse.OriginalMessageId = message.Envelope.Message.MessageId;
                     effectsResponse.Status = ResultStatusCode.Success;
                     result = effectsResponse;
                 }

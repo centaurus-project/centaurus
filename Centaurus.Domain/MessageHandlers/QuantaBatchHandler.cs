@@ -63,7 +63,7 @@ namespace Centaurus.Domain
             if (signatures != null)
                 foreach (var apexSignatures in signatures)
                     foreach (var signature in apexSignatures.Signatures)
-                        Context.AuditResultManager.Add(new AuditorResult { Apex = apexSignatures.Apex, Signature = signature });
+                        Context.ResultManager.Add(new AuditorResult { Apex = apexSignatures.Apex, Signature = signature });
 
             //TODO: move this logic to dedicated class/manager
             //get apex diff between the node and Alpha

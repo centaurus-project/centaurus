@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Net.WebSockets;
 using System.Threading;
 using System.Threading.Tasks;
@@ -53,21 +55,23 @@ namespace Centaurus.NetSDK
 
         public async Task Connect()
         {
-            var wsUri = new Uri($"{(Config.UseSecureConnection ? "wss" : "ws")}://{Config.AlphaServerAddress}/centaurus");
-            var query = HttpUtility.ParseQueryString(wsUri.Query);
+            UriHelper.TryCreateWsConnection(Config.AlphaServerAddress, Config.UseSecureConnection, out var uri);
+            uri = new Uri(uri, "/centaurus");
+
+            var query = HttpUtility.ParseQueryString(uri.Query);
             query.Set(WebSocketConstants.PubkeyParamName, Config.ClientKeyPair.AccountId);
 
-            var uriBuilder = new UriBuilder(wsUri);
+            var uriBuilder = new UriBuilder(uri);
             uriBuilder.Query = query.ToString();
 
-            wsUri = uriBuilder.Uri;
+            uri = uriBuilder.Uri;
 
             //fetch constellation info from the server
-            ConstellationInfo = await PublicApi.GetConstellationInfo(Config.AlphaServerAddress, Config.UseSecureConnection);
+            ConstellationInfo = await Config.GetConstellationInfo(Config.AlphaServerAddress, Config.UseSecureConnection);
             //we expect that the first message from the server will start the handshake routine
             OnMessage += HandleHandshakeMessage;
             //connect the client websocket
-            await webSocketWrapper.Connect(wsUri, cancellationTokenSource.Token);
+            await webSocketWrapper.Connect(uri, cancellationTokenSource.Token);
             //listen for incoming messages
             _ = Task.Factory.StartNew(Listen, TaskCreationOptions.LongRunning).Unwrap();
 
@@ -87,7 +91,7 @@ namespace Centaurus.NetSDK
             QuantumResult result = null;
             if (envelope.Message.MessageId != default)
             {
-                result = new QuantumResult(envelope, client);
+                result = new QuantumResult(envelope, ConstellationInfo);
                 result.ScheduleExpiration(RequestTimeout);
                 collator.Add(result);
             }
@@ -263,8 +267,9 @@ namespace Centaurus.NetSDK
         /// <param name="envelope"></param>
         private void HandleMessage(MessageEnvelopeBase envelope)
         {
-            if (!collator.Resolve(envelope) && envelope.Message is IQuantumInfoContainer quantum)
-                client.HandleQuantumResult(quantum);
+            if ((!collator.Resolve(envelope, out var quantumResult) || quantumResult.IsFinalized) //if notification or quantum is finalized
+                && envelope.Message is IQuantumInfoContainer quantum)
+                client.HandleQuantumNotification(quantum);
         }
 
         /// <summary>

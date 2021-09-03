@@ -1,4 +1,5 @@
 ﻿using Centaurus.Client;
+using System;
 using System.Threading.Tasks;
 
 namespace Centaurus.NetSDK
@@ -15,17 +16,10 @@ namespace Centaurus.NetSDK
         /// <param name="secretKey">Secret key used to sign messages on behalf of the account.</param>
         /// <param name="useSecureConnection">Whether to use TLS encryption for the connection (recommended for production usage).</param>
         public ConstellationConfig(string alphaServerAddress, byte[] secretKey, bool useSecureConnection = true)
-            :this(alphaServerAddress, secretKey, useSecureConnection, null)
-        {
-
-        }
-
-        protected ConstellationConfig(string alphaServerAddress, byte[] secretKey, bool useSecureConnection = true, OutgoingConnectionFactoryBase outgoingConnectionFactoryBase = null)
         {
             AlphaServerAddress = alphaServerAddress;
             ClientKeyPair = KeyPair.FromSecretSeed(secretKey);
             UseSecureConnection = useSecureConnection;
-            OutgoingConnectionFactory = outgoingConnectionFactoryBase ?? OutgoingConnectionFactoryBase.Default;
         }
 
         /// <summary>
@@ -48,6 +42,8 @@ namespace Centaurus.NetSDK
         /// </summary>
         public readonly bool UseSecureConnection;
 
-        internal OutgoingConnectionFactoryBase OutgoingConnectionFactory { get; }
+        internal OutgoingConnectionFactoryBase OutgoingConnectionFactory { get; } = OutgoingConnectionFactoryBase.Default;
+
+        internal Func<string, bool, Task<ConstellationInfo>> GetConstellationInfo { get; } = PublicApi.GetConstellationInfo;
     }
 }

@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading;
 
 namespace Centaurus.Domain
 {
@@ -89,8 +90,8 @@ namespace Centaurus.Domain
         {
             if (string.IsNullOrWhiteSpace(path))
                 return path;
-            return Path.IsPathRooted(path) 
-                ? path 
+            return Path.IsPathRooted(path)
+                ? path
                 : Path.GetFullPath(Path.Combine(Settings.CWD, path.Trim('.').Trim('\\').Trim('/')));
         }
 
@@ -98,6 +99,7 @@ namespace Centaurus.Domain
 
         public void Setup(Snapshot snapshot)
         {
+
             if (Exchange != null)
                 Exchange.OnUpdates -= Exchange_OnUpdates;
 
@@ -114,7 +116,7 @@ namespace Centaurus.Domain
 
             SetupPaymentProviders(snapshot.Cursors);
 
-            AuditResultManager?.Dispose(); AuditResultManager = new ResultManager(this);
+            ResultManager?.Dispose(); ResultManager = new ResultManager(this);
 
             DisposeAnalyticsManager();
 
@@ -156,7 +158,9 @@ namespace Centaurus.Domain
                 return;
             }
             if (Constellation.Alpha.Equals((RawPubKey)Settings.KeyPair))
+            {
                 RoleManager.SetRole(CentaurusNodeRole.Alpha);
+            }
             else
                 RoleManager.SetRole(CentaurusNodeRole.Beta);
         }
@@ -178,15 +182,21 @@ namespace Centaurus.Domain
             foreach (var paymentProvider in PaymentProvidersManager.GetAll())
             {
                 paymentProvider.OnPaymentCommit += PaymentProvider_OnPaymentCommit;
+                paymentProvider.OnError += PaymentProvider_OnError;
             }
         }
 
         private void PaymentProvider_OnPaymentCommit(PaymentProviderBase paymentProvider, PaymentProvider.Models.DepositNotificationModel notification)
         {
-            if (!IsAlpha)
-                return;
+            if (!IsAlpha || StateManager.State != State.Ready)
+                throw new OperationCanceledException($"Current server is not ready to process deposits. Is Alpha: {IsAlpha}, State: {StateManager.State}");
 
             QuantumHandler.HandleAsync(new DepositQuantum { Source = notification.ToDomainModel() });
+        }
+
+        private void PaymentProvider_OnError(PaymentProviderBase paymentProvider, Exception exc)
+        {
+            logger.Error(exc, $"Error occurred in {paymentProvider.Id}");
         }
 
         public void Dispose()
@@ -195,7 +205,7 @@ namespace Centaurus.Domain
             PaymentProvidersManager?.Dispose();
 
             QuantumHandler.Dispose();
-            AuditResultManager?.Dispose();
+            ResultManager?.Dispose();
             DisposeAnalyticsManager();
             PerformanceStatisticsManager?.Dispose();
         }
@@ -262,7 +272,7 @@ namespace Centaurus.Domain
 
         public HashSet<int> AssetIds { get; private set; }
 
-        public ResultManager AuditResultManager { get; private set; }
+        public ResultManager ResultManager { get; private set; }
 
         public AnalyticsManager AnalyticsManager { get; private set; }
 

@@ -28,7 +28,7 @@ namespace Centaurus.Test
         {
             state = WebSocketState.Aborted;
             if (secondPartyWebsocket != null)
-                Task.Factory.StartNew(secondPartyWebsocket.SetClosed);
+                Task.Run(secondPartyWebsocket.SetClosed);
         }
 
         private void SetClosed()

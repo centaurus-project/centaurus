@@ -29,6 +29,7 @@ namespace Centaurus.Domain
         }
 
         public event Action<BatchSavedInfo> OnBatchSaved;
+
         public void UpdateBatch(bool force = false)
         {
             lock (syncRoot)
@@ -62,10 +63,9 @@ namespace Centaurus.Domain
 
         //last saved quantum apex
         public ulong LastSavedApex { get; private set; }
-
         public void ApplyUpdates(bool force = false)
         {
-            lock (syncRoot)
+            lock (applyUpdatesSyncRoot)
             {
                 var updates = GetNextUpdates();
                 while (updates != null && updates.IsCompleted && (updates.AreSignaturesCollected || force))
@@ -81,7 +81,7 @@ namespace Centaurus.Domain
 
                         var batchInfo = new BatchSavedInfo
                         {
-                            SavedAt = lastUpdateTime,
+                            SavedAt = DateTime.UtcNow,
                             QuantaCount = pendingUpdates.QuantaCount,
                             EffectsCount = pendingUpdates.EffectsCount,
                             ElapsedMilliseconds = sw.ElapsedMilliseconds
@@ -120,28 +120,31 @@ namespace Centaurus.Domain
                 Signatures = new List<SignatureModel> { result.CurrentNodeSignature.ToPersistenModel() }
             };
 
-            if (pendingUpdates.FirstApex == 0)
-                pendingUpdates.FirstApex = result.Apex;
-
-            pendingUpdates.LastApex = result.Apex;
-
-            pendingUpdates.AddQuantum(qModel, result.Effects.Sum(e => e.Effects.Effects.Count));
-            pendingUpdates.AddQuantumRefs(result.Effects.Select(eg => new QuantumRefPersistentModel
+            lock (syncRoot)
             {
-                AccountId = eg.Account,
-                Apex = result.Apex,
-                IsQuantumInitiator = eg.Account == result.Initiator
-            }));
+                if (pendingUpdates.FirstApex == 0)
+                    pendingUpdates.FirstApex = result.Apex;
 
-            if (result.HasSettingsUpdate)
-                pendingUpdates.AddConstellation(Context.Constellation.ToPesrsistentModel());
+                pendingUpdates.LastApex = result.Apex;
 
-            pendingUpdates.AddAffectedAccounts(result.AffectedAccounts.Keys);
+                pendingUpdates.AddQuantum(qModel, result.Effects.Sum(e => e.Effects.Effects.Count));
+                pendingUpdates.AddQuantumRefs(result.Effects.Select(eg => new QuantumRefPersistentModel
+                {
+                    AccountId = eg.Account,
+                    Apex = result.Apex,
+                    IsQuantumInitiator = eg.Account == result.Initiator
+                }));
 
-            if (result.HasCursorUpdate)
-                pendingUpdates.HasCursorUpdate = true;
+                if (result.HasSettingsUpdate)
+                    pendingUpdates.AddConstellation(Context.Constellation.ToPesrsistentModel());
 
-            return pendingUpdates.Id;
+                pendingUpdates.AddAffectedAccounts(result.AffectedAccounts.Keys);
+
+                if (result.HasCursorUpdate)
+                    pendingUpdates.HasCursorUpdate = true;
+
+                return pendingUpdates.Id;
+            }
         }
 
         public void AddSignatures(uint updatesId, ulong apex, List<AuditorResult> signatures)
@@ -165,6 +168,7 @@ namespace Centaurus.Domain
         private const int MaxSaveInterval = 5;
 
         private DateTime lastUpdateTime;
+        private object applyUpdatesSyncRoot = new { };
         private object syncRoot = new { };
         private Timer saveTimer = new Timer();
         private XdrBufferFactory.RentedBuffer buffer = XdrBufferFactory.Rent(256 * 1024);
@@ -208,23 +212,20 @@ namespace Centaurus.Domain
 
         private void SaveTimer_Elapsed(object sender, ElapsedEventArgs e)
         {
-            lock (syncRoot)
+            try
             {
-                try
+                if (Context.StateManager?.State == State.Running || Context.StateManager?.State == State.Ready)
                 {
-                    if (Context.StateManager?.State == State.Running || Context.StateManager?.State == State.Ready)
-                    {
-                        UpdateBatch();
-                    }
+                    UpdateBatch();
                 }
-                catch (Exception exc)
-                {
-                    logger.Error(exc);
-                }
-                finally
-                {
-                    saveTimer.Start();
-                }
+            }
+            catch (Exception exc)
+            {
+                logger.Error(exc);
+            }
+            finally
+            {
+                saveTimer.Start();
             }
         }
 

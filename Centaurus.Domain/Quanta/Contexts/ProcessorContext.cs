@@ -97,6 +97,11 @@ namespace Centaurus.Domain
 
             BuildProcessingResult(quantumResultMessage, rawEffects);
 
+            //assign the serialized quantum to the result
+            ProcessingResult.ResultMessage.Request = new RequestInfo { Data = ProcessingResult.RawQuantum };
+            //assign apex to the result
+            ProcessingResult.ResultMessage.Apex = Apex;
+
             //add quantum data to updates batch
             ProcessingResult.UpdatesBatchId = Context.PendingUpdatesManager.AddQuantum(ProcessingResult);
         }
@@ -151,7 +156,7 @@ namespace Centaurus.Domain
 
             var result = new QuantaProcessingResult
             {
-                Apex = Apex,
+                Quantum = Quantum,
                 RawQuantum = rawQuantum,
                 QuantumHash = quantumHash,
                 PayloadHash = payloadHash,

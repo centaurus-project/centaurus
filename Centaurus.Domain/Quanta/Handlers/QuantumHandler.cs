@@ -42,10 +42,12 @@ namespace Centaurus.Domain
         /// <summary>
         /// Handles the quantum and returns Task.
         /// </summary>
-        /// <param name="quantum">Quantum to handle</param>
-        public Task<QuantumResultMessageBase> HandleAsync(Quantum quantum)
+        /// <param name="quantum">Quantum to handle</param>s
+        public Task HandleAsync(Quantum quantum)
         {
-            if (QuantaThrottlingManager.Current.IsThrottlingEnabled && QuantaThrottlingManager.Current.MaxItemsPerSecond <= awaitedQuanta.Count)
+            if (Context.IsAlpha //if current node is not alpha, than we need to keep process quanta
+                && QuantaThrottlingManager.Current.IsThrottlingEnabled 
+                && QuantaThrottlingManager.Current.MaxItemsPerSecond <= awaitedQuanta.Count)
                 throw new TooManyRequestsException("Server is too busy. Try again later.");
             var newHandleItem = new HandleItem(quantum);
             if (newHandleItem.Quantum.Apex > 0)
@@ -83,7 +85,6 @@ namespace Centaurus.Domain
             try
             {
                 Context.ExtensionsManager.BeforeQuantumHandle(handleItem.Quantum);
-
                 Context.PendingUpdatesManager.UpdateBatch();
                 result = await HandleQuantum(handleItem.Quantum);
                 if (result.Status != ResultStatusCode.Success)
@@ -163,7 +164,7 @@ namespace Centaurus.Domain
         {
             Context.QuantumStorage.AddQuantum(new PendingQuantum
             {
-                Quantum = processingResult.ResultMessage.Quantum,
+                Quantum = processingResult.Quantum,
                 Signatures = new List<AuditorSignatureInternal> { processingResult.CurrentNodeSignature }
             }, processingResult.QuantumHash);
         }
@@ -171,7 +172,7 @@ namespace Centaurus.Domain
         private void ProcessResult(ProcessorContext processorContext)
         {
             //register result
-            Context.AuditResultManager.Add(processorContext.ProcessingResult);
+            Context.ResultManager.Add(processorContext.ProcessingResult);
 
             //send result to auditors
             Context.OutgoingConnectionManager.EnqueueResult(new AuditorResult

@@ -41,7 +41,7 @@ namespace Centaurus.Domain
                         || auditor.PubKey.Equals(Context.Settings.KeyPair)) //current server
                         continue;
 
-                    var connection = new AtomicConnection(this, auditor.PubKey, GetCentaurusConnection(auditor, Context.Settings.UseSecureConnection));
+                    var connection = new AtomicConnection(this, auditor.PubKey, GetAuditorUri(auditor, Context.Settings.UseSecureConnection));
                     connections.Add(auditor.PubKey, connection);
                     connection.Run();
                 }
@@ -68,7 +68,7 @@ namespace Centaurus.Domain
                 var auditor = auditors.FirstOrDefault(a => a.PubKey.Equals(connection.PubKey));
                 if (auditor == null //not in address book
                     || !auditor.IsPrime //not prime server
-                    || GetCentaurusConnection(auditor, Context.Settings.UseSecureConnection) != connection.Address) //address changed
+                    || GetAuditorUri(auditor, Context.Settings.UseSecureConnection) != connection.Address) //address changed
                     connectionsToDrop.Add(connection.PubKey);
             }
             foreach (var connectionKey in connectionsToDrop)
@@ -79,7 +79,7 @@ namespace Centaurus.Domain
             }
         }
 
-        public static Uri GetCentaurusConnection(Settings.Auditor auditor, bool useSecureConnection)
+        public static Uri GetAuditorUri(Settings.Auditor auditor, bool useSecureConnection)
         {
             return new Uri(auditor.GetWsConnection(useSecureConnection), WebSocketConstants.CentaurusWebSocketEndPoint);
         }

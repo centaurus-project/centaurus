@@ -5,6 +5,7 @@ using NLog;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using static Centaurus.Domain.ProcessorContext;
@@ -35,6 +36,10 @@ namespace Centaurus.Domain
 
         public void Add(AuditorResult resultMessage)
         {
+            //auditor can send delayed results
+            if (resultMessage.Apex < Context.PendingUpdatesManager.LastSavedApex)
+                return;
+
             var aggregate = default(Aggregate);
             lock (pendingAggregatesSyncRoot)
             {
@@ -63,6 +68,16 @@ namespace Centaurus.Domain
             {
                 if (!pendingAggregates.Remove(id, out _))
                     logger.Trace($"Unable to remove item by id '{id}'");
+            }
+        }
+
+        public QuantumResultMessageBase GetResult(ulong id)
+        {
+            lock (pendingAggregatesSyncRoot)
+            {
+                if (pendingAggregates.TryGetValue(id, out var aggregate))
+                    return aggregate.Item.Result.ResultMessage;
+                return null;
             }
         }
 
@@ -235,7 +250,7 @@ namespace Centaurus.Domain
                         Signatures = resultMessages.Select(r => r.Signature.PayloadSignature).ToList()
                     };
 
-                    foreach (var notification in Item.Result.GetNotificationMessages(effectsProof))
+                    foreach (var notification in Item.Result.GetNotificationMessages(Item.Result.Initiator, effectsProof))
                     {
                         var aPubKey = Item.Result.AffectedAccounts[notification.Key];
                         Manager.Context.Notify(aPubKey, notification.Value.CreateEnvelope<MessageEnvelopeSignless>());
@@ -256,7 +271,7 @@ namespace Centaurus.Domain
             {
                 try
                 {
-                    if (Item.Result.ResultMessage.Quantum is WithdrawalRequestQuantum transactionQuantum)
+                    if (Item.Result.Quantum is WithdrawalRequestQuantum transactionQuantum)
                     {
                         if (!Manager.Context.PaymentProvidersManager.TryGetManager(transactionQuantum.Provider, out var paymentProvider))
                             throw new Exception($"Unable to find manager {transactionQuantum.Provider}");
@@ -279,15 +294,13 @@ namespace Centaurus.Domain
                 {
                     var votesCount = resultMessages.Count;
 
-                    var originalEnvelope = Item.Result.ResultMessage.OriginalMessage;
-                    SequentialRequestMessage requestMessage = null;
-                    if (originalEnvelope.Message is SequentialRequestMessage)
-                        requestMessage = (SequentialRequestMessage)originalEnvelope.Message;
-                    else if (originalEnvelope.Message is RequestQuantum)
-                        requestMessage = ((RequestQuantum)originalEnvelope.Message).RequestEnvelope.Message as SequentialRequestMessage;
+                    var quantum = Item.Result.Quantum;
+                    SequentialRequestMessage requestMessage = quantum is RequestQuantumBase requestQuantum 
+                        ? requestQuantum.RequestMessage 
+                        : null;
 
                     var exc = new Exception("Majority for quantum" +
-                        $" {Item.Apex} ({requestMessage?.GetMessageType() ?? originalEnvelope.Message.GetMessageType()})" +
+                        $" {Item.Apex} ({requestMessage?.GetMessageType() ?? quantum.GetMessageType()})" +
                         $" is unreachable. Results received count is {processedAuditors.Count}," +
                         $" valid results count is {votesCount}. The constellation collapsed.");
                     Manager.Context.StateManager.Failed(exc);

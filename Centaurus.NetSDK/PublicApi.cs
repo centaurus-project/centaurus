@@ -9,18 +9,13 @@ namespace Centaurus.NetSDK
     {
         public static async Task<ConstellationInfo> GetConstellationInfo(string alphaAddress, bool useSecureConnection)
         {
-            if (!TryCreateUri(alphaAddress, useSecureConnection, out var uri))
+            if (!UriHelper.TryCreateHttpConnection(alphaAddress, useSecureConnection, out var uri))
                 throw new ArgumentException("Invalid address");
 
             var uriBuilder = new UriBuilder(uri);
             uriBuilder.Scheme = useSecureConnection ? Uri.UriSchemeHttps : Uri.UriSchemeHttp;
 
             return await GetConstellationInfo<ConstellationInfo>(uriBuilder.Uri);
-        }
-
-        private static bool TryCreateUri(string address, bool useSecureConnection, out Uri uri)
-        {
-            return Uri.TryCreate($"{(useSecureConnection ? Uri.UriSchemeHttps : Uri.UriSchemeHttp)}://{address}", UriKind.Absolute, out uri);
         }
 
         public static async Task<T> GetConstellationInfo<T>(Uri uri)

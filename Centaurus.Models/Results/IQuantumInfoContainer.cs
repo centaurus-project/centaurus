@@ -8,7 +8,7 @@ namespace Centaurus.Models
     {
         public ulong Apex { get; }
 
-        public byte[] QuantumHash { get; }
+        public RequestInfoBase Request { get; }
 
         public PayloadProof PayloadProof { get; }
 

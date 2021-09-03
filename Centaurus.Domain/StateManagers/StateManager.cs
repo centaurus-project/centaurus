@@ -194,7 +194,10 @@ namespace Centaurus.Domain
                 if (apexDiff > ChasingDelayTreshold && State == State.Ready)
                     SetState(State.Chasing); //node is too behind the Alpha
                 else if (apexDiff < RunningDelayTreshold && State == State.Chasing)
+                {
                     SetState(State.Running); //node reached Alpha
+                    UpdateState();
+                }
             }
         }
 

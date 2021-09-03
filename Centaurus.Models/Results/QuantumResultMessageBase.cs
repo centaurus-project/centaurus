@@ -14,10 +14,20 @@ namespace Centaurus.Models
         [XdrField(1)]
         public PayloadProof PayloadProof { get; set; }
 
-        public Quantum Quantum => (Quantum)OriginalMessage.Message;
+        [XdrField(2)]
+        public RequestInfoBase Request { get; set; }
 
-        public ulong Apex => Quantum.Apex;
+        [XdrField(3)]
+        public ulong Apex { get; set; }
 
-        public byte[] QuantumHash => Quantum.ComputeHash();
+        public byte[] QuantumHash
+        {
+            get 
+            {
+                if (Request is RequestInfo)
+                    return Request.Data.ComputeHash();
+                return Request.Data;
+            }
+        }
     }
 }

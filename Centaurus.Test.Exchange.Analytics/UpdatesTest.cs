@@ -146,7 +146,7 @@ namespace Centaurus.Test.Exchange.Analytics
             {
                 foreach (var asset in context.Constellation.Assets)
                 {
-                    if (asset.Code == "XLM") //base asset
+                    if (asset.IsQuoteAsset) //base asset
                         continue;
                     foreach (var precision in DepthsSubscription.Precisions)
                     {

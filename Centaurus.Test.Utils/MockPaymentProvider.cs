@@ -1,7 +1,9 @@
 ﻿using Centaurus.Models;
 using Centaurus.PaymentProvider;
 using Centaurus.PaymentProvider.Models;
+using System;
 using System.Collections.Generic;
+using System.Reflection;
 
 namespace Centaurus.Test
 {
@@ -46,7 +48,13 @@ namespace Centaurus.Test
         public void Deposit(DepositNotificationModel depositNotificationModel)
         {
             NotificationsManager.RegisterNotification(depositNotificationModel);
-            RaiseOnPaymentCommit(depositNotificationModel);
+            try
+            {
+                var commitPaymentsMethod = typeof(PaymentProviderBase).GetMethod("CommitPayments", BindingFlags.Instance | BindingFlags.NonPublic);
+                commitPaymentsMethod.Invoke(this, null);
+            }
+            catch (OperationCanceledException)
+            { }
         }
 
         public override bool AreSignaturesValid(byte[] transaction, params SignatureModel[] signature)

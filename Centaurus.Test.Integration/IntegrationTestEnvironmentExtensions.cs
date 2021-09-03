@@ -30,7 +30,7 @@ namespace Centaurus.Test
 
             var assets = new List<AssetSettings>();
             for (var i = 0; i < assetCodes.Length; i++)
-                assets.Add(new AssetSettings { Code = assetCodes[i] });
+                assets.Add(new AssetSettings { Code = assetCodes[i], IsQuoteAsset = i == 0 });
 
             var auditors = environment.AuditorWrappers.Select(a =>
                 new Auditor
@@ -64,7 +64,7 @@ namespace Centaurus.Test
             foreach (var a in environment.AuditorWrappers.Values)
                 constellationInit.Sign(a.Context.Settings.KeyPair);
 
-            var res = await environment.AlphaWrapper.ConstellationController.Update(constellationInit);
+            var res = await environment.AlphaWrapper.ConstellationController.Init(constellationInit);
 
             var result = (ConstellationController.InitResult)((JsonResult)res).Value;
 

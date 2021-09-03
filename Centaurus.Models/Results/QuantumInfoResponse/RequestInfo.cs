@@ -11,7 +11,7 @@ namespace Centaurus.Models
     public abstract class RequestInfoBase
     {
         [XdrField(0)]
-        public byte[] Request { get; set; }
+        public byte[] Data { get; set; }
     }
 
     public class RequestHashInfo: RequestInfoBase

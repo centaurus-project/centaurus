@@ -37,7 +37,7 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
         private async Task SendQuanta(ConnectionBase connection, QuantaBatchRequest batchRequest)
         {
             var aboveApex = batchRequest.QuantaCursor;
-            var batchSize = 50;
+            var batchSize = Context.Settings.SyncBatchSize;
             while (true)
             {
                 if (!Context.QuantumStorage.GetQuantaBacth(aboveApex, batchSize, out var currentBatch)
@@ -66,7 +66,7 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
 
                 await connection.SendMessage(batch.CreateEnvelope<MessageEnvelopeSignless>());
                 var lastQuantum = currentBatch.LastOrDefault();
-                aboveApex = lastQuantum?.Quantum.Apex ?? 0;
+                aboveApex = lastQuantum?.Quantum.Apex ?? Context.QuantumStorage.CurrentApex;
                 if (aboveApex == Context.QuantumStorage.CurrentApex)
                     break;
             };

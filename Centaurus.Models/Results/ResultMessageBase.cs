@@ -9,14 +9,14 @@ namespace Centaurus.Models
     public abstract class ResultMessageBase : Message
     {
         [XdrField(0)]
-        public MessageEnvelopeBase OriginalMessage { get; set; }
-
-        [XdrField(1)]
         public ResultStatusCode Status { get; set; }
 
-        [XdrField(3, Optional = true)]
+        [XdrField(1, Optional = true)]
         public string ErrorMessage { get; set; }
 
-        public override long MessageId => OriginalMessage.Message.MessageId;
+        [XdrField(2)]
+        public long OriginalMessageId { get; set; }
+
+        public override long MessageId => OriginalMessageId;
     }
 }

@@ -13,6 +13,10 @@ namespace Centaurus.PaymentProvider
             CursorComparer = cursorComparer ?? throw new ArgumentNullException(nameof(cursorComparer));
         }
 
+        /// <summary>
+        /// Adds the notification to the notifications queue
+        /// </summary>
+        /// <param name="notification"></param>
         public void RegisterNotification(DepositNotificationModel notification)
         {
             lock (notificationsSyncRoot)
@@ -26,7 +30,12 @@ namespace Centaurus.PaymentProvider
             }
         }
 
-        public bool TryGetNextPayment(out DepositNotificationModel notification)
+        /// <summary>
+        /// Fetches first notification in the queue
+        /// </summary>
+        /// <param name="notification"></param>
+        /// <returns>True if there are notifications in the queue, otherwise false</returns>
+        public bool TryGetNextNotification(out DepositNotificationModel notification)
         {
             lock (notificationsSyncRoot)
             {
@@ -35,14 +44,25 @@ namespace Centaurus.PaymentProvider
             }
         }
 
-        public void RemovePayment(string cursor)
+        /// <summary>
+        /// Removes first notification in the queue
+        /// </summary>
+        public void RemoveNextNotification()
         {
             lock (notificationsSyncRoot)
             {
-                var notification = pendingDeposits.FirstOrDefault();
-                if (notification == null || notification.Cursor != cursor)
-                    throw new Exception("Unable to dequeue cursor.");
                 pendingDeposits.RemoveAt(0);
+            }
+        }
+
+        /// <summary>
+        /// Marks all notifications as unsent
+        /// </summary>
+        public void ResetSentNotification()
+        {
+            lock (notificationsSyncRoot)
+            {
+                pendingDeposits.ForEach(n => n.IsSend = false);
             }
         }
 

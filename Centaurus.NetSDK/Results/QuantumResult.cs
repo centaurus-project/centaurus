@@ -10,11 +10,11 @@ namespace Centaurus.NetSDK
     /// </summary>
     public class QuantumResult
     {
-        public QuantumResult(MessageEnvelopeBase requestEnvelope, CentaurusClient client)
+        public QuantumResult(MessageEnvelopeBase requestEnvelope, ConstellationInfo constellationInfo)
         {
             Request = requestEnvelope ?? throw new ArgumentNullException(nameof(requestEnvelope));
             IsFinalizationRequired = requestEnvelope.Message is SequentialRequestMessage;
-            this.client = client ?? throw new ArgumentNullException(nameof(client));
+            this.constellationInfo = constellationInfo ?? throw new ArgumentNullException(nameof(constellationInfo));
         }
 
         internal readonly TaskCompletionSource<MessageEnvelopeBase> Acknowledged = new TaskCompletionSource<MessageEnvelopeBase>();
@@ -23,9 +23,7 @@ namespace Centaurus.NetSDK
 
         internal bool IsFinalizationRequired { get; private set; }
 
-        private CentaurusClient client;
-
-        private ConstellationInfo ConstellationInfo => client.connection.ConstellationInfo;
+        private readonly ConstellationInfo constellationInfo;
 
         /// <summary>
         /// Event that resolves when the server returns the acknowledgment confirmation for the client request.
@@ -81,8 +79,6 @@ namespace Centaurus.NetSDK
                         if (!Acknowledged.Task.IsCompleted) //complete acknowledgment task if it's not completed yet
                             Acknowledged.TrySetResult(resultEnvelope);
 
-                        if (resultEnvelope.Message is QuantumResultMessageBase quantumResult)
-                            client.HandleQuantumResult(quantumResult);
                         Finalized.TrySetResult(resultEnvelope);
                     }
                     else
@@ -103,18 +99,18 @@ namespace Centaurus.NetSDK
             if (resultEnvelope.Message is QuantumResultMessageBase quantumResult)
             {
                 //TODO: cache current auditors keypairs
-                var signaturesCount = quantumResult.GetValidSignaturesCount(ConstellationInfo.Auditors.Select(a => new KeyPair(a.PubKey)).ToList());
+                var signaturesCount = quantumResult.GetValidSignaturesCount(constellationInfo.Auditors.Select(a => new KeyPair(a.PubKey)).ToList());
                 if (signaturesCount < 1)
                     throw new RequestException(resultEnvelope, "Result message has no signatures.");
 
-                if (MajorityHelper.HasMajority(signaturesCount, ConstellationInfo.Auditors.Count))
+                if (MajorityHelper.HasMajority(signaturesCount, constellationInfo.Auditors.Count))
                     return (true, true); //valid and finalized
                 else
                     return (true, false); //valid but not finalized
             }
             else
             {
-                var isSignedByAuditor = ConstellationInfo.Auditors.Any(a => resultEnvelope.IsSignatureValid(new RawPubKey(a.PubKey), false));
+                var isSignedByAuditor = constellationInfo.Auditors.Any(a => resultEnvelope.IsSignatureValid(new RawPubKey(a.PubKey), false));
                 return (isSignedByAuditor, false);
             }
         }

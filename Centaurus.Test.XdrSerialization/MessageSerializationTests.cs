@@ -54,13 +54,12 @@ namespace Centaurus.Test
         }
 
         [Test]
-        public void AccountNullValueSerializationTest()
+        public void NullValueSerializationTest()
         {
-            //var account = new Account { Id = 1, Balances = new List<Balance>(), Nonce = 1, Orders = new List<Order>(), Pubkey = KeyPair.Random() };
-            //var rawData = XdrConverter.Serialize(account);
-            //account = XdrConverter.Deserialize<Account>(rawData);
-            //Assert.AreEqual(null, account.RequestRateLimits);
-            Assert.Fail();
+            var signature = new AuditorSignatureInternal { AuditorId = 1, PayloadSignature = new TinySignature { Data = BinaryExtensions.RandomBytes(64) } };
+            var rawData = XdrConverter.Serialize(signature);
+            signature = XdrConverter.Deserialize<AuditorSignatureInternal>(rawData);
+            Assert.AreEqual(null, signature.TxSignature);
         }
 
         [Test]

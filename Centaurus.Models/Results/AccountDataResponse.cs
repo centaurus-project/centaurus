@@ -13,7 +13,5 @@ namespace Centaurus.Models
 
         [XdrField(2)]
         public ulong Sequence { get; set; }
-
-        public new AccountDataRequestQuantum Quantum => (AccountDataRequestQuantum)base.Quantum;
     }
 }

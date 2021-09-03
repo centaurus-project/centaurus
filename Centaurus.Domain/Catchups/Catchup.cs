@@ -33,7 +33,6 @@ namespace Centaurus.Domain
             await semaphoreSlim.WaitAsync();
             try
             {
-
                 logger.Trace($"Auditor state from {pubKey.GetAccountId()} received by AlphaCatchup.");
                 if (Context.StateManager.State != State.Rising)
                 {
@@ -195,13 +194,19 @@ namespace Centaurus.Domain
             {
                 foreach (var signature in quantumItem.signatures)
                 {
-                    Context.AuditResultManager.Add(signature);
+                    Context.ResultManager.Add(signature);
                 }
-                var resultMessage = await Context.QuantumHandler.HandleAsync(quantumItem.quantum);
-                var processedQuantum = (Quantum)resultMessage.OriginalMessage.Message;
+
+                //compute quantum hash before processing
+                var originalQuantumHash = quantumItem.quantum.ComputeHash();
+
+                await Context.QuantumHandler.HandleAsync(quantumItem.quantum);
+
+                //compute quantum hash after processing
+                var processedQuantumHash = quantumItem.quantum.ComputeHash();
                 //TODO: do we need some extra checks here?
-                if (!ByteArrayPrimitives.Equals(quantumItem.quantum.ComputeHash(), processedQuantum.ComputeHash()))
-                    throw new Exception("Apexes are not equal for a quantum on restore.");
+                if (!ByteArrayPrimitives.Equals(originalQuantumHash, processedQuantumHash))
+                    throw new Exception("Quantum hash are not equal on restore.");
             }
         }
 

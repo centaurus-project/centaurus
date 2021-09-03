@@ -40,8 +40,12 @@ namespace Centaurus.NetSDK
                     effectsBytes = effectsBytes.Concat(effectsInfo.EffectsGroupData.ComputeHash());
             }
 
+            var quantumRequestHash = quantumInfo.Request.Data;
+            if (quantumInfo.Request is RequestInfo)
+                quantumRequestHash = quantumInfo.Request.Data.ComputeHash();
+
             //compute payload hash
-            var payloadHash = ByteArrayExtensions.ComputeQuantumPayloadHash(quantumInfo.Apex, quantumInfo.QuantumHash, effectsBytes.ToArray().ComputeHash());
+            var payloadHash = ByteArrayExtensions.ComputeQuantumPayloadHash(quantumInfo.Apex, quantumRequestHash, effectsBytes.ToArray().ComputeHash());
 
             if (!ByteArrayPrimitives.Equals(quantumInfo.PayloadProof.PayloadHash, payloadHash))
                 return 0;

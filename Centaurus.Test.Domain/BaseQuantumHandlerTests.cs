@@ -2,6 +2,7 @@
 using Centaurus.Models;
 using Centaurus.PaymentProvider;
 using Centaurus.PaymentProvider.Models;
+using Centaurus.Xdr;
 using NUnit.Framework;
 using System;
 using System.Collections.Generic;
@@ -100,7 +101,7 @@ namespace Centaurus.Test
                 RequestEnvelope = envelope
             };
 
-            var res = await AssertQuantumHandling(quantum, excpectedException);
+            await AssertQuantumHandling(quantum, excpectedException);
             if (excpectedException == null)
             {
                 var currentMarket = context.Exchange.GetMarket(asset);
@@ -134,11 +135,11 @@ namespace Centaurus.Test
             var envelope = order.CreateEnvelope().Sign(useFakeSigner ? TestEnvironment.Client2KeyPair : TestEnvironment.Client1KeyPair);
             var quantum = new RequestQuantum { RequestEnvelope = envelope };
 
-            var submitResult = await AssertQuantumHandling(quantum, excpectedException);
+            await AssertQuantumHandling(quantum, excpectedException);
             if (excpectedException != null)
                 return;
 
-            var apex = ((Quantum)submitResult.OriginalMessage.Message).Apex + apexMod;
+            var apex = quantum.Apex + apexMod;
 
             var orderCancellation = new OrderCancellationRequest
             {
@@ -150,7 +151,7 @@ namespace Centaurus.Test
             envelope = orderCancellation.CreateEnvelope().Sign(TestEnvironment.Client1KeyPair);
             quantum = new RequestQuantum { RequestEnvelope = envelope };
 
-            var cancelResult = await AssertQuantumHandling(quantum, excpectedException);
+            await AssertQuantumHandling(quantum, excpectedException);
 
             if (excpectedException != null)
                 return;
@@ -241,13 +242,15 @@ namespace Centaurus.Test
             envelope.Sign(TestEnvironment.Client1KeyPair);
             var quantum = new AccountDataRequestQuantum { RequestEnvelope = envelope };
 
-            var res = await AssertQuantumHandling(quantum, excpectedException);
+            await AssertQuantumHandling(quantum, excpectedException);
+            var result = context.ResultManager.GetResult(quantum.Apex);
             if (excpectedException == null)
             {
-                Assert.IsInstanceOf<AccountDataResponse>(res);
-                var adr = (AccountDataResponse)res;
+                Assert.IsInstanceOf<AccountDataResponse>(result);
+                var adr = (AccountDataResponse)result;
                 var payloadHash = adr.ComputePayloadHash();
-                Assert.AreEqual(payloadHash, adr.Quantum.PayloadHash);
+                var accountDataRequestQuantum = XdrConverter.Deserialize<AccountDataRequestQuantum>(adr.Request.Data);
+                Assert.AreEqual(payloadHash, accountDataRequestQuantum.PayloadHash);
             }
         }
 
@@ -280,11 +283,11 @@ namespace Centaurus.Test
             }
         }
 
-        protected async Task<QuantumResultMessageBase> AssertQuantumHandling(Quantum quantum, Type excpectedException = null)
+        protected async Task AssertQuantumHandling(Quantum quantum, Type excpectedException = null)
         {
             try
             {
-                var result = await context.QuantumHandler.HandleAsync(quantum);
+                await context.QuantumHandler.HandleAsync(quantum);
 
                 context.PendingUpdatesManager.UpdateBatch(true);
                 context.PendingUpdatesManager.ApplyUpdates(true);
@@ -292,14 +295,11 @@ namespace Centaurus.Test
                 //check that processed quanta is saved to the storage
                 var lastApex = context.PermanentStorage.GetLastApex();
                 Assert.AreEqual(context.QuantumStorage.CurrentApex, lastApex);
-
-                return result;
             }
             catch (Exception exc)
             {
                 if (excpectedException == null || excpectedException.FullName != exc.GetType().FullName)
                     throw;
-                return null;
             }
         }
     }

@@ -28,7 +28,7 @@ namespace Centaurus.Domain
             {
                 var resultsBatch = (AuditorResultsBatch)message.Envelope.Message;
                 foreach (var result in resultsBatch.AuditorResultMessages)
-                    Context.AuditResultManager.Add(result);
+                    Context.ResultManager.Add(result);
             }
             return Task.CompletedTask;
         }

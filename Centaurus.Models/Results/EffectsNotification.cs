@@ -11,7 +11,7 @@ namespace Centaurus.Models
         public ulong Apex { get; set; }
 
         [XdrField(1)]
-        public byte[] QuantumHash { get; set; }
+        public RequestInfoBase Request { get; set; }
 
         [XdrField(2)]
         public PayloadProof PayloadProof { get; set; }

@@ -23,16 +23,11 @@ namespace Centaurus.PaymentProvider
 
         public event Action<PaymentProviderBase, DepositNotificationModel> OnPaymentCommit;
 
-        protected void RaiseOnPaymentCommit(DepositNotificationModel deposit)
-        {
-            OnPaymentCommit?.Invoke(this, deposit);
-        }
+        public event Action<PaymentProviderBase, Exception> OnError;
 
-        public event Action<Exception> OnError;
-
-        protected void RaiseOnError(Exception exc)
+        public void RaiseOnError(Exception exception)
         {
-            OnError?.Invoke(exc);
+            OnError?.Invoke(this, exception);
         }
 
         public SettingsModel Settings { get; }
@@ -49,6 +44,16 @@ namespace Centaurus.PaymentProvider
 
         public string LastRegisteredCursor => NotificationsManager?.LastRegisteredCursor;
 
+        public void ResetNotificationCursor()
+        {
+
+        }
+
+        /// <summary>
+        /// Builds transaction for the withdrawal
+        /// </summary>
+        /// <param name="withdrawalRequest"></param>
+        /// <returns></returns>
         public abstract byte[] BuildTransaction(WithdrawalRequestModel withdrawalRequest);
 
         /// <summary>
@@ -66,10 +71,20 @@ namespace Centaurus.PaymentProvider
         /// <returns></returns>
         public abstract bool AreSignaturesValid(byte[] transaction, params SignatureModel[] signature);
 
+        /// <summary>
+        /// Signs transaction with the nodes private key
+        /// </summary>
+        /// <param name="transaction"></param>
+        /// <returns></returns>
         public abstract SignatureModel SignTransaction(byte[] transaction);
 
+        /// <summary>
+        /// Submits the transaction to the net
+        /// </summary>
+        /// <param name="transaction"></param>
+        /// <param name="signatures"></param>
         public abstract void SubmitTransaction(byte[] transaction, List<SignatureModel> signatures);
-        
+
         /// </summary>
         /// <param name="left"></param>
         /// <param name="right"></param>
@@ -117,16 +132,24 @@ namespace Centaurus.PaymentProvider
 
         void CommitPayments()
         {
-            foreach (var payment in NotificationsManager.GetAll())
+            try
             {
-                if (DateTime.UtcNow - payment.DepositTime < commitDelay)
-                    break;
-                if (payment.IsSend)
-                    continue;
+                if (OnPaymentCommit == null)
+                    return;
+                foreach (var payment in NotificationsManager.GetAll())
+                {
+                    if (DateTime.UtcNow - payment.DepositTime < commitDelay)
+                        break;
+                    if (payment.IsSend)
+                        continue;
 
-                RaiseOnPaymentCommit(payment);
-                //mark as send
-                payment.IsSend = true;
+                    OnPaymentCommit.Invoke(this, payment);
+                    //mark as send
+                    payment.IsSend = true;
+                }
+            }
+            catch (OperationCanceledException exc)
+            {
             }
         }
 
@@ -150,7 +173,7 @@ namespace Centaurus.PaymentProvider
             }
             catch (Exception exc)
             {
-                //TODO: log
+                RaiseOnError(exc);
             }
             StartTimer();
         }

@@ -17,26 +17,23 @@ namespace Centaurus.NetSDK
                 throw new Exception("Failed to schedule request collation.");
         }
 
-        public bool Resolve(MessageEnvelopeBase envelope)
+        public bool Resolve(MessageEnvelopeBase envelope, out QuantumResult quantumResult)
         {
+            quantumResult = null;
             if (!(envelope.Message is ResultMessageBase resultMessage))
             {
                 logger.Trace("Request is not a quantum result message.");
                 return false;
             }
-            var messageId = resultMessage.OriginalMessage.Message is RequestQuantumBase requestQuantum ?
-                requestQuantum.RequestMessage.MessageId :
-                resultMessage.OriginalMessage.Message.MessageId;
-            if (!Requests.TryGetValue(messageId, out var response))
+            var messageId = resultMessage.OriginalMessageId;
+            if (!Requests.TryGetValue(messageId, out quantumResult))
             {
                 logger.Trace($"Unable set result for msg with id {envelope.Message.GetMessageType()}:{messageId}.");
                 return false;
             }
-            response.AssignResponse(envelope);
-            if (response.IsFinalized)
-            {
+            quantumResult.AssignResponse(envelope);
+            if (quantumResult.IsFinalized)
                 Requests.TryRemove(messageId, out _);
-            }
 
             logger.Trace($"{envelope.Message.GetMessageType()}:{messageId} result was set.");
             return true;

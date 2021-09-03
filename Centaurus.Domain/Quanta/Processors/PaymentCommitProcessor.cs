@@ -26,7 +26,7 @@ namespace Centaurus.Domain
             foreach (var payment in depositNotification.Items)
                 ProcessDeposit(payment, context);
 
-            context.PaymentProvider.NotificationsManager.RemovePayment(depositNotification.Cursor);
+            context.PaymentProvider.NotificationsManager.RemoveNextNotification();
 
             return Task.FromResult((QuantumResultMessageBase)context.Quantum.CreateEnvelope<MessageEnvelopeSignless>().CreateResult(ResultStatusCode.Success));
         }
@@ -53,7 +53,7 @@ namespace Centaurus.Domain
         private bool TryGetNotification(PaymentCommitProcessorContext context, out DepositNotification notification)
         {
             notification = null;
-            if (!context.PaymentProvider.NotificationsManager.TryGetNextPayment(out var paymentNotification))
+            if (!context.PaymentProvider.NotificationsManager.TryGetNextNotification(out var paymentNotification))
                 return false;
             notification = paymentNotification.ToDomainModel();
             return true;

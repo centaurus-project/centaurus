@@ -113,7 +113,10 @@ namespace Centaurus
             if (envelope == null)
                 throw new ArgumentNullException(nameof(envelope));
             var resultMessage = Activator.CreateInstance<TResultMessage>();
-            resultMessage.OriginalMessage = envelope;
+            var messageId = envelope.Message.MessageId;
+            if (envelope.Message is RequestQuantumBase request)
+                messageId = request.RequestMessage.MessageId;
+            resultMessage.OriginalMessageId = messageId;
             resultMessage.Status = status;
             return resultMessage;
         }

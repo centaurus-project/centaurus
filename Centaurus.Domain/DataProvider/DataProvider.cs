@@ -62,8 +62,8 @@ namespace Centaurus.Domain
                     }).ToList(),
                     Request = accountQuantum.IsInitiator
                         //send full quantum if the account is initiator, otherwise send hash
-                        ? (RequestInfoBase)new RequestInfo { Request = quantum.RawQuantum }
-                        : new RequestHashInfo { Request = quantum.RawQuantum.ComputeHash() }
+                        ? (RequestInfoBase)new RequestInfo { Data = quantum.RawQuantum }
+                        : new RequestHashInfo { Data = quantum.RawQuantum.ComputeHash() }
                 });
             }
 

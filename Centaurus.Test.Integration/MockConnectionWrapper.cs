@@ -42,7 +42,7 @@ namespace Centaurus.Test
 
             currentSideSocket.Connect(webSocketServer);
             webSocketServer.Connect((MockWebSocket)WebSocket);
-            Task.Factory.StartNew(() => startup.Context.IncomingConnectionManager.OnNewConnection(webSocketServer, currentSideSocket.KeyPair, "192.168.0.1"), TaskCreationOptions.LongRunning);
+            Task.Factory.StartNew(async () => await startup.Context.IncomingConnectionManager.OnNewConnection(webSocketServer, currentSideSocket.KeyPair, "192.168.0.1"), TaskCreationOptions.LongRunning);
             return Task.CompletedTask;
         }
     }
