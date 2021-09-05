@@ -36,20 +36,18 @@ namespace Centaurus.Domain
 
         public void Add(AuditorResult resultMessage)
         {
-            //auditor can send delayed results
-            if (resultMessage.Apex < Context.PendingUpdatesManager.LastSavedApex)
-                return;
-
             var aggregate = default(Aggregate);
             lock (pendingAggregatesSyncRoot)
             {
                 //result message could be received before quantum was processed
                 if (!pendingAggregates.TryGetValue(resultMessage.Apex, out aggregate))
                 {
-                    aggregate = new Aggregate(resultMessage, this);
-                    //if result apex is less than or equal to last processed apex, then the result is no more relevant
-                    if (resultMessage.Apex > Context.QuantumStorage.CurrentApex)
+                    //auditor can send delayed results
+                    if (resultMessage.Apex > Context.PendingUpdatesManager.LastSavedApex)
+                    {
+                        aggregate = new Aggregate(resultMessage, this);
                         pendingAggregates.Add(resultMessage.Apex, aggregate);
+                    }
                     return;
                 }
             }
@@ -67,7 +65,10 @@ namespace Centaurus.Domain
             lock (pendingAggregatesSyncRoot)
             {
                 if (!pendingAggregates.Remove(id, out _))
+                {
+                    Console.WriteLine($"Unable to remove item by id '{id}'");
                     logger.Trace($"Unable to remove item by id '{id}'");
+                }
             }
         }
 
@@ -126,19 +127,31 @@ namespace Centaurus.Domain
 
         private void Cleanup()
         {
-            var now = DateTime.UtcNow;
-            var itemsToRemove = default(List<ulong>);
-            lock (pendingAggregatesSyncRoot)
+            try
             {
-                itemsToRemove = pendingAggregates
-                    .Where(kv => now - kv.Value.CreatedAt > aggregateLifeTime)
-                    .Select(kv => kv.Key)
-                    .ToList();
-            }
+                var now = DateTime.UtcNow;
+                var itemsToRemove = new List<ulong>();
+                lock (pendingAggregatesSyncRoot)
+                {
+                    foreach (var aggregate in pendingAggregates)
+                    {
+                        if (now - aggregate.Value.CreatedAt > aggregateLifeTime || aggregate.Key < Context.PendingUpdatesManager.LastSavedApex)
+                        {
+                            itemsToRemove.Add(aggregate.Key);
+                        }
+                        else
+                            break;
+                    }
+                }
 
-            foreach (var itemKey in itemsToRemove)
-                Remove(itemKey);
-            cleanupTimer?.Start();
+                foreach (var itemKey in itemsToRemove)
+                    Remove(itemKey);
+                cleanupTimer?.Start();
+            }
+            catch (Exception exc)
+            {
+                Console.WriteLine(exc);
+            }
         }
 
         private System.Timers.Timer cleanupTimer;
@@ -147,7 +160,7 @@ namespace Centaurus.Domain
         protected static Logger logger = LogManager.GetCurrentClassLogger();
 
         private object pendingAggregatesSyncRoot = new { };
-        private Dictionary<ulong, Aggregate> pendingAggregates = new Dictionary<ulong, Aggregate>();
+        private SortedDictionary<ulong, Aggregate> pendingAggregates = new SortedDictionary<ulong, Aggregate>();
         private readonly RawPubKey currentPubKey;
 
         class Aggregate
@@ -188,11 +201,24 @@ namespace Centaurus.Domain
 
             public void Add(AuditorResult resultMessage)
             {
+                var majorityResult = MajorityResults.Unknown;
                 lock (syncRoot)
                 {
-                    //skip if processed or current auditor already sent the result
-                    if (IsProcessed || processedAuditors.Contains(resultMessage.Signature.AuditorId))
+
+                    if (processedAuditors.Contains(resultMessage.Signature.AuditorId))
                         return;
+
+                    //TODO: add extra validations. Auditors can send invalid results
+                    processedAuditors.Add(resultMessage.Signature.AuditorId);
+
+                    //skip if processed or current auditor already sent the result
+                    if (IsProcessed)
+                    {
+                        //all signature received
+                        if (processedAuditors.Count == Manager.Context.AuditorIds.Count)
+                            Manager.Remove(Item.Apex);
+                        return;
+                    }
 
                     //if current server is not Alpha than it can delay
                     if (!Item.IsResultAssigned)
@@ -201,12 +227,10 @@ namespace Centaurus.Domain
                         return;
                     }
 
+
                     //obtain auditor from constellation
                     if (!Manager.Context.AuditorIds.TryGetValue((byte)resultMessage.Signature.AuditorId, out var auditor))
                         return;
-
-                    //TODO: add extra validations. Auditors can send invalid results
-                    processedAuditors.Add(resultMessage.Signature.AuditorId);
 
                     //check if signature is valid and tx signature is presented for TxResultMessage
                     if (resultMessage.Signature.PayloadSignature.IsValid(auditor, Item.Result.PayloadHash))
@@ -219,14 +243,12 @@ namespace Centaurus.Domain
                             Manager.Context.QuantumStorage.AddResult(resultMessage);
                     }
 
-                    var majorityResult = CheckMajority();
+                    majorityResult = CheckMajority();
                     if (majorityResult == MajorityResults.Unknown)
                         return;
-
-                    OnResult(majorityResult);
-                    Manager.Remove(Item.Apex);
                     IsProcessed = true;
                 }
+                OnResult(majorityResult);
             }
 
             public void Add(QuantaProcessingResult processingResult)
@@ -241,29 +263,33 @@ namespace Centaurus.Domain
             {
                 lock (syncRoot)
                 {
-                    if (IsProcessed || (isAcknowledgment && IsAcknowledgmentSent))
+                    if (isAcknowledgment && (IsProcessed || IsAcknowledgmentSent))
                         return;
+                    IsAcknowledgmentSent = true;
+                }
 
-                    var effectsProof = new PayloadProof
-                    {
-                        PayloadHash = Item.Result.PayloadHash,
-                        Signatures = resultMessages.Select(r => r.Signature.PayloadSignature).ToList()
-                    };
+                var effectsProof = new PayloadProof
+                {
+                    PayloadHash = Item.Result.PayloadHash,
+                    Signatures = resultMessages.Select(r => r.Signature.PayloadSignature).ToList()
+                };
 
-                    foreach (var notification in Item.Result.GetNotificationMessages(Item.Result.Initiator, effectsProof))
+                if (IsProcessed) //send notification only after majority received
+                {
+                    var notifications = Item.Result.GetNotificationMessages(Item.Result.Initiator, new RequestHashInfo { Data = Item.Result.QuantumHash }, effectsProof);
+                    foreach (var notification in notifications)
                     {
                         var aPubKey = Item.Result.AffectedAccounts[notification.Key];
                         Manager.Context.Notify(aPubKey, notification.Value.CreateEnvelope<MessageEnvelopeSignless>());
                     }
+                }
 
-                    if (Item.Result.Initiator != 0)
-                    {
-                        var aPubKey = Item.Result.AffectedAccounts[Item.Result.Initiator];
-                        Item.Result.ResultMessage.PayloadProof = effectsProof;
-                        Item.Result.ResultMessage.Effects = Item.Result.Effects.GetAccountEffects(Item.Result.Initiator);
-                        Manager.Context.Notify(aPubKey, Item.Result.ResultMessage.CreateEnvelope<MessageEnvelopeSignless>());
-                    }
-                    IsAcknowledgmentSent = true;
+                if (Item.Result.Initiator != 0)
+                {
+                    var aPubKey = Item.Result.AffectedAccounts[Item.Result.Initiator];
+                    Item.Result.ResultMessage.PayloadProof = effectsProof;
+                    Item.Result.ResultMessage.Effects = Item.Result.Effects.GetAccountEffects(Item.Result.Initiator);
+                    Manager.Context.Notify(aPubKey, Item.Result.ResultMessage.CreateEnvelope<MessageEnvelopeSignless>());
                 }
             }
 
@@ -295,8 +321,8 @@ namespace Centaurus.Domain
                     var votesCount = resultMessages.Count;
 
                     var quantum = Item.Result.Quantum;
-                    SequentialRequestMessage requestMessage = quantum is RequestQuantumBase requestQuantum 
-                        ? requestQuantum.RequestMessage 
+                    SequentialRequestMessage requestMessage = quantum is RequestQuantumBase requestQuantum
+                        ? requestQuantum.RequestMessage
                         : null;
 
                     var exc = new Exception("Majority for quantum" +
@@ -313,13 +339,7 @@ namespace Centaurus.Domain
 
             private void PersistSignatures()
             {
-                lock (syncRoot)
-                {
-                    if (IsProcessed)
-                        return;
-
-                    Manager.Context.PendingUpdatesManager.AddSignatures(Item.Result.UpdatesBatchId, Item.Apex, resultMessages);
-                }
+                Manager.Context.PendingUpdatesManager.AddSignatures(Item.Result.UpdatesBatchId, Item.Apex, resultMessages);
             }
 
             private MajorityResults CheckMajority()

@@ -60,12 +60,10 @@ namespace Centaurus.Domain
                 throw new UnauthorizedException();
         }
 
-
-        private ConnectionState[] AutorizedConnectionStates = new ConnectionState[] { ConnectionState.Ready };
         private void ValidateClient(ConnectionBase connection)
         {
             if (connection is IncomingClientConnection clientConnection //check requests count only for a client connection 
-                && AutorizedConnectionStates.Contains(clientConnection.ConnectionState) //increment requests count only for validated connection
+                && clientConnection.ConnectionState == ConnectionState.Ready //increment requests count only for validated connection
                 && !clientConnection.Account.RequestCounter.IncRequestCount(DateTime.UtcNow.Ticks, out var error))
                 throw new TooManyRequestsException(error);
         }

@@ -219,15 +219,16 @@ namespace Centaurus.NetSDK
                         }
                         continue;
                     }
+                    var envelope = default(MessageEnvelopeBase);
                     try
                     {
-                        var envelope = XdrConverter.Deserialize<MessageEnvelopeBase>(new XdrBufferReader(readerBuffer.Buffer));
-                        OnMessage?.Invoke(envelope);
+                        envelope = XdrConverter.Deserialize<MessageEnvelopeBase>(new XdrBufferReader(readerBuffer.Buffer));
                     }
                     catch
                     {
                         OnException?.Invoke(new UnexpectedMessageException("Failed to deserialize a response message received from the server."));
                     }
+                    OnMessage?.Invoke(envelope);
                 }
             }
             catch (OperationCanceledException)

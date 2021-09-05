@@ -33,6 +33,10 @@ namespace Centaurus.Domain
         {
             var quantumHandler = Context.QuantumHandler;
             var quantaBatch = (QuantaBatch)message.Envelope.Message;
+
+            //update alpha apex
+            Context.StateManager.UpdateAlphaApex(quantaBatch.LastKnownApex);
+
             var quanta = quantaBatch.Quanta;
             foreach (var processedQuantum in quanta)
             {
@@ -44,34 +48,22 @@ namespace Centaurus.Domain
 
                 if (quantum.Apex != lastKnownApex + 1)
                 {
-                    logger.Warn($"Batch has invalid quantum apexes (current: {quantumHandler.LastAddedQuantumApex}, received: {quantum.Apex}). New apex cursor request will be send.");
                     await connection.SendMessage(new QuantaBatchRequest
                     {
                         QuantaCursor = quantumHandler.LastAddedQuantumApex,
-                        ResultCursor = Context.RoleManager.ParticipationLevel == CentaurusNodeParticipationLevel.Prime ? ulong.MaxValue : Context.PendingUpdatesManager.LastSavedApex
+                        ResultCursor = Context.RoleManager.ParticipationLevel == CentaurusNodeParticipationLevel.Prime ? ulong.MaxValue : Context.PendingUpdatesManager.LastSavedApex //prime servers will receive results from other auditors
                     }.CreateEnvelope<MessageEnvelopeSignless>());
+                    logger.Warn($"Batch has invalid quantum apexes (current: {quantumHandler.LastAddedQuantumApex}, received: {quantum.Apex}). New apex cursor request sent.");
                     return;
                 }
 
-                //if Init quantum than wait for handling
-                if (quantum.Apex == 1)
-                    await Context.QuantumHandler.HandleAsync(quantum);
-                else
-                    _ = Context.QuantumHandler.HandleAsync(quantum);
+                _ = Context.QuantumHandler.HandleAsync(quantum);
             }
             var signatures = quantaBatch.Signatures;
             if (signatures != null)
                 foreach (var apexSignatures in signatures)
                     foreach (var signature in apexSignatures.Signatures)
                         Context.ResultManager.Add(new AuditorResult { Apex = apexSignatures.Apex, Signature = signature });
-
-            //TODO: move this logic to dedicated class/manager
-            //get apex diff between the node and Alpha
-            var apexDiff = quantaBatch.LastKnownApex > quantumHandler.LastAddedQuantumApex 
-                ? quantaBatch.LastKnownApex - quantumHandler.LastAddedQuantumApex 
-                : 0;
-
-            Context.StateManager.UpdateDelay(apexDiff);
         }
 
         private async Task AddAuditorState(ConnectionBase connection, IncomingMessage message)

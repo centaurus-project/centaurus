@@ -242,14 +242,12 @@ namespace Centaurus.NetSDK
             var accountEffects = XdrConverter.Deserialize<EffectsGroup>(currentAccountEffects.EffectsGroupData);
             lock (quantaQueueSyncRoot)
             {
+                if (accountEffects.AccountSequence <= lastHandledAccountSequence.Value)
+                    return;//inspect it
+
                 quantaQueue.Add(accountEffects.AccountSequence, (quantumInfo.Apex, accountEffects));
                 if (quantaQueue.Count > 1_000)
-                {
                     throw new Exception("Effects notification length is to big.");
-                }
-
-                if (quantaQueue.Count > 20)
-                    Console.WriteLine($"{Config.ClientKeyPair.AccountId}-{quantaQueue.Count}");
             }
             ProcessQuantumInfos();
         }

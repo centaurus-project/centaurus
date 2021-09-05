@@ -1,11 +1,9 @@
 ﻿using Centaurus.Domain.Models;
 using Centaurus.Models;
-using Microsoft.Extensions.Logging;
 using NLog;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 

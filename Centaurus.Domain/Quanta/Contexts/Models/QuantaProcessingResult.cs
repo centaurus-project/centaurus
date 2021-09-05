@@ -40,7 +40,7 @@ namespace Centaurus.Domain
         /// Creates message notifications for accounts that were affected by quantum
         /// </summary>
         /// <returns></returns>
-        public Dictionary<ulong, Message> GetNotificationMessages(ulong initiator, PayloadProof payloadProof)
+        public Dictionary<ulong, EffectsNotification> GetNotificationMessages(ulong initiator, RequestHashInfo requestHashInfo, PayloadProof payloadProof)
         {
             if (payloadProof == null)
                 throw new ArgumentNullException(nameof(payloadProof));
@@ -53,13 +53,14 @@ namespace Centaurus.Domain
                     continue;
                 var notification = new EffectsNotification
                 {
+                    Request = requestHashInfo,
                     PayloadProof = payloadProof,
                     Effects = Effects.GetAccountEffects(effectsGroup.Account),
                     Apex = Apex
                 };
                 result.Add(effectsGroup.Account, notification);
             }
-            return result.ToDictionary(k => k.Key, v => (Message)v.Value);
+            return result.ToDictionary(k => k.Key, v => v.Value);
         }
     }
 

@@ -40,6 +40,12 @@ namespace Centaurus.Domain
                 auditorsStatistics[accountId] = message.FromModel(accountId);
         }
 
+        public void RemoveAuditorStatistics(string accountId)
+        {
+            lock (auditorsStatistics)
+                auditorsStatistics.Remove(accountId);
+        }
+
         public void Dispose()
         {
             lock (syncRoot)
@@ -130,7 +136,7 @@ namespace Centaurus.Domain
 
         void NotifyAuditors(AuditorPerfStatistics statisticsMessage)
         {
-            Context.OutgoingConnectionManager.EnqueueMessage(statisticsMessage.CreateEnvelope());
+            Context.OutgoingConnectionManager.EnqueueMessage(statisticsMessage.CreateEnvelope<MessageEnvelopeSignless>());
         }
 
         int GetQuantaAvgLength()

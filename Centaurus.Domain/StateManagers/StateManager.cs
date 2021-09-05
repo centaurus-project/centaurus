@@ -31,6 +31,9 @@ namespace Centaurus.Domain
 
         public State State { get; private set; }
 
+        public event Action<StateChangedEventArgs> StateChanged;
+
+
         public void Init(State state)
         {
             lock (syncRoot)
@@ -38,7 +41,10 @@ namespace Centaurus.Domain
                 if (State != State.Undefined)
                     throw new InvalidOperationException("Context is already initialized.");
 
-                SetState(state);
+                if (state == State.Undefined)
+                    throw new InvalidOperationException($"Init state cannot be {state}.");
+
+                UpdateState(state);
             }
         }
 
@@ -52,55 +58,6 @@ namespace Centaurus.Domain
         {
             lock (syncRoot)
                 SetState(State.Failed, exc);
-        }
-
-        private object syncRoot = new { };
-        private void SetState(State state, Exception exc = null)
-        {
-            if (exc != null)
-                logger.Error(exc);
-            if (State != state)
-            {
-                logger.Trace($"State update: new state: {state}, prev state: {State}");
-                var stateArgs = new StateChangedEventArgs(state, State);
-                State = state;
-
-                StateChanged?.Invoke(stateArgs);
-
-                Context.NotifyAuditors(new StateUpdateMessage { State = State }.CreateEnvelope<MessageEnvelopeSignless>());
-                logger.Trace($"State update {state} sent.");
-            }
-        }
-
-        private object statesSyncRoot = new { };
-        private Dictionary<RawPubKey, State> connectedAuditors = new Dictionary<RawPubKey, State>();
-
-        private bool IsConstellationReady()
-        {
-            //get
-            //{
-                lock (statesSyncRoot)
-                {
-                    //if Prime node than it must be connected with other nodes
-                    if (Context.RoleManager.ParticipationLevel == CentaurusNodeParticipationLevel.Prime)
-                    {
-                        //if current server is 
-                        var isAlphaReady = Context.IsAlpha && (State == State.Ready || State == State.Running);
-                        var connectedCount = 0;
-                        foreach (var auditorState in connectedAuditors)
-                        {
-                            if (auditorState.Value != State.Ready && auditorState.Value != State.Running)
-                                continue;
-                            if (Context.Constellation.Alpha == auditorState.Key)
-                                isAlphaReady = true;
-                            connectedCount++;
-                        }
-                        return isAlphaReady && Context.HasMajority(connectedCount, false);
-                    }
-                    else
-                        return connectedAuditors.TryGetValue(Context.Constellation.Alpha, out var alphaState) && (alphaState == State.Ready || alphaState == State.Running);
-                }
-            //}
         }
 
         public int ConnectedAuditorsCount
@@ -150,12 +107,7 @@ namespace Centaurus.Domain
         public void Rised()
         {
             lock (syncRoot)
-            {
-                if (IsConstellationReady())
-                    SetState(State.Ready);
-                else
-                    SetState(State.Running);
-            }
+                UpdateState(State.Running);
         }
 
         public void SetAuditorState(RawPubKey auditorPubKey, State state)
@@ -164,9 +116,10 @@ namespace Centaurus.Domain
             {
                 logger.Trace($"Auditor's {auditorPubKey.GetAccountId()} state {state} received.");
                 if (!connectedAuditors.TryGetValue(auditorPubKey, out var currentState) && state == currentState)
-                    return;
+                    return; //state didn't change
                 connectedAuditors[auditorPubKey] = state;
                 logger.Trace($"Auditor's {auditorPubKey.GetAccountId()} state {state} set.");
+                //update current node state
                 UpdateState();
             }
         }
@@ -179,39 +132,108 @@ namespace Centaurus.Domain
                 {
                     //remove state from catchup if presented
                     Context.Catchup.RemoveState(auditorPubKey);
+                    //update current node state
                     UpdateState();
                 }
             }
         }
 
-        const ulong ChasingDelayTreshold = 10_000;
-        const ulong RunningDelayTreshold = 1_000;
-
-        public void UpdateDelay(ulong apexDiff)
+        /// <summary>
+        /// Updates last processed by alpha apex
+        /// </summary>
+        /// <param name="constellationApex"></param>
+        public void UpdateAlphaApex(ulong constellationApex)
         {
             lock (syncRoot)
             {
-                if (apexDiff > ChasingDelayTreshold && State == State.Ready)
-                    SetState(State.Chasing); //node is too behind the Alpha
-                else if (apexDiff < RunningDelayTreshold && State == State.Chasing)
+                AlphaApex = constellationApex;
+            }
+        }
+
+        /// <summary>
+        /// Updates current node delay
+        /// </summary>
+        public void UpdateDelay()
+        {
+            if (Context.IsAlpha)
+                return;
+            lock (syncRoot)
+            {
+                var isDelayed = State.Chasing == State;
+                if (isDelayed)
                 {
-                    SetState(State.Running); //node reached Alpha
-                    UpdateState();
+                    if (AlphaApex <= Context.QuantumStorage.CurrentApex || AlphaApex - Context.QuantumStorage.CurrentApex < RunningDelayTreshold)
+                        UpdateState(State.Running);
+                }
+                else
+                {
+                    if (AlphaApex > Context.QuantumStorage.CurrentApex && AlphaApex - Context.QuantumStorage.CurrentApex > ChasingDelayTreshold)
+                        UpdateState(State.Chasing);
                 }
             }
         }
 
-        private void UpdateState()
+        private const ulong ChasingDelayTreshold = 10_000;
+        private const ulong RunningDelayTreshold = 1_000;
+        private ulong AlphaApex;
+        private object syncRoot = new { };
+        private object statesSyncRoot = new { };
+        private Dictionary<RawPubKey, State> connectedAuditors = new Dictionary<RawPubKey, State>();
+
+        private void UpdateState(State? state = null)
         {
-            lock (syncRoot)
+            if (!state.HasValue) //state can be null if trying update on auditor's state change
+                state = State;
+            if (state == State.Running && IsConstellationReady())
+                SetState(State.Ready);
+            else if (state == State.Ready && !IsConstellationReady())
+                SetState(State.Running);
+            else
+                SetState(state.Value);
+        }
+
+        private bool IsConstellationReady()
+        {
+            lock (statesSyncRoot)
             {
-                if (State == State.Running && IsConstellationReady())
-                    SetState(State.Ready);
-                else if (State == State.Ready && !IsConstellationReady())
-                    SetState(State.Running);
+                //if Prime node than it must be connected with other nodes
+                if (Context.RoleManager.ParticipationLevel == CentaurusNodeParticipationLevel.Prime)
+                {
+                    //if current server is 
+                    var isAlphaReady = Context.IsAlpha && (State == State.Ready || State == State.Running);
+                    var connectedCount = 0;
+                    foreach (var auditorState in connectedAuditors)
+                    {
+                        if (auditorState.Value != State.Ready && auditorState.Value != State.Running)
+                            continue;
+                        if (Context.Constellation.Alpha == auditorState.Key)
+                            isAlphaReady = true;
+                        connectedCount++;
+                    }
+                    return isAlphaReady && Context.HasMajority(connectedCount, false);
+                }
+                else
+                    //if auditor doesn't have connections with another auditors, we only need to verify alpha's state
+                    return connectedAuditors.TryGetValue(Context.Constellation.Alpha, out var alphaState) && (alphaState == State.Ready || alphaState == State.Running);
             }
         }
 
-        public event Action<StateChangedEventArgs> StateChanged;
+        private void SetState(State state, Exception exc = null)
+        {
+            if (exc != null)
+                logger.Error(exc);
+            if (State != state)
+            {
+                logger.Trace($"State update: new state: {state}, prev state: {State}");
+                var stateArgs = new StateChangedEventArgs(state, State);
+                State = state;
+
+                StateChanged?.Invoke(stateArgs);
+                var updateMessage = new StateUpdateMessage { State = State }.CreateEnvelope().Sign(Context.Settings.KeyPair);
+                Context.NotifyAuditors(updateMessage);
+                logger.Trace($"State update {state} sent.");
+            }
+        }
+
     }
 }

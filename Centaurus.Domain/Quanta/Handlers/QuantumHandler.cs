@@ -167,6 +167,7 @@ namespace Centaurus.Domain
                 Quantum = processingResult.Quantum,
                 Signatures = new List<AuditorSignatureInternal> { processingResult.CurrentNodeSignature }
             }, processingResult.QuantumHash);
+            Context.StateManager.UpdateDelay();
         }
 
         private void ProcessResult(ProcessorContext processorContext)

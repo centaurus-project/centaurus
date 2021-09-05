@@ -58,6 +58,8 @@ namespace Centaurus.Domain
 
             InfoConnectionManager = new InfoConnectionManager(this);
 
+            ResultManager = new ResultManager(this);
+
             Catchup = new Catchup(this);
 
             StateManager = new StateManager(this);
@@ -68,19 +70,17 @@ namespace Centaurus.Domain
             DynamicSerializersInitializer.Init();
 
             var lastSnapshot = DataProvider.GetLastSnapshot();
-            var state = State.Undefined;
             if (lastSnapshot != null)
             {
                 Setup(lastSnapshot);
-                state = IsAlpha ? State.Rising : State.Running;
+                var state = IsAlpha ? State.Rising : State.Running;
+                StateManager.Init(state);
             }
             else if (lastSnapshot == null)
             {
                 //establish connection with genesis auditors
                 EstablishOutgoingConnections();
             }
-
-            StateManager.Init(state);
 
             QuantumStorage.Init(lastSnapshot?.Apex ?? 0, lastSnapshot?.LastHash ?? new byte[] { });
             QuantumHandler.Start();
@@ -115,8 +115,6 @@ namespace Centaurus.Domain
             Exchange?.Dispose(); Exchange = Exchange.RestoreExchange(snapshot.Settings.Assets, snapshot.Orders, IsAlpha, useLegacyOrderbook);
 
             SetupPaymentProviders(snapshot.Cursors);
-
-            ResultManager?.Dispose(); ResultManager = new ResultManager(this);
 
             DisposeAnalyticsManager();
 
@@ -205,7 +203,7 @@ namespace Centaurus.Domain
             PaymentProvidersManager?.Dispose();
 
             QuantumHandler.Dispose();
-            ResultManager?.Dispose();
+            ResultManager.Dispose();
             DisposeAnalyticsManager();
             PerformanceStatisticsManager?.Dispose();
         }
@@ -225,6 +223,8 @@ namespace Centaurus.Domain
         }
 
         public DataProvider DataProvider { get; }
+
+        public ResultManager ResultManager { get; }
 
         public UpdatesManager PendingUpdatesManager { get; }
 
@@ -271,8 +271,6 @@ namespace Centaurus.Domain
         public PerformanceStatisticsManager PerformanceStatisticsManager { get; private set; }
 
         public HashSet<int> AssetIds { get; private set; }
-
-        public ResultManager ResultManager { get; private set; }
 
         public AnalyticsManager AnalyticsManager { get; private set; }
 

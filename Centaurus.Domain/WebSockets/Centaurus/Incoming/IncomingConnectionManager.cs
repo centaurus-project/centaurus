@@ -182,7 +182,10 @@ namespace Centaurus.Domain
 
                 connections.TryRemove(connection.PubKey, out _);
                 if (connection.IsAuditor)
+                {
                     Context.StateManager.RemoveAuditorState(connection.PubKey);
+                    Context.PerformanceStatisticsManager.RemoveAuditorStatistics(connection.PubKeyAddress);
+                }
             }
         }
 

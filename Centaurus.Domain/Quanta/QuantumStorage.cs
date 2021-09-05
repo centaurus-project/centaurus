@@ -18,6 +18,7 @@ namespace Centaurus.Domain
             CurrentApex = currentApex;
             LastQuantumHash = lastQuantumHash;
         }
+
         public void AddQuantum(PendingQuantum processedQuantum, byte[] hash)
         {
             lock (syncRoot)
