@@ -25,7 +25,6 @@ namespace Centaurus.Domain
         }
 
         private readonly List<EffectsGroup> effects = new List<EffectsGroup>();
-        private readonly Dictionary<ulong, RawPubKey> affectedAccounts = new Dictionary<ulong, RawPubKey>();
 
         public ExecutionContext CentaurusContext => Context;
 
@@ -46,14 +45,13 @@ namespace Centaurus.Domain
             if (ProcessingResult != null)
                 throw new InvalidOperationException("The quantum already processed.");
 
-            var accountId = 0ul;
             var accountPubKey = default(RawPubKey);
             //get account id for account effects
             if (effectProcessor.Effect is AccountEffect clientEffect)
-                accountId = clientEffect.Account;
+                accountPubKey = clientEffect.Account;
 
             //get or add account effects group
-            var effectsGroup = effects.FirstOrDefault(e => e.Account == accountId);
+            var effectsGroup = effects.FirstOrDefault(e => accountPubKey == null && e.Account == null || e.Account == accountPubKey);
             if (effectsGroup == null)
             {
                 var accountSequence = 0ul;
@@ -65,7 +63,7 @@ namespace Centaurus.Domain
                 }
                 effectsGroup = new EffectsGroup
                 {
-                    Account = accountId,
+                    Account = accountPubKey,
                     AccountSequence = accountSequence,
                     Effects = new List<Effect>()
                 };
@@ -75,14 +73,6 @@ namespace Centaurus.Domain
             effectsGroup.Effects.Add(effectProcessor.Effect);
             //commit the effect
             effectProcessor.CommitEffect();
-
-            //ensure account is cached
-            if (accountId != 0 && !affectedAccounts.ContainsKey(accountId))
-            {
-                if (accountPubKey == null)
-                    accountPubKey = Context.AccountStorage.GetAccount(accountId).Pubkey;
-                affectedAccounts.Add(accountId, accountPubKey);
-            }
         }
 
         /// <summary>
@@ -128,7 +118,7 @@ namespace Centaurus.Domain
                 Quantum.EffectsProof = effectsProof;
             else
             {
-                if (!ByteArrayComparer.Default.Equals(effectsProof, Quantum.EffectsProof) && !EnvironmentHelper.IsTest)
+                if (!effectsProof.AsSpan().SequenceEqual(Quantum.EffectsProof) && !EnvironmentHelper.IsTest)
                 {
                     throw new Exception($"Effects hash for quantum {Apex} is not equal to provided by Alpha.");
                 }
@@ -161,14 +151,13 @@ namespace Centaurus.Domain
                 QuantumHash = quantumHash,
                 PayloadHash = payloadHash,
                 Timestamp = Quantum.Timestamp,
-                Initiator = InitiatorAccount?.Id ?? 0,
+                Initiator = InitiatorAccount?.Pubkey,
                 Effects = rawEffects,
-                CurrentNodeSignature = GetSignature(payloadHash),
                 ResultMessage = quantumResultMessage,
-                AffectedAccounts = affectedAccounts
+                CurrentAuditorId = Context.AuditorPubKeys[Context.Settings.KeyPair]
             };
             //get constellation effects
-            var constellationEffects = effects.FirstOrDefault(e => e.Account == 0);
+            var constellationEffects = effects.FirstOrDefault(e => e.Account == null);
             if (constellationEffects != null)
                 foreach (var effect in constellationEffects.Effects)
                 {
@@ -185,24 +174,5 @@ namespace Centaurus.Domain
             ProcessingResult = result;
         }
 
-        AuditorSignatureInternal GetSignature(byte[] payloadHash)
-        {
-            if (!Context.AuditorPubKeys.TryGetValue(Context.Settings.KeyPair, out var auditorId))
-                throw new Exception("Unable to find current auditor id.");
-            var currentAuditorSignature = new AuditorSignatureInternal
-            {
-                AuditorId = auditorId,
-                PayloadSignature = payloadHash.Sign(Context.Settings.KeyPair)
-            };
-
-            //add transaction signature
-            if (this is ITransactionProcessorContext transactionContext)
-            {
-                var signature = transactionContext.PaymentProvider.SignTransaction(transactionContext.Transaction);
-                currentAuditorSignature.TxSignature = signature.Signature;
-                currentAuditorSignature.TxSigner = signature.Signer;
-            }
-            return currentAuditorSignature;
-        }
     }
 }

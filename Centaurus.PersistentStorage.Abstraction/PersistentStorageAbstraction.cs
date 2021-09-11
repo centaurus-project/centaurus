@@ -60,11 +60,6 @@ namespace Centaurus.PersistentStorage.Abstraction
             return Query.LoadQuantaForAccount(accountPubkey, apex, limit, order);
         }
 
-        public List<AccountQuantumDTO> LoadQuantaForAccount(ulong accountId, ulong fromApex, int limit, QueryOrder order = QueryOrder.Asc)
-        {
-            return Query.LoadQuantaForAccount(accountId, fromApex, limit, order);
-        }
-
         public CursorsPersistentModel LoadCursors()
         {
             return Query.LoadCursors() ?? new CursorsPersistentModel { Cursors = new Dictionary<string, string>() };

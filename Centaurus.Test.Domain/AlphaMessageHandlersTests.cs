@@ -208,7 +208,7 @@ namespace Centaurus.Test
 
             var envelope = new OrderRequest
             {
-                Account = account.Id,
+                Account = account.Pubkey,
                 RequestId = 1
             }.CreateEnvelope();
             envelope.Sign(TestEnvironment.Client1KeyPair);
@@ -234,7 +234,7 @@ namespace Centaurus.Test
 
             var envelope = new AccountDataRequest
             {
-                Account = clientConnection.Account.Id,
+                Account = clientConnection.Account.Pubkey,
                 RequestId = 1
             }.CreateEnvelope();
             envelope.Sign(TestEnvironment.Client1KeyPair);
@@ -261,7 +261,7 @@ namespace Centaurus.Test
                 //TODO: replace it with quantum
                 var effect = new RequestRateLimitUpdateEffect
                 {
-                    Account = account.Id,
+                    Account = account.Pubkey,
                     RequestRateLimits = new RequestRateLimits
                     {
                         HourLimit = (uint)requestLimit.Value,
@@ -279,7 +279,7 @@ namespace Centaurus.Test
             {
                 var envelope = new AccountDataRequest
                 {
-                    Account = account.Id,
+                    Account = account.Pubkey,
                     RequestId = i + 1
                 }.CreateEnvelope();
                 envelope.Sign(clientKeyPair);
@@ -310,7 +310,7 @@ namespace Centaurus.Test
 
             var clientConnection = GetIncomingConnection(context, client.PublicKey, state);
 
-            var envelope = new QuantumInfoRequest { Account = account.Id }.CreateEnvelope();
+            var envelope = new QuantumInfoRequest { Account = account.Pubkey }.CreateEnvelope();
             envelope.Sign(client);
 
             using var writer = new XdrBufferWriter();

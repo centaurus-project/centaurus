@@ -13,7 +13,7 @@ namespace Centaurus.Models
         /// An account that initiated a request.
         /// </summary>
         [XdrField(0)]
-        public ulong Account { get; set; }
+        public RawPubKey Account { get; set; }
 
         /// <summary>
         /// Client request id.

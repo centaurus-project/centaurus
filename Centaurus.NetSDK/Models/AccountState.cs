@@ -8,7 +8,6 @@ namespace Centaurus.NetSDK
     public class AccountState
     {
         public ulong Nonce { get; internal set; }
-        public ulong AccountId { get; internal set; }
 
         internal ConstellationInfo ConstellationInfo;
 

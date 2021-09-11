@@ -19,18 +19,17 @@ namespace Centaurus.Domain
             LastQuantumHash = lastQuantumHash;
         }
 
-        public void AddQuantum(PendingQuantum processedQuantum, byte[] hash)
+        public void AddQuantum(Quantum quantum, byte[] hash)
         {
             lock (syncRoot)
             {
-                var quantum = processedQuantum.Quantum;
                 if (quantum.Apex < 1)
                     throw new Exception("Quantum has no apex");
 
                 CurrentApex = quantum.Apex;
                 LastQuantumHash = hash;
                 apexes.Add(quantum.Apex);
-                quanta.Add(processedQuantum);
+                quanta.Add(quantum);
                 if (apexes.Count >= (QuantaCacheCapacity + capacityThreshold)) //remove oldest quanta
                 {
                     apexes.RemoveRange(0, capacityThreshold);
@@ -46,7 +45,7 @@ namespace Centaurus.Domain
         /// <param name="maxCount">Batch max size.</param>
         /// <param name="quanta">Batch itself. Can be null.</param>
         /// <returns>True if data presented in the storage, otherwise false.</returns>
-        public bool GetQuantaBacth(ulong apexFrom, int maxCount, out List<PendingQuantum> quantaBatch)
+        public bool GetQuantaBacth(ulong apexFrom, int maxCount, out List<Quantum> quantaBatch)
         {
             lock (syncRoot)
             {
@@ -59,21 +58,9 @@ namespace Centaurus.Domain
             }
         }
 
-        public void AddResult(AuditorResult resultMessage)
-        {
-            lock (syncRoot)
-            {
-                var apexIndex = apexes.IndexOf(resultMessage.Apex);
-                if (apexIndex == -1)
-                    return;
-                var quantum = quanta[apexIndex];
-                quantum.Signatures.Add(resultMessage.Signature);
-            }
-        }
-
         private List<ulong> apexes = new List<ulong>();
 
-        private List<PendingQuantum> quanta = new List<PendingQuantum>();
+        private List<Quantum> quanta = new List<Quantum>();
 
         private int QuantaCacheCapacity = 1_000_000;
         private int capacityThreshold = 100_000;

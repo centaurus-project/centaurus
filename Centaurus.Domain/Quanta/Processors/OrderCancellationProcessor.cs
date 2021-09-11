@@ -48,7 +48,7 @@ namespace Centaurus.Domain
             context.Orderbook = context.CentaurusContext.Exchange.GetOrderbook(context.OrderWrapper.Order.Asset, context.OrderWrapper.Order.Side);
 
             //TODO: check that lot size is greater than minimum allowed lot
-            if (context.OrderWrapper.Account.Id != orderRequest.Account)
+            if (!context.OrderWrapper.Account.Pubkey.Equals(orderRequest.Account))
                 throw new ForbiddenException();
 
             if (context.OrderWrapper.Order.Side == OrderSide.Buy)

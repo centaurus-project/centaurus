@@ -88,10 +88,6 @@ namespace Centaurus.Models
         /// </summary>
         StateUpdate = 109,
         /// <summary>
-        /// The message is send after success handshake. Contains account id.
-        /// </summary>
-        ClientConnectionSuccess = 150,
-        /// <summary>
         /// Account data request result.
         /// </summary>
         AccountDataResponse = 151,

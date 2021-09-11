@@ -14,7 +14,7 @@ namespace Centaurus.PersistentStorage
          * Public key of an account to which an effect has been applied.
          */
         [IgnoreMember]
-        public ulong AccountId { get; set; }
+        public byte[] Account { get; set; }
 
         /**
          * Quantum apex.
@@ -34,14 +34,14 @@ namespace Centaurus.PersistentStorage
             get
             {
                 //{account_pubkey}{quantum_apex}
-                var rawId = new byte[16];
-                BinaryPrimitives.WriteUInt64BigEndian(rawId.AsSpan(0, 8), AccountId);
+                var rawId = new byte[40];
+                Array.Copy(Account, rawId, 32);
                 BinaryPrimitives.WriteUInt64BigEndian(rawId.AsSpan(8, 8), Apex);
                 return rawId;
             }
             set
             {
-                AccountId = BinaryPrimitives.ReadUInt64BigEndian(value.AsSpan(0, 8));
+                Account = value.AsSpan(0, 32).ToArray();
                 Apex = BinaryPrimitives.ReadUInt64BigEndian(value.AsSpan(8, 8));
             }
         }

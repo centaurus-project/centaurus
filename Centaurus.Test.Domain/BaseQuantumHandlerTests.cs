@@ -86,7 +86,7 @@ namespace Centaurus.Test
             var account = context.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
             var order = new OrderRequest
             {
-                Account = account.Id,
+                Account = account.Pubkey,
                 RequestId = nonce,
                 Amount = amount,
                 Asset = asset,
@@ -124,7 +124,7 @@ namespace Centaurus.Test
 
             var order = new OrderRequest
             {
-                Account = acc.Id,
+                Account = acc.Pubkey,
                 RequestId = 1,
                 Amount = amount,
                 Asset = asset,
@@ -143,7 +143,7 @@ namespace Centaurus.Test
 
             var orderCancellation = new OrderCancellationRequest
             {
-                Account = acc.Id,
+                Account = acc.Pubkey,
                 RequestId = 2,
                 OrderId = apex
             };
@@ -175,7 +175,7 @@ namespace Centaurus.Test
             var providerSettings = context.Constellation.Providers.First();
             var withdrawal = new WithdrawalRequest
             {
-                Account = account.Id,
+                Account = account.Pubkey,
                 RequestId = 1,
                 Amount = amount,
                 Asset = context.Constellation.QuoteAsset.Code,
@@ -202,7 +202,7 @@ namespace Centaurus.Test
 
             var withdrawal = new PaymentRequest
             {
-                Account = account.Id,
+                Account = account.Pubkey,
                 RequestId = 1,
                 Asset = context.Constellation.QuoteAsset.Code,
                 Destination = TestEnvironment.Client2KeyPair,
@@ -234,7 +234,7 @@ namespace Centaurus.Test
             var account = context.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
             var order = new AccountDataRequest
             {
-                Account = account.Id,
+                Account = account.Pubkey,
                 RequestId = nonce
             };
 
@@ -270,7 +270,7 @@ namespace Centaurus.Test
             {
                 var envelope = new AccountDataRequest
                 {
-                    Account = account.Id,
+                    Account = account.Pubkey,
                     RequestId = i + 1
                 }.CreateEnvelope();
                 envelope.Sign(clientKeyPair);
@@ -287,9 +287,16 @@ namespace Centaurus.Test
         {
             try
             {
-                await context.QuantumHandler.HandleAsync(quantum);
-
-                context.PendingUpdatesManager.UpdateBatch(true);
+                await context.QuantumHandler.HandleAsync(quantum, Task.FromResult(true));
+                await context.PendingUpdatesManager.SyncRoot.WaitAsync();
+                try
+                {
+                    context.PendingUpdatesManager.UpdateBatch(true);
+                }
+                finally
+                {
+                    context.PendingUpdatesManager.SyncRoot.Release();
+                }
                 context.PendingUpdatesManager.ApplyUpdates(true);
 
                 //check that processed quanta is saved to the storage

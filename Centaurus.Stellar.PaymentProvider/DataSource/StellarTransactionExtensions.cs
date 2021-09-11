@@ -74,7 +74,7 @@ namespace Centaurus.Stellar.PaymentProvider
                         return result;
                     var amount = (ulong)operation.PaymentOp.Amount.InnerValue;
                     var destKeypair = stellar_dotnet_sdk.KeyPair.FromPublicKey(operation.PaymentOp.Destination.Ed25519.InnerValue);
-                    if (vault.PublicKey.SequenceEqual(destKeypair.PublicKey))
+                    if (vault.PublicKey.AsSpan().SequenceEqual(destKeypair.PublicKey))
                         payment = new DepositModel
                         {
                             Destination = destination,

@@ -11,6 +11,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
@@ -189,7 +190,7 @@ namespace Centaurus.Domain
             if (!IsAlpha || StateManager.State != State.Ready)
                 throw new OperationCanceledException($"Current server is not ready to process deposits. Is Alpha: {IsAlpha}, State: {StateManager.State}");
 
-            QuantumHandler.HandleAsync(new DepositQuantum { Source = notification.ToDomainModel() });
+            QuantumHandler.HandleAsync(new DepositQuantum { Source = notification.ToDomainModel() }, Task.FromResult(true));
         }
 
         private void PaymentProvider_OnError(PaymentProviderBase paymentProvider, Exception exc)

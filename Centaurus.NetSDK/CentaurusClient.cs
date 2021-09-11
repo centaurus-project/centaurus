@@ -92,10 +92,9 @@ namespace Centaurus.NetSDK
             var accountQuantumRequest = XdrConverter.Deserialize<AccountDataRequestQuantum>(adr.Request.Data);
 
             //compare with specified one
-            if (!payloadHash.SequenceEqual(accountQuantumRequest.PayloadHash))
+            if (!payloadHash.AsSpan().SequenceEqual(accountQuantumRequest.PayloadHash))
                 throw new Exception("Computed payload hash isn't equal to quantum payload hash.");
 
-            AccountState.AccountId = connection.AccountId;
             AccountState.ConstellationInfo = connection.ConstellationInfo;
 
             //get last account sequence
@@ -129,9 +128,9 @@ namespace Centaurus.NetSDK
             {
                 request.RequestId = DateTime.UtcNow.Ticks * (request is SequentialRequestMessage ? 1 : -1);
             }
-            if (request.Account == 0)
+            if (request.Account == null)
             {
-                request.Account = connection.AccountId;
+                request.Account = connection.Config.ClientKeyPair;
             }
             var envelope = request.CreateEnvelope();
             var result = await connection.SendMessage(envelope);
@@ -242,7 +241,7 @@ namespace Centaurus.NetSDK
             var accountEffects = XdrConverter.Deserialize<EffectsGroup>(currentAccountEffects.EffectsGroupData);
             lock (quantaQueueSyncRoot)
             {
-                if (accountEffects.AccountSequence <= lastHandledAccountSequence.Value)
+                if (lastHandledAccountSequence.HasValue && accountEffects.AccountSequence <= lastHandledAccountSequence.Value)
                     return;//inspect it
 
                 quantaQueue.Add(accountEffects.AccountSequence, (quantumInfo.Apex, accountEffects));
@@ -266,27 +265,36 @@ namespace Centaurus.NetSDK
                     lock (quantaQueueSyncRoot)
                         accountEffects = quantaQueue.FirstOrDefault().Value;
 
-                    while (accountEffects != default && accountEffects.effectsGroup.AccountSequence == lastHandledAccountSequence.Value + 1)
+                    while (accountEffects != default)
                     {
-                        var apex = accountEffects.apex;
-                        var effectsGroup = accountEffects.effectsGroup;
-                        //apply effects to the client-side state
-                        foreach (var effect in effectsGroup.Effects)
-                        {
-                            //assign apex and account
-                            effect.Apex = apex;
-                            if (effect is AccountEffect accountEffect)
-                                accountEffect.Account = effectsGroup.Account;
-                            AccountState.ApplyAccountStateChanges(effect);
-                        }
+                        var currentEffectsSequence = accountEffects.effectsGroup.AccountSequence;
+                        var expectedEffectsSequence = lastHandledAccountSequence.Value + 1;
+                        if (currentEffectsSequence > expectedEffectsSequence)
+                            break;
 
-                        //set account sequence
-                        lastHandledAccountSequence = effectsGroup.AccountSequence;
+                        if (currentEffectsSequence == expectedEffectsSequence)
+                        {
+                            var apex = accountEffects.apex;
+                            var effectsGroup = accountEffects.effectsGroup;
+                            //apply effects to the client-side state
+                            foreach (var effect in effectsGroup.Effects)
+                            {
+                                //assign apex and account
+                                effect.Apex = apex;
+                                if (effect is AccountEffect accountEffect)
+                                    accountEffect.Account = effectsGroup.Account;
+                                //notify subscribers about changes
+                                AccountState.ApplyAccountStateChanges(effect);
+                            }
+
+                            //set account sequence
+                            lastHandledAccountSequence = effectsGroup.AccountSequence;
+                        }
 
                         lock (quantaQueueSyncRoot)
                         {
                             //remove current effects group from queue
-                            quantaQueue.Remove(effectsGroup.AccountSequence);
+                            quantaQueue.Remove(currentEffectsSequence);
                             //try get next effects group
                             accountEffects = quantaQueue.FirstOrDefault().Value;
                         }

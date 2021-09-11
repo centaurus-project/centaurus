@@ -28,8 +28,7 @@ namespace Centaurus.Domain
 
             if (context.DestinationAccount == null)
             {
-                var accId = context.CentaurusContext.AccountStorage.NextAccountId;
-                context.AddAccountCreate(context.CentaurusContext.AccountStorage, accId, payment.Destination);
+                context.AddAccountCreate(context.CentaurusContext.AccountStorage, payment.Destination);
             }
 
             if (!context.DestinationAccount.HasBalance(payment.Asset))

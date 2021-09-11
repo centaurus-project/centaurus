@@ -37,7 +37,7 @@ namespace Centaurus.Domain
             }
         }
 
-        private int maxAllowedBatchLength = 10;
+        private int maxAllowedBatchLength = 20;
 
         private void Reset()
         {

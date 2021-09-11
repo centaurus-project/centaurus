@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Centaurus.Test;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -43,11 +44,11 @@ namespace Centaurus.PersistentStorage
                     Apex = (ulong)(i + prefix),
                     TimeStamp = 100 * i,
                     RawQuantum = RandomData(64),
-                    Effects = GenerateBuffers(4, 40).Select((b, i) => new AccountEffects { Account = (ulong)i, Effects = b }).ToList(),
+                    Effects = GenerateBuffers(4, 40).Select((b, i) => new AccountEffects { Account = BinaryExtensions.RandomBytes(32), Effects = b }).ToList(),
                     Signatures = auditors.Select(_ => RandomData(64)).Select(s => new SignatureModel { PayloadSignature = s }).ToList()
                 });
             Generate(QuantaPerBatch * EffectsPerQuantum, testData,
-                i => new QuantumRefPersistentModel() { AccountId = (ulong)rnd.Next(1, 1000), Apex = (ulong)(i + prefix) });
+                i => new QuantumRefPersistentModel() { Account = BinaryExtensions.RandomBytes(32), Apex = (ulong)(i + prefix) });
             Generate(AccountsAffected, testData,
                 i => new AccountPersistentModel()
                 {

@@ -7,7 +7,6 @@ namespace Centaurus.Models
     [XdrUnion((int)MessageTypes.HandshakeRequest, typeof(HandshakeRequest))]
     [XdrUnion((int)MessageTypes.HandshakeResponse, typeof(HandshakeResponse))]
     [XdrUnion((int)MessageTypes.AuditorHandshakeResponse, typeof(AuditorHandshakeResponse))]
-    [XdrUnion((int)MessageTypes.ClientConnectionSuccess, typeof(ClientConnectionSuccess))]
     [XdrUnion((int)MessageTypes.WithdrawalRequest, typeof(WithdrawalRequest))]
     [XdrUnion((int)MessageTypes.AccountDataRequest, typeof(AccountDataRequest))]
     [XdrUnion((int)MessageTypes.AccountDataRequestQuantum, typeof(AccountDataRequestQuantum))]

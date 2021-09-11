@@ -4,6 +4,7 @@ using NLog;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,13 +15,16 @@ namespace Centaurus.Domain
     {
         class HandleItem
         {
-            public HandleItem(Quantum quantum)
+            public HandleItem(Quantum quantum, Task<bool> signatureValidation)
             {
                 Quantum = quantum ?? throw new ArgumentNullException(nameof(quantum));
+                SignatureValidation = signatureValidation ?? throw new ArgumentNullException(nameof(signatureValidation));
                 HandlingTaskSource = new TaskCompletionSource<QuantumResultMessageBase>(TaskCreationOptions.RunContinuationsAsynchronously);
             }
 
             public Quantum Quantum { get; }
+
+            public Task<bool> SignatureValidation { get; }
 
             public TaskCompletionSource<QuantumResultMessageBase> HandlingTaskSource { get; }
         }
@@ -43,13 +47,13 @@ namespace Centaurus.Domain
         /// Handles the quantum and returns Task.
         /// </summary>
         /// <param name="quantum">Quantum to handle</param>s
-        public Task HandleAsync(Quantum quantum)
+        public Task HandleAsync(Quantum quantum, Task<bool> signatureValidation)
         {
             if (Context.IsAlpha //if current node is not alpha, than we need to keep process quanta
-                && QuantaThrottlingManager.Current.IsThrottlingEnabled 
+                && QuantaThrottlingManager.Current.IsThrottlingEnabled
                 && QuantaThrottlingManager.Current.MaxItemsPerSecond <= awaitedQuanta.Count)
                 throw new TooManyRequestsException("Server is too busy. Try again later.");
-            var newHandleItem = new HandleItem(quantum);
+            var newHandleItem = new HandleItem(quantum, signatureValidation);
             if (newHandleItem.Quantum.Apex > 0)
                 LastAddedQuantumApex = newHandleItem.Quantum.Apex;
             awaitedQuanta.Add(newHandleItem);
@@ -58,7 +62,7 @@ namespace Centaurus.Domain
 
         public ulong LastAddedQuantumApex { get; private set; }
 
-        public int QuantaQueueLenght => awaitedQuanta?.Count ?? 0;
+        public int QuantaQueueLenght => awaitedQuanta.Count;
 
         private async Task RunQuantumWorker()
         {
@@ -66,6 +70,9 @@ namespace Centaurus.Domain
             {
                 foreach (var handlingItem in awaitedQuanta.GetConsumingEnumerable())
                 {
+                    var isSignatureValid = await handlingItem.SignatureValidation;
+                    if (!isSignatureValid)
+                        throw new Exception("Signature is invalid.");
                     await ProcessQuantum(handlingItem);
                     if (Context.IsAlpha && QuantaThrottlingManager.Current.IsThrottlingEnabled)
                         Thread.Sleep(QuantaThrottlingManager.Current.SleepTime);
@@ -85,8 +92,16 @@ namespace Centaurus.Domain
             try
             {
                 Context.ExtensionsManager.BeforeQuantumHandle(handleItem.Quantum);
-                Context.PendingUpdatesManager.UpdateBatch();
-                result = await HandleQuantum(handleItem.Quantum);
+                await Context.PendingUpdatesManager.SyncRoot.WaitAsync();
+                try
+                {
+                    Context.PendingUpdatesManager.UpdateBatch();
+                    result = await HandleQuantum(handleItem.Quantum);
+                }
+                finally
+                {
+                    Context.PendingUpdatesManager.SyncRoot.Release();
+                }
                 if (result.Status != ResultStatusCode.Success)
                     throw new Exception("Failed to handle quantum.");
                 tcs.SetResult(result);
@@ -125,10 +140,11 @@ namespace Centaurus.Domain
                 if (quantum.Apex != Context.QuantumStorage.CurrentApex + 1)
                     throw new Exception($"Current quantum apex is {quantum.Apex} but {Context.QuantumStorage.CurrentApex + 1} was expected.");
 
-                if (!quantum.PrevHash.SequenceEqual(Context.QuantumStorage.LastQuantumHash))
+                if (!quantum.PrevHash.AsSpan().SequenceEqual(Context.QuantumStorage.LastQuantumHash))
                     throw new Exception($"Quantum previous hash doesn't equal to last quantum hash.");
-                ValidateRequestQuantum(quantum, account);
             }
+            if (!Context.IsAlpha || Context.StateManager.State == State.Rising)
+                ValidateRequestQuantum(quantum, account);
         }
 
         Account GetAccountWrapper(Quantum quantum)
@@ -162,11 +178,7 @@ namespace Centaurus.Domain
 
         private void AddToQuantumStorage(QuantaProcessingResult processingResult)
         {
-            Context.QuantumStorage.AddQuantum(new PendingQuantum
-            {
-                Quantum = processingResult.Quantum,
-                Signatures = new List<AuditorSignatureInternal> { processingResult.CurrentNodeSignature }
-            }, processingResult.QuantumHash);
+            Context.QuantumStorage.AddQuantum(processingResult.Quantum, processingResult.QuantumHash);
             Context.StateManager.UpdateDelay();
         }
 
@@ -174,13 +186,6 @@ namespace Centaurus.Domain
         {
             //register result
             Context.ResultManager.Add(processorContext.ProcessingResult);
-
-            //send result to auditors
-            Context.OutgoingConnectionManager.EnqueueResult(new AuditorResult
-            {
-                Apex = processorContext.Quantum.Apex,
-                Signature = processorContext.ProcessingResult.CurrentNodeSignature
-            });
         }
 
         void ValidateRequestQuantum(Quantum quantum, Account accountWrapper)
@@ -188,7 +193,6 @@ namespace Centaurus.Domain
             var request = quantum as RequestQuantumBase;
             if (request == null)
                 return;
-            ValidateAccountRequestSignature(request, accountWrapper);
             ValidateAccountRequestRate(request, accountWrapper);
         }
 
@@ -237,8 +241,7 @@ namespace Centaurus.Domain
 
         public void Dispose()
         {
-            awaitedQuanta?.Dispose();
-            awaitedQuanta = null;
+            awaitedQuanta.Dispose();
         }
     }
 }

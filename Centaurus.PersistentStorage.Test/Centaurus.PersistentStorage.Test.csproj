@@ -16,6 +16,7 @@
     <ProjectReference Include="..\Centaurus.Common\Centaurus.Common.csproj" />
     <ProjectReference Include="..\Centaurus.PersistentStorage.Abstraction\Centaurus.PersistentStorage.Abstraction.csproj" />
     <ProjectReference Include="..\Centaurus.PersistentStorage\Centaurus.PersistentStorage.csproj" />
+    <ProjectReference Include="..\Centaurus.Test.Utils\Centaurus.Test.Utils.csproj" />
   </ItemGroup>
 
 </Project>

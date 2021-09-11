@@ -22,7 +22,7 @@ namespace Centaurus.Domain
             private object batchSyncRoot = new { };
             private List<IPersistentModel> batch = new List<IPersistentModel>();
 
-            private HashSet<ulong> accounts = new HashSet<ulong>();
+            private HashSet<RawPubKey> accounts = new HashSet<RawPubKey>();
 
             public bool HasCursorUpdate { get; set; }
 
@@ -33,7 +33,7 @@ namespace Centaurus.Domain
             public ulong FirstApex;
             public ulong LastApex;
 
-            public void AddAffectedAccounts(IEnumerable<ulong> accounts)
+            public void AddAffectedAccounts(IEnumerable<RawPubKey> accounts)
             {
                 this.accounts.UnionWith(accounts);
             }

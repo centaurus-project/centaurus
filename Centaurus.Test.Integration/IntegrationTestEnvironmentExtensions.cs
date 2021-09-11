@@ -276,10 +276,7 @@ namespace Centaurus.Test
 
             var res = await processor.Process(processContext);
 
-            context.QuantumStorage.AddQuantum(new PendingQuantum { 
-                Quantum = quantum, 
-                Signatures = new List<AuditorSignatureInternal>() }, 
-            quantum.ComputeHash());
+            context.QuantumStorage.AddQuantum(quantum, quantum.ComputeHash());
 
             return res;
         }

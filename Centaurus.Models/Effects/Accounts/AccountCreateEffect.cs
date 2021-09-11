@@ -8,7 +8,5 @@ namespace Centaurus.Models
     [XdrContract]
     public class AccountCreateEffect: AccountEffect
     {
-        [XdrField(0)]
-        public RawPubKey Pubkey { get; set; }
     }
 }

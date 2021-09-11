@@ -31,12 +31,12 @@ namespace Centaurus.Test
 
         public IEnumerable<AccountPersistentModel> LoadAccounts()
         {
-            return accountsCollection.OrderBy(a => a.AccountId).ToList();
+            return accountsCollection.ToList();
         }
 
         public AccountPersistentModel LoadAccount(byte[] accountPubkey)
         {
-            return accountsCollection.FirstOrDefault(a => a.AccountPubkey.SequenceEqual(accountPubkey));
+            return accountsCollection.FirstOrDefault(a => a.AccountPubkey.AsSpan().SequenceEqual(accountPubkey));
         }
 
         public CursorsPersistentModel LoadCursors()
@@ -67,15 +67,9 @@ namespace Centaurus.Test
             return quantaCollection.OrderBy(q => q.Apex).SkipWhile(q => q.Apex <= apex).ToList();
         }
 
-        public List<AccountQuantumDTO> LoadQuantaForAccount(byte[] accountPubkey, ulong apex, int limit, QueryOrder order = QueryOrder.Asc)
+        public List<AccountQuantumDTO> LoadQuantaForAccount(byte[] account, ulong fromApex, int limit, QueryOrder order = QueryOrder.Asc)
         {
-            var account = LoadAccount(accountPubkey);
-            return LoadQuantaForAccount(account.AccountId, apex, limit, order);
-        }
-
-        public List<AccountQuantumDTO> LoadQuantaForAccount(ulong accountId, ulong fromApex, int limit, QueryOrder order = QueryOrder.Asc)
-        {
-            var quantaRefs = quantaRefCollection.Where(q => q.AccountId == accountId);
+            var quantaRefs = quantaRefCollection.Where(q => q.Account.AsSpan().SequenceEqual(account));
             if (order == QueryOrder.Asc)
             {
                 quantaRefs = quantaRefs.OrderBy(q => q.Apex);
@@ -120,7 +114,8 @@ namespace Centaurus.Test
                 {
                     case AccountPersistentModel account:
                         {
-                            var current = accountsCollection.FirstOrDefault(a => a.AccountId == account.AccountId);
+                            var pubkey = account.AccountPubkey;
+                            var current = accountsCollection.FirstOrDefault(a => a.AccountPubkey.SequenceEqual(account.AccountPubkey));
                             if (current != null)
                                 accountsCollection.Insert(accountsCollection.IndexOf(current), account);
                             else

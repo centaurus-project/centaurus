@@ -6,13 +6,12 @@ namespace Centaurus.Domain
 {
     public static class ProcessorContextExtensions
     {
-        public static void AddAccountCreate(this ProcessorContext processorContext, AccountStorage accountStorage, ulong accountId, RawPubKey publicKey)
+        public static void AddAccountCreate(this ProcessorContext processorContext, AccountStorage accountStorage, RawPubKey publicKey)
         {
             processorContext.AddEffectProcessor(new AccountCreateEffectProcessor(
                 new AccountCreateEffect
                 {
-                    Account = accountId,
-                    Pubkey = publicKey,
+                    Account = publicKey,
                     Apex = processorContext.Apex
                 },
                 accountStorage,
@@ -25,7 +24,7 @@ namespace Centaurus.Domain
             processorContext.AddEffectProcessor(new BalanceCreateEffectProcessor(
                 new BalanceCreateEffect
                 {
-                    Account = account.Id,
+                    Account = account.Pubkey,
                     Asset = asset,
                     Apex = processorContext.Apex
                 },
@@ -38,7 +37,7 @@ namespace Centaurus.Domain
             processorContext.AddEffectProcessor(new BalanceUpdateEffectProcesor(
                 new BalanceUpdateEffect
                 {
-                    Account = account.Id,
+                    Account = account.Pubkey,
                     Amount = amount,
                     Asset = asset,
                     Apex = processorContext.Apex,
@@ -53,7 +52,7 @@ namespace Centaurus.Domain
             var effect = new OrderPlacedEffect
             {
                 Apex = processorContext.Apex,
-                Account = order.Account.Id,
+                Account = order.Account.Pubkey,
                 Asset = order.Order.Asset,
                 Amount = order.Order.Amount,
                 QuoteAmount = order.Order.QuoteAmount,
@@ -72,7 +71,7 @@ namespace Centaurus.Domain
                 Asset = order.Order.Asset,
                 Side = order.Order.Side,
                 Apex = processorContext.Apex,
-                Account = order.Account.Id,
+                Account = order.Account.Pubkey,
                 AssetAmount = assetAmount,
                 QuoteAmount = quoteAmount,
                 IsNewOrder = isNewOrder
@@ -88,7 +87,7 @@ namespace Centaurus.Domain
                 new OrderRemovedEffect
                 {
                     Apex = processorContext.Apex,
-                    Account = order.Account.Id,
+                    Account = order.Account.Pubkey,
                     Amount = order.Order.Amount,
                     QuoteAmount = order.Order.QuoteAmount,
                     Price = order.Order.Price,
@@ -111,7 +110,7 @@ namespace Centaurus.Domain
                 {
                     Nonce = newNonce,
                     PrevNonce = currentNonce,
-                    Account = account.Id,
+                    Account = account.Pubkey,
                     Apex = processorContext.Apex
                 },
                 account

@@ -15,7 +15,7 @@ namespace Centaurus.Models
             if (signature == null)
                 throw new ArgumentNullException(nameof(signature));
 
-            return effectsProof.Signatures != null && effectsProof.Signatures.Any(s => s.Data.SequenceEqual(signature));
+            return effectsProof.Signatures != null && effectsProof.Signatures.Any(s => s.Data.AsSpan().SequenceEqual(signature));
         }
     }
 }

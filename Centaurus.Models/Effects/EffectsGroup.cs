@@ -9,12 +9,13 @@ namespace Centaurus.Models
     public class EffectsGroup
     {
         [XdrField(0)]
-        public ulong Account { get; set; }
+        public List<Effect> Effects { get; set; }
 
         [XdrField(1)]
         public ulong AccountSequence { get; set; }
 
-        [XdrField(2)]
-        public List<Effect> Effects { get; set; }
+        [XdrField(2, Optional = true)]
+        public RawPubKey Account { get; set; }
+
     }
 }

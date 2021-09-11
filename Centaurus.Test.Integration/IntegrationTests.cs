@@ -131,7 +131,7 @@ namespace Centaurus.Test
             //generate quantum that will not be processed by Alpha
             var request = new AccountDataRequest
             {
-                Account = client.Id,
+                Account = client.Pubkey,
                 RequestId = DateTime.UtcNow.Ticks
             }
                 .CreateEnvelope()
@@ -156,7 +156,7 @@ namespace Centaurus.Test
             {
                 var rawQuantum = quantum.ToByteArray();
                 var auditorsQuantum = XdrConverter.Deserialize<Quantum>(rawQuantum);
-                return a.Value.Context.QuantumHandler.HandleAsync(auditorsQuantum);
+                return a.Value.Context.QuantumHandler.HandleAsync(auditorsQuantum, Task.FromResult(true));
             }));
 
             //change quantum
@@ -165,10 +165,10 @@ namespace Centaurus.Test
                 a.Context.QuantumStorage.GetQuantaBacth(lastApex, 1, out var quanta);
                 var quantum = quanta.First();
                 if (invalidHash)
-                    quantum.Quantum.Timestamp = DateTime.UtcNow.Ticks;
+                    quantum.Timestamp = DateTime.UtcNow.Ticks;
                 if (invalidClientSignature)
                 {
-                    var request = (RequestQuantum)quantum.Quantum;
+                    var request = (RequestQuantum)quantum;
                     ((MessageEnvelope)request.RequestEnvelope).Signature = new TinySignature { Data = new byte[64] };
                     request.RequestEnvelope.Sign(KeyPair.Random());
                 }
@@ -216,7 +216,7 @@ namespace Centaurus.Test
                 : environment.AlphaWrapper.Context.Constellation.MinAllowedLotSize + 1;
             var sqamRequest = new OrderRequest
             {
-                Account = client.Id,
+                Account = client.Pubkey,
                 Amount = amount,
                 Price = 1,
                 Asset = environment.AlphaWrapper.Context.Constellation.Assets[1].Code,
@@ -234,7 +234,7 @@ namespace Centaurus.Test
                 Timestamp = DateTime.UtcNow.Ticks
             };
 
-            quantaStorage.AddQuantum(new PendingQuantum { Quantum = requestQuantum, Signatures = new List<AuditorSignatureInternal>() }, requestQuantum.ComputeHash());
+            quantaStorage.AddQuantum(requestQuantum, requestQuantum.ComputeHash());
 
             var expectedState = useFakeClient || useFakeAlpha || invalidBalance ? State.Failed : State.Ready;
 

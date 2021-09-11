@@ -29,9 +29,9 @@ namespace Centaurus.Test
             var account = context.AccountStorage.GetAccount(accountKey);
 
             var allLimit = 1000;
-            var allEffectsResult = context.DataProvider.LoadQuantaInfo(null, isDesc, allLimit, account.Id).Items;
+            var allEffectsResult = context.DataProvider.LoadQuantaInfo(null, isDesc, allLimit, account.Pubkey).Items;
 
-            var opositeOrderedResult = context.DataProvider.LoadQuantaInfo(null, !isDesc, allLimit, account.Id).Items;
+            var opositeOrderedResult = context.DataProvider.LoadQuantaInfo(null, !isDesc, allLimit, account.Pubkey).Items;
 
             //check ordering
             for (int i = 0, opI = allEffectsResult.Count - 1; i < allEffectsResult.Count; i++, opI--)
@@ -50,15 +50,15 @@ namespace Centaurus.Test
             var zeroCursor = "0";
             //check fetching
             var limit = 1;
-            TestFetching(allEffectsResult, zeroCursor, isDesc, limit, account.Id);
+            TestFetching(allEffectsResult, zeroCursor, isDesc, limit, account.Pubkey);
 
             //check reverse fetching
             allEffectsResult.Reverse();
             allEffectsResult.ForEach(ae => ae.Items.Reverse());
-            TestFetching(allEffectsResult, zeroCursor, !isDesc, limit, account.Id, true);
+            TestFetching(allEffectsResult, zeroCursor, !isDesc, limit, account.Pubkey, true);
         }
 
-        private void TestFetching(List<QuantumInfo> allEffects, string cursor, bool isDesc, int limit, ulong account, bool isReverseDirection = false)
+        private void TestFetching(List<QuantumInfo> allEffects, string cursor, bool isDesc, int limit, RawPubKey account, bool isReverseDirection = false)
         {
             var nextCursor = cursor;
             var totalCount = 0;

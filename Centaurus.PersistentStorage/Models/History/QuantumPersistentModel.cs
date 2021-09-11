@@ -63,7 +63,7 @@ namespace Centaurus.PersistentStorage
     public class AccountEffects
     {
         [Key(0)]
-        public ulong Account { get; set; }
+        public byte[] Account { get; set; }
 
         [Key(1)]
         public byte[] Effects { get; set; }

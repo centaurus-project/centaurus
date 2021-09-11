@@ -20,6 +20,6 @@ namespace Centaurus.Models
 
     public abstract class AccountEffect: Effect
     {
-        public ulong Account { get; set; }
+        public RawPubKey Account { get; set; }
     }
 }

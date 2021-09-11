@@ -134,8 +134,6 @@ namespace Centaurus
             if (status == ResultStatusCode.Success)
                 switch (messageType)
                 {
-                    case HandshakeResponse _:
-                        return CreateResult<ClientConnectionSuccess>(envelope, status);
                     case AccountDataRequest _:
                         return CreateResult<AccountDataResponse>(envelope, status);
                     default:

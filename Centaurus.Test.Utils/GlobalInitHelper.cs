@@ -120,12 +120,12 @@ namespace Centaurus.Test
                 MinAccountBalance = 1,
                 MinAllowedLotSize = 1,
                 Providers = new List<ProviderSettings> { stellarProviderSettings },
-                RequestRateLimits = new RequestRateLimits { HourLimit = 1000, MinuteLimit = 100 },
+                RequestRateLimits = new RequestRateLimits { HourLimit = uint.MaxValue, MinuteLimit = uint.MaxValue },
             }.CreateEnvelope<ConstellationMessageEnvelope>()
                 .Sign(TestEnvironment.AlphaKeyPair)
                 .Sign(TestEnvironment.Auditor1KeyPair);
 
-            await context.QuantumHandler.HandleAsync(new ConstellationQuantum { RequestEnvelope = initRequest });
+            await context.QuantumHandler.HandleAsync(new ConstellationQuantum { RequestEnvelope = initRequest }, Task.FromResult(true));
 
             var deposits = new List<DepositModel>();
             Action<byte[], string> addAssetsFn = (acc, asset) =>
@@ -133,7 +133,7 @@ namespace Centaurus.Test
                 deposits.Add(new DepositModel
                 {
                     Destination = acc,
-                    Amount = 10000,
+                    Amount = ulong.MaxValue / 2,
                     Asset = asset,
                     IsSuccess = true
                 });
@@ -141,7 +141,7 @@ namespace Centaurus.Test
 
             for (int i = 0; i < clients.Count; i++)
             {
-                var acc = context.AccountStorage.CreateAccount(context.AccountStorage.NextAccountId, clients[i].PublicKey, context.Constellation.RequestRateLimits);
+                var acc = context.AccountStorage.CreateAccount(clients[i].PublicKey, context.Constellation.RequestRateLimits);
                 for (var c = 0; c < assets.Count; c++)
                     addAssetsFn(acc.Pubkey, assets[c].Code);
             }
@@ -165,7 +165,7 @@ namespace Centaurus.Test
                 Source = txNotification.ToDomainModel()
             };
 
-            await context.QuantumHandler.HandleAsync(depositQuantum);
+            await context.QuantumHandler.HandleAsync(depositQuantum, Task.FromResult(true));
 
             //save all effects
             context.PendingUpdatesManager.UpdateBatch(true);

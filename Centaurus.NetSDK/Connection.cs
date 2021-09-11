@@ -27,8 +27,6 @@ namespace Centaurus.NetSDK
 
         public bool IsConnected { get; private set; }
 
-        public ulong AccountId { get; private set; }
-
         private readonly OutgoingConnectionWrapperBase webSocketWrapper;
 
         private readonly TaskCompletionSource<bool> HandshakeTask = new TaskCompletionSource<bool>();
@@ -235,11 +233,11 @@ namespace Centaurus.NetSDK
             { }
             catch (Exception e)
             {
-                var status = WebSocketCloseStatus.InternalServerError;
+                var status = WebSocketCloseStatus.NormalClosure;
+                var errorDescription = e.Message;
                 //connection has been already closed by the other side
                 if ((e as WebSocketException)?.WebSocketErrorCode == WebSocketError.ConnectionClosedPrematurely) return;
 
-                string errorDescription = null;
                 if (e is ConnectionCloseException closeException)
                 {
                     status = closeException.Status;
@@ -301,10 +299,10 @@ namespace Centaurus.NetSDK
 
                     await result.OnAcknowledged;
 
-                    var handshakeInitResult = result.Result.Message as ClientConnectionSuccess;
+                    var handshakeInitResult = result.Result.Message as ResultMessageBase;
                     if (handshakeInitResult.Status != ResultStatusCode.Success)
                         throw new Exception("Server rejected handshake confirmation.");
-                    AccountId = handshakeInitResult.AccountId;
+
                     logger.Trace("Handshake routine finalized successfully.");
                     HandshakeTask.TrySetResult(true);
                     IsConnected = true;

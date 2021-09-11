@@ -56,7 +56,7 @@ namespace Centaurus.Stellar.PaymentProvider
             if (withdrawalRequest == null)
                 throw new ArgumentNullException(nameof(withdrawalRequest));
 
-            if (!rawTransaction.SequenceEqual(BuildTransaction(withdrawalRequest)))
+            if (!rawTransaction.AsSpan().SequenceEqual(BuildTransaction(withdrawalRequest)))
             {
                 error = "Transaction is not equal to expected one.";
                 return false;

@@ -14,7 +14,7 @@ namespace Centaurus.Domain
             if (effect == null)
                 throw new ArgumentNullException(nameof(effect));
 
-            return new QuantumRefPersistentModel { AccountId = effect.Account, Apex = effect.Apex, IsQuantumInitiator = isQuantumInitiator };
+            return new QuantumRefPersistentModel { Account = effect.Account, Apex = effect.Apex, IsQuantumInitiator = isQuantumInitiator };
         }
     }
 }

@@ -17,7 +17,6 @@ namespace Centaurus.Domain
 
             var acc = new Account(defaultRequestRateLimits)
             {
-                Id = accountModel.AccountId,
                 AccountSequence = accountModel.AccountSequence,
                 Nonce = accountModel.Nonce,
                 Pubkey = accountModel.AccountPubkey,
@@ -52,7 +51,6 @@ namespace Centaurus.Domain
 
             var acc = new AccountPersistentModel
             {
-                AccountId = accountModel.Id,
                 AccountSequence = accountModel.AccountSequence,
                 Nonce = accountModel.Nonce,
                 AccountPubkey = accountModel.Pubkey,

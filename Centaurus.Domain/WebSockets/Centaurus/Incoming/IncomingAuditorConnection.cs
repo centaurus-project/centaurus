@@ -24,7 +24,7 @@ namespace Centaurus
 
         private QuantumSyncWorker quantumWorker;
 
-        public ulong CurrentCursor => quantumWorker.CurrentQuantaCursor;
+        public ulong CurrentCursor => quantumWorker.CurrentQuantaCursor ?? 0;
 
         public void SetSyncCursor(ulong newQuantumCursor, ulong newResultCursor)
         {

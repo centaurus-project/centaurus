@@ -29,7 +29,7 @@ namespace Centaurus.Test
             Array.Fill(signature, (byte)64);
             var original = new OrderRequest()
             {
-                Account = 1,
+                Account = KeyPair.Random(),
                 Amount = 2131231,
                 RequestId = 1,
                 TimeInForce = TimeInForce.ImmediateOrCancel,

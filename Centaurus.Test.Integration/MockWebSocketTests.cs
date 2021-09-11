@@ -30,7 +30,7 @@ namespace Centaurus.Test
                 var segment = receiveData.AsSegment(0, 1024);
                 var res = await leftWebsocket.ReceiveAsync(segment, CancellationToken.None);
                 Assert.AreEqual(data.Length, res.Count);
-                Assert.IsTrue(data.SequenceEqual(segment.Slice(0, res.Count).ToArray()));
+                Assert.IsTrue(data.AsSpan().SequenceEqual(segment.Slice(0, res.Count).ToArray()));
             }
         }
 

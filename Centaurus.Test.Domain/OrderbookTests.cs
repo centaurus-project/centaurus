@@ -36,7 +36,6 @@ namespace Centaurus.Test
 
             var account1 = new Account(requestRateLimits)
             {
-                Id = 1,
                 Pubkey = new RawPubKey() { Data = KeyPair.Random().PublicKey },
                 Balances = new Dictionary<string, Balance>(),
                 Orders = new Dictionary<ulong, Order>()
@@ -49,7 +48,6 @@ namespace Centaurus.Test
 
             var account2 = new Account(requestRateLimits)
             {
-                Id = 2,
                 Pubkey = new RawPubKey() { Data = KeyPair.Random().PublicKey },
                 Balances = new Dictionary<string, Balance>(),
                 Orders = new Dictionary<ulong, Order>()
@@ -93,8 +91,8 @@ namespace Centaurus.Test
                 Cursors = new Dictionary<string, string> { { "Stellar-Main", "0" } }
             });
 
-            this.account1 = context.AccountStorage.GetAccount(account1.Id);
-            this.account2 = context.AccountStorage.GetAccount(account2.Id);
+            this.account1 = context.AccountStorage.GetAccount(account1.Pubkey);
+            this.account2 = context.AccountStorage.GetAccount(account2.Pubkey);
         }
 
         [TearDown]
@@ -127,13 +125,13 @@ namespace Centaurus.Test
                 if (rnd.NextDouble() >= 0.5)
                 {
                     initiator = account1;
-                    request.Account = account1.Id;
+                    request.Account = account1.Pubkey;
                     request.Side = OrderSide.Buy;
                 }
                 else
                 {
                     initiator = account2;
-                    request.Account = account2.Id;
+                    request.Account = account2.Pubkey;
                     request.Side = OrderSide.Sell;
                 }
 
@@ -171,7 +169,7 @@ namespace Centaurus.Test
                 {
                     new OrderRemovedEffectProccessor(new OrderRemovedEffect
                     {
-                        Account = account.Id,
+                        Account = account.Pubkey,
                         OrderId = order.OrderId,
                         Amount = order.Amount,
                         QuoteAmount = order.QuoteAmount,

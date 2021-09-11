@@ -43,6 +43,7 @@ namespace Centaurus
 
                 var logsDirectory = Path.Combine(settings.CWD, "logs");
                 LogConfigureHelper.Configure(logsDirectory, settings.Silent, settings.Verbose);
+                logger = LogManager.GetCurrentClassLogger();
                 isLoggerInited = true;
 
                 var context = new Domain.ExecutionContext(settings, new PersistentStorageAbstraction(), PaymentProvidersFactoryBase.Default, OutgoingConnectionFactoryBase.Default);

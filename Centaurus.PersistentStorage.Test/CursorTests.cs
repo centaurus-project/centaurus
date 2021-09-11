@@ -1,4 +1,5 @@
-﻿using NUnit.Framework;
+﻿using Centaurus.Test;
+using NUnit.Framework;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -13,6 +14,12 @@ namespace Centaurus.PersistentStorage.Test
         private PersistentStorage storage;
         private string path = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "db");
 
+        private byte[][] accounts = { 
+            Enumerable.Range(0, 32).Select(i => (byte)i).ToArray(),
+            Enumerable.Range(1, 32).Select(i => (byte)i).ToArray(),
+            Enumerable.Range(2, 32).Select(i => (byte)i).ToArray() 
+        };
+
         [OneTimeSetUp]
         public void Setup()
         {
@@ -26,11 +33,11 @@ namespace Centaurus.PersistentStorage.Test
                 };
 
             var quantumRefsBatch = new List<QuantumRefPersistentModel> {
-                    new QuantumRefPersistentModel { Apex = 1, AccountId = 1 },
-                    new QuantumRefPersistentModel { Apex = 2, AccountId = 1 },
-                    new QuantumRefPersistentModel { Apex = 3, AccountId = 1 },
-                    new QuantumRefPersistentModel { Apex = 4, AccountId = 2 },
-                    new QuantumRefPersistentModel { Apex = 101, AccountId = 3 },
+                    new QuantumRefPersistentModel { Apex = 1, Account = accounts[0] },
+                    new QuantumRefPersistentModel { Apex = 2, Account = accounts[0] },
+                    new QuantumRefPersistentModel { Apex = 3, Account = accounts[0] },
+                    new QuantumRefPersistentModel { Apex = 4, Account = accounts[1] },
+                    new QuantumRefPersistentModel { Apex = 101, Account = accounts[2] },
                 };
 
             storage.SaveBatch(quantaBatch.Cast<IPersistentModel>().Concat(quantumRefsBatch).ToList());
@@ -70,22 +77,20 @@ namespace Centaurus.PersistentStorage.Test
 
 
         [Test]
-        [TestCase(QueryOrder.Asc, 3, 1ul, 0ul, null)]
-        [TestCase(QueryOrder.Asc, 2, 1ul, 1ul, null)]
-        [TestCase(QueryOrder.Asc, 1, 1ul, 1ul, 2ul)]
+        [TestCase(QueryOrder.Asc, 3, 0, 0ul, null)]
+        [TestCase(QueryOrder.Asc, 2, 0, 1ul, null)]
+        [TestCase(QueryOrder.Asc, 1, 0, 1ul, 2ul)]
         [TestCase(QueryOrder.Asc, 5, null, 0ul, null)]
-        [TestCase(QueryOrder.Asc, 1, 3ul, 100ul, 110ul)]
-        [TestCase(QueryOrder.Desc, 3, 1ul, 100ul, null)]
-        [TestCase(QueryOrder.Desc, 2, 1ul, 110ul, null)]
-        [TestCase(QueryOrder.Desc, 1, 3ul, 110ul, 100ul)]
-        [TestCase(QueryOrder.Desc, 0, 1ul, 100ul, 110ul)]
+        [TestCase(QueryOrder.Asc, 1, 2, 100ul, 110ul)]
+        [TestCase(QueryOrder.Desc, 3, 0, 100ul, null)]
+        [TestCase(QueryOrder.Desc, 2, 0, 110ul, null)]
+        [TestCase(QueryOrder.Desc, 1, 2, 110ul, 100ul)]
+        [TestCase(QueryOrder.Desc, 0, 0, 100ul, 110ul)]
         [TestCase(QueryOrder.Desc, 5, null, 0ul, null)]
-        public void QuantaRefStorageIteratorTest(QueryOrder order, int expectedCount, ulong? account, ulong from, ulong? to)
+        public void QuantaRefStorageIteratorTest(QueryOrder order, int expectedCount, int? accountIndex, ulong from, ulong? to)
         {
-            //var startFrom = new QuantumRefPersistentModel
-            //{ AccountId = account, Apex = 1 }.Key;
-            var cursor = account.HasValue
-                ? storage.Find<QuantumRefPersistentModel>(UlongConverter.Encode(account.Value), order)
+            var cursor = accountIndex.HasValue
+                ? storage.Find<QuantumRefPersistentModel>(accounts[accountIndex.Value], order)
                 : storage.Find<QuantumRefPersistentModel>(order);
 
             cursor.From(UlongConverter.Encode(from));
@@ -96,8 +101,8 @@ namespace Centaurus.PersistentStorage.Test
             }
             var aboveApexQuanta = cursor.ToList();
 
-            if (account.HasValue)
-                aboveApexQuanta.ForEach(q => Assert.AreEqual(q.AccountId, account.Value));
+            if (accountIndex.HasValue)
+                aboveApexQuanta.ForEach(q => Assert.IsTrue(q.Account.AsSpan().SequenceEqual(accounts[accountIndex.Value])));
 
             Assert.AreEqual(expectedCount, aboveApexQuanta.Count);
         }

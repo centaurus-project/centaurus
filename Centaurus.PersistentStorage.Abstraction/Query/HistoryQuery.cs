@@ -22,18 +22,11 @@ namespace Centaurus.PersistentStorage
             return storage.Find<QuantumPersistentModel>().From(UlongConverter.Encode(apex));
         }
 
-        public List<AccountQuantumDTO> LoadQuantaForAccount(byte[] accountPubkey, ulong apex, int limit, QueryOrder order = QueryOrder.Asc)
-        {
-            var account = LoadAccount(accountPubkey);
-            if (account == null) return null;
-            return LoadQuantaForAccount(account.AccountId, apex, limit, order);
-        }
-
-        public List<AccountQuantumDTO> LoadQuantaForAccount(ulong accountId, ulong fromApex, int limit, QueryOrder order = QueryOrder.Asc)
+        public List<AccountQuantumDTO> LoadQuantaForAccount(byte[] account, ulong fromApex, int limit, QueryOrder order = QueryOrder.Asc)
         {
             var startFrom = new QuantumRefPersistentModel
-            { AccountId = accountId, Apex = fromApex }.Key;
-            var refs = storage.Find<QuantumRefPersistentModel>(UlongConverter.Encode(accountId), order)
+            { Account = account, Apex = fromApex }.Key;
+            var refs = storage.Find<QuantumRefPersistentModel>(account, order)
                 .From(startFrom)
                 .Take(limit)
                 .ToDictionary(qr => qr.Apex, qr => qr);

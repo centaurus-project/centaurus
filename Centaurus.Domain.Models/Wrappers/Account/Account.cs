@@ -11,8 +11,6 @@ namespace Centaurus.Domain.Models
             RequestCounter = new AccountRequestCounter(requestRateLimits);
         }
 
-        public ulong Id { get; set; }
-
         public RawPubKey Pubkey { get; set; }
 
         public ulong Nonce { get; set; }

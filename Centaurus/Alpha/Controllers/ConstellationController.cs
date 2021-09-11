@@ -68,7 +68,7 @@ namespace Centaurus.Controllers
 
                 constellationQuantum.Validate(Context);
 
-                await Context.QuantumHandler.HandleAsync(constellationQuantum);
+                await Context.QuantumHandler.HandleAsync(constellationQuantum, Task.FromResult(true));
 
                 return new JsonResult(new InitResult { IsSuccess = true });
             }

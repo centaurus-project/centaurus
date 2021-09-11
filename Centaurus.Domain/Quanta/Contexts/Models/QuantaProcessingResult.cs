@@ -10,7 +10,7 @@ namespace Centaurus.Domain
     {
         public Quantum Quantum { get; set; }
 
-        public ulong Initiator { get; set; }
+        public RawPubKey Initiator { get; set; }
 
         public ulong Apex => Quantum.Apex;
 
@@ -28,28 +28,26 @@ namespace Centaurus.Domain
 
         public long Timestamp { get; set; }
 
-        public AuditorSignatureInternal CurrentNodeSignature { get; set; }
-
         public QuantumResultMessageBase ResultMessage { get; set; }
 
         public uint UpdatesBatchId { get; set; }
 
-        public Dictionary<ulong, RawPubKey> AffectedAccounts { get; set; }
+        public int CurrentAuditorId { get; set; }
 
         /// <summary>
         /// Creates message notifications for accounts that were affected by quantum
         /// </summary>
         /// <returns></returns>
-        public Dictionary<ulong, EffectsNotification> GetNotificationMessages(ulong initiator, RequestHashInfo requestHashInfo, PayloadProof payloadProof)
+        public Dictionary<RawPubKey, EffectsNotification> GetNotificationMessages(RawPubKey initiator, RequestHashInfo requestHashInfo, PayloadProof payloadProof)
         {
             if (payloadProof == null)
                 throw new ArgumentNullException(nameof(payloadProof));
 
-            var result = new Dictionary<ulong, EffectsNotification>();
+            var result = new Dictionary<RawPubKey, EffectsNotification>();
             foreach (var effectsGroup in Effects)
             {
                 //initiator will receive result message
-                if (effectsGroup.Account == initiator || effectsGroup.Account == 0)
+                if (effectsGroup.Account == null || (initiator != null && effectsGroup.Account.Equals(initiator)))
                     continue;
                 var notification = new EffectsNotification
                 {
@@ -75,7 +73,7 @@ namespace Centaurus.Domain
 
         public EffectsGroup Effects { get; }
 
-        public ulong Account => Effects.Account;
+        public RawPubKey Account => Effects.Account;
 
         public ulong AccountSequence => Effects.AccountSequence;
 

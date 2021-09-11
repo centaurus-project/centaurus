@@ -86,9 +86,8 @@ namespace Centaurus.Domain
                 //ignore registration with non-base asset or with amount that is less than MinAccountBalance
                 if (deposit.Asset != baseAsset || deposit.Amount < context.CentaurusContext.Constellation.MinAccountBalance)
                     return;
-                var accId = context.CentaurusContext.AccountStorage.NextAccountId;
-                context.AddAccountCreate(context.CentaurusContext.AccountStorage, accId, deposit.Destination);
-                account = context.CentaurusContext.AccountStorage.GetAccount(accId);
+                context.AddAccountCreate(context.CentaurusContext.AccountStorage, deposit.Destination);
+                account = context.CentaurusContext.AccountStorage.GetAccount(deposit.Destination);
             }
 
             if (!account.HasBalance(deposit.Asset))

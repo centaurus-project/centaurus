@@ -28,7 +28,7 @@ namespace Centaurus
 
         private object syncRoot = new { };
 
-        public ulong CurrentQuantaCursor { get; private set; }
+        public ulong? CurrentQuantaCursor { get; private set; }
         public ulong? CurrentResultCursor { get; private set; }
 
         public void SetCursors(ulong quantaCursor, ulong? resultCursor)
@@ -41,7 +41,7 @@ namespace Centaurus
         }
 
 
-        private (ulong quantaCursor, ulong? resultCursor) GetCursors()
+        private (ulong? quantaCursor, ulong? resultCursor) GetCursors()
         {
             lock (syncRoot)
                 return (CurrentQuantaCursor, CurrentResultCursor);
@@ -65,7 +65,7 @@ namespace Centaurus
                         return;
                     }
 
-                    var quantaDiff = Context.QuantumStorage.CurrentApex - cursors.quantaCursor;
+                    var quantaDiff = (Context.QuantumStorage.CurrentApex - cursors.quantaCursor) ?? 0;
                     var resultDiff = (Context.PendingUpdatesManager.LastSavedApex - cursors.resultCursor) ?? 0;
 
                     if (!Context.IsAlpha //only Alpha should broadcast quanta
@@ -78,46 +78,28 @@ namespace Centaurus
                     }
 
                     var quantaBatch = quantaDiff > 0
-                        ? GetPendingQuanta(cursors.quantaCursor, batchSize)
-                        : new List<PendingQuantum>();
+                        ? GetPendingQuanta(cursors.quantaCursor.Value, batchSize)
+                        : new List<Quantum>();
 
                     var batchMessage = new QuantaBatch
                     {
-                        Quanta = quantaBatch.Select(q => (Message)q.Quantum).ToList(),
+                        Quanta = quantaBatch.Select(q => (Message)q).ToList(),
                         LastKnownApex = Context.QuantumStorage.CurrentApex
                     };
 
-                    var firstQuantumApex = quantaBatch.FirstOrDefault()?.Quantum.Apex;
-                    var lastQuantumApex = quantaBatch.LastOrDefault()?.Quantum.Apex;
+                    var firstQuantumApex = quantaBatch.FirstOrDefault()?.Apex;
+                    var lastQuantumApex = quantaBatch.LastOrDefault()?.Apex;
 
                     if (resultDiff != 0)
                     {
                         var resultCursor = cursors.resultCursor.Value;
                         var count = Math.Min(batchSize, (int)(Context.PendingUpdatesManager.LastSavedApex - resultCursor));
-
-                        var signaturesQuanta = default(IEnumerable<PendingQuantum>);
-                        if (quantaBatch.Count > 0 && firstQuantumApex <= resultCursor && resultCursor + (ulong)count <= lastQuantumApex)
-                        {
-                            signaturesQuanta = quantaBatch
-                                .SkipWhile(q => q.Quantum.Apex != resultCursor + 1)
-                                .Take(count);
-                        }
-                        else
-                            //TODO:intersect with loaded already quanta
-                            signaturesQuanta = GetPendingQuanta(resultCursor, count);
-
-                        batchMessage.Signatures = signaturesQuanta
-                            .Select(q => new QuantumSignatures
-                            {
-                                Apex = q.Quantum.Apex,
-                                Signatures = q.Signatures
-                            })
-                            .ToList();
+                        batchMessage.Signatures = GetAuditorResults(resultCursor, count);
                     }
 
                     var lastResultApex = batchMessage.Signatures?.LastOrDefault()?.Apex;
 
-                    logger.Trace($"About to sent {batchMessage.Quanta.Count} quanta and {batchMessage.Signatures?.Count ?? 0} results. Quanta from {firstQuantumApex} to {lastQuantumApex}.");
+                    logger.Trace($"About to sent {batchMessage.Quanta.Count} quanta and {batchMessage.Signatures?.Count ?? 0} results to {auditor.PubKeyAddress}. Quanta from {firstQuantumApex} to {lastQuantumApex}.");
 
                     await auditor.SendMessage(batchMessage.CreateEnvelope<MessageEnvelopeSignless>());
 
@@ -141,16 +123,35 @@ namespace Centaurus
             }
         }
 
-        private List<PendingQuantum> GetPendingQuanta(ulong from, int count)
+        private List<Quantum> GetPendingQuanta(ulong from, int count)
         {
             if (!Context.QuantumStorage.GetQuantaBacth(from, count, out var quanta))
             {
                 //quanta are not found in the in-memory storage
-                quanta = Context.DataProvider.GetQuantaAboveApex(from, count);
+                quanta = Context.DataProvider.GetQuantaAboveApex(from, count).Select(q => q.Quantum).ToList();
                 if (quanta.Count < 1)
                     throw new Exception("No quanta from database.");
             }
             return quanta;
+        }
+
+        private List<QuantumSignatures> GetAuditorResults(ulong from, int count)
+        {
+            if (!Context.ResultManager.TryGetResults(from, count, out var results))
+            {
+                //quanta are not found in the in-memory storage
+                results = Context.DataProvider.GetQuantaAboveApex(from, count)
+                    .Select(q =>
+                    new QuantumSignatures
+                    {
+                        Apex = q.Quantum.Apex,
+                        Signatures = q.Signatures
+                    })
+                    .ToList();
+                if (results.Count < 1)
+                    throw new Exception("No quanta from database.");
+            }
+            return results;
         }
 
         public void Dispose()

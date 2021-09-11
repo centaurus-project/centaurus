@@ -26,7 +26,6 @@ namespace Centaurus.Test.Exchange.Analytics
 
             account1 = new Account(requestsLimit)
             {
-                Id = 1,
                 Pubkey = new RawPubKey() { Data = KeyPair.Random().PublicKey },
                 Balances = new Dictionary<string, Balance>(),
                 Orders = new Dictionary<ulong, Order>()
@@ -40,7 +39,6 @@ namespace Centaurus.Test.Exchange.Analytics
 
             account2 = new Account(requestsLimit)
             {
-                Id = 2,
                 Pubkey = new RawPubKey() { Data = KeyPair.Random().PublicKey },
                 Balances = new Dictionary<string, Balance>(),
                 Orders = new Dictionary<ulong, Order>()
@@ -106,7 +104,7 @@ namespace Centaurus.Test.Exchange.Analytics
                     {
                         Message = new OrderRequest
                         {
-                            Account = account1.Id,
+                            Account = account1.Pubkey,
                             RequestId = i,
                             Amount = (ulong)rnd.Next(1, 20),
                             Asset = "USD",

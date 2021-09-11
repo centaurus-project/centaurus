@@ -30,30 +30,29 @@ namespace Centaurus.Domain
 
         public event Action<BatchSavedInfo> OnBatchSaved;
 
+        public System.Threading.SemaphoreSlim SyncRoot { get; } = new System.Threading.SemaphoreSlim(1);
+
         public void UpdateBatch(bool force = false)
         {
-            lock (syncRoot)
-            {
-                if (force || IsSaveRequired())
-                    try
-                    {
-                        pendingUpdates.Complete(Context);
-                        lastUpdateTime = DateTime.UtcNow;
+            if (force || IsSaveRequired())
+                try
+                {
+                    pendingUpdates.Complete(Context);
+                    lastUpdateTime = DateTime.UtcNow;
 
-                        logger.Trace($"Batch update. Id: {pendingUpdates.Id}, apex range: {pendingUpdates.FirstApex}-{pendingUpdates.LastApex}, quanta: {pendingUpdates.QuantaCount}, effects: {pendingUpdates.EffectsCount}");
+                    logger.Info($"Batch update. Id: {pendingUpdates.Id}, apex range: {pendingUpdates.FirstApex}-{pendingUpdates.LastApex}, quanta: {pendingUpdates.QuantaCount}, effects: {pendingUpdates.EffectsCount}");
 
-                        pendingUpdates = new UpdatesContainer(unchecked(pendingUpdates.Id + 1));
-                        RegisterUpdates(pendingUpdates);
-                        ApplyUpdatesAsync();
-                    }
-                    catch (Exception exc)
+                    pendingUpdates = new UpdatesContainer(unchecked(pendingUpdates.Id + 1));
+                    RegisterUpdates(pendingUpdates);
+                    ApplyUpdatesAsync();
+                }
+                catch (Exception exc)
+                {
+                    if (Context.StateManager.State != State.Failed)
                     {
-                        if (Context.StateManager.State != State.Failed)
-                        {
-                            Context.StateManager.Failed(new Exception("Batch update failed.", exc));
-                        }
+                        Context.StateManager.Failed(new Exception("Batch update failed.", exc));
                     }
-            }
+                }
         }
 
         public Task ApplyUpdatesAsync(bool force = false)
@@ -89,7 +88,7 @@ namespace Centaurus.Domain
                         Task.Factory.StartNew(() => OnBatchSaved?.Invoke(batchInfo));
                         RemoveUpdates(updates.Id);
 
-                        logger.Trace($"Batch {updates.Id} saved in {sw.ElapsedMilliseconds}.");
+                        logger.Info($"Batch {updates.Id} saved in {sw.ElapsedMilliseconds}.");
 
                         updates = GetNextUpdates();
                     }
@@ -112,39 +111,37 @@ namespace Centaurus.Domain
                 Apex = result.Apex,
                 Effects = result.Effects.Select(eg => new AccountEffects
                 {
-                    Account = eg.Account,
+                    Account = eg.Account ?? new byte[32],
                     Effects = eg.RawEffects
                 }).ToList(),
                 RawQuantum = result.RawQuantum,
-                TimeStamp = result.Timestamp,
-                Signatures = new List<SignatureModel> { result.CurrentNodeSignature.ToPersistenModel() }
+                TimeStamp = result.Timestamp
             };
 
-            lock (syncRoot)
-            {
-                if (pendingUpdates.FirstApex == 0)
-                    pendingUpdates.FirstApex = result.Apex;
+            if (pendingUpdates.FirstApex == 0)
+                pendingUpdates.FirstApex = result.Apex;
 
-                pendingUpdates.LastApex = result.Apex;
+            pendingUpdates.LastApex = result.Apex;
 
-                pendingUpdates.AddQuantum(qModel, result.Effects.Sum(e => e.Effects.Effects.Count));
-                pendingUpdates.AddQuantumRefs(result.Effects.Select(eg => new QuantumRefPersistentModel
+            pendingUpdates.AddQuantum(qModel, result.Effects.Sum(e => e.Effects.Effects.Count));
+            pendingUpdates.AddQuantumRefs(result.Effects
+                .Where(e => e.Account != null)
+                .Select(eg => new QuantumRefPersistentModel
                 {
-                    AccountId = eg.Account,
+                    Account = eg.Account,
                     Apex = result.Apex,
-                    IsQuantumInitiator = eg.Account == result.Initiator
+                    IsQuantumInitiator = eg.Account.Equals(result.Initiator)
                 }));
 
-                if (result.HasSettingsUpdate)
-                    pendingUpdates.AddConstellation(Context.Constellation.ToPesrsistentModel());
+            if (result.HasSettingsUpdate)
+                pendingUpdates.AddConstellation(Context.Constellation.ToPesrsistentModel());
 
-                pendingUpdates.AddAffectedAccounts(result.AffectedAccounts.Keys);
+            pendingUpdates.AddAffectedAccounts(result.Effects.Select(e => e.Account).Where(a => a != null));
 
-                if (result.HasCursorUpdate)
-                    pendingUpdates.HasCursorUpdate = true;
+            if (result.HasCursorUpdate)
+                pendingUpdates.HasCursorUpdate = true;
 
-                return pendingUpdates.Id;
-            }
+            return pendingUpdates.Id;
         }
 
         public void AddSignatures(uint updatesId, ulong apex, List<AuditorResult> signatures)
@@ -169,7 +166,6 @@ namespace Centaurus.Domain
 
         private DateTime lastUpdateTime;
         private object applyUpdatesSyncRoot = new { };
-        private object syncRoot = new { };
         private Timer saveTimer = new Timer();
         private XdrBufferFactory.RentedBuffer buffer = XdrBufferFactory.Rent(256 * 1024);
 
@@ -216,7 +212,15 @@ namespace Centaurus.Domain
             {
                 if (Context.StateManager?.State == State.Running || Context.StateManager?.State == State.Ready)
                 {
-                    UpdateBatch();
+                    SyncRoot.Wait();
+                    try
+                    {
+                        UpdateBatch();
+                    }
+                    finally
+                    {
+                        SyncRoot.Release();
+                    }
                 }
             }
             catch (Exception exc)
@@ -231,14 +235,13 @@ namespace Centaurus.Domain
 
         public void Dispose()
         {
-            lock (syncRoot)
-            {
-                saveTimer.Stop();
-                saveTimer.Elapsed -= SaveTimer_Elapsed;
-                saveTimer.Dispose();
+            saveTimer.Stop();
+            saveTimer.Elapsed -= SaveTimer_Elapsed;
+            saveTimer.Dispose();
 
-                buffer.Dispose();
-            }
+            buffer.Dispose();
+
+            SyncRoot.Dispose();
         }
     }
 }

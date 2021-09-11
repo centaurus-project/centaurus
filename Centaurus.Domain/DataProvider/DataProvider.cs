@@ -27,9 +27,9 @@ namespace Centaurus.Domain
         /// <param name="limit">Maximum items in batch.</param>
         /// <param name="account">Current account</param>
         /// <returns></returns>
-        public QuantumInfoResponse LoadQuantaInfo(string cursor, bool isDesc, int limit, ulong account)
+        public QuantumInfoResponse LoadQuantaInfo(string cursor, bool isDesc, int limit, RawPubKey account)
         {
-            if (account == 0)
+            if (account == null)
                 throw new ArgumentException("Account must be specified.");
 
             ulong.TryParse(cursor, out var apex);
@@ -46,7 +46,7 @@ namespace Centaurus.Domain
                 foreach (var effectsGroup in quantum.Effects)
                 {
                     //send effects group object if the account is initiator, otherwise send hash
-                    if (effectsGroup.Account == account)
+                    if (effectsGroup.Account.Equals(account))
                         effects.Add(new EffectsInfo { EffectsGroupData = effectsGroup.Effects });
                     else
                         effects.Add(new EffectsHashInfo { EffectsGroupData = effectsGroup.Effects.ComputeHash() });
@@ -246,7 +246,7 @@ namespace Centaurus.Domain
             return new Snapshot
             {
                 Apex = apex,
-                Accounts = accountStorage.GetAll().OrderBy(a => a.Id).ToList(),
+                Accounts = accountStorage.GetAll().OrderBy(a => a.Pubkey.ToString()).ToList(),
                 Orders = allOrders.OrderBy(o => o.OrderId).ToList(),
                 Settings = settings,
                 LastHash = lastQuantumData.ComputeHash(),

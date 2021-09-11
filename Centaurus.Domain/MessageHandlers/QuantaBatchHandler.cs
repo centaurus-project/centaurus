@@ -1,5 +1,7 @@
 ﻿using Centaurus.Models;
 using NLog;
+using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading.Tasks;
@@ -57,7 +59,7 @@ namespace Centaurus.Domain
                     return;
                 }
 
-                _ = Context.QuantumHandler.HandleAsync(quantum);
+                _ = Context.QuantumHandler.HandleAsync(quantum, QuantumSignatureValidator.Validate(quantum));
             }
             var signatures = quantaBatch.Signatures;
             if (signatures != null)
@@ -65,7 +67,6 @@ namespace Centaurus.Domain
                     foreach (var signature in apexSignatures.Signatures)
                         Context.ResultManager.Add(new AuditorResult { Apex = apexSignatures.Apex, Signature = signature });
         }
-
         private async Task AddAuditorState(ConnectionBase connection, IncomingMessage message)
         {
             await Context.Catchup.AddAuditorState(connection.PubKey, message.Envelope.Message as QuantaBatch);
