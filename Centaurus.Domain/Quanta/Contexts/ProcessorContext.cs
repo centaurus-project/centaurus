@@ -1,6 +1,8 @@
 ﻿using Centaurus.Domain.Models;
 using Centaurus.Models;
 using Centaurus.Xdr;
+using Microsoft.Extensions.Logging;
+using NLog;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -93,7 +95,7 @@ namespace Centaurus.Domain
             ProcessingResult.ResultMessage.Apex = Apex;
 
             //add quantum data to updates batch
-            ProcessingResult.UpdatesBatchId = Context.PendingUpdatesManager.AddQuantum(ProcessingResult);
+            ProcessingResult.UpdatesBatch = Context.PendingUpdatesManager.AddQuantum(ProcessingResult);
         }
 
         List<RawEffectsDataContainer> GetRawEffectsDataContainer()

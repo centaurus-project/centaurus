@@ -27,10 +27,8 @@ namespace Centaurus.Test
         {
             context.SetState(State.Ready);
 
-            var connection = GetIncomingConnection(context, TestEnvironment.Client1KeyPair);
-
             var accountId = context.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
-            var messages = new Dictionary<Task<bool>, RequestQuantum>();
+            var messages = new Dictionary<RequestQuantum, Task<bool>>();
             for (var i = 0; i < 1_00_000; i++)
             {
                 var quantumRequest = new RequestQuantum
@@ -44,7 +42,7 @@ namespace Centaurus.Test
                         RequestId = DateTime.UtcNow.Ticks
                     }.CreateEnvelope().Sign(TestEnvironment.Client1KeyPair)
                 };
-                messages.Add(QuantumSignatureValidator.Validate(quantumRequest), quantumRequest);
+                messages.Add(quantumRequest, QuantumSignatureValidator.Validate(quantumRequest));
             }
 
             var sw = new Stopwatch();
@@ -52,15 +50,14 @@ namespace Centaurus.Test
             var tasks = new List<Task>();
             foreach (var q in messages)
             {
-
-                tasks.Add(context.QuantumHandler.HandleAsync(q.Value, q.Key));
+                tasks.Add(context.QuantumHandler.HandleAsync(q.Key, q.Value));
             }
 
             await Task.WhenAll(tasks);
 
             sw.Stop();
 
-            TestContext.Out.Write($"{messages.Count} processed in {sw.ElapsedMilliseconds}. {messages.Count / (sw.ElapsedMilliseconds / 1000)} quanta per second.");
+            TestContext.Out.Write($"{messages.Count} processed in {sw.ElapsedMilliseconds}. {decimal.Divide(messages.Count, decimal.Divide(sw.ElapsedMilliseconds, 1000)).ToString(".##")} quanta per second.");
             Assert.IsTrue(true);
         }
     }

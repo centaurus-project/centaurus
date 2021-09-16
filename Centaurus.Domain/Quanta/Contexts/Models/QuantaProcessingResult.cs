@@ -30,7 +30,7 @@ namespace Centaurus.Domain
 
         public QuantumResultMessageBase ResultMessage { get; set; }
 
-        public uint UpdatesBatchId { get; set; }
+        public UpdatesManager.UpdatesContainer UpdatesBatch { get; set; }
 
         public int CurrentAuditorId { get; set; }
 

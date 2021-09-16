@@ -124,6 +124,7 @@ namespace Centaurus.Domain
                 if (result == null)
                     result = requestQuantum.RequestEnvelope.CreateResult(exc);
                 Context.OnMessageProcessResult(result, Context.AccountStorage.GetAccount(requestQuantum.RequestMessage.Account).Pubkey);
+                logger.Error(exc, "Error on handling.");
             }
         }
 

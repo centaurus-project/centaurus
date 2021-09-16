@@ -162,13 +162,13 @@ namespace Centaurus.Test
             //change quantum
             environment.AuditorWrappers.Values.ToList().ForEach(a =>
             {
-                a.Context.QuantumStorage.GetQuantaBacth(lastApex, 1, out var quanta);
+                var quanta = a.Context.QuantumStorage.GetQuanta(lastApex, 1);
                 var quantum = quanta.First();
                 if (invalidHash)
-                    quantum.Timestamp = DateTime.UtcNow.Ticks;
+                    quantum.Quantum.Timestamp = DateTime.UtcNow.Ticks;
                 if (invalidClientSignature)
                 {
-                    var request = (RequestQuantum)quantum;
+                    var request = (RequestQuantum)quantum.Quantum;
                     ((MessageEnvelope)request.RequestEnvelope).Signature = new TinySignature { Data = new byte[64] };
                     request.RequestEnvelope.Sign(KeyPair.Random());
                 }

@@ -40,9 +40,9 @@ namespace Centaurus.Domain
         }
     }
 
-    public class OutgoingResultsStorage: IDisposable
+    public class OutgoingResultsStorage : IDisposable
     {
-        const int MaxMessageBatchSize = 50;
+        const int MaxMessageBatchSize = 500;
 
         static Logger logger = LogManager.GetCurrentClassLogger();
         readonly OutgoingMessageStorage outgoingMessageStorage;
@@ -72,14 +72,22 @@ namespace Centaurus.Domain
                                 resultsBatch = results.Take(MaxMessageBatchSize).ToList();
                                 var removeCount = Math.Min(MaxMessageBatchSize, results.Count);
                                 results.RemoveRange(0, removeCount);
+
+                                logger.Trace($"Results batch sent. Batch size: {resultsBatch.Count}, apexes: {resultsBatch[0].Apex}-{resultsBatch[resultsBatch.Count - 1].Apex}.");
                             }
                         }
                         if (resultsBatch != default)
                         {
-                            outgoingMessageStorage.EnqueueMessage(new AuditorResultsBatch { AuditorResultMessages = resultsBatch }.CreateEnvelope<MessageEnvelopeSignless>());
-                            continue;
+                            outgoingMessageStorage.EnqueueMessage(
+                                new AuditorResultsBatch
+                                {
+                                    AuditorResultMessages = resultsBatch
+                                }.CreateEnvelope<MessageEnvelopeSignless>());
                         }
-                        Thread.Sleep(50);
+                        else
+                        {
+                            Thread.Sleep(50);
+                        }
                     }
                     catch (Exception exc)
                     {

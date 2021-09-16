@@ -243,9 +243,9 @@ namespace Centaurus.Test
             var quantum = new AccountDataRequestQuantum { RequestEnvelope = envelope };
 
             await AssertQuantumHandling(quantum, excpectedException);
-            var result = context.ResultManager.GetResult(quantum.Apex);
             if (excpectedException == null)
             {
+                var result = context.ResultManager.GetResult(quantum.Apex);
                 Assert.IsInstanceOf<AccountDataResponse>(result);
                 var adr = (AccountDataResponse)result;
                 var payloadHash = adr.ComputePayloadHash();

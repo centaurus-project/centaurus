@@ -125,32 +125,36 @@ namespace Centaurus
 
         private List<Quantum> GetPendingQuanta(ulong from, int count)
         {
-            if (!Context.QuantumStorage.GetQuantaBacth(from, count, out var quanta))
-            {
-                //quanta are not found in the in-memory storage
-                quanta = Context.DataProvider.GetQuantaAboveApex(from, count).Select(q => q.Quantum).ToList();
-                if (quanta.Count < 1)
-                    throw new Exception("No quanta from database.");
-            }
+            var quanta = Context.QuantumStorage
+                .GetQuanta(from, count)
+                .Select(q => q.Quantum)
+                .ToList();
+
+            if (quanta.Count < 1)
+                throw new Exception($"Quanta from {from} apex not found.");
+
             return quanta;
         }
 
         private List<QuantumSignatures> GetAuditorResults(ulong from, int count)
         {
-            if (!Context.ResultManager.TryGetResults(from, count, out var results))
+            var quanta = Context.QuantumStorage
+                .GetQuanta(from, count);
+
+            if (quanta.Count < 1)
+                throw new Exception($"Quanta from {from} apex not found.");
+
+            var results = new List<QuantumSignatures>(quanta.Count);
+            foreach (var q in quanta)
             {
-                //quanta are not found in the in-memory storage
-                results = Context.DataProvider.GetQuantaAboveApex(from, count)
-                    .Select(q =>
-                    new QuantumSignatures
-                    {
-                        Apex = q.Quantum.Apex,
-                        Signatures = q.Signatures
-                    })
-                    .ToList();
-                if (results.Count < 1)
-                    throw new Exception("No quanta from database.");
+                if (q.Signatures == null)
+                {
+                    logger.Info($"Signatures not found for quantum {q.Quantum.Apex}");
+                    break;
+                }
+                results.Add(new QuantumSignatures { Apex = q.Quantum.Apex, Signatures = q.Signatures });
             }
+
             return results;
         }
 

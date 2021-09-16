@@ -43,7 +43,7 @@ namespace Centaurus.Domain
             PendingUpdatesManager = new UpdatesManager(this);
             PendingUpdatesManager.OnBatchSaved += PendingUpdatesManager_OnBatchSaved;
 
-            QuantumStorage = new QuantumStorage();
+            QuantumStorage = new QuantumStorage(this);
 
             MessageHandlers = new MessageHandlers(this);
 
@@ -60,7 +60,6 @@ namespace Centaurus.Domain
             InfoConnectionManager = new InfoConnectionManager(this);
 
             ResultManager = new ResultManager(this);
-
             Catchup = new Catchup(this);
 
             StateManager = new StateManager(this);
@@ -83,7 +82,10 @@ namespace Centaurus.Domain
                 EstablishOutgoingConnections();
             }
 
-            QuantumStorage.Init(lastSnapshot?.Apex ?? 0, lastSnapshot?.LastHash ?? new byte[] { });
+
+            var lastApex = lastSnapshot?.Apex ?? 0;
+            var lastHash = lastSnapshot?.LastHash ?? new byte[32];
+            QuantumStorage.Init(lastApex, lastHash);
             QuantumHandler.Start();
         }
 

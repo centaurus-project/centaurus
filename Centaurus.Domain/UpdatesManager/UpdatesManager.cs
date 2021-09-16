@@ -34,17 +34,15 @@ namespace Centaurus.Domain
 
         public void UpdateBatch(bool force = false)
         {
-            if (force || IsSaveRequired())
+            if (force || IsBatchUpdateRequired())
                 try
                 {
                     pendingUpdates.Complete(Context);
-                    lastUpdateTime = DateTime.UtcNow;
 
                     logger.Info($"Batch update. Id: {pendingUpdates.Id}, apex range: {pendingUpdates.FirstApex}-{pendingUpdates.LastApex}, quanta: {pendingUpdates.QuantaCount}, effects: {pendingUpdates.EffectsCount}");
 
                     pendingUpdates = new UpdatesContainer(unchecked(pendingUpdates.Id + 1));
                     RegisterUpdates(pendingUpdates);
-                    ApplyUpdatesAsync();
                 }
                 catch (Exception exc)
                 {
@@ -66,8 +64,10 @@ namespace Centaurus.Domain
         {
             lock (applyUpdatesSyncRoot)
             {
-                var updates = GetNextUpdates();
-                while (updates != null && updates.IsCompleted && (updates.AreSignaturesCollected || force))
+                while (awaitedUpdates.TryPeek(out var updates) //verify that there is updates in the queue
+                    && updates.IsCompleted //check if update is completed
+                    && (updates.AreSignaturesCollected || force) //check if it's ready to be saved
+                    && awaitedUpdates.TryDequeue(out _)) //remove it from the queue
                 {
                     try
                     {
@@ -86,11 +86,8 @@ namespace Centaurus.Domain
                             ElapsedMilliseconds = sw.ElapsedMilliseconds
                         };
                         Task.Factory.StartNew(() => OnBatchSaved?.Invoke(batchInfo));
-                        RemoveUpdates(updates.Id);
 
                         logger.Info($"Batch {updates.Id} saved in {sw.ElapsedMilliseconds}.");
-
-                        updates = GetNextUpdates();
                     }
                     catch (Exception exc)
                     {
@@ -104,7 +101,7 @@ namespace Centaurus.Domain
             }
         }
 
-        public uint AddQuantum(QuantaProcessingResult result)
+        public UpdatesContainer AddQuantum(QuantaProcessingResult result)
         {
             var qModel = new QuantumPersistentModel
             {
@@ -117,11 +114,6 @@ namespace Centaurus.Domain
                 RawQuantum = result.RawQuantum,
                 TimeStamp = result.Timestamp
             };
-
-            if (pendingUpdates.FirstApex == 0)
-                pendingUpdates.FirstApex = result.Apex;
-
-            pendingUpdates.LastApex = result.Apex;
 
             pendingUpdates.AddQuantum(qModel, result.Effects.Sum(e => e.Effects.Effects.Count));
             pendingUpdates.AddQuantumRefs(result.Effects
@@ -141,30 +133,16 @@ namespace Centaurus.Domain
             if (result.HasCursorUpdate)
                 pendingUpdates.HasCursorUpdate = true;
 
-            return pendingUpdates.Id;
+            return pendingUpdates;
         }
 
-        public void AddSignatures(uint updatesId, ulong apex, List<AuditorResult> signatures)
-        {
-            lock (awaitedUpdatesSyncRoot)
-            {
-                if (!awaitedUpdates.TryGetValue(updatesId, out var updates))
-                    throw new Exception($"Updates with id {updatesId} is not registered.");
-                updates.AddSignatures(apex, signatures);
-                if (updates.AreSignaturesCollected)
-                    ApplyUpdatesAsync();
-            }
-        }
-
-        private object awaitedUpdatesSyncRoot = new { };
-        private SortedDictionary<uint, UpdatesContainer> awaitedUpdates = new SortedDictionary<uint, UpdatesContainer>();
+        private ConcurrentQueue<UpdatesContainer> awaitedUpdates = new ConcurrentQueue<UpdatesContainer>();
 
         private UpdatesContainer pendingUpdates;
 
         private const int MaxQuantaCount = 50_000;
         private const int MaxSaveInterval = 5;
 
-        private DateTime lastUpdateTime;
         private object applyUpdatesSyncRoot = new { };
         private Timer saveTimer = new Timer();
         private XdrBufferFactory.RentedBuffer buffer = XdrBufferFactory.Rent(256 * 1024);
@@ -172,30 +150,14 @@ namespace Centaurus.Domain
 
         private void RegisterUpdates(UpdatesContainer updatesContainer)
         {
-            lock (awaitedUpdatesSyncRoot)
-            {
-                awaitedUpdates.Add(updatesContainer.Id, updatesContainer);
-                QuantaThrottlingManager.Current.SetBatchQueueLength(awaitedUpdates.Count);
-            }
+            awaitedUpdates.Enqueue(updatesContainer);
+            QuantaThrottlingManager.Current.SetBatchQueueLength(awaitedUpdates.Count);
         }
 
-        private void RemoveUpdates(uint id)
-        {
-            lock (awaitedUpdatesSyncRoot)
-                if (!awaitedUpdates.Remove(id))
-                    throw new Exception("Unable to remove updates from pending collection.");
-        }
-
-        private UpdatesContainer GetNextUpdates()
-        {
-            lock (awaitedUpdatesSyncRoot)
-                return awaitedUpdates.FirstOrDefault().Value;
-        }
-
-        private bool IsSaveRequired()
+        private bool IsBatchUpdateRequired()
         {
             return pendingUpdates.QuantaCount > 0
-                && (pendingUpdates.QuantaCount >= MaxQuantaCount || DateTime.UtcNow - lastUpdateTime > TimeSpan.FromSeconds(MaxSaveInterval));
+                && (pendingUpdates.QuantaCount >= MaxQuantaCount || DateTime.UtcNow - pendingUpdates.InitDate > TimeSpan.FromSeconds(MaxSaveInterval));
         }
 
         private void InitTimer()
@@ -221,6 +183,7 @@ namespace Centaurus.Domain
                     {
                         SyncRoot.Release();
                     }
+                    ApplyUpdatesAsync();
                 }
             }
             catch (Exception exc)

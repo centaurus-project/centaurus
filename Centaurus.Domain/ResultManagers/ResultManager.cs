@@ -18,27 +18,46 @@ namespace Centaurus.Domain
         {
             InitTimers();
             Task.Factory.StartNew(ProcessResults, TaskCreationOptions.LongRunning);
+            Task.Factory.StartNew(ProcessAuditorResults, TaskCreationOptions.LongRunning);
         }
 
         private void ProcessResults()
         {
-            foreach (var resultItem in results.GetConsumingEnumerable())
+            var options = new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount * 5 };
+            var partitioner = Partitioner.Create(results.GetConsumingEnumerable(), EnumerablePartitionerOptions.NoBuffering);
+            Parallel.ForEach(partitioner, options, result =>
             {
                 try
                 {
-                    if (resultItem is QuantaProcessingResult result)
-                        AddInternal(result);
-                    else
-                        AddInternal((AuditorResult)resultItem);
+                    AddInternal(result);
                 }
                 catch (Exception exc)
                 {
                     logger.Error(exc, "Error on processing result");
                 }
-            }
+            });
         }
 
-        private BlockingCollection<object> results = new BlockingCollection<object>();
+        private void ProcessAuditorResults()
+        {
+
+            var options = new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount * 5 };
+            var partitioner = Partitioner.Create(auditorResults.GetConsumingEnumerable(), EnumerablePartitionerOptions.NoBuffering);
+            Parallel.ForEach(partitioner, options, result =>
+            {
+                try
+                {
+                    AddInternal(result);
+                }
+                catch (Exception exc)
+                {
+                    logger.Error(exc, "Error on processing auditor result");
+                }
+            });
+        }
+
+
+        private BlockingCollection<QuantaProcessingResult> results = new BlockingCollection<QuantaProcessingResult>();
         public void Add(QuantaProcessingResult processingResult)
         {
             results.Add(processingResult);
@@ -46,40 +65,34 @@ namespace Centaurus.Domain
 
         private void AddInternal(QuantaProcessingResult processingResult)
         {
-            var aggregate = default(Aggregate);
-            lock (pendingAggregatesSyncRoot)
-                if (!pendingAggregates.TryGetValue(processingResult.Apex, out aggregate))
-                {
-                    aggregate = new Aggregate(processingResult.Apex, this);
-                    pendingAggregates.Add(processingResult.Apex, aggregate);
-                }
-            aggregate.Add(processingResult);
+            GetAggregate(processingResult.Apex).Add(processingResult);
         }
 
+        private BlockingCollection<AuditorResult> auditorResults = new BlockingCollection<AuditorResult>();
         public void Add(AuditorResult resultMessage)
         {
-            results.Add(resultMessage);
+            auditorResults.Add(resultMessage);
         }
 
-        private void AddInternal(AuditorResult resultMessage)
+        public void AddInternal(AuditorResult resultMessage)
         {
-            var aggregate = default(Aggregate);
-            lock (pendingAggregatesSyncRoot)
-            {
-                //result message could be received before quantum was processed
-                if (!pendingAggregates.TryGetValue(resultMessage.Apex, out aggregate))
-                {
-                    //auditor can send delayed results
-                    if (resultMessage.Apex <= Context.PendingUpdatesManager.LastSavedApex)
-                        return;
-
-                    aggregate = new Aggregate(resultMessage.Apex, this);
-                    pendingAggregates.Add(resultMessage.Apex, aggregate);
-                }
-            }
-
+            //auditor can send delayed results
+            if (resultMessage.Apex <= Context.PendingUpdatesManager.LastSavedApex)
+                return;
             //add the signature to the aggregate
-            aggregate.Add(resultMessage);
+            GetAggregate(resultMessage.Apex).Add(resultMessage);
+        }
+
+        private Aggregate GetAggregate(ulong apex)
+        {
+            if (!pendingAggregates.TryGetValue(apex, out var aggregate))
+                lock (pendingAggregatesSyncRoot)
+                    if (!pendingAggregates.TryGetValue(apex, out aggregate))
+                    {
+                        aggregate = new Aggregate(apex, this);
+                        pendingAggregates.Add(apex, aggregate);
+                    }
+            return aggregate;
         }
 
         /// <summary>
@@ -89,23 +102,15 @@ namespace Centaurus.Domain
         public void Remove(ulong id)
         {
             lock (pendingAggregatesSyncRoot)
-            {
                 if (!pendingAggregates.Remove(id, out _))
                 {
-                    Console.WriteLine($"Unable to remove item by id '{id}'");
-                    logger.Trace($"Unable to remove item by id '{id}'");
+                    logger.Info($"Unable to remove item by id '{id}'");
                 }
-            }
         }
 
         public QuantumResultMessageBase GetResult(ulong id)
         {
-            lock (pendingAggregatesSyncRoot)
-            {
-                if (pendingAggregates.TryGetValue(id, out var aggregate))
-                    return aggregate.Item.Result.ResultMessage;
-                return null;
-            }
+            return GetAggregate(id)?.Item?.Result.ResultMessage;
         }
 
         public virtual void Dispose()
@@ -122,7 +127,7 @@ namespace Centaurus.Domain
         private void InitTimers()
         {
             cleanupTimer = new System.Timers.Timer();
-            cleanupTimer.Interval = 30 * 1000;
+            cleanupTimer.Interval = 5 * 1000;
             cleanupTimer.AutoReset = false;
             cleanupTimer.Elapsed += (s, e) => Cleanup();
             cleanupTimer.Start();
@@ -136,49 +141,41 @@ namespace Centaurus.Domain
 
         private void SendAcknowledgment()
         {
-            var acknowledgmentTimeout = TimeSpan.FromMilliseconds(100);
-            var resultsToSend = default(List<Aggregate>);
-            lock (pendingAggregatesSyncRoot)
-            {
-                resultsToSend = pendingAggregates.Values
-                    .Where(a => a.Item.IsResultAssigned && !a.IsAcknowledgmentSent && DateTime.UtcNow - a.CreatedAt > acknowledgmentTimeout)
-                    .ToList();
-            }
-            foreach (var resultItem in resultsToSend)
-                resultItem.SendResult(true);
-            acknowledgmentTimer.Start();
+            //var acknowledgmentTimeout = TimeSpan.FromMilliseconds(100);
+            //var resultsToSend = default(List<Aggregate>);
+            //lock (pendingAggregatesSyncRoot)
+            //{
+            //    resultsToSend = pendingAggregates.Values
+            //        .Where(a => a.Item.IsResultAssigned && !a.IsAcknowledgmentSent && DateTime.UtcNow - a.CreatedAt > acknowledgmentTimeout)
+            //        .ToList();
+            //}
+            //foreach (var resultItem in resultsToSend)
+            //    resultItem.SendResult(true);
+            //acknowledgmentTimer.Start();
         }
 
-        private TimeSpan aggregateLifeTime = new TimeSpan(0, 1, 0);
-
+        private ulong advanceThreshold = 50_000;
         private void Cleanup()
         {
             try
             {
-                var now = DateTime.UtcNow;
-                var itemsToRemove = new List<ulong>();
-                lock (pendingAggregatesSyncRoot)
+                if (Context.PendingUpdatesManager.LastSavedApex > advanceThreshold)
                 {
-                    if (pendingAggregates.Count < 1_000_000)
-                        return;
-                    foreach (var aggregate in pendingAggregates)
+                    var apexRemoveLimit = Context.PendingUpdatesManager.LastSavedApex - advanceThreshold;
+                    var apexToRemove = 0ul;
+                    lock (pendingAggregatesSyncRoot)
+                        apexToRemove = pendingAggregates.FirstOrDefault().Key;
+                    while (apexToRemove != 0 && apexToRemove < apexRemoveLimit)
                     {
-                        if (now - aggregate.Value.CreatedAt > aggregateLifeTime || aggregate.Key < Context.PendingUpdatesManager.LastSavedApex)
-                        {
-                            itemsToRemove.Add(aggregate.Key);
-                        }
-                        else
-                            break;
+                        Remove(apexToRemove);
+                        apexToRemove++;
                     }
                 }
-
-                foreach (var itemKey in itemsToRemove)
-                    Remove(itemKey);
                 cleanupTimer?.Start();
             }
             catch (Exception exc)
             {
-                Console.WriteLine(exc);
+                logger.Error(exc, "Error on results cleanup.");
             }
         }
 
@@ -189,38 +186,6 @@ namespace Centaurus.Domain
 
         private object pendingAggregatesSyncRoot = new { };
         private SortedDictionary<ulong, Aggregate> pendingAggregates = new SortedDictionary<ulong, Aggregate>();
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="from">From cursor (exclusive)</param>
-        /// <param name="limit">Max items to load</param>
-        /// <returns></returns>
-        public bool TryGetResults(ulong from, int limit, out List<QuantumSignatures> auditorResults)
-        {
-            auditorResults = null;
-            lock (pendingAggregatesSyncRoot)
-            {
-                var firstApex = pendingAggregates.FirstOrDefault().Key;
-                if (firstApex == 0 || firstApex > (from + 1))
-                    return false;
-                var skip = (int)(from - firstApex) + 1;
-                if (skip >= pendingAggregates.Count)
-                    return false;
-                auditorResults = pendingAggregates
-                    .Skip(skip)
-                    .Take(limit)
-                    .Select(a =>
-                    {
-                        return new QuantumSignatures
-                        {
-                            Apex = a.Key,
-                            Signatures = a.Value.GetResults().Select(s => s.Signature).ToList()
-                        };
-                    }).ToList();
-            }
-            return true;
-        }
 
         class Aggregate
         {
@@ -277,12 +242,7 @@ namespace Centaurus.Domain
                         processedAuditors.Add(resultMessage.Signature.AuditorId);
                         //skip if processed or current auditor already sent the result
                         if (IsProcessed)
-                        {
-                            //all signatures received
-                            if (processedAuditors.Count == Manager.Context.AuditorIds.Count)
-                                Manager.Remove(Item.Apex);
                             return;
-                        }
                         resultMessages.Add(resultMessage);
                     }
 
@@ -419,7 +379,8 @@ namespace Centaurus.Domain
 
             private void PersistSignatures()
             {
-                Manager.Context.PendingUpdatesManager.AddSignatures(Item.Result.UpdatesBatchId, Item.Apex, resultMessages);
+                Manager.Context.QuantumStorage.AddSignatures(Item.Apex, resultMessages.Select(r => r.Signature).ToList());
+                Item.Result.UpdatesBatch.AddSignatures(Item.Apex, resultMessages);
             }
 
             private MajorityResults CheckMajority()

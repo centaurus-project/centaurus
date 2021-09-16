@@ -59,6 +59,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Centaurus.Stellar.PaymentPr
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Centaurus.NetSDK", "Centaurus.NetSDK\Centaurus.NetSDK.csproj", "{43EC18BD-1702-44EB-8CAF-89D51AAC31DD}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Centaurus.Stellar.PaymentProvider.Tests", "Centaurus.Stellar.PaymentProvider.Tests\Centaurus.Stellar.PaymentProvider.Tests.csproj", "{E8E42417-F65D-4EBC-BF1F-53FBA381F6DB}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -165,6 +167,10 @@ Global
 		{43EC18BD-1702-44EB-8CAF-89D51AAC31DD}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{43EC18BD-1702-44EB-8CAF-89D51AAC31DD}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{43EC18BD-1702-44EB-8CAF-89D51AAC31DD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E8E42417-F65D-4EBC-BF1F-53FBA381F6DB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E8E42417-F65D-4EBC-BF1F-53FBA381F6DB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E8E42417-F65D-4EBC-BF1F-53FBA381F6DB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E8E42417-F65D-4EBC-BF1F-53FBA381F6DB}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -183,6 +189,7 @@ Global
 		{C42A314B-A5CB-4ABC-A752-1836D1345E9C} = {E7AE6334-8F96-4FD7-B7CE-DEE954AA4445}
 		{6D29C374-2922-4E95-B81E-A4E194DEB9FB} = {E3C81D24-CEF0-432E-908B-E1E4ABCDAB20}
 		{43EC18BD-1702-44EB-8CAF-89D51AAC31DD} = {E5CBE171-375A-4F49-B337-D5528A1D9672}
+		{E8E42417-F65D-4EBC-BF1F-53FBA381F6DB} = {E3C81D24-CEF0-432E-908B-E1E4ABCDAB20}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {39DB9995-0257-4C02-B0C5-886C29AD5F7B}
