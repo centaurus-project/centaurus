@@ -13,15 +13,16 @@ namespace Centaurus.Domain
 {
     public class QuantumStorage : ContextualBase
     {
-        private MemoryCache quantaCache = new MemoryCache(new MemoryCacheOptions { ExpirationScanFrequency = TimeSpan.FromSeconds(15), SizeLimit = 2_000_000 });
+        private MemoryCache quantaCache = new MemoryCache(new MemoryCacheOptions { ExpirationScanFrequency = TimeSpan.FromSeconds(5) });
 
         static Logger logger = LogManager.GetCurrentClassLogger();
         public QuantumStorage(ExecutionContext context)
             : base(context)
         {
+            context.PendingUpdatesManager.OnBatchSaved += PendingUpdatesManager_OnBatchSaved;
         }
 
-        const int batchSize = 500_000;
+        const int batchSize = 1_000_000;
 
 
         public ulong CurrentApex { get; private set; }
@@ -70,6 +71,30 @@ namespace Centaurus.Domain
             batch[currentQuantumIndex].Signatures = auditorSignatures;
         }
 
+        private void QuantaRangePersisted(ulong from, ulong to)
+        {
+            var fromBatchId = GetBatchApexStart(from);
+            var toBatchId = GetBatchApexStart(to + 1);
+            if (fromBatchId == toBatchId) //if the same batch start, than there is some quanta to persist
+                return;
+
+            var batch = default(List<PendingQuantum>);
+            if (!quantaCache.TryGetValue(fromBatchId, out batch) || batch.Count != batchSize)
+                logger.Error("Batch is not found or not full yet");
+
+            lock (quantaCache)
+            {
+                //remove old entry to update options
+                quantaCache.Remove(fromBatchId);
+
+                var options = new MemoryCacheEntryOptions();
+                options.SetSlidingExpiration(TimeSpan.FromSeconds(15));
+                options.RegisterPostEvictionCallback(OnPostEviction);
+
+                quantaCache.Set(fromBatchId, batch, options);
+            }
+        }
+
         private List<PendingQuantum> GetBatch(ulong batchId)
         {
             var batch = default(List<PendingQuantum>);
@@ -78,12 +103,18 @@ namespace Centaurus.Domain
                 {
                     if (!quantaCache.TryGetValue(batchId, out batch))
                     {
+                        var options = new MemoryCacheEntryOptions();
                         batch = LoadQuantaFromDB(batchId);
                         if (batchId == 0) //insert null at 0 position, otherwise index will not be relevant to apex
                             batch.Insert(0, null);
-                        if (batch.Count != batchSize) //set capacity for pending batch
-                            batch.Capacity = batchSize;
-                        quantaCache.Set(batchId, batch, new MemoryCacheEntryOptions { Size = batchSize });
+                        batch.Capacity = batchSize;
+                        if (batch.Count != batchSize)
+                            options.Priority = CacheItemPriority.NeverRemove;
+                        else
+                            options.SetSlidingExpiration(TimeSpan.FromSeconds(15));
+                        options.RegisterPostEvictionCallback(OnPostEviction);
+
+                        quantaCache.Set(batchId, batch, options);
                     }
                 }
             return batch;
@@ -104,6 +135,16 @@ namespace Centaurus.Domain
                 .Take(batchSize);
             logger.Info($"Batch with apex start {batchStartApex} is loaded.");
             return query.Select(q => q.ToPendingQuantum()).ToList();
+        }
+
+        private void OnPostEviction(object key, object value, EvictionReason reason, object state)
+        {
+            logger.Info($"Batch {key} with {((List<PendingQuantum>)value).Count} is removed because of {reason}. State: {state}.");
+        }
+
+        private void PendingUpdatesManager_OnBatchSaved(BatchSavedInfo batchSavedInfo)
+        {
+            QuantaRangePersisted(batchSavedInfo.FromApex, batchSavedInfo.ToApex);
         }
     }
 }

@@ -13,7 +13,6 @@ namespace Centaurus.Stellar.PaymentProvider.Tests
         [Test]
         public void InitTest()
         {
-            Debugger.Launch();
             var provider = new StellarPaymentProvider(new SettingsModel
             {
                 Cursor = "6180462233923584",

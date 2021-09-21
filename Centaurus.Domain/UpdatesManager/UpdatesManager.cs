@@ -83,8 +83,11 @@ namespace Centaurus.Domain
                             SavedAt = DateTime.UtcNow,
                             QuantaCount = pendingUpdates.QuantaCount,
                             EffectsCount = pendingUpdates.EffectsCount,
-                            ElapsedMilliseconds = sw.ElapsedMilliseconds
+                            ElapsedMilliseconds = sw.ElapsedMilliseconds,
+                            FromApex = updates.FirstApex,
+                            ToApex = updates.LastApex
                         };
+
                         Task.Factory.StartNew(() => OnBatchSaved?.Invoke(batchInfo));
 
                         logger.Info($"Batch {updates.Id} saved in {sw.ElapsedMilliseconds}.");
