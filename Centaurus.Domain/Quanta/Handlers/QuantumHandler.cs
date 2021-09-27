@@ -47,7 +47,7 @@ namespace Centaurus.Domain
         /// Handles the quantum and returns Task.
         /// </summary>
         /// <param name="quantum">Quantum to handle</param>s
-        public Task HandleAsync(Quantum quantum, Task<bool> signatureValidation)
+        public Task<QuantumResultMessageBase> HandleAsync(Quantum quantum, Task<bool> signatureValidation)
         {
             if (Context.IsAlpha //if current node is not alpha, than we need to keep process quanta
                 && QuantaThrottlingManager.Current.IsThrottlingEnabled

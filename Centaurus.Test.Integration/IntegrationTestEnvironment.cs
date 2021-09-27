@@ -80,7 +80,7 @@ namespace Centaurus.Test
                             TransactionHash = new byte[] { }
                         }).ToList()
                     };
-                    provider.Deposit(depositNotification);
+                    provider.AddDeposit(depositNotification);
                 }
             }
             Clients.AddRange(clients);

@@ -28,6 +28,10 @@ namespace Centaurus.PersistentStorage.Abstraction
 
         IEnumerable<PriceHistoryFramePersistentModel> GetPriceHistory(string market, int period, int from, int to);
 
+        PendingQuantaPersistentModel LoadPendingQuanta();
+
+        void DeletePendingQuanta();
+
         void SaveBatch(List<IPersistentModel> batch);
     }
 }

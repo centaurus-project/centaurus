@@ -35,6 +35,7 @@ namespace Centaurus.Domain
             );
             context.CentaurusContext.Setup(updateSnapshot);
 
+            //if state is undefined, than we need to init it
             if (context.CentaurusContext.StateManager.State == State.Undefined)
                 context.CentaurusContext.StateManager.Init(State.Running);
 

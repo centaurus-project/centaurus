@@ -94,8 +94,8 @@ namespace Centaurus.Domain
             //assign apex to the result
             ProcessingResult.ResultMessage.Apex = Apex;
 
-            //add quantum data to updates batch
-            ProcessingResult.UpdatesBatch = Context.PendingUpdatesManager.AddQuantum(ProcessingResult);
+            //add quantum data to updates batch and assign persistent model
+            ProcessingResult.PersistentModel = Context.PendingUpdatesManager.AddQuantum(ProcessingResult);
         }
 
         List<RawEffectsDataContainer> GetRawEffectsDataContainer()

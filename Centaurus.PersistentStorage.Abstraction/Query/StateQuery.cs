@@ -28,5 +28,10 @@ namespace Centaurus.PersistentStorage
         {
             return storage.First<CursorsPersistentModel>();
         }
+
+        public PendingQuantaPersistentModel LoadPendingQuanta()
+        {
+            return storage.First<PendingQuantaPersistentModel>();
+        }
     }
 }

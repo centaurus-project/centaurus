@@ -24,7 +24,7 @@ namespace Centaurus.Domain
 
             LastSavedApex = Context.DataProvider.GetLastApex();
 
-            pendingUpdates = new UpdatesContainer();
+            pendingUpdates = new UpdatesContainer(context);
             RegisterUpdates(pendingUpdates);
         }
 
@@ -41,7 +41,7 @@ namespace Centaurus.Domain
 
                     logger.Info($"Batch update. Id: {pendingUpdates.Id}, apex range: {pendingUpdates.FirstApex}-{pendingUpdates.LastApex}, quanta: {pendingUpdates.QuantaCount}, effects: {pendingUpdates.EffectsCount}");
 
-                    pendingUpdates = new UpdatesContainer(unchecked(pendingUpdates.Id + 1));
+                    pendingUpdates = new UpdatesContainer(Context, unchecked(pendingUpdates.Id + 1));
                     RegisterUpdates(pendingUpdates);
                 }
                 catch (Exception exc)
@@ -53,27 +53,27 @@ namespace Centaurus.Domain
                 }
         }
 
-        public Task ApplyUpdatesAsync(bool force = false)
+        public Task ApplyUpdatesAsync()
         {
-            return Task.Factory.StartNew(() => ApplyUpdates(force));
+            return Task.Factory.StartNew(() => ApplyUpdates());
         }
 
         //last saved quantum apex
         public ulong LastSavedApex { get; private set; }
-        public void ApplyUpdates(bool force = false)
+        public void ApplyUpdates()
         {
             lock (applyUpdatesSyncRoot)
             {
                 while (awaitedUpdates.TryPeek(out var updates) //verify that there is updates in the queue
                     && updates.IsCompleted //check if update is completed
-                    && (updates.AreSignaturesCollected || force) //check if it's ready to be saved
+                    && (updates.AreSignaturesCollected) //check if it's ready to be saved
                     && awaitedUpdates.TryDequeue(out _)) //remove it from the queue
                 {
                     try
                     {
                         var sw = new Stopwatch();
                         sw.Start();
-                        Context.DataProvider.SaveBatch(updates.GetUpdates(force));
+                        Context.DataProvider.SaveBatch(updates.GetUpdates());
                         sw.Stop();
 
                         LastSavedApex = updates.LastApex;
@@ -104,7 +104,37 @@ namespace Centaurus.Domain
             }
         }
 
-        public UpdatesContainer AddQuantum(QuantaProcessingResult result)
+        public void PersistPendingQuanta()
+        {
+            lock (applyUpdatesSyncRoot)
+            {
+                //if node stopped during rising than we don't need to persist pending quanta, it's already in db
+                if (Context.StateManager.State == State.Rising)
+                    return;
+                var pendingQuanta = new List<PendingQuantumPersistentModel>();
+                var hasMoreQuanta = true;
+                while (hasMoreQuanta && awaitedUpdates.TryDequeue(out var updates))
+                {
+                    try
+                    {
+                        hasMoreQuanta = updates.GetPendingQuanta(out var currentPendingQuanta);
+                        if (currentPendingQuanta.Count > 0)
+                            pendingQuanta.AddRange(currentPendingQuanta.Select(q => new PendingQuantumPersistentModel { 
+                                RawQuantum = q.RawQuantum,
+                                Signatures = q.Signatures
+                            }));
+                    }
+                    catch (Exception exc)
+                    {
+                        logger.Error(exc, "Error on obtaining pending quanta.");
+                    }
+                }
+                var pendingQuantaModel = new PendingQuantaPersistentModel { Quanta = pendingQuanta };
+                Context.DataProvider.SaveBatch(new List<IPersistentModel> { pendingQuantaModel });
+            }
+        }
+
+        public QuantumPersistentModel AddQuantum(QuantaProcessingResult result)
         {
             var qModel = new QuantumPersistentModel
             {
@@ -136,7 +166,7 @@ namespace Centaurus.Domain
             if (result.HasCursorUpdate)
                 pendingUpdates.HasCursorUpdate = true;
 
-            return pendingUpdates;
+            return qModel;
         }
 
         private ConcurrentQueue<UpdatesContainer> awaitedUpdates = new ConcurrentQueue<UpdatesContainer>();

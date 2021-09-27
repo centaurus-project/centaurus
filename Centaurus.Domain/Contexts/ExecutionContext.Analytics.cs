@@ -64,7 +64,7 @@ namespace Centaurus.Domain
             {
                 try
                 {
-                    AnalyticsManager.SaveUpdates(PermanentStorage);
+                    AnalyticsManager.SaveUpdates(PersistentStorage);
                 }
                 catch
                 {

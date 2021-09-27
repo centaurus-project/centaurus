@@ -67,10 +67,10 @@ namespace Centaurus.Test
         /// <summary>
         /// Setups Global with predefined settings
         /// </summary>
-        public static async Task<ExecutionContext> DefaultAlphaSetup()
+        public static async Task<ExecutionContext> DefaultAlphaSetup(IPersistentStorage storage = null, Settings settings = null)
         {
-            var settings = GetAlphaSettings();
-            var storage = GetStorage(settings.ConnectionString);
+            settings = settings ?? GetAlphaSettings();
+            storage = storage ?? GetStorage(settings.ConnectionString);
             return await Setup(GetPredefinedClients(), GetPredefinedAuditors(), settings, storage);
         }
 
@@ -139,11 +139,10 @@ namespace Centaurus.Test
                 });
             };
 
-            for (int i = 0; i < clients.Count; i++)
+            foreach (var client in clients)
             {
-                var acc = context.AccountStorage.CreateAccount(clients[i].PublicKey, context.Constellation.RequestRateLimits);
                 for (var c = 0; c < assets.Count; c++)
-                    addAssetsFn(acc.Pubkey, assets[c].Code);
+                    addAssetsFn(client.PublicKey, assets[c].Code);
             }
 
             var providerId = PaymentProviderBase.GetProviderId(stellarProviderSettings.Provider, stellarProviderSettings.Name);
@@ -155,8 +154,8 @@ namespace Centaurus.Test
                 ProviderId = providerId
             };
 
-            context.PaymentProvidersManager.TryGetManager(providerId, out var paymentProvider);
-            paymentProvider.NotificationsManager.RegisterNotification(txNotification);
+            var paymentProvider = (MockPaymentProvider)context.PaymentProvidersManager.GetManager(providerId);
+            paymentProvider.AddDeposit(txNotification);
 
             var depositQuantum = new DepositQuantum
             {
@@ -169,6 +168,7 @@ namespace Centaurus.Test
 
             //save all effects
             context.PendingUpdatesManager.UpdateBatch(true);
+            context.PendingUpdatesManager.ApplyUpdates();
             return context;
         }
 

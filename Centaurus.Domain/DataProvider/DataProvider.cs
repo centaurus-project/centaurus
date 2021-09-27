@@ -34,7 +34,7 @@ namespace Centaurus.Domain
 
             ulong.TryParse(cursor, out var apex);
             var order = isDesc ? QueryOrder.Desc : QueryOrder.Asc;
-            var accountQuanta = Context.PermanentStorage.LoadQuantaForAccount(account, apex, limit, order);
+            var accountQuanta = Context.PersistentStorage.LoadQuantaForAccount(account, apex, limit, order);
             var accountQuantumInfos = new List<QuantumInfo>();
 
             foreach (var accountQuantum in accountQuanta)
@@ -92,7 +92,7 @@ namespace Centaurus.Domain
         /// <returns></returns>
         public List<PendingQuantum> GetQuantaAboveApex(ulong apex, int count = 0)
         {
-            var quantaModels = Context.PermanentStorage.LoadQuantaAboveApex(apex);
+            var quantaModels = Context.PersistentStorage.LoadQuantaAboveApex(apex);
             var query = (IEnumerable<QuantumPersistentModel>)quantaModels.OrderBy(q => q.Apex);
             if (count > 0)
                 query = query.Take(count);
@@ -105,15 +105,17 @@ namespace Centaurus.Domain
         /// <returns></returns>
         public ulong GetLastApex()
         {
-            return Context.PermanentStorage.GetLastApex();
+            return Context.PersistentStorage.GetLastApex();
         }
 
-        public Snapshot GetLastSnapshot()
+        public (Snapshot snapshot, List<PendingQuantum> pendingQuanta) GetPersistentData()
         {
+            (Snapshot snapshot, List<PendingQuantum> pendingQuanta) data = default;
             var lastApex = GetLastApex();
-            if (lastApex < 1)
-                return null;
-            return GetSnapshot(lastApex);
+            if (lastApex > 0)
+                data.snapshot = GetSnapshot(lastApex);
+            data.pendingQuanta = LoadPendingQuanta();
+            return data;
         }
 
         /// <summary>
@@ -136,7 +138,7 @@ namespace Centaurus.Domain
             if (settings == null)
                 return null;
 
-            var cursors = Context.PermanentStorage.LoadCursors()?.Cursors ?? new Dictionary<string, string>();
+            var cursors = Context.PersistentStorage.LoadCursors()?.Cursors ?? new Dictionary<string, string>();
 
             var accounts = GetAccounts(settings.QuoteAsset.Code, settings.RequestRateLimits);
 
@@ -148,7 +150,7 @@ namespace Centaurus.Domain
 
             var exchange = GetRestoredExchange(orders, settings);
 
-            var quanta = Context.PermanentStorage.LoadQuantaAboveApex(apex);
+            var quanta = Context.PersistentStorage.LoadQuantaAboveApex(apex);
 
             var effects = quanta
                 .SelectMany(q =>
@@ -232,7 +234,7 @@ namespace Centaurus.Domain
                 processor.RevertEffect();
             }
 
-            var lastQuantumData = (Quantum)XdrConverter.Deserialize<Message>(Context.PermanentStorage.LoadQuantum(apex).RawQuantum);
+            var lastQuantumData = (Quantum)XdrConverter.Deserialize<Message>(Context.PersistentStorage.LoadQuantum(apex).RawQuantum);
 
             //TODO: refactor restore exchange
             //we need to clean all order links to be able to restore exchange
@@ -257,7 +259,15 @@ namespace Centaurus.Domain
         public void SaveBatch(List<IPersistentModel> updates)
         {
             lock (syncRoot)
-                Context.PermanentStorage.SaveBatch(updates);
+                Context.PersistentStorage.SaveBatch(updates);
+        }
+
+        public List<PendingQuantum> LoadPendingQuanta()
+        {
+            var pendingQuantaModel = Context.PersistentStorage.LoadPendingQuanta();
+            if (pendingQuantaModel == null)
+                return null;
+            return pendingQuantaModel.Quanta.Select(q => q.ToDomainModel()).ToList();
         }
 
         /// <summary>
@@ -267,7 +277,7 @@ namespace Centaurus.Domain
         /// <returns></returns>
         private ConstellationSettings GetConstellationSettings()
         {
-            var settingsModel = Context.PermanentStorage.LoadSettings(ulong.MaxValue);
+            var settingsModel = Context.PersistentStorage.LoadSettings(ulong.MaxValue);
             if (settingsModel == null)
                 return null;
 
@@ -281,7 +291,7 @@ namespace Centaurus.Domain
         private ulong GetMinRevertApex()
         {
             //obtain min apex we can revert to
-            var minApex = Context.PermanentStorage.LoadQuanta().FirstOrDefault()?.Apex ?? 0;
+            var minApex = Context.PersistentStorage.LoadQuanta().FirstOrDefault()?.Apex ?? 0;
             if (minApex == 0) //we can't revert at all
                 return 0;
 
@@ -295,7 +305,7 @@ namespace Centaurus.Domain
 
         private List<Account> GetAccounts(string baseAsset, RequestRateLimits requestRateLimits)
         {
-            return Context.PermanentStorage.LoadAccounts()
+            return Context.PersistentStorage.LoadAccounts()
                 .Select(a => a.ToDomainModel(baseAsset, requestRateLimits))
                 .ToList();
         }

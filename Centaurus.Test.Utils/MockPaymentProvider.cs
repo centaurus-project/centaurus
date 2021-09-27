@@ -3,6 +3,7 @@ using Centaurus.PaymentProvider;
 using Centaurus.PaymentProvider.Models;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 
 namespace Centaurus.Test
@@ -12,6 +13,7 @@ namespace Centaurus.Test
         public MockPaymentProvider(SettingsModel settings, string config) 
             : base(settings, config)
         {
+            ReloadDeposits(this);
         }
 
         public override byte[] BuildTransaction(WithdrawalRequestModel withdrawalRequest)
@@ -45,7 +47,15 @@ namespace Centaurus.Test
             return true;
         }
 
-        public void Deposit(DepositNotificationModel depositNotificationModel)
+        private static List<DepositNotificationModel> allDeposits = new List<DepositNotificationModel>();
+
+        public void AddDeposit(DepositNotificationModel depositNotificationModel)
+        {
+            allDeposits.Add(depositNotificationModel);
+            RegisterDeposit(depositNotificationModel);
+        }
+
+        private void RegisterDeposit(DepositNotificationModel depositNotificationModel)
         {
             NotificationsManager.RegisterNotification(depositNotificationModel);
             try
@@ -55,6 +65,12 @@ namespace Centaurus.Test
             }
             catch (OperationCanceledException)
             { }
+        }
+
+        private static void ReloadDeposits(MockPaymentProvider provider)
+        {
+            foreach (var deposit in allDeposits.Where(d => provider.CompareCursors(d.Cursor, provider.Cursor) > 0))
+                provider.RegisterDeposit(deposit);
         }
 
         public override bool AreSignaturesValid(byte[] transaction, params SignatureModel[] signature)

@@ -3,6 +3,7 @@ using Centaurus.Domain.Models;
 using Centaurus.Exchange.Analytics;
 using Centaurus.Models;
 using Centaurus.PaymentProvider;
+using Centaurus.PersistentStorage;
 using Centaurus.PersistentStorage.Abstraction;
 using NLog;
 using System;
@@ -20,15 +21,15 @@ namespace Centaurus.Domain
         static Logger logger = LogManager.GetCurrentClassLogger();
 
         /// <param name="settings">Application config</param>
-        /// <param name="storage">Permanent storage object</param>
+        /// <param name="storage">Persistent storage object</param>
         /// <param name="useLegacyOrderbook"></param>
         public ExecutionContext(Settings settings, IPersistentStorage storage, PaymentProvidersFactoryBase paymentProviderFactory, OutgoingConnectionFactoryBase connectionFactory, bool useLegacyOrderbook = false)
         {
 
             Settings = settings ?? throw new ArgumentNullException(nameof(settings));
 
-            PermanentStorage = storage ?? throw new ArgumentNullException(nameof(storage));
-            PermanentStorage.Connect(GetAbsolutePath(Settings.ConnectionString));
+            PersistentStorage = storage ?? throw new ArgumentNullException(nameof(storage));
+            PersistentStorage.Connect(GetAbsolutePath(Settings.ConnectionString));
 
             PaymentProviderFactory = paymentProviderFactory ?? throw new ArgumentNullException(nameof(paymentProviderFactory));
 
@@ -69,24 +70,61 @@ namespace Centaurus.Domain
 
             DynamicSerializersInitializer.Init();
 
-            var lastSnapshot = DataProvider.GetLastSnapshot();
-            if (lastSnapshot != null)
+            var persistentData = DataProvider.GetPersistentData();
+
+            var lastApex = persistentData.snapshot?.Apex ?? 0;
+            var lastHash = persistentData.snapshot?.LastHash ?? new byte[32];
+            QuantumStorage.Init(lastApex, lastHash);
+            QuantumHandler.Start();
+
+            //apply data, if presented in db
+            if (persistentData != default)
             {
-                Setup(lastSnapshot);
-                var state = IsAlpha ? State.Rising : State.Running;
-                StateManager.Init(state);
+                StateManager.Init(State.Rising);
+                //apply snapshot if not null
+                if (persistentData.snapshot != null)
+                    Setup(persistentData.snapshot);
+
+                if (persistentData.pendingQuanta != null)
+                    HandlePendingQuanta(persistentData.pendingQuanta);
+
+                if (!IsAlpha)
+                    StateManager.Rised();
             }
-            else if (lastSnapshot == null)
+
+            if (Constellation == null)
             {
                 //establish connection with genesis auditors
                 EstablishOutgoingConnections();
             }
+        }
 
+        private void HandlePendingQuanta(List<PendingQuantum> pendingQuanta)
+        {
+            foreach (var quantum in pendingQuanta)
+            {
+                try
+                { 
+                    //handle quantum
+                    var result = QuantumHandler.HandleAsync(quantum.Quantum, QuantumSignatureValidator.Validate(quantum.Quantum)).Result;
 
-            var lastApex = lastSnapshot?.Apex ?? 0;
-            var lastHash = lastSnapshot?.LastHash ?? new byte[32];
-            QuantumStorage.Init(lastApex, lastHash);
-            QuantumHandler.Start();
+                    //verify that the pending quantum has current node signature
+                    var currentNodeSignature = quantum.Signatures.FirstOrDefault(s => s.AuditorId == Constellation.GetAuditorId(Settings.KeyPair)) ?? throw new Exception($"Unable to get signature for quantum {quantum.Quantum.Apex}");
+
+                    //verify the payload signature
+                    if (!Settings.KeyPair.Verify(quantum.Quantum.GetPayloadHash(), currentNodeSignature.PayloadSignature.Data))
+                        throw new Exception($"Signature for the quantum {quantum.Quantum.Apex} is invalid.");
+
+                    //add signatures
+                    foreach (var signature in quantum.Signatures)
+                        ResultManager.Add(new AuditorResult { Apex = quantum.Quantum.Apex, Signature = signature });
+                }
+                catch (AggregateException exc)
+                {
+                    //unwrap aggregate exc
+                    throw exc.GetBaseException();
+                }
+            }
         }
 
         private string GetAbsolutePath(string path)
@@ -122,7 +160,7 @@ namespace Centaurus.Domain
             DisposeAnalyticsManager();
 
             AnalyticsManager = new AnalyticsManager(
-                PermanentStorage,
+                PersistentStorage,
                 DepthsSubscription.Precisions.ToList(),
                 Constellation.Assets.Where(a => !a.IsQuoteAsset).Select(a => a.Code).ToList(), //all but base asset
                 snapshot.Orders.Select(o => o.Order.ToOrderInfo()).ToList()
@@ -140,6 +178,38 @@ namespace Centaurus.Domain
             IncomingConnectionManager.CleanupAuditorConnections();
 
             EstablishOutgoingConnections();
+        }
+
+        public void Complete()
+        {
+            StateManager.Stopped();
+
+            //close all connections
+            Task.WaitAll(
+                IncomingConnectionManager.CloseAllConnections(),
+                InfoConnectionManager.CloseAllConnections(),
+                Task.Factory.StartNew(OutgoingConnectionManager.CloseAllConnections)
+            );
+
+            PersistPendingQuanta();
+        }
+
+        private void PersistPendingQuanta()
+        {
+            ResultManager.CompleteAdding();
+
+            while (!ResultManager.IsAddingCompleted)
+                Thread.Sleep(50);
+
+            //sleep for a second to make sure that all results were added
+            Thread.Sleep(1000);
+
+            //complete current updates container
+            PendingUpdatesManager.UpdateBatch(true);
+            //save all completed quanta
+            PendingUpdatesManager.ApplyUpdates();
+            //persist all pending quanta
+            PendingUpdatesManager.PersistPendingQuanta();
         }
 
         private void EstablishOutgoingConnections()
@@ -241,7 +311,7 @@ namespace Centaurus.Domain
 
         public RoleManager RoleManager { get; }
 
-        public IPersistentStorage PermanentStorage { get; }
+        public IPersistentStorage PersistentStorage { get; }
 
         public Settings Settings { get; }
 

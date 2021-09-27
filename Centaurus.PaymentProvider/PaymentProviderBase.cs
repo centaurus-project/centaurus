@@ -44,11 +44,6 @@ namespace Centaurus.PaymentProvider
 
         public string LastRegisteredCursor => NotificationsManager?.LastRegisteredCursor;
 
-        public void ResetNotificationCursor()
-        {
-
-        }
-
         /// <summary>
         /// Builds transaction for the withdrawal
         /// </summary>

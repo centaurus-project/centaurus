@@ -14,6 +14,7 @@ namespace Centaurus.Test
         private List<SettingsPersistentModel> settingsCollection = new List<SettingsPersistentModel>();
         private List<PriceHistoryFramePersistentModel> frames = new List<PriceHistoryFramePersistentModel>();
         private CursorsPersistentModel paymentCursors = null;
+        private PendingQuantaPersistentModel pendingQuanta = null;
 
         public void Connect(string path)
         {
@@ -137,6 +138,9 @@ namespace Centaurus.Test
                     case CursorsPersistentModel _paymentCursors:
                         paymentCursors = _paymentCursors;
                         break;
+                    case PendingQuantaPersistentModel _pendingQuanta:
+                        pendingQuanta = _pendingQuanta;
+                        break;
                     default:
                         throw new InvalidOperationException($"Unknown persistent model type.");
                 }
@@ -145,6 +149,16 @@ namespace Centaurus.Test
 
         public void Dispose()
         {
+        }
+
+        public PendingQuantaPersistentModel LoadPendingQuanta()
+        {
+            return pendingQuanta;
+        }
+
+        public void DeletePendingQuanta()
+        {
+            pendingQuanta = null;
         }
     }
 }

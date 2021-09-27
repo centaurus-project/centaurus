@@ -129,7 +129,7 @@ namespace Centaurus.Domain
         {
             logger.Info($"About to load quanta batch from db. Start apex: {batchStartApex}, size: {batchSize}.");
             var aboveApex = batchStartApex > 0 ? batchStartApex - 1 : 0;
-            var quantaModels = Context.PermanentStorage.LoadQuantaAboveApex(aboveApex); //LoadQuantaAboveApex returns exclusive results
+            var quantaModels = Context.PersistentStorage.LoadQuantaAboveApex(aboveApex); //LoadQuantaAboveApex returns exclusive results
             var query = quantaModels
                 .OrderBy(q => q.Apex)
                 .Take(batchSize);

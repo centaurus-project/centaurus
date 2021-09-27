@@ -75,6 +75,16 @@ namespace Centaurus.PersistentStorage.Abstraction
             Storage.SaveBatch(batch);
         }
 
+        public PendingQuantaPersistentModel LoadPendingQuanta()
+        {
+            return Query.LoadPendingQuanta();
+        }
+
+        public void DeletePendingQuanta()
+        {
+            Storage.Delete<PendingQuantaPersistentModel>(PendingQuantaPersistentModel.KeyValue);
+        }
+
         public void Dispose()
         {
             storage?.Dispose();

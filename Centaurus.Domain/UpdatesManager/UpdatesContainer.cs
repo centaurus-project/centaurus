@@ -8,9 +8,10 @@ namespace Centaurus.Domain
 {
     public partial class UpdatesManager
     {
-        public class UpdatesContainer
+        public class UpdatesContainer : ContextualBase
         {
-            public UpdatesContainer(uint id = 0)
+            public UpdatesContainer(ExecutionContext context, uint id = 0)
+                : base(context)
             {
                 Id = id;
             }
@@ -45,7 +46,7 @@ namespace Centaurus.Domain
 
             public void AddQuantum(QuantumPersistentModel quantum, int effectsCount)
             {
-                pendingQuanta.Add(quantum.Apex, quantum);
+                pendingQuanta.Add(quantum);
                 batch.Add(quantum);
                 if (FirstApex == 0)
                 {
@@ -87,35 +88,38 @@ namespace Centaurus.Domain
                 IsCompleted = true;
             }
 
-            private Dictionary<ulong, QuantumPersistentModel> pendingQuanta { get; } = new Dictionary<ulong, QuantumPersistentModel>();
+            private List<QuantumPersistentModel> pendingQuanta { get; } = new List<QuantumPersistentModel>();
 
-            public void AddSignatures(ulong apex, List<AuditorResult> signatures)
+            internal List<IPersistentModel> GetUpdates()
             {
-                if (signatures == null)
-                    throw new ArgumentNullException(nameof(signatures));
-                if (!pendingQuanta.TryGetValue(apex, out var quantum))
-                    throw new InvalidOperationException($"Unable to find quantum with {apex} apex.");
-                quantum.Signatures = signatures.Select(s => s.Signature.ToPersistenModel()).ToList();
+                return batch;
             }
 
-            internal List<IPersistentModel> GetUpdates(bool force = true)
+            internal bool GetPendingQuanta(out List<QuantumPersistentModel> quanta)
             {
-                //force all quanta adding to batch
-                //if (force)
-                //    lock (pendingQuantaSyncRoot)
-                //    {
-                //        var pendingApexes = pendingQuanta.Keys.ToList();
-                //        foreach (var apex in Context)
-                //            AddSignatures(apex, null);
-                //    }
-                return batch;
+                quanta = new List<QuantumPersistentModel>();
+                foreach (var quantum in pendingQuanta)
+                {
+                    if (quantum.Signatures == null)
+                    {
+                        if (!Context.ResultManager.TryGetSignatures(quantum.Apex, out var signatures))
+                        {
+                            //quantum was handled with errors
+                            logger.Error($"Quantum {quantum.Apex} doesn't have signatures.");
+                            return false;
+                        }
+                        quantum.Signatures = signatures.Select(s => s.ToPersistenModel()).ToList();
+                    }
+                    quanta.Add(quantum);
+                }
+                return true;
             }
 
             public bool AreSignaturesCollected
             {
                 get
                 {
-                    return pendingQuanta.Count == pendingQuanta.Count(q => q.Value.Signatures != null);
+                    return pendingQuanta.Count == pendingQuanta.Count(q => q.Signatures != null);
                 }
             }
         }

@@ -23,13 +23,14 @@ namespace Centaurus.Test
 
 
         [Test]
+        [Explicit]
         public async Task PerformanceTest()
         {
             context.SetState(State.Ready);
 
             var accountId = context.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
             var messages = new Dictionary<RequestQuantum, Task<bool>>();
-            for (var i = 0; i < 1_00_000; i++)
+            for (var i = 0; i < 100_000; i++)
             {
                 var quantumRequest = new RequestQuantum
                 {

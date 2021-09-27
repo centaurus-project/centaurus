@@ -108,6 +108,8 @@ namespace Centaurus.Domain
         {
             lock (syncRoot)
                 UpdateState(State.Running);
+            //after node successfully started, the pending quanta can be removed
+            Context.PersistentStorage.DeletePendingQuanta();
         }
 
         public void SetAuditorState(RawPubKey auditorPubKey, State state)
@@ -229,7 +231,9 @@ namespace Centaurus.Domain
                 State = state;
 
                 StateChanged?.Invoke(stateArgs);
-                var updateMessage = new StateUpdateMessage { State = State }.CreateEnvelope().Sign(Context.Settings.KeyPair);
+                var updateMessage = new StateUpdateMessage { State = State }
+                    .CreateEnvelope<MessageEnvelopeSignless>()
+                    .Sign(Context.Settings.KeyPair);
                 Context.NotifyAuditors(updateMessage);
                 logger.Trace($"State update {state} sent.");
             }

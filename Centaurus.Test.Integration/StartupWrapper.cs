@@ -59,7 +59,7 @@ namespace Centaurus.Test
 
         public void Dispose()
         {
-            var db = Startup.Context.PermanentStorage;
+            var db = Startup.Context.PersistentStorage;
             Shutdown();
         }
     }

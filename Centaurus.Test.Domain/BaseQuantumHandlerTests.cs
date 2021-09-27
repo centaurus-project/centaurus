@@ -242,10 +242,9 @@ namespace Centaurus.Test
             envelope.Sign(TestEnvironment.Client1KeyPair);
             var quantum = new AccountDataRequestQuantum { RequestEnvelope = envelope };
 
-            await AssertQuantumHandling(quantum, excpectedException);
+            var result = await AssertQuantumHandling(quantum, excpectedException);
             if (excpectedException == null)
             {
-                var result = context.ResultManager.GetResult(quantum.Apex);
                 Assert.IsInstanceOf<AccountDataResponse>(result);
                 var adr = (AccountDataResponse)result;
                 var payloadHash = adr.ComputePayloadHash();
@@ -283,30 +282,20 @@ namespace Centaurus.Test
             }
         }
 
-        protected async Task AssertQuantumHandling(Quantum quantum, Type excpectedException = null)
+        protected async Task<QuantumResultMessageBase> AssertQuantumHandling(Quantum quantum, Type excpectedException = null)
         {
             try
             {
-                await context.QuantumHandler.HandleAsync(quantum, Task.FromResult(true));
-                await context.PendingUpdatesManager.SyncRoot.WaitAsync();
-                try
-                {
-                    context.PendingUpdatesManager.UpdateBatch(true);
-                }
-                finally
-                {
-                    context.PendingUpdatesManager.SyncRoot.Release();
-                }
-                context.PendingUpdatesManager.ApplyUpdates(true);
+                var result = await context.QuantumHandler.HandleAsync(quantum, Task.FromResult(true));
 
-                //check that processed quanta is saved to the storage
-                var lastApex = context.PermanentStorage.GetLastApex();
-                Assert.AreEqual(context.QuantumStorage.CurrentApex, lastApex);
+                Assert.AreEqual(result.Status, ResultStatusCode.Success);
+                return result;
             }
             catch (Exception exc)
             {
                 if (excpectedException == null || excpectedException.FullName != exc.GetType().FullName)
                     throw;
+                return null;
             }
         }
     }

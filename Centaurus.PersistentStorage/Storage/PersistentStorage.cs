@@ -112,6 +112,11 @@ namespace Centaurus.PersistentStorage
             return MutliGet<T>(keyRefs.Select(t => t.Key).ToArray());
         }
 
+        public void Delete<T>(byte[] key) where T : IPersistentModel, new()
+        {
+            db.Remove(key, ResolveColumnFamily<T>());
+        }
+
         //implement single item fetch and multiget
 
         public string GetStats()

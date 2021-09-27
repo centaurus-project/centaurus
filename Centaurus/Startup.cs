@@ -45,16 +45,9 @@ namespace Centaurus
 
         public void Shutdown()
         {
-            Context.StateManager.Stopped();
+            Context.Complete();
             if (AlphaStartup != null)
                 AlphaStartup.Shutdown();
-
-            //close all connections
-            Task.WaitAll(
-                Context.IncomingConnectionManager.CloseAllConnections(),
-                Context.InfoConnectionManager.CloseAllConnections(),
-                Task.Factory.StartNew(Context.OutgoingConnectionManager.CloseAllConnections)
-            );
         }
     }
 }
