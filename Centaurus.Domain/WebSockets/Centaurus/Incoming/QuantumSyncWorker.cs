@@ -14,7 +14,7 @@ namespace Centaurus
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public QuantumSyncWorker(Domain.ExecutionContext context, ConnectionBase auditor)
+        public QuantumSyncWorker(Domain.ExecutionContext context, IncomingAuditorConnection auditor)
             : base(context)
         {
             this.auditor = auditor ?? throw new ArgumentNullException(nameof(auditor));
@@ -22,7 +22,7 @@ namespace Centaurus
             Task.Factory.StartNew(SendQuantums, TaskCreationOptions.LongRunning);
         }
 
-        private readonly ConnectionBase auditor;
+        private readonly IncomingAuditorConnection auditor;
         private readonly int batchSize;
         private CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
 
@@ -47,6 +47,17 @@ namespace Centaurus
                 return (CurrentQuantaCursor, CurrentResultCursor);
         }
 
+        private bool IsAuditorReadyToHandleQuanta
+        {
+            get
+            {
+                return auditor.ConnectionState == ConnectionState.Ready //connection is validated
+                    && (auditor.AuditorState.IsRunning || auditor.AuditorState.IsWaitingForInit); //auditor is ready to handle quanta
+            }
+        }
+
+        private bool IsCurrentNodeReady => Context.StateManager.State != State.Rising && Context.StateManager.State != State.Undefined;
+
         private async Task SendQuantums()
         {
             var hasPendingQuanta = true;
@@ -69,9 +80,9 @@ namespace Centaurus
                     var resultDiff = (Context.PendingUpdatesManager.LastSavedApex - cursors.resultCursor) ?? 0;
 
                     if (!Context.IsAlpha //only Alpha should broadcast quanta
-                        || auditor.ConnectionState != ConnectionState.Ready //connection is not validated yet
+                        || !IsAuditorReadyToHandleQuanta //auditor is not ready to handle quanta
                         || (quantaDiff == 0 && resultDiff == 0) //nothing to sync
-                        || Context.StateManager.State == State.Rising || Context.StateManager.State == State.Undefined) //wait for Running state
+                        || !IsCurrentNodeReady)
                     {
                         hasPendingQuanta = false;
                         continue;

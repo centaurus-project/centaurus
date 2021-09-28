@@ -88,12 +88,14 @@ namespace Centaurus.Domain
                 if (persistentData.pendingQuanta != null)
                     HandlePendingQuanta(persistentData.pendingQuanta);
 
+
                 if (!IsAlpha)
                     StateManager.Rised();
             }
 
             if (Constellation == null)
             {
+                SetAuditorStates();
                 //establish connection with genesis auditors
                 EstablishOutgoingConnections();
             }
@@ -104,7 +106,7 @@ namespace Centaurus.Domain
             foreach (var quantum in pendingQuanta)
             {
                 try
-                { 
+                {
                     //handle quantum
                     var result = QuantumHandler.HandleAsync(quantum.Quantum, QuantumSignatureValidator.Validate(quantum.Quantum)).Result;
 
@@ -148,6 +150,9 @@ namespace Centaurus.Domain
 
             AuditorIds = Constellation.Auditors.ToDictionary(a => Constellation.GetAuditorId(a.PubKey), a => a.PubKey);
             AuditorPubKeys = AuditorIds.ToDictionary(a => a.Value, a => a.Key);
+
+            //update current auditors
+            SetAuditorStates();
 
             SetRole();
 
@@ -218,6 +223,15 @@ namespace Centaurus.Domain
                 ? Constellation.Auditors.Select(a => new Settings.Auditor(a.PubKey, a.Address)).ToList()
                 : Settings.GenesisAuditors.ToList();
             OutgoingConnectionManager.Connect(auditors);
+        }
+
+
+        private void SetAuditorStates()
+        {
+            var auditors = Constellation != null
+                ? Constellation.Auditors.Select(a => a.PubKey).ToList()
+                : Settings.GenesisAuditors.Select(a => (RawPubKey)a.PubKey).ToList();
+            StateManager.SetAuditors(auditors);
         }
 
         private void SetRole()

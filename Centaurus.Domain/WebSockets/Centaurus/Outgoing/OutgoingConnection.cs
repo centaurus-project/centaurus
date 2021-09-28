@@ -5,6 +5,7 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using static Centaurus.Domain.StateManager;
 
 namespace Centaurus.Domain
 {
@@ -19,6 +20,7 @@ namespace Centaurus.Domain
         {
             this.connection = connection ?? throw new ArgumentNullException(nameof(connection));
             this.outgoingMessageStorage = outgoingMessageStorage ?? throw new ArgumentNullException(nameof(outgoingMessageStorage));
+            AuditorState = Context.StateManager.GetAuditorState(keyPair);
             //we know that we connect to auditor so we can set connection state to validated immediately
             ConnectionState = ConnectionState.Ready;
         }
@@ -27,6 +29,8 @@ namespace Centaurus.Domain
 
         protected override int inBufferSize => BufferSize;
         protected override int outBufferSize => BufferSize;
+
+        public AuditorState AuditorState { get; }
 
         public async Task EstablishConnection(Uri uri)
         {
@@ -45,7 +49,7 @@ namespace Centaurus.Domain
                     {
                         if (!cancellationToken.IsCancellationRequested
                             && outgoingMessageStorage.TryPeek(out MessageEnvelopeBase message)
-                            && Context.StateManager.IsAuditorRunning(PubKey)
+                            && AuditorState.IsRunning
                             )
                         {
                             try

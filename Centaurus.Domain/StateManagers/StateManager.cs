@@ -65,7 +65,17 @@ namespace Centaurus.Domain
             get
             {
                 lock (statesSyncRoot)
-                    return connectedAuditors.Count;
+                    return auditors.Count(a => a.Value.CurrentState.HasValue);
+            }
+        }
+
+        public AuditorState GetAuditorState(RawPubKey pubKey)
+        {
+            lock (statesSyncRoot)
+            {
+                if (!auditors.TryGetValue(pubKey, out var auditorState))
+                    throw new Exception($"{pubKey.GetAccountId()} is not auditor.");
+                return auditorState;
             }
         }
 
@@ -74,33 +84,7 @@ namespace Centaurus.Domain
             get
             {
                 lock (statesSyncRoot)
-                    return connectedAuditors.Keys.ToList();
-            }
-        }
-
-        public bool IsAuditorReady(RawPubKey pubKey)
-        {
-            if (pubKey == null)
-                throw new ArgumentNullException(nameof(pubKey));
-
-            lock (statesSyncRoot)
-            {
-                if (!connectedAuditors.TryGetValue(pubKey, out var state))
-                    return false;
-                return state == State.Ready;
-            }
-        }
-
-        public bool IsAuditorRunning(RawPubKey pubKey)
-        {
-            if (pubKey == null)
-                throw new ArgumentNullException(nameof(pubKey));
-
-            lock (statesSyncRoot)
-            {
-                if (!connectedAuditors.TryGetValue(pubKey, out var state))
-                    return false;
-                return state == State.Running || state == State.Ready || state == State.Chasing;
+                    return auditors.Keys.ToList();
             }
         }
 
@@ -112,14 +96,40 @@ namespace Centaurus.Domain
             Context.PersistentStorage.DeletePendingQuanta();
         }
 
+        public void SetAuditors(List<RawPubKey> auditorPubkeys)
+        {
+            lock (statesSyncRoot)
+            {
+                var currentAuditors = auditors;
+                auditors.Clear();
+                var currentAuditorKey = (RawPubKey)Context.Settings.KeyPair;
+                foreach (var auditor in auditorPubkeys)
+                {
+                    if (auditor.Equals(currentAuditorKey))
+                        continue; //skip current
+                    //if auditor's state already presented, add it. Otherwise create and add new state instance.
+                    if (currentAuditors.TryGetValue(auditor, out var auditorState))
+                        auditors.Add(auditor, auditorState);
+                    else
+                        auditors.Add(auditor, new AuditorState());
+                }
+                //update current node state
+                UpdateState();
+            }
+        }
+
         public void SetAuditorState(RawPubKey auditorPubKey, State state)
         {
             lock (statesSyncRoot)
             {
                 logger.Trace($"Auditor's {auditorPubKey.GetAccountId()} state {state} received.");
-                if (!connectedAuditors.TryGetValue(auditorPubKey, out var currentState) && state == currentState)
+                if (!auditors.TryGetValue(auditorPubKey, out var currentState))
+                    throw new Exception($"{auditorPubKey.GetAccountId()} is not auditor.");
+
+                if (currentState.CurrentState == state)
                     return; //state didn't change
-                connectedAuditors[auditorPubKey] = state;
+
+                currentState.CurrentState = state;
                 logger.Trace($"Auditor's {auditorPubKey.GetAccountId()} state {state} set.");
                 //update current node state
                 UpdateState();
@@ -130,13 +140,16 @@ namespace Centaurus.Domain
         {
             lock (statesSyncRoot)
             {
-                if (connectedAuditors.Remove(auditorPubKey, out _))
+                if (auditors.TryGetValue(auditorPubKey, out var currentState))
                 {
+                    currentState.CurrentState = null;
                     //remove state from catchup if presented
                     Context.Catchup.RemoveState(auditorPubKey);
                     //update current node state
                     UpdateState();
                 }
+                else
+                    throw new Exception($"{auditorPubKey.GetAccountId()} is not auditor.");
             }
         }
 
@@ -180,7 +193,7 @@ namespace Centaurus.Domain
         private ulong AlphaApex;
         private object syncRoot = new { };
         private object statesSyncRoot = new { };
-        private Dictionary<RawPubKey, State> connectedAuditors = new Dictionary<RawPubKey, State>();
+        private Dictionary<RawPubKey, AuditorState> auditors = new Dictionary<RawPubKey, AuditorState>();
 
         private void UpdateState(State? state = null)
         {
@@ -204,9 +217,9 @@ namespace Centaurus.Domain
                     //if current server is 
                     var isAlphaReady = Context.IsAlpha && (State == State.Ready || State == State.Running);
                     var connectedCount = 0;
-                    foreach (var auditorState in connectedAuditors)
+                    foreach (var auditorState in auditors)
                     {
-                        if (auditorState.Value != State.Ready && auditorState.Value != State.Running)
+                        if (!(auditorState.Value.CurrentState == State.Ready || auditorState.Value.CurrentState == State.Running))
                             continue;
                         if (Context.Constellation.Alpha == auditorState.Key)
                             isAlphaReady = true;
@@ -216,7 +229,7 @@ namespace Centaurus.Domain
                 }
                 else
                     //if auditor doesn't have connections with another auditors, we only need to verify alpha's state
-                    return connectedAuditors.TryGetValue(Context.Constellation.Alpha, out var alphaState) && (alphaState == State.Ready || alphaState == State.Running);
+                    return auditors.TryGetValue(Context.Constellation.Alpha, out var alphaState) && (alphaState.CurrentState == State.Ready || alphaState.CurrentState == State.Running);
             }
         }
 
@@ -239,5 +252,16 @@ namespace Centaurus.Domain
             }
         }
 
+
+        public class AuditorState
+        {
+            public State? CurrentState { get; set; }
+
+            public bool IsRunning => CurrentState == State.Running || CurrentState == State.Ready || CurrentState == State.Chasing;
+
+            public bool IsWaitingForInit => CurrentState == State.Undefined;
+
+            public bool IsReady => CurrentState == State.Ready;
+        }
     }
 }

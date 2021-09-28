@@ -2,6 +2,7 @@
 using Centaurus.Models;
 using NLog;
 using System.Net.WebSockets;
+using static Centaurus.Domain.StateManager;
 
 namespace Centaurus
 {
@@ -12,6 +13,7 @@ namespace Centaurus
         public IncomingAuditorConnection(ExecutionContext context, KeyPair keyPair, WebSocket webSocket, string ip)
             : base(context, keyPair, webSocket, ip)
         {
+            AuditorState = Context.StateManager.GetAuditorState(keyPair);
             quantumWorker = new QuantumSyncWorker(Context, this);
             SendHandshake();
         }
@@ -25,6 +27,8 @@ namespace Centaurus
         private QuantumSyncWorker quantumWorker;
 
         public ulong CurrentCursor => quantumWorker.CurrentQuantaCursor ?? 0;
+
+        public AuditorState AuditorState { get; }
 
         public void SetSyncCursor(ulong newQuantumCursor, ulong newResultCursor)
         {
