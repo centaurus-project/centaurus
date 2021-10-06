@@ -1,4 +1,5 @@
 ﻿using Centaurus.Controllers;
+using Centaurus.Domain;
 using Centaurus.Domain.Models;
 using Centaurus.Models;
 using Centaurus.NetSDK;
@@ -173,7 +174,7 @@ namespace Centaurus.Test
             try
             {
                 var result = await client.Pay(keyPair.PublicKey, asset, amount);
-                await result.OnAcknowledged;
+                await result.OnFinalized;
                 await AssertBalance(client, asset, balanceAmount - amount, 0);
             }
             catch (Exception exc)
@@ -251,9 +252,7 @@ namespace Centaurus.Test
 
             context.QuantumProcessor.TryGetValue(messageType, out var processor);
 
-            var processContext = processor.GetContext(quantum, account);
-
-            var res = await processor.Process(processContext);
+            var res = await processor.Process(new QuantumProcessingItem(quantum, Task.FromResult(true)));
 
             return res;
         }
@@ -272,9 +271,7 @@ namespace Centaurus.Test
 
             context.QuantumProcessor.TryGetValue(messageType, out var processor);
 
-            var processContext = processor.GetContext(quantum, account);
-
-            var res = await processor.Process(processContext);
+            var res = await processor.Process(new QuantumProcessingItem(quantum, Task.FromResult(true)));
 
             context.QuantumStorage.AddQuantum(quantum, quantum.ComputeHash());
 

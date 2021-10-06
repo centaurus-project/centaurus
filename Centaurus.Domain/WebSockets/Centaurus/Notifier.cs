@@ -49,21 +49,5 @@ namespace Centaurus.Domain
             else //notify all connected auditors
                 context.OutgoingConnectionManager.EnqueueMessage(envelope);
         }
-
-        /// <summary>
-        /// Notifies message author(s) about message processing result
-        /// </summary>
-        /// <param name="result">Result message</param>
-        public static void OnMessageProcessResult(this ExecutionContext context, ResultMessageBase result, RawPubKey rawPubKey)
-        {
-            if (result == null)
-                return;
-            if (context == null)
-                throw new ArgumentNullException(nameof(context));
-            if (rawPubKey == null)
-                throw new ArgumentNullException(nameof(rawPubKey));
-
-            context.Notify(rawPubKey, result.CreateEnvelope());
-        }
     }
 }

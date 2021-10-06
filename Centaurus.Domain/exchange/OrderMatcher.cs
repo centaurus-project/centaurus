@@ -7,32 +7,33 @@ namespace Centaurus.Domain
 {
     public class OrderMatcher
     {
-        public OrderMatcher(OrderRequest orderRequest, ProcessorContext processorContext)
+        public OrderMatcher(ExchangeMarket market, string baseAsset, QuantumProcessingItem quantumProcessingItem)
         {
-            this.processorContext = processorContext;
-            baseAsset = this.processorContext.Context.Constellation.QuoteAsset.Code;
+            this.quantumProcessingItem = quantumProcessingItem ?? throw new ArgumentNullException(nameof(quantumProcessingItem));
+            this.baseAsset = baseAsset ?? throw new ArgumentNullException(nameof(baseAsset));
+            this.market = market ?? throw new ArgumentNullException(nameof(market));
+            var orderRequest = (OrderRequest)((RequestQuantumBase)quantumProcessingItem.Quantum).RequestMessage;
 
             takerOrder = new OrderWrapper(
                 new Order
                 {
-                    OrderId = this.processorContext.Apex,
+                    OrderId = quantumProcessingItem.Apex,
                     Amount = orderRequest.Amount,
                     Price = orderRequest.Price,
                     Asset = orderRequest.Asset,
                     Side = orderRequest.Side
                 },
-                this.processorContext.InitiatorAccount
+                quantumProcessingItem.Initiator
             );
             timeInForce = orderRequest.TimeInForce;
 
             asset = takerOrder.Order.Asset;
             side = takerOrder.Order.Side;
             //get asset orderbook
-            market = this.processorContext.Context.Exchange.GetMarket(asset);
             orderbook = market.GetOrderbook(side.Inverse());
             //fetch balances
             if (!takerOrder.Account.HasBalance(asset))
-                this.processorContext.AddBalanceCreate(this.processorContext.InitiatorAccount, asset);
+                quantumProcessingItem.AddBalanceCreate(quantumProcessingItem.Initiator, asset);
         }
 
         private readonly OrderWrapper takerOrder;
@@ -43,11 +44,11 @@ namespace Centaurus.Domain
 
         private readonly OrderSide side;
 
-        private readonly OrderbookBase orderbook;
+        private readonly Orderbook orderbook;
 
         private readonly ExchangeMarket market;
 
-        private readonly ProcessorContext processorContext;
+        private readonly QuantumProcessingItem quantumProcessingItem;
 
         private readonly string baseAsset;
 
@@ -61,7 +62,7 @@ namespace Centaurus.Domain
             var counterOrder = orderbook.Head;
             var nextOrder = default(OrderWrapper);
 
-            var updates = new ExchangeUpdate(asset, new DateTime(processorContext.Quantum.Timestamp, DateTimeKind.Utc));
+            var updates = new ExchangeUpdate(asset, new DateTime(quantumProcessingItem.Quantum.Timestamp, DateTimeKind.Utc));
 
             var tradeAssetAmount = 0ul;
             var tradeQuoteAmount = 0ul;
@@ -103,7 +104,7 @@ namespace Centaurus.Domain
                 return;
 
             //record taker trade effect. AddTrade will update order amount
-            processorContext.AddTrade(
+            quantumProcessingItem.AddTrade(
                 takerOrder,
                 tradeAssetAmount,
                 tradeQuoteAmount,
@@ -144,7 +145,7 @@ namespace Centaurus.Domain
             //select the market to add new order
             var reminderOrderbook = market.GetOrderbook(side);
             //record maker trade effect
-            processorContext.AddOrderPlaced(reminderOrderbook, takerOrder, baseAsset);
+            quantumProcessingItem.AddOrderPlaced(reminderOrderbook, takerOrder, baseAsset);
             return true;
         }
 
@@ -202,7 +203,7 @@ namespace Centaurus.Domain
             private Trade RecordTrade()
             {
                 //record maker trade effect
-                matcher.processorContext.AddTrade(
+                matcher.quantumProcessingItem.AddTrade(
                          makerOrder,
                          AssetAmount,
                          QuoteAmount,
@@ -216,13 +217,13 @@ namespace Centaurus.Domain
                     QuoteAmount = QuoteAmount,
                     Asset = matcher.asset,
                     Price = makerOrder.Order.Price,
-                    TradeDate = new DateTime(matcher.processorContext.Quantum.Timestamp, DateTimeKind.Utc)
+                    TradeDate = new DateTime(matcher.quantumProcessingItem.Quantum.Timestamp, DateTimeKind.Utc)
                 };
             }
 
             private void RecordOrderRemoved()
             {
-                matcher.processorContext.AddOrderRemoved(matcher.orderbook, makerOrder, matcher.baseAsset);
+                matcher.quantumProcessingItem.AddOrderRemoved(matcher.orderbook, makerOrder, matcher.baseAsset);
             }
         }
     }

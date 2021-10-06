@@ -7,7 +7,7 @@ using Centaurus.Models;
 
 namespace Centaurus.Domain
 {
-    public class AccountDataRequestProcessor : RequestQuantumProcessor
+    public class AccountDataRequestProcessor : QuantumProcessorBase
     {
         public AccountDataRequestProcessor(ExecutionContext context)
             :base(context)
@@ -17,21 +17,21 @@ namespace Centaurus.Domain
 
         public override string SupportedMessageType { get; } = typeof(AccountDataRequest).Name;
 
-        public override Task<QuantumResultMessageBase> Process(RequestContext context)
+        public override Task<QuantumResultMessageBase> Process(QuantumProcessingItem quantumProcessingItem)
         {
-            var quantum = (AccountDataRequestQuantum)context.Request;
+            var quantum = (AccountDataRequestQuantum)quantumProcessingItem.Quantum;
             var requestMessage = quantum.RequestMessage;
 
-            context.UpdateNonce();
+            UpdateNonce(quantumProcessingItem);
 
-            var resultMessage = (AccountDataResponse)context.Quantum.CreateEnvelope<MessageEnvelopeSignless>().CreateResult(ResultStatusCode.Success);
-            resultMessage.Balances = context.InitiatorAccount.Balances
+            var resultMessage = (AccountDataResponse)quantumProcessingItem.Quantum.CreateEnvelope<MessageEnvelopeSignless>().CreateResult(ResultStatusCode.Success);
+            resultMessage.Balances = quantumProcessingItem.Initiator.Balances
                 .Values
                 .Select(balance => new Balance { Amount = balance.Amount, Asset = balance.Asset, Liabilities = balance.Liabilities })
                 .OrderBy(balance => balance.Asset)
                 .ToList();
 
-            resultMessage.Orders = context.InitiatorAccount.Orders
+            resultMessage.Orders = quantumProcessingItem.Initiator.Orders
                 .Values
                 .Select(order =>
                     new Order
@@ -46,16 +46,16 @@ namespace Centaurus.Domain
                 .OrderBy(order => order.OrderId)
                 .ToList();
 
-            resultMessage.Sequence = context.InitiatorAccount.AccountSequence;
+            resultMessage.Sequence = quantumProcessingItem.Initiator.AccountSequence;
 
             quantum.PayloadHash = resultMessage.ComputePayloadHash();
 
             return Task.FromResult((QuantumResultMessageBase)resultMessage);
         }
 
-        public override Task Validate(RequestContext context)
+        public override Task Validate(QuantumProcessingItem quantumProcessingItem)
         {
-            context.ValidateNonce();
+            ValidateNonce(quantumProcessingItem);
             return Task.CompletedTask;
         }
     }

@@ -91,9 +91,9 @@ namespace Centaurus.Test.Exchange.Analytics
         public void OrderbookPerformanceTest(int iterations, bool useNormalDistribution = false)
         {
             var rnd = new Random();
-
+            var asset = "USD";
             var orderRequestProcessor = new OrderRequestProcessor(context);
-            var testTradeResults = new Dictionary<RequestQuantum, RequestContext>();
+            var testTradeResults = new Dictionary<RequestQuantum, QuantumProcessingItem>();
             for (var i = 1; i < iterations; i++)
             {
                 var price = useNormalDistribution ? rnd.NextNormallyDistributed() + 50 : rnd.NextDouble() * 100;
@@ -107,7 +107,7 @@ namespace Centaurus.Test.Exchange.Analytics
                             Account = account1.Pubkey,
                             RequestId = i,
                             Amount = (ulong)rnd.Next(1, 20),
-                            Asset = "USD",
+                            Asset = asset,
                             Price = Math.Round(price * 10) / 10,
                             Side = rnd.NextDouble() >= 0.5 ? OrderSide.Buy : OrderSide.Sell
                         },
@@ -116,17 +116,16 @@ namespace Centaurus.Test.Exchange.Analytics
                     Timestamp = DateTime.UtcNow.Ticks
                 };
 
-                var orderContext = (RequestContext)orderRequestProcessor.GetContext(trade, context.AccountStorage.GetAccount(account1.Pubkey));
-                testTradeResults.Add(trade, orderContext);
+                testTradeResults.Add(trade, new QuantumProcessingItem(trade, System.Threading.Tasks.Task.FromResult(true)));
             }
 
             PerfCounter.MeasureTime(() =>
             {
                 foreach (var trade in testTradeResults)
-                    context.Exchange.ExecuteOrder(trade.Value);
+                    context.Exchange.ExecuteOrder(asset, context.Constellation.QuoteAsset.Code, trade.Value);
             }, () =>
             {
-                var market = context.Exchange.GetMarket("USD");
+                var market = context.Exchange.GetMarket(asset);
                 return $"{iterations} iterations, orderbook size: {market.Bids.Count} bids,  {market.Asks.Count} asks, {market.Bids.GetBestPrice().ToString("G3")}/{market.Asks.GetBestPrice().ToString("G3")} spread.";
             });
         }

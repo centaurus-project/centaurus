@@ -50,23 +50,28 @@ namespace Centaurus.Domain
         /// <summary>
         /// Process customer's order request.
         /// </summary>
-        /// <param name="orderRequest">Order request quantum</param>
+        /// <param name="quantumProcessingItem">Order request quantum</param>
         /// <returns></returns>
-        public void ExecuteOrder(RequestContext context)
+        public void ExecuteOrder(string asset, string baseAsset, QuantumProcessingItem quantumProcessingItem)
         {
-            var orderRequest = (OrderRequest)context.Request.RequestMessage;
-            var updates = new OrderMatcher(orderRequest, context).Match();
+            var market = GetMarket(asset);
+            var updates = new OrderMatcher(market, baseAsset, quantumProcessingItem).Match();
             awaitedUpdates?.Add(updates);
         }
 
-        public void RemoveOrder(RequestContext context, OrderbookBase orderbook, OrderWrapper order)
+        public void RemoveOrder(QuantumProcessingItem quantumProcessingItem, string baseAsset)
         {
-            context.AddOrderRemoved(orderbook, order, context.Context.Constellation.QuoteAsset.Code);
+            var request = (RequestQuantumBase)quantumProcessingItem.Quantum;
+            var orderCancellation = (OrderCancellationRequest)request.RequestMessage;
+            var orderWrapper = OrderMap.GetOrder(orderCancellation.OrderId);
+            var orderbook = GetOrderbook(orderWrapper.Order.Asset, orderWrapper.Order.Side);
+
+            quantumProcessingItem.AddOrderRemoved(orderbook, orderWrapper, baseAsset);
             if (awaitedUpdates != null)
             {
-                var updateTime = new DateTime(context.Quantum.Timestamp, DateTimeKind.Utc);
+                var updateTime = new DateTime(quantumProcessingItem.Quantum.Timestamp, DateTimeKind.Utc);
                 var exchangeItem = new ExchangeUpdate(orderbook.Market, updateTime);
-                exchangeItem.OrderUpdates.Add(order.Order.ToOrderInfo(OrderState.Deleted));
+                exchangeItem.OrderUpdates.Add(orderWrapper.Order.ToOrderInfo(OrderState.Deleted));
                 awaitedUpdates.Add(exchangeItem);
             }
         }
@@ -84,9 +89,9 @@ namespace Centaurus.Domain
             return Markets.ContainsKey(asset);
         }
 
-        public ExchangeMarket AddMarket(AssetSettings asset, bool useLegacyOrderbook = false)
+        public ExchangeMarket AddMarket(AssetSettings asset)
         {
-            var market = asset.CreateMarket(OrderMap, useLegacyOrderbook);
+            var market = asset.CreateMarket(OrderMap);
             Markets.Add(asset.Code, market);
             return market;
         }
@@ -97,19 +102,19 @@ namespace Centaurus.Domain
             OrderMap.Clear();
         }
 
-        public OrderbookBase GetOrderbook(string asset, OrderSide side)
+        public Orderbook GetOrderbook(string asset, OrderSide side)
         {
             return GetMarket(asset).GetOrderbook(side);
         }
 
-        public static Exchange RestoreExchange(List<AssetSettings> assets, List<OrderWrapper> orders, bool observeTrades, bool useLegacyOrderbook = false)
+        public static Exchange RestoreExchange(List<AssetSettings> assets, List<OrderWrapper> orders, bool observeTrades)
         {
             var exchange = new Exchange(observeTrades);
             foreach (var asset in assets)
             {
                 if (asset.IsQuoteAsset)
                     continue;
-                exchange.AddMarket(asset, useLegacyOrderbook);
+                exchange.AddMarket(asset);
             }
 
             foreach (var order in orders)

@@ -200,7 +200,9 @@ namespace Centaurus.Domain
                 //compute quantum hash before processing
                 var originalQuantumHash = quantumItem.quantum.ComputeHash();
 
-                await Context.QuantumHandler.HandleAsync(quantumItem.quantum, QuantumSignatureValidator.Validate(quantumItem.quantum));
+                var processingItem = Context.QuantumHandler.HandleAsync(quantumItem.quantum, QuantumSignatureValidator.Validate(quantumItem.quantum));
+
+                await processingItem.OnAcknowledge;
 
                 //compute quantum hash after processing
                 var processedQuantumHash = quantumItem.quantum.ComputeHash();

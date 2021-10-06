@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public class ConstellationUpdateProcessor : QuantumProcessor
+    public class ConstellationUpdateProcessor : QuantumProcessorBase
     {
         public ConstellationUpdateProcessor(ExecutionContext context)
             : base(context)
@@ -18,28 +18,28 @@ namespace Centaurus.Domain
 
         public override string SupportedMessageType { get; } = typeof(ConstellationUpdate).Name;
 
-        public override Task<QuantumResultMessageBase> Process(ProcessorContext context)
+        public override Task<QuantumResultMessageBase> Process(QuantumProcessingItem processingItem)
         {
-            var updateQuantum = (ConstellationUpdate)((ConstellationQuantum)context.Quantum).RequestMessage;
+            var updateQuantum = (ConstellationUpdate)((ConstellationQuantum)processingItem.Quantum).RequestMessage;
 
-            var settings = updateQuantum.ToConstellationSettings(context.Apex);
+            var settings = updateQuantum.ToConstellationSettings(processingItem.Apex);
 
-            context.AddConstellationUpdate(settings, Context.Constellation);
+            processingItem.AddConstellationUpdate(settings, Context.Constellation);
 
             var updateSnapshot = settings.ToSnapshot(
-                context.Apex,
+                processingItem.Apex,
                 Context.AccountStorage?.GetAll().ToList() ?? new List<Account>(),
                 Context.Exchange?.OrderMap.GetAllOrders().ToList() ?? new List<OrderWrapper>(),
                 GetCursors(settings.Providers),
-                context.Quantum.ComputeHash()
+                processingItem.Quantum.ComputeHash()
             );
-            context.CentaurusContext.Setup(updateSnapshot);
+            Context.Setup(updateSnapshot);
 
             //if state is undefined, than we need to init it
-            if (context.CentaurusContext.StateManager.State == State.Undefined)
-                context.CentaurusContext.StateManager.Init(State.Running);
+            if (Context.StateManager.State == State.Undefined)
+                Context.StateManager.Init(State.Running);
 
-            return Task.FromResult((QuantumResultMessageBase)context.Quantum.CreateEnvelope<MessageEnvelopeSignless>().CreateResult(ResultStatusCode.Success));
+            return Task.FromResult((QuantumResultMessageBase)processingItem.Quantum.CreateEnvelope<MessageEnvelopeSignless>().CreateResult(ResultStatusCode.Success));
         }
 
         private Dictionary<string, string> GetCursors(List<ProviderSettings> providers)
@@ -60,11 +60,11 @@ namespace Centaurus.Domain
 
         const int minAuditorsCount = 2;
 
-        public override Task Validate(ProcessorContext context)
+        public override Task Validate(QuantumProcessingItem processingItem)
         {
-            ((ConstellationQuantum)context.Quantum).Validate(Context);
+            ((ConstellationQuantum)processingItem.Quantum).Validate(Context);
 
-            var requestEnvelope = ((ConstellationQuantum)context.Quantum).RequestEnvelope;
+            var requestEnvelope = ((ConstellationQuantum)processingItem.Quantum).RequestEnvelope;
 
             if (!(requestEnvelope.Message is ConstellationUpdate constellationUpdate))
                 throw new ArgumentException("Message is not ConstellationUpdate");

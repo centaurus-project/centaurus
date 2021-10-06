@@ -8,18 +8,10 @@ using System.Linq;
 
 namespace Centaurus.Test
 {
-    [TestFixture(true)]
-    [TestFixture(false)]
     public class OrderbookTests
     {
-        public OrderbookTests(bool useLegacyOrderbook)
-        {
-            this.useLegacyOrderbook = useLegacyOrderbook;
-        }
-
         Account account1;
         Account account2;
-        private bool useLegacyOrderbook;
         private ExecutionContext context;
         string baseAsset = "XLM";
         string secondAsset = "USD";
@@ -30,7 +22,7 @@ namespace Centaurus.Test
             EnvironmentHelper.SetTestEnvironmentVariable();
             var settings = GlobalInitHelper.GetAlphaSettings();
 
-            context = new ExecutionContext(settings, new MockStorage(), new MockPaymentProviderFactory(), new DummyConnectionWrapperFactory(), useLegacyOrderbook);
+            context = new ExecutionContext(settings, new MockStorage(), new MockPaymentProviderFactory(), new DummyConnectionWrapperFactory());
 
             var requestRateLimits = new RequestRateLimits { HourLimit = 1000, MinuteLimit = 100 };
 
@@ -110,7 +102,7 @@ namespace Centaurus.Test
 
 
             var orderRequestProcessor = new OrderRequestProcessor(context);
-            var testTradeResults = new Dictionary<RequestQuantum, RequestContext>();
+            var testTradeResults = new Dictionary<RequestQuantum, QuantumProcessingItem>();
             for (var i = 1; i < iterations; i++)
             {
                 var price = useNormalDistribution ? rnd.NextNormallyDistributed() + 50 : rnd.NextDouble() * 100;
@@ -146,8 +138,7 @@ namespace Centaurus.Test
                     Timestamp = DateTime.UtcNow.Ticks
                 };
 
-                var processorContext = (RequestContext)orderRequestProcessor.GetContext(trade, initiator);
-                testTradeResults.Add(trade, processorContext);
+                testTradeResults.Add(trade, new QuantumProcessingItem(trade, System.Threading.Tasks.Task.FromResult(true)) { Initiator = initiator });
             }
             var baseAsset = context.Constellation.QuoteAsset.Code;
             var xlmStartBalance = account1.GetBalance(baseAsset).Amount + account2.GetBalance(baseAsset).Amount;
@@ -157,7 +148,7 @@ namespace Centaurus.Test
             {
                 foreach (var trade in testTradeResults)
                 {
-                    context.Exchange.ExecuteOrder(trade.Value);
+                    context.Exchange.ExecuteOrder(asset, baseAsset, trade.Value);
                 }
             });
 
@@ -197,13 +188,12 @@ namespace Centaurus.Test
         [Explicit]
         [Category("Performance")]
         [TestCase(10000)]
-        [TestCase(100000, true)]
         public void OrderbookPerformanceTest(int iterations, bool useNormalDistribution = false)
         {
             ExecuteWithOrderbook(iterations, useNormalDistribution, executeOrders => PerfCounter.MeasureTime(executeOrders, () =>
             {
                 var market = context.Exchange.GetMarket(context.Constellation.Assets[1].Code);
-                return $"Is legacy orderbook: {useLegacyOrderbook}, {iterations} iterations, orderbook size: {market.Bids.Count} bids,  {market.Asks.Count} asks, {market.Bids.GetBestPrice().ToString("G3")}/{market.Asks.GetBestPrice().ToString("G3")} spread.";
+                return $"{iterations} iterations, orderbook size: {market.Bids.Count} bids,  {market.Asks.Count} asks, {market.Bids.GetBestPrice().ToString("G3")}/{market.Asks.GetBestPrice().ToString("G3")} spread.";
             }));
         }
 

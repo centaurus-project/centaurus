@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 namespace Centaurus.Domain
 {
 
-    public class WithdrawalProcessor : QuantumProcessorBase<WithdrawalProcessorContext>
+    public class WithdrawalProcessor : QuantumProcessorBase
     {
         public WithdrawalProcessor(ExecutionContext context)
             : base(context)
@@ -16,51 +16,55 @@ namespace Centaurus.Domain
 
         public override string SupportedMessageType { get; } = typeof(WithdrawalRequest).Name;
 
-        public override Task<QuantumResultMessageBase> Process(WithdrawalProcessorContext context)
+        public override Task<QuantumResultMessageBase> Process(QuantumProcessingItem quantumProcessingItem)
         {
-            context.UpdateNonce();
+            UpdateNonce(quantumProcessingItem);
 
-            context.AddBalanceUpdate(context.InitiatorAccount, context.WithdrawalRequest.Asset, context.WithdrawalRequest.Amount, UpdateSign.Minus);
+            var withdrawalQuantum = (WithdrawalRequestQuantum)quantumProcessingItem.Quantum;
+            var withdrawalRequest = (WithdrawalRequest)withdrawalQuantum.RequestMessage;
 
-            return Task.FromResult((QuantumResultMessageBase)context.Quantum.CreateEnvelope<MessageEnvelopeSignless>().CreateResult(ResultStatusCode.Success));
+            quantumProcessingItem.AddBalanceUpdate(quantumProcessingItem.Initiator, withdrawalRequest.Asset, withdrawalRequest.Amount, UpdateSign.Minus);
+
+            return Task.FromResult((QuantumResultMessageBase)withdrawalQuantum.CreateEnvelope<MessageEnvelopeSignless>().CreateResult(ResultStatusCode.Success));
         }
 
-        public override Task Validate(WithdrawalProcessorContext context)
+        public override Task Validate(QuantumProcessingItem quantumProcessingItem)
         {
-            context.ValidateNonce();
+            ValidateNonce(quantumProcessingItem);
 
-            var sourceAccount = context.InitiatorAccount;
+            var sourceAccount = quantumProcessingItem.Initiator;
+            var withdrawalQuantum = (WithdrawalRequestQuantum)quantumProcessingItem.Quantum;
+            var withdrawalRequest = (WithdrawalRequest)withdrawalQuantum.RequestMessage;
 
-            var centaurusAsset = context.CentaurusContext.Constellation.Assets.FirstOrDefault(a => a.Code == context.WithdrawalRequest.Asset);
+            var centaurusAsset = Context.Constellation.Assets.FirstOrDefault(a => a.Code == withdrawalRequest.Asset);
             if (centaurusAsset == null || centaurusAsset.IsSuspended)
-                throw new BadRequestException($"Constellation doesn't support asset '{context.WithdrawalRequest.Asset}'.");
+                throw new BadRequestException($"Constellation doesn't support asset '{withdrawalRequest.Asset}'.");
 
-            var providerAsset = context.PaymentProvider.Settings.Assets.FirstOrDefault(a => a.CentaurusAsset == context.WithdrawalRequest.Asset);
+            if (!Context.PaymentProvidersManager.TryGetManager(withdrawalRequest.Provider, out var paymentProvider))
+                throw new BadRequestException($"{withdrawalRequest.Asset} provider is not supported.");
+
+            var providerAsset = paymentProvider.Settings.Assets.FirstOrDefault(a => a.CentaurusAsset == withdrawalRequest.Asset);
             if (providerAsset == null)
                 throw new BadRequestException($"Current provider doesn't support withdrawal of asset {centaurusAsset.Code}.");
 
-            var baseAsset = context.CentaurusContext.Constellation.QuoteAsset.Code;
+            var baseAsset = Context.Constellation.QuoteAsset.Code;
 
-            var minBalance = centaurusAsset.Code == baseAsset ? context.CentaurusContext.Constellation.MinAccountBalance : 0;
-            if (!(sourceAccount.GetBalance(centaurusAsset.Code)?.HasSufficientBalance(context.WithdrawalRequest.Amount, minBalance) ?? false))
+            var minBalance = centaurusAsset.Code == baseAsset ? Context.Constellation.MinAccountBalance : 0;
+            if (!(sourceAccount.GetBalance(centaurusAsset.Code)?.HasSufficientBalance(withdrawalRequest.Amount, minBalance) ?? false))
                 throw new BadRequestException($"Insufficient balance.");
 
-            var withdrawal = context.WithdrawalRequest.ToProviderModel();
-            if (context.CentaurusContext.IsAlpha) //if it's Alpha than we need to build transaction
+            var withdrawal = withdrawalRequest.ToProviderModel();
+            if (withdrawalQuantum.Transaction == null) //build transaction if it wasn't build yet
             {
-                context.WithdrawalRequestQuantum.Transaction = context.PaymentProvider.BuildTransaction(withdrawal);
-                context.WithdrawalRequestQuantum.Provider = context.PaymentProvider.Id;
+                withdrawalQuantum.Transaction = paymentProvider.BuildTransaction(withdrawal);
+                withdrawalQuantum.Provider = paymentProvider.Id;
             }
+
             //should we validate signatures here?
-            else if (!context.PaymentProvider.IsTransactionValid(context.WithdrawalRequestQuantum.Transaction, withdrawal, out var error))
+            else if (!paymentProvider.IsTransactionValid(withdrawalQuantum.Transaction, withdrawal, out var error))
                 throw new BadRequestException($"Transaction is invalid.\nReason: {error}");
 
             return Task.CompletedTask;
-        }
-
-        public override ProcessorContext GetContext(Quantum quantum, Account account)
-        {
-            return new WithdrawalProcessorContext(Context, quantum, account);
         }
     }
 }

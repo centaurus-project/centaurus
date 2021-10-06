@@ -4,19 +4,6 @@ namespace Centaurus.Test
 {
     public class AlphaQuantumHandlerTests : BaseQuantumHandlerTests
     {
-        [SetUp]
-        public void Setup()
-        {
-            EnvironmentHelper.SetTestEnvironmentVariable();
-            context = GlobalInitHelper.DefaultAlphaSetup().Result;
-        }
-
-        [TearDown]
-        public void TearDown()
-        {
-            context?.Dispose();
-        }
-
         static object[] AccountRequestRateLimitsCases =
         {
             new object[] { TestEnvironment.Client1KeyPair, null },

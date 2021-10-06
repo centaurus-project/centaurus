@@ -9,11 +9,11 @@ namespace Centaurus.Domain
 {
     public class OrderPlacedEffectProcessor : ClientEffectProcessor<OrderPlacedEffect>
     {
-        private OrderbookBase orderBook;
+        private Orderbook orderBook;
         private OrderWrapper order;
         private string baseAsset;
 
-        public OrderPlacedEffectProcessor(OrderPlacedEffect effect, Account account, OrderbookBase orderBook, OrderWrapper order, string baseAsset)
+        public OrderPlacedEffectProcessor(OrderPlacedEffect effect, Account account, Orderbook orderBook, OrderWrapper order, string baseAsset)
             :base(effect, account)
         {
             this.orderBook = orderBook ?? throw new ArgumentNullException(nameof(orderBook));

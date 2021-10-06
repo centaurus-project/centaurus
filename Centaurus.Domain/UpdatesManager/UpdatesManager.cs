@@ -134,36 +134,36 @@ namespace Centaurus.Domain
             }
         }
 
-        public QuantumPersistentModel AddQuantum(QuantaProcessingResult result)
+        public QuantumPersistentModel AddQuantum(QuantumProcessingItem quantumProcessingItem)
         {
             var qModel = new QuantumPersistentModel
             {
-                Apex = result.Apex,
-                Effects = result.Effects.Select(eg => new AccountEffects
+                Apex = quantumProcessingItem.Apex,
+                Effects = quantumProcessingItem.Effects.Select(eg => new AccountEffects
                 {
                     Account = eg.Account ?? new byte[32],
                     Effects = eg.RawEffects
                 }).ToList(),
-                RawQuantum = result.RawQuantum,
-                TimeStamp = result.Timestamp
+                RawQuantum = quantumProcessingItem.RawQuantum,
+                TimeStamp = quantumProcessingItem.Quantum.Timestamp
             };
 
-            pendingUpdates.AddQuantum(qModel, result.Effects.Sum(e => e.Effects.Effects.Count));
-            pendingUpdates.AddQuantumRefs(result.Effects
+            pendingUpdates.AddQuantum(qModel, quantumProcessingItem.Effects.Sum(e => e.Effects.Effects.Count));
+            pendingUpdates.AddQuantumRefs(quantumProcessingItem.Effects
                 .Where(e => e.Account != null)
                 .Select(eg => new QuantumRefPersistentModel
                 {
                     Account = eg.Account,
-                    Apex = result.Apex,
-                    IsQuantumInitiator = eg.Account.Equals(result.Initiator)
+                    Apex = quantumProcessingItem.Apex,
+                    IsQuantumInitiator = eg.Account.Equals(quantumProcessingItem.Initiator?.Pubkey)
                 }));
 
-            if (result.HasSettingsUpdate)
+            if (quantumProcessingItem.HasSettingsUpdate)
                 pendingUpdates.AddConstellation(Context.Constellation.ToPesrsistentModel());
 
-            pendingUpdates.AddAffectedAccounts(result.Effects.Select(e => e.Account).Where(a => a != null));
+            pendingUpdates.AddAffectedAccounts(quantumProcessingItem.Effects.Select(e => e.Account).Where(a => a != null));
 
-            if (result.HasCursorUpdate)
+            if (quantumProcessingItem.HasCursorUpdate)
                 pendingUpdates.HasCursorUpdate = true;
 
             return qModel;

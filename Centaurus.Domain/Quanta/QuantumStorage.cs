@@ -78,28 +78,24 @@ namespace Centaurus.Domain
             if (fromBatchId == toBatchId) //if the same batch start, than there is some quanta to persist
                 return;
 
-            var batch = default(List<PendingQuantum>);
-            if (!quantaCache.TryGetValue(fromBatchId, out batch) || batch.Count != batchSize)
+            if (!quantaCache.TryGetValue<List<PendingQuantum>>(fromBatchId, out var batch) || batch.Count != batchSize)
                 logger.Error("Batch is not found or not full yet");
 
-            lock (quantaCache)
-            {
-                //remove old entry to update options
-                quantaCache.Remove(fromBatchId);
+            var options = new MemoryCacheEntryOptions();
+            options.SetSlidingExpiration(TimeSpan.FromSeconds(15));
+            options.RegisterPostEvictionCallback(OnPostEviction);
 
-                var options = new MemoryCacheEntryOptions();
-                options.SetSlidingExpiration(TimeSpan.FromSeconds(15));
-                options.RegisterPostEvictionCallback(OnPostEviction);
-
-                quantaCache.Set(fromBatchId, batch, options);
-            }
+            //replace old entry
+            quantaCache.Set(fromBatchId, batch, options);
         }
+
+        private object syncRoot = new { };
 
         private List<PendingQuantum> GetBatch(ulong batchId)
         {
             var batch = default(List<PendingQuantum>);
             if (!quantaCache.TryGetValue(batchId, out batch))
-                lock (quantaCache)
+                lock (syncRoot)
                 {
                     if (!quantaCache.TryGetValue(batchId, out batch))
                     {

@@ -3,8 +3,10 @@ using Centaurus.Models;
 using Centaurus.PaymentProvider;
 using Centaurus.PaymentProvider.Models;
 using Centaurus.PersistentStorage.Abstraction;
+using NUnit.Framework;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -94,6 +96,7 @@ namespace Centaurus.Test
         {
             var context = new ExecutionContext(settings, storage, new MockPaymentProviderFactory(), new DummyConnectionWrapperFactory());
 
+
             var assets = new List<AssetSettings> { new AssetSettings { Code = "XLM", IsQuoteAsset = true }, new AssetSettings { Code = "USD" } };
 
             var stellarProviderVault = KeyPair.Random().AccountId;
@@ -125,7 +128,7 @@ namespace Centaurus.Test
                 .Sign(TestEnvironment.AlphaKeyPair)
                 .Sign(TestEnvironment.Auditor1KeyPair);
 
-            await context.QuantumHandler.HandleAsync(new ConstellationQuantum { RequestEnvelope = initRequest }, Task.FromResult(true));
+            await context.QuantumHandler.HandleAsync(new ConstellationQuantum { RequestEnvelope = initRequest }, Task.FromResult(true)).OnAcknowledge;
 
             var deposits = new List<DepositModel>();
             Action<byte[], string> addAssetsFn = (acc, asset) =>
@@ -164,7 +167,7 @@ namespace Centaurus.Test
                 Source = txNotification.ToDomainModel()
             };
 
-            await context.QuantumHandler.HandleAsync(depositQuantum, Task.FromResult(true));
+            await context.QuantumHandler.HandleAsync(depositQuantum, Task.FromResult(true)).OnAcknowledge;
 
             //save all effects
             context.PendingUpdatesManager.UpdateBatch(true);

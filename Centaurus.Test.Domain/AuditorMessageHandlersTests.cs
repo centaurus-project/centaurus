@@ -13,7 +13,7 @@ namespace Centaurus.Test
 
         private ExecutionContext context;
 
-        [SetUp]
+        [OneTimeSetUp]
         public void Setup()
         {
             EnvironmentHelper.SetTestEnvironmentVariable();

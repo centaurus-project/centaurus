@@ -1,15 +1,11 @@
 ﻿using Centaurus.Domain.Models;
-using Centaurus.Domain.Quanta.Contexts;
 using Centaurus.Models;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public class OrderCancellationProcessor : QuantumProcessorBase<OrderCancellationProcessorContext>
+    public class OrderCancellationProcessor : QuantumProcessorBase
     {
         public OrderCancellationProcessor(ExecutionContext context)
             :base(context)
@@ -19,52 +15,29 @@ namespace Centaurus.Domain
 
         public override string SupportedMessageType { get; } = typeof(OrderCancellationRequest).Name;
 
-        public override ProcessorContext GetContext(Quantum quantum, Account account)
+        public override Task<QuantumResultMessageBase> Process(QuantumProcessingItem quantumProcessingItem)
         {
-            return new OrderCancellationProcessorContext(Context, quantum, account);
-        }
+            UpdateNonce(quantumProcessingItem);
 
-        public override Task<QuantumResultMessageBase> Process(OrderCancellationProcessorContext context)
-        {
-            context.UpdateNonce();
+            Context.Exchange.RemoveOrder(quantumProcessingItem, Context.Constellation.QuoteAsset.Code);
 
-            context.CentaurusContext.Exchange.RemoveOrder(context, context.Orderbook, context.OrderWrapper);
-
-            var resultMessage = context.Quantum.CreateEnvelope<MessageEnvelopeSignless>().CreateResult(ResultStatusCode.Success);
+            var resultMessage = quantumProcessingItem.Quantum.CreateEnvelope<MessageEnvelopeSignless>().CreateResult(ResultStatusCode.Success);
             return Task.FromResult((QuantumResultMessageBase)resultMessage);
         }
 
-        public override Task Validate(OrderCancellationProcessorContext context)
+        public override Task Validate(QuantumProcessingItem quantumProcessingItem)
         {
-            context.ValidateNonce();
+            ValidateNonce(quantumProcessingItem);
 
-            var quantum = context.Quantum as RequestQuantum;
+            var quantum = (RequestQuantum)quantumProcessingItem.Quantum;
             var orderRequest = (OrderCancellationRequest)quantum.RequestMessage;
 
-            context.OrderWrapper = context.CentaurusContext.Exchange.OrderMap.GetOrder(orderRequest.OrderId);
-            if (context.OrderWrapper == null)
+            var orderWrapper = Context.Exchange.OrderMap.GetOrder(orderRequest.OrderId);
+            if (orderWrapper == null)
                 throw new BadRequestException($"Order {orderRequest.OrderId} is not found.");
 
-            context.Orderbook = context.CentaurusContext.Exchange.GetOrderbook(context.OrderWrapper.Order.Asset, context.OrderWrapper.Order.Side);
-
-            //TODO: check that lot size is greater than minimum allowed lot
-            if (!context.OrderWrapper.Account.Pubkey.Equals(orderRequest.Account))
+            if (!orderWrapper.Account.Pubkey.Equals(orderRequest.Account))
                 throw new ForbiddenException();
-
-            if (context.OrderWrapper.Order.Side == OrderSide.Buy)
-            {
-                var balance = context.InitiatorAccount.GetBalance(context.CentaurusContext.Constellation.QuoteAsset.Code);
-                if (balance.Liabilities < context.OrderWrapper.Order.QuoteAmount)
-                    throw new BadRequestException("Quote liabilities is less than order size.");
-            }
-            else
-            {
-                var balance = context.InitiatorAccount.GetBalance(context.OrderWrapper.Order.Asset);
-                if (balance == null)
-                    throw new BadRequestException("Balance for asset not found.");
-                if (balance.Liabilities < context.OrderWrapper.Order.Amount)
-                    throw new BadRequestException("Asset liabilities is less than order size.");
-            }
 
             return Task.CompletedTask;
         }

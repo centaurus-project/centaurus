@@ -9,10 +9,10 @@ namespace Centaurus.Domain
 {
     public class OrderRemovedEffectProccessor : ClientEffectProcessor<OrderRemovedEffect>
     {
-        private OrderbookBase orderbook;
+        private Orderbook orderbook;
         private string baseAsset;
 
-        public OrderRemovedEffectProccessor(OrderRemovedEffect effect, Account account, OrderbookBase orderbook, string baseAsset)
+        public OrderRemovedEffectProccessor(OrderRemovedEffect effect, Account account, Orderbook orderbook, string baseAsset)
             : base(effect, account)
         {
             this.orderbook = orderbook ?? throw new ArgumentNullException(nameof(orderbook));

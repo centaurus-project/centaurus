@@ -14,14 +14,24 @@ namespace Centaurus.Test
 {
     public abstract class BaseQuantumHandlerTests
     {
+        [OneTimeSetUp]
+        public void Setup()
+        {
+            EnvironmentHelper.SetTestEnvironmentVariable();
+            context = GlobalInitHelper.DefaultAlphaSetup().Result;
+        }
+
+        [OneTimeTearDown]
+        public void TearDown()
+        {
+            context?.Dispose();
+        }
+
         protected ExecutionContext context;
 
         [Test]
-        [TestCase(0, "XLM", typeof(InvalidOperationException))]
-        [TestCase(1, "XLM", typeof(InvalidOperationException))]
-        [TestCase(10, "1000", typeof(InvalidOperationException))]
         [TestCase(10, "XLM", null)]
-        public async Task TxCommitQuantumTest(int cursor, string asset, Type excpectedException)
+        public async Task DepositQuantumTest(int cursor, string asset, Type excpectedException)
         {
             context.SetState(State.Ready);
 
@@ -74,20 +84,21 @@ namespace Centaurus.Test
         }
 
         [Test]
-        [TestCase(0, "XLM", 0ul, OrderSide.Sell, typeof(UnauthorizedException))]
-        [TestCase(1, "XLM", 0ul, OrderSide.Sell, typeof(BadRequestException))]
-        [TestCase(1, "USD", 0ul, OrderSide.Sell, typeof(BadRequestException))]
-        [TestCase(1, "USD", 1000000000ul, OrderSide.Sell, typeof(BadRequestException))]
-        [TestCase(1, "USD", 100ul, OrderSide.Sell, null)]
-        [TestCase(1, "USD", 100ul, OrderSide.Buy, typeof(BadRequestException))]
-        [TestCase(1, "USD", 98ul, OrderSide.Buy, null)]
-        public async Task OrderQuantumTest(int nonce, string asset, ulong amount, OrderSide side, Type excpectedException)
+        [TestCase(true, 1, "USD", 98ul, OrderSide.Buy, null)]
+        [TestCase(false, 1, "USD", 100ul, OrderSide.Sell, null)]
+        [TestCase(true, 0, "XLM", 0ul, OrderSide.Sell, typeof(UnauthorizedException))]
+        [TestCase(true, 1, "XLM", 0ul, OrderSide.Sell, typeof(BadRequestException))]
+        [TestCase(true, 1, "USD", 0ul, OrderSide.Sell, typeof(BadRequestException))]
+        [TestCase(true, 1, "USD", ulong.MaxValue, OrderSide.Sell, typeof(BadRequestException))]
+        [TestCase(true, 1, "XLM", 100ul, OrderSide.Buy, typeof(BadRequestException))]
+        public async Task OrderQuantumTest(bool useFirstAccount, int nonceInc, string asset, ulong amount, OrderSide side, Type excpectedException)
         {
-            var account = context.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
+            var accountKeypair = useFirstAccount ? TestEnvironment.Client1KeyPair : TestEnvironment.Client2KeyPair;
+            var account = context.AccountStorage.GetAccount(accountKeypair);
             var order = new OrderRequest
             {
                 Account = account.Pubkey,
-                RequestId = nonce,
+                RequestId = (long)account.Nonce + nonceInc,
                 Amount = amount,
                 Asset = asset,
                 Price = 100,
@@ -95,29 +106,23 @@ namespace Centaurus.Test
             };
 
             var envelope = order.CreateEnvelope();
-            envelope.Sign(TestEnvironment.Client1KeyPair);
+            envelope.Sign(accountKeypair);
             var quantum = new RequestQuantum
             {
                 RequestEnvelope = envelope
             };
-
+            var ordersCount = account.Orders.Count;
             await AssertQuantumHandling(quantum, excpectedException);
             if (excpectedException == null)
-            {
-                var currentMarket = context.Exchange.GetMarket(asset);
-                Assert.IsTrue(currentMarket != null);
-
-                var requests = side == OrderSide.Buy ? currentMarket.Bids : currentMarket.Asks;
-                Assert.AreEqual(1, requests.Count);
-            }
+                Assert.AreEqual(ordersCount + 1, account.Orders.Count);
         }
 
         [Test]
+        [TestCase("USD", 98ul, OrderSide.Buy, 0ul, false, null)]
         [TestCase("USD", 100ul, OrderSide.Sell, 111ul, false, typeof(BadRequestException))]
         [TestCase("USD", 98ul, OrderSide.Buy, 111ul, false, typeof(BadRequestException))]
-        [TestCase("USD", 100ul, OrderSide.Sell, 0ul, true, typeof(UnauthorizedAccessException))]
+        [TestCase("USD", 100ul, OrderSide.Sell, 0ul, true, typeof(UnauthorizedException))]
         [TestCase("USD", 100ul, OrderSide.Sell, 0ul, false, null)]
-        [TestCase("USD", 98ul, OrderSide.Buy, 0ul, false, null)]
         public async Task OrderCancellationQuantumTest(string asset, ulong amount, OrderSide side, ulong apexMod, bool useFakeSigner, Type excpectedException)
         {
             var acc = context.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
@@ -125,49 +130,51 @@ namespace Centaurus.Test
             var order = new OrderRequest
             {
                 Account = acc.Pubkey,
-                RequestId = 1,
+                RequestId = (long)acc.Nonce + 1,
                 Amount = amount,
                 Asset = asset,
                 Price = 100,
                 Side = side
             };
 
-            var envelope = order.CreateEnvelope().Sign(useFakeSigner ? TestEnvironment.Client2KeyPair : TestEnvironment.Client1KeyPair);
+            var envelope = order.CreateEnvelope().Sign(TestEnvironment.Client1KeyPair);
             var quantum = new RequestQuantum { RequestEnvelope = envelope };
 
-            await AssertQuantumHandling(quantum, excpectedException);
-            if (excpectedException != null)
-                return;
+            await AssertQuantumHandling(quantum);
 
-            var apex = quantum.Apex + apexMod;
+            var orderId = quantum.Apex + apexMod;
 
             var orderCancellation = new OrderCancellationRequest
             {
                 Account = acc.Pubkey,
-                RequestId = 2,
-                OrderId = apex
+                RequestId = (long)acc.Nonce + 1,
+                OrderId = orderId
             };
 
-            envelope = orderCancellation.CreateEnvelope().Sign(TestEnvironment.Client1KeyPair);
+            var ordersCount = acc.Orders.Count;
+
+            envelope = orderCancellation.CreateEnvelope().Sign(useFakeSigner ? TestEnvironment.Client2KeyPair : TestEnvironment.Client1KeyPair);
             quantum = new RequestQuantum { RequestEnvelope = envelope };
 
             await AssertQuantumHandling(quantum, excpectedException);
-
             if (excpectedException != null)
+            {
+                //remove created order
+                orderCancellation.OrderId = orderId - apexMod;
+                envelope = orderCancellation.CreateEnvelope().Sign(TestEnvironment.Client1KeyPair);
+                quantum = new RequestQuantum { RequestEnvelope = envelope };
+                await AssertQuantumHandling(quantum);
                 return;
-            var currentMarket = context.Exchange.GetMarket(asset);
-            Assert.IsTrue(currentMarket != null);
+            }
 
-            var requests = side == OrderSide.Buy ? currentMarket.Bids : currentMarket.Asks;
-            Assert.AreEqual(requests.Count, 0);
+            Assert.AreEqual(ordersCount - 1, acc.Orders.Count);
         }
 
 
 
         [Test]
-        [TestCase(100ul, true, typeof(UnauthorizedAccessException))]
-        [TestCase(100ul, false, typeof(BadRequestException))]
-        [TestCase(1000000000000ul, false, typeof(BadRequestException))]
+        [TestCase(100ul, true, typeof(UnauthorizedException))]
+        [TestCase(ulong.MaxValue, false, typeof(BadRequestException))]
         [TestCase(100ul, false, null)]
         public async Task WithdrawalQuantumTest(ulong amount, bool useFakeSigner, Type excpectedException)
         {
@@ -176,7 +183,7 @@ namespace Centaurus.Test
             var withdrawal = new WithdrawalRequest
             {
                 Account = account.Pubkey,
-                RequestId = 1,
+                RequestId = (long)account.Nonce + 1,
                 Amount = amount,
                 Asset = context.Constellation.QuoteAsset.Code,
                 Destination = KeyPair.Random().PublicKey,
@@ -191,10 +198,8 @@ namespace Centaurus.Test
         }
 
         [Test]
-        [TestCase(100ul, false, typeof(BadRequestException))]
-        [TestCase(100ul, false, typeof(BadRequestException))]
-        [TestCase(1000000000000ul, false, typeof(BadRequestException))]
-        [TestCase(100ul, true, typeof(UnauthorizedAccessException))]
+        [TestCase(ulong.MaxValue, false, typeof(BadRequestException))]
+        [TestCase(100ul, true, typeof(UnauthorizedException))]
         [TestCase(100ul, false, null)]
         public async Task PaymentQuantumTest(ulong amount, bool useFakeSigner, Type excpectedException)
         {
@@ -203,7 +208,7 @@ namespace Centaurus.Test
             var withdrawal = new PaymentRequest
             {
                 Account = account.Pubkey,
-                RequestId = 1,
+                RequestId = (long)account.Nonce + 1,
                 Asset = context.Constellation.QuoteAsset.Code,
                 Destination = TestEnvironment.Client2KeyPair,
                 Amount = amount
@@ -218,7 +223,6 @@ namespace Centaurus.Test
             var expextedBalance = account.GetBalance(baseAsset).Amount - amount;
 
             await AssertQuantumHandling(quantum, excpectedException);
-
             if (excpectedException == null)
             {
                 Assert.AreEqual(account.GetBalance(baseAsset).Amount, expextedBalance);
@@ -226,16 +230,15 @@ namespace Centaurus.Test
         }
 
         [Test]
-        [TestCase(0, typeof(UnauthorizedException))]
-        [TestCase(1, null)]
-        public async Task AccountDataRequestTest(int nonce, Type excpectedException)
+        [TestCase(1ul, null)]
+        public async Task AccountDataRequestTest(ulong nonceInc, Type excpectedException)
         {
             context.SetState(State.Ready);
             var account = context.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
             var order = new AccountDataRequest
             {
                 Account = account.Pubkey,
-                RequestId = nonce
+                RequestId = (long)(nonceInc + account.Nonce)
             };
 
             var envelope = order.CreateEnvelope();
@@ -253,42 +256,45 @@ namespace Centaurus.Test
             }
         }
 
-        [Test]
-        [TestCaseSource("AccountRequestRateLimitsCases")]
-        public async Task AccountRequestRateLimitTest(KeyPair clientKeyPair, int? requestLimit)
-        {
-            context.SetState(State.Ready);
+        //[Test]
+        //[TestCaseSource("AccountRequestRateLimitsCases")]
+        //public async Task AccountRequestRateLimitTest(KeyPair clientKeyPair, int? requestLimit)
+        //{
+        //    context.SetState(State.Ready);
 
-            var account = context.AccountStorage.GetAccount(clientKeyPair);
-            if (requestLimit.HasValue)
-                account.RequestRateLimits = new RequestRateLimits { HourLimit = (uint)requestLimit.Value, MinuteLimit = (uint)requestLimit.Value };
+        //    var account = context.AccountStorage.GetAccount(clientKeyPair);
+        //    if (requestLimit.HasValue)
+        //        account.RequestRateLimits = new RequestRateLimits { HourLimit = (uint)requestLimit.Value, MinuteLimit = (uint)requestLimit.Value };
 
-            var minuteLimit = (account.RequestRateLimits ?? context.Constellation.RequestRateLimits).MinuteLimit;
-            var minuteIterCount = minuteLimit + 1;
-            for (var i = 0; i < minuteIterCount; i++)
-            {
-                var envelope = new AccountDataRequest
-                {
-                    Account = account.Pubkey,
-                    RequestId = i + 1
-                }.CreateEnvelope();
-                envelope.Sign(clientKeyPair);
-                var quantum = new AccountDataRequestQuantum { RequestEnvelope = envelope };
+        //    var minuteLimit = (account.RequestRateLimits ?? context.Constellation.RequestRateLimits).MinuteLimit;
+        //    var minuteIterCount = minuteLimit + 1;
+        //    for (var i = 0; i < minuteIterCount; i++)
+        //    {
+        //        var envelope = new AccountDataRequest
+        //        {
+        //            Account = account.Pubkey,
+        //            RequestId = i + 1
+        //        }.CreateEnvelope();
+        //        envelope.Sign(clientKeyPair);
+        //        var quantum = new AccountDataRequestQuantum { RequestEnvelope = envelope };
 
-                if (i + 1 > minuteLimit)
-                    await AssertQuantumHandling(quantum, typeof(TooManyRequestsException));
-                else
-                    await AssertQuantumHandling(quantum, null);
-            }
-        }
+        //        if (i + 1 > minuteLimit)
+        //            await AssertQuantumHandling(quantum, typeof(TooManyRequestsException));
+        //        else
+        //            await AssertQuantumHandling(quantum, null);
+        //    }
+        //}
 
         protected async Task<QuantumResultMessageBase> AssertQuantumHandling(Quantum quantum, Type excpectedException = null)
         {
             try
             {
-                var result = await context.QuantumHandler.HandleAsync(quantum, Task.FromResult(true));
+                var result = await context.QuantumHandler.HandleAsync(quantum, QuantumSignatureValidator.Validate(quantum)).OnAcknowledge;
 
-                Assert.AreEqual(result.Status, ResultStatusCode.Success);
+                if (excpectedException != null)
+                    Assert.Fail($"{excpectedException.Name} was expected, but wasn't occurred.");
+
+                Assert.AreEqual(result.Status.ToString(), ResultStatusCode.Success.ToString());
                 return result;
             }
             catch (Exception exc)

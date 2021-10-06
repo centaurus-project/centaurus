@@ -22,8 +22,7 @@ namespace Centaurus.Domain
 
         /// <param name="settings">Application config</param>
         /// <param name="storage">Persistent storage object</param>
-        /// <param name="useLegacyOrderbook"></param>
-        public ExecutionContext(Settings settings, IPersistentStorage storage, PaymentProvidersFactoryBase paymentProviderFactory, OutgoingConnectionFactoryBase connectionFactory, bool useLegacyOrderbook = false)
+        public ExecutionContext(Settings settings, IPersistentStorage storage, PaymentProvidersFactoryBase paymentProviderFactory, OutgoingConnectionFactoryBase connectionFactory)
         {
 
             Settings = settings ?? throw new ArgumentNullException(nameof(settings));
@@ -66,8 +65,6 @@ namespace Centaurus.Domain
             StateManager = new StateManager(this);
             StateManager.StateChanged += AppState_StateChanged;
 
-            this.useLegacyOrderbook = useLegacyOrderbook;
-
             DynamicSerializersInitializer.Init();
 
             var persistentData = DataProvider.GetPersistentData();
@@ -108,7 +105,9 @@ namespace Centaurus.Domain
                 try
                 {
                     //handle quantum
-                    var result = QuantumHandler.HandleAsync(quantum.Quantum, QuantumSignatureValidator.Validate(quantum.Quantum)).Result;
+                    var quantumProcessingItem = QuantumHandler.HandleAsync(quantum.Quantum, QuantumSignatureValidator.Validate(quantum.Quantum));
+
+                    quantumProcessingItem.OnAcknowledge.Wait();
 
                     //verify that the pending quantum has current node signature
                     var currentNodeSignature = quantum.Signatures.FirstOrDefault(s => s.AuditorId == Constellation.GetAuditorId(Settings.KeyPair)) ?? throw new Exception($"Unable to get signature for quantum {quantum.Quantum.Apex}");
@@ -138,8 +137,6 @@ namespace Centaurus.Domain
                 : Path.GetFullPath(Path.Combine(Settings.CWD, path.Trim('.').Trim('\\').Trim('/')));
         }
 
-        readonly bool useLegacyOrderbook;
-
         public void Setup(Snapshot snapshot)
         {
 
@@ -158,7 +155,7 @@ namespace Centaurus.Domain
 
             AccountStorage = new AccountStorage(snapshot.Accounts);
 
-            Exchange?.Dispose(); Exchange = Exchange.RestoreExchange(snapshot.Settings.Assets, snapshot.Orders, IsAlpha, useLegacyOrderbook);
+            Exchange?.Dispose(); Exchange = Exchange.RestoreExchange(snapshot.Settings.Assets, snapshot.Orders, RoleManager.ParticipationLevel == CentaurusNodeParticipationLevel.Prime);
 
             SetupPaymentProviders(snapshot.Cursors);
 

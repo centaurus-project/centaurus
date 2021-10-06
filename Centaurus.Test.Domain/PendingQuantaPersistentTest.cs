@@ -39,7 +39,7 @@ namespace Centaurus.Test
                     Account = TestEnvironment.Client1KeyPair,
                     RequestId = DateTime.UtcNow.Ticks
                 }.CreateEnvelope().Sign(TestEnvironment.Client1KeyPair)
-            }, Task.FromResult(true));
+            }, Task.FromResult(true)).OnAcknowledge;
 
             context.Complete();
 
