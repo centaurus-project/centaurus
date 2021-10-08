@@ -26,6 +26,7 @@ namespace Centaurus.Domain
             if (destinationAccount == null)
             {
                 quantumProcessingItem.AddAccountCreate(Context.AccountStorage, payment.Destination, Context.Constellation.RequestRateLimits);
+                destinationAccount = Context.AccountStorage.GetAccount(payment.Destination);
             }
 
             if (!destinationAccount.HasBalance(payment.Asset))

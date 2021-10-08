@@ -32,6 +32,8 @@ namespace Centaurus.Domain
         {
             CurrentApex = lastApex;
             LastQuantumHash = lastQuantumHash;
+            //load current batch
+            GetBatch(GetBatchApexStart(CurrentApex));
         }
 
         /// <summary>

@@ -35,7 +35,7 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
                 State = Context.StateManager.State
             });
 
-            //after sending auditor handshake the connection become ready
+            //after sending auditor handshake the connection becomes ready
             connection.ConnectionState = ConnectionState.Ready;
         }
     }

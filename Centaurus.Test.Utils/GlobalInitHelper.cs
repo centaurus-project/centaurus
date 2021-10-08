@@ -128,7 +128,7 @@ namespace Centaurus.Test
                 .Sign(TestEnvironment.AlphaKeyPair)
                 .Sign(TestEnvironment.Auditor1KeyPair);
 
-            await context.QuantumHandler.HandleAsync(new ConstellationQuantum { RequestEnvelope = initRequest }, Task.FromResult(true)).OnAcknowledge;
+            await context.QuantumHandler.HandleAsync(new ConstellationQuantum { RequestEnvelope = initRequest }, Task.FromResult(true)).OnProcessed;
 
             var deposits = new List<DepositModel>();
             Action<byte[], string> addAssetsFn = (acc, asset) =>
@@ -162,12 +162,12 @@ namespace Centaurus.Test
 
             var depositQuantum = new DepositQuantum
             {
-                Apex = 2,
+                Apex = context.QuantumStorage.CurrentApex + 1,
                 PrevHash = context.QuantumStorage.LastQuantumHash,
                 Source = txNotification.ToDomainModel()
             };
 
-            await context.QuantumHandler.HandleAsync(depositQuantum, Task.FromResult(true)).OnAcknowledge;
+            await context.QuantumHandler.HandleAsync(depositQuantum, Task.FromResult(true)).OnProcessed;
 
             //save all effects
             context.PendingUpdatesManager.UpdateBatch(true);

@@ -35,7 +35,6 @@ namespace Centaurus.Domain
         public async Task EstablishConnection(Uri uri)
         {
             await connection.Connect(uri, cancellationToken);
-            _ = Task.Factory.StartNew(Listen, TaskCreationOptions.LongRunning);
             ProcessOutgoingMessageQueue();
         }
 

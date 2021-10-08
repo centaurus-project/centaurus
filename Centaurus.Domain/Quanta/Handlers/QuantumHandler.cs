@@ -91,14 +91,22 @@ namespace Centaurus.Domain
             {
                 var originalException = exc.InnerException;
                 processingItem.SetException(originalException);
+                NotifyOnException(processingItem, originalException);
                 if (!Context.IsAlpha) //if current node is auditor, than all quanta received from Alpha must pass the validation
                     throw originalException;
             }
             catch (Exception exc)
             {
                 processingItem.SetException(exc);
+                NotifyOnException(processingItem, exc);
                 throw;
             }
+        }
+
+        void NotifyOnException(QuantumProcessingItem processingItem, Exception exc)
+        {
+            if (processingItem.Initiator != null && !EnvironmentHelper.IsTest)
+                Context.Notify(processingItem.Initiator.Pubkey, ((RequestQuantum)processingItem.Quantum).RequestEnvelope.CreateResult(exc).CreateEnvelope());
         }
 
         void ValidateQuantum(QuantumProcessingItem processingItem)
@@ -160,6 +168,8 @@ namespace Centaurus.Domain
             AddToQuantumStorage(processingItem);
 
             ProcessResult(processingItem);
+
+            processingItem.Processed();
 
             logger.Trace($"Message of type {quantum.GetType().Name} with apex {quantum.Apex} is handled.");
         }

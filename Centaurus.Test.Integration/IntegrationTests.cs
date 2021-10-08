@@ -156,7 +156,7 @@ namespace Centaurus.Test
             {
                 var rawQuantum = quantum.ToByteArray();
                 var auditorsQuantum = XdrConverter.Deserialize<Quantum>(rawQuantum);
-                return a.Value.Context.QuantumHandler.HandleAsync(auditorsQuantum, Task.FromResult(true)).OnAcknowledge;
+                return a.Value.Context.QuantumHandler.HandleAsync(auditorsQuantum, Task.FromResult(true)).OnProcessed;
             }));
 
             //change quantum

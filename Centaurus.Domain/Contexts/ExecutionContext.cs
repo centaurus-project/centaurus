@@ -59,7 +59,6 @@ namespace Centaurus.Domain
 
             InfoConnectionManager = new InfoConnectionManager(this);
 
-            ResultManager = new ResultManager(this);
             Catchup = new Catchup(this);
 
             StateManager = new StateManager(this);
@@ -72,6 +71,9 @@ namespace Centaurus.Domain
             var lastApex = persistentData.snapshot?.Apex ?? 0;
             var lastHash = persistentData.snapshot?.LastHash ?? new byte[32];
             QuantumStorage.Init(lastApex, lastHash);
+
+            ResultManager = new ResultManager(this);
+
             QuantumHandler.Start();
 
             //apply data, if presented in db
@@ -107,7 +109,7 @@ namespace Centaurus.Domain
                     //handle quantum
                     var quantumProcessingItem = QuantumHandler.HandleAsync(quantum.Quantum, QuantumSignatureValidator.Validate(quantum.Quantum));
 
-                    quantumProcessingItem.OnAcknowledge.Wait();
+                    quantumProcessingItem.OnProcessed.Wait();
 
                     //verify that the pending quantum has current node signature
                     var currentNodeSignature = quantum.Signatures.FirstOrDefault(s => s.AuditorId == Constellation.GetAuditorId(Settings.KeyPair)) ?? throw new Exception($"Unable to get signature for quantum {quantum.Quantum.Apex}");

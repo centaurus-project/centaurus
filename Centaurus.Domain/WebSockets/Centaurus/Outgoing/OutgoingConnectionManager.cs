@@ -134,8 +134,7 @@ namespace Centaurus.Domain
                 lock (syncRoot)
                 {
                     isAborted = true;
-                    Unsubscribe(auditor);
-                    CloseConnection(auditor).Wait();
+                    auditor?.CloseConnection();
                     OutgoingResultsStorage.Dispose();
                 }
             }
@@ -154,73 +153,26 @@ namespace Centaurus.Domain
                     uriBuilder.Query = query.ToString();
 
                     var connectionUri = uriBuilder.Uri;
-
+                    var connectionAttempts = 0;
                     while (!isAborted)
                     {
-                        var _auditor = new OutgoingConnection(Context, PubKey, OutgoingMessageStorage, connectionManager.connectionFactory.GetConnection());
+                        auditor = new OutgoingConnection(Context, PubKey, OutgoingMessageStorage, connectionManager.connectionFactory.GetConnection());
                         try
                         {
-                            Subscribe(_auditor);
-                            await _auditor.EstablishConnection(connectionUri);
-                            auditor = _auditor;
-                            break;
+                            await auditor.EstablishConnection(connectionUri);
+                            await auditor.Listen();
                         }
                         catch (Exception exc)
                         {
-                            Unsubscribe(_auditor);
-                            await CloseConnection(_auditor);
+                            auditor = null;
 
-                            if (!(exc is OperationCanceledException))
-                                logger.Info($"Unable establish connection with {connectionUri}. Retry in 1000ms");
+                            if (!(exc is OperationCanceledException) && connectionAttempts % 100 == 0)
+                                logger.Error(exc, $"Unable establish connection with {connectionUri} after {connectionAttempts} attempts. Retry in 1000ms");
                             Thread.Sleep(1000);
+                            connectionAttempts++;
                         }
                     }
                 });
-            }
-
-            private void Subscribe(OutgoingConnection _auditor)
-            {
-                if (_auditor != null)
-                    _auditor.OnConnectionStateChanged += OnConnectionStateChanged;
-            }
-
-            private void Unsubscribe(OutgoingConnection _auditor)
-            {
-                if (_auditor != null)
-                    _auditor.OnConnectionStateChanged -= OnConnectionStateChanged;
-            }
-
-            private void OnConnectionStateChanged((ConnectionBase connection, ConnectionState prev, ConnectionState current) args)
-            {
-                switch (args.current)
-                {
-                    case ConnectionState.Closed:
-                        Close(args.connection);
-                        break;
-                    default:
-                        break;
-                }
-            }
-
-            private async Task CloseConnection(OutgoingConnection _auditor)
-            {
-                if (_auditor != null)
-                {
-                    await _auditor.CloseConnection();
-                    _auditor.Dispose();
-                }
-            }
-
-            private void Close(ConnectionBase e)
-            {
-                lock (syncRoot)
-                {
-                    Unsubscribe(auditor);
-                    CloseConnection(auditor).Wait();
-                    auditor = null;
-                    if (!isAborted)
-                        ConnectToAuditor();
-                }
             }
 
             private readonly object syncRoot = new { };

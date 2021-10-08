@@ -51,7 +51,7 @@ namespace Centaurus.Test
             var tasks = new List<Task>();
             foreach (var q in messages)
             {
-                tasks.Add(context.QuantumHandler.HandleAsync(q.Key, q.Value).OnAcknowledge);
+                tasks.Add(context.QuantumHandler.HandleAsync(q.Key, q.Value).OnProcessed);
             }
 
             await Task.WhenAll(tasks);

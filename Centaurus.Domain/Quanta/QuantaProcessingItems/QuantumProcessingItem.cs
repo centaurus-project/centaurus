@@ -47,50 +47,26 @@ namespace Centaurus.Domain
 
         public int CurrentAuditorId { get; private set; }
 
-        public Task<QuantumResultMessageBase> OnAcknowledge => acknowledgmentTaskSource.Task;
+        public Task<QuantumResultMessageBase> OnProcessed => onProcessedTaskSource.Task;
 
-        public Task<QuantumResultMessageBase> OnFinalized => acknowledgmentTaskSource.Task;
-
-        QuantumProcessingTaskSource acknowledgmentTaskSource = new QuantumProcessingTaskSource();
-
-        QuantumProcessingTaskSource finalizeTaskSource = new QuantumProcessingTaskSource();
-
-        public void SetResult(bool isFinalize)
-        {
-            if (finalizeTaskSource.Task.IsCompleted)
-                throw new InvalidOperationException("The result is already set.");
-
-            if (!isFinalize)
-            {
-                if (acknowledgmentTaskSource.Task.IsCompleted)
-                    throw new InvalidOperationException("The acknowledgment result is already set.");
-                acknowledgmentTaskSource.SetResult(ResultMessage);
-            }
-            else
-            {
-                if (!acknowledgmentTaskSource.Task.IsCompleted)
-                    acknowledgmentTaskSource.SetResult(ResultMessage);
-                finalizeTaskSource.SetResult(ResultMessage);
-            }
-        }
+        QuantumProcessingTaskSource onProcessedTaskSource = new QuantumProcessingTaskSource();
 
         public void SetException(Exception exc)
         {
-            if (!acknowledgmentTaskSource.Task.IsCompleted)
-                acknowledgmentTaskSource.SetException(exc);
-            if (!finalizeTaskSource.Task.IsCompleted)
-                finalizeTaskSource.SetException(exc);
+            onProcessedTaskSource.TrySetException(exc);
+        }
+
+        public void Processed()
+        {
+            onProcessedTaskSource.TrySetResult(ResultMessage);
         }
 
         /// <summary>
         /// Creates message notifications for accounts that were affected by quantum
         /// </summary>
         /// <returns></returns>
-        public Dictionary<RawPubKey, EffectsNotification> GetNotificationMessages(PayloadProof payloadProof)
+        public Dictionary<RawPubKey, EffectsNotification> GetNotificationMessages()
         {
-            if (payloadProof == null)
-                throw new ArgumentNullException(nameof(payloadProof));
-
             var requestHashInfo = new RequestHashInfo { Data = QuantumHash };
 
             var result = new Dictionary<RawPubKey, EffectsNotification>();
@@ -102,7 +78,7 @@ namespace Centaurus.Domain
                 var notification = new EffectsNotification
                 {
                     Request = requestHashInfo,
-                    PayloadProof = payloadProof,
+                    PayloadProof = ResultMessage.PayloadProof,
                     Effects = Effects.GetAccountEffects(effectsGroup.Account),
                     Apex = Apex
                 };

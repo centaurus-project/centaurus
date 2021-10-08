@@ -22,7 +22,11 @@ namespace Centaurus.Domain
         public ResultManager(ExecutionContext context)
             : base(context)
         {
+            //create batch for current apex
             CreateBatch(GetBatchApexStart(Context.QuantumStorage.CurrentApex));
+            //update batch if required
+            UpdateCache();
+
             InitTimers();
             Task.Factory.StartNew(ProcessResults, TaskCreationOptions.LongRunning);
             Task.Factory.StartNew(ProcessAuditorResults, TaskCreationOptions.LongRunning);
@@ -103,7 +107,8 @@ namespace Centaurus.Domain
                 }
                 catch (Exception exc)
                 {
-                    logger.Error(exc, "Error on processing auditor result");
+                    Context.StateManager.Failed(new Exception($"Error on auditor result for apex {result.Apex}", exc));
+                    return;
                 }
             });
         }
@@ -176,19 +181,20 @@ namespace Centaurus.Domain
                 if (nextBatchId - Context.PendingUpdatesManager.LastSavedApex < advanceThreshold)
                 {
                     CreateBatch(nextBatchId);
-                    foreach (var batchId in currentBatchIds)
+                    //copy batch to be able to modify original
+                    var _currentBatchIds = currentBatchIds.ToList();
+                    foreach (var batchId in _currentBatchIds)
                     {
-                        if (batchId != currentBatchId)
+                        if (batchId == currentBatchId)
+                            break;
+                        currentBatchIds.Remove(batchId);
+                        if (!resultCache.TryGetValue(batchId, out var batch))
                         {
-                            currentBatchIds.Remove(batchId);
-                            if (!resultCache.TryGetValue(batchId, out var batch))
-                            {
-                                Context.StateManager.Failed(new Exception($"Result batch {batchId} is not found."));
-                                return;
-                            }
-                            //replace old entry
-                            resultCache.Set(batchId, batch, new MemoryCacheEntryOptions { SlidingExpiration = TimeSpan.FromSeconds(15) });
+                            Context.StateManager.Failed(new Exception($"Result batch {batchId} is not found."));
+                            return;
                         }
+                        //replace old entry
+                        resultCache.Set(batchId, batch, new MemoryCacheEntryOptions { SlidingExpiration = TimeSpan.FromSeconds(15) });
                     }
                 }
                 cacheUpdateTimer?.Start();
@@ -227,10 +233,9 @@ namespace Centaurus.Domain
 
             public ResultManager Manager { get; }
 
-            public bool IsFinalized { get; private set; }
-
             public QuantumProcessingItem ProcessingItem { get; private set; }
 
+            private bool IsFinalized;
             private object syncRoot = new { };
             private HashSet<int> processedAuditors = new HashSet<int>();
             private List<AuditorSignatureInternal> signatures = new List<AuditorSignatureInternal>();
@@ -269,6 +274,21 @@ namespace Centaurus.Domain
                     majorityResult = GetMajorityResult();
                     if (IsFinalized || majorityResult == MajorityResult.Unknown)
                         return;
+                    else if (majorityResult == MajorityResult.Unreachable)
+                    {
+                        var votesCount = signatures.Count;
+
+                        var quantum = ProcessingItem.Quantum;
+                        SequentialRequestMessage requestMessage = quantum is RequestQuantumBase requestQuantum
+                            ? requestQuantum.RequestMessage
+                            : null;
+
+                        var exc = new Exception("Majority for quantum" +
+                            $" {Apex} ({requestMessage?.GetMessageType() ?? quantum.GetMessageType()})" +
+                            $" is unreachable. Results received count is {processedAuditors.Count}," +
+                            $" valid results count is {votesCount}. The constellation collapsed.");
+                        Manager.Context.StateManager.Failed(exc);
+                    }
 
                     IsFinalized = true;
                 }
@@ -284,9 +304,6 @@ namespace Centaurus.Domain
                     //send result to auditors
                     Manager.Context.OutgoingConnectionManager.EnqueueResult(new AuditorResult { Apex = Apex, Signature = signature });
                     ProcessOutrunSignatures(this);
-                    //set acknowledge result if not finalized
-                    if (!IsFinalized)
-                        ProcessingItem.SetResult(false);
                 }
             }
 
@@ -295,9 +312,13 @@ namespace Centaurus.Domain
                 processedAuditors.Add(signature.AuditorId);
                 //skip if processed or current auditor already sent the result
                 if (IsFinalized)
+                {
+                    logger.Trace($"Apex: {Apex} finalized already.");
                     return;
+                }
                 signatures.Add(signature);
                 ProcessingItem.ResultMessage.PayloadProof.Signatures.Add(signature.PayloadSignature);
+                logger.Trace($"Apex: {Apex}, signature set. Count:" + ProcessingItem.ResultMessage.PayloadProof.Signatures.Count);
             }
 
             private AuditorSignatureInternal AddCurrentNodeSignature()
@@ -336,15 +357,12 @@ namespace Centaurus.Domain
 
             private void SendResult()
             {
-                var effectsProof = new PayloadProof
-                {
-                    PayloadHash = ProcessingItem.PayloadHash,
-                    Signatures = signatures.Select(s => s.PayloadSignature).ToList()
-                };
-
-                var notifications = ProcessingItem.GetNotificationMessages(effectsProof);
+                var notifications = ProcessingItem.GetNotificationMessages();
                 foreach (var notification in notifications)
                     Manager.Context.Notify(notification.Key, notification.Value.CreateEnvelope<MessageEnvelopeSignless>());
+
+                if (ProcessingItem.Initiator != null)
+                    Manager.Context.Notify(ProcessingItem.Initiator.Pubkey, ProcessingItem.ResultMessage.CreateEnvelope<MessageEnvelopeSignless>());
             }
 
             private void SubmitTransaction()
@@ -370,25 +388,8 @@ namespace Centaurus.Domain
 
             private void OnResult(MajorityResult majorityResult)
             {
-                if (majorityResult == MajorityResult.Unreachable)
-                {
-                    var votesCount = signatures.Count;
-
-                    var quantum = ProcessingItem.Quantum;
-                    SequentialRequestMessage requestMessage = quantum is RequestQuantumBase requestQuantum
-                        ? requestQuantum.RequestMessage
-                        : null;
-
-                    var exc = new Exception("Majority for quantum" +
-                        $" {Apex} ({requestMessage?.GetMessageType() ?? quantum.GetMessageType()})" +
-                        $" is unreachable. Results received count is {processedAuditors.Count}," +
-                        $" valid results count is {votesCount}. The constellation collapsed.");
-                    Manager.Context.StateManager.Failed(exc);
-                    throw exc;
-                }
                 SubmitTransaction();
                 PersistSignatures();
-                ProcessingItem.SetResult(true);
                 SendResult();
             }
 

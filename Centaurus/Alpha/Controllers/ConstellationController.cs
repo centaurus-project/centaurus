@@ -70,7 +70,7 @@ namespace Centaurus.Controllers
 
                 var quantumProcessingItem = Context.QuantumHandler.HandleAsync(constellationQuantum, Task.FromResult(true));
 
-                await quantumProcessingItem.OnAcknowledge;
+                await quantumProcessingItem.OnProcessed;
 
                 return new JsonResult(new InitResult { IsSuccess = true });
             }

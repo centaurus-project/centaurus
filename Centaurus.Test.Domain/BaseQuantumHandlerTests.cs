@@ -289,7 +289,7 @@ namespace Centaurus.Test
         {
             try
             {
-                var result = await context.QuantumHandler.HandleAsync(quantum, QuantumSignatureValidator.Validate(quantum)).OnAcknowledge;
+                var result = await context.QuantumHandler.HandleAsync(quantum, QuantumSignatureValidator.Validate(quantum)).OnProcessed;
 
                 if (excpectedException != null)
                     Assert.Fail($"{excpectedException.Name} was expected, but wasn't occurred.");

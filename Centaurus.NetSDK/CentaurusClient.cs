@@ -99,7 +99,6 @@ namespace Centaurus.NetSDK
 
             //get last account sequence
             var effects = XdrConverter.Deserialize<EffectsGroup>(adr.Effects.First().EffectsGroupData);
-
             foreach (var balance in adr.Balances)
             {
                 AccountState.balances[balance.Asset] = new BalanceModel

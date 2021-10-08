@@ -186,9 +186,12 @@ namespace Centaurus.Alpha
                 pubKey = null;
                 if (context == null)
                     throw new ArgumentNullException(nameof(context));
-                if (!(context.Request.Query.TryGetValue(WebSocketConstants.PubkeyParamName, out var address) 
+                if (!(context.Request.Query.TryGetValue(WebSocketConstants.PubkeyParamName, out var address)
                     && KeyPair.TryGetFromAccountId(address, out var keyPair)))
+                {
+                    logger.Trace($"Unable to get pubkey from request {context.Request.Path}.");
                     return false;
+                }
                 pubKey = keyPair;
                 return true;
             }
@@ -220,11 +223,18 @@ namespace Centaurus.Alpha
 
                 app.Use(async (context, next) =>
                 {
+                    logger.Trace($"New connection received. Path: {context.Request.Path}");
                     var path = context.Request.Path.ToString();
                     if (context.WebSockets.IsWebSocketRequest && webSocketHandlers.Keys.Contains(path))
+                    {
+                        logger.Trace($"Handler for path `{context.Request.Path}` found.");
                         await webSocketHandlers[path].Invoke(context, next);
+                    }
                     else
+                    {
+                        logger.Trace($"Handler for path `{context.Request.Path}` not found.");
                         await next();
+                    }
                 });
 
                 app.UseMvc(routes =>
