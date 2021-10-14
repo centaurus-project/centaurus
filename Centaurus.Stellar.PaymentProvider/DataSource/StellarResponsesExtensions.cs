@@ -56,15 +56,16 @@ namespace Centaurus.Stellar
             };
         }
 
-        public static TxSubmitModel ToModel(this SubmitTransactionResponse accountResponse)
+        public static TxSubmitModel ToModel(this SubmitTransactionResponse submitResponse)
         {
-            if (accountResponse == null)
+            if (submitResponse == null)
                 return null;
             return new TxSubmitModel
             {
-                Hash = accountResponse.Hash,
-                IsSuccess = accountResponse.IsSuccess(),
-                ResultXdr = accountResponse.ResultXdr
+                Hash = submitResponse.Hash,
+                IsSuccess = submitResponse.IsSuccess(),
+                ResultXdr = submitResponse.ResultXdr,
+                FeeCharged = submitResponse.Result.FeeCharged
             };
         }
     }

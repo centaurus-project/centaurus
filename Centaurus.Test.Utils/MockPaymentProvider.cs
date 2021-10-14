@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Threading.Tasks;
 
 namespace Centaurus.Test
 {
@@ -36,9 +37,9 @@ namespace Centaurus.Test
             return new SignatureModel { Signer = new byte[] { }, Signature = new byte[] { } };
         }
 
-        public override void SubmitTransaction(byte[] transaction, List<SignatureModel> signatures)
+        public override Task<bool> SubmitTransaction(byte[] transaction, List<SignatureModel> signatures)
         {
-            return;
+            return Task.FromResult(true);
         }
 
         public override bool IsTransactionValid(byte[] transaction, WithdrawalRequestModel withdrawalRequestm, out string error)

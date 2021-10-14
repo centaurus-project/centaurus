@@ -106,7 +106,7 @@ namespace Centaurus.Domain
         void NotifyOnException(QuantumProcessingItem processingItem, Exception exc)
         {
             if (processingItem.Initiator != null && !EnvironmentHelper.IsTest)
-                Context.Notify(processingItem.Initiator.Pubkey, ((RequestQuantum)processingItem.Quantum).RequestEnvelope.CreateResult(exc).CreateEnvelope());
+                Context.Notify(processingItem.Initiator.Pubkey, ((RequestQuantumBase)processingItem.Quantum).RequestEnvelope.CreateResult(exc).CreateEnvelope());
         }
 
         void ValidateQuantum(QuantumProcessingItem processingItem)

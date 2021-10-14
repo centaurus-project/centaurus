@@ -21,6 +21,8 @@ namespace Centaurus.NetSDK
 
         public readonly ConstellationConfig Config;
 
+        public ConstellationInfo ConstellationInfo => connection.ConstellationInfo;
+
         public AccountState AccountState { get; }
 
         internal Connection connection;
@@ -165,14 +167,15 @@ namespace Centaurus.NetSDK
         /// <param name="asset">Asset code to withdraw</param>
         /// <param name="amount">Amount to withdraw</param>
         /// <returns></returns>
-        public async Task<QuantumResult> Withdraw(string provider, byte[] destination, string asset, ulong amount)
+        public async Task<QuantumResult> Withdraw(string provider, byte[] destination, string asset, ulong amount, ulong fee)
         {
             var withdrawalRequest = new WithdrawalRequest
             {
                 Provider = provider,
                 Destination = destination,
                 Asset = asset,
-                Amount = amount
+                Amount = amount,
+                Fee = fee
             };
             return await Send(withdrawalRequest);
         }

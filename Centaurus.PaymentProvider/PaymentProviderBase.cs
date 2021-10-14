@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Timers;
 
 namespace Centaurus.PaymentProvider
@@ -78,7 +79,8 @@ namespace Centaurus.PaymentProvider
         /// </summary>
         /// <param name="transaction"></param>
         /// <param name="signatures"></param>
-        public abstract void SubmitTransaction(byte[] transaction, List<SignatureModel> signatures);
+        /// <returns>Submission result.</returns>
+        public abstract Task<bool> SubmitTransaction(byte[] transaction, List<SignatureModel> signatures);
 
         /// </summary>
         /// <param name="left"></param>

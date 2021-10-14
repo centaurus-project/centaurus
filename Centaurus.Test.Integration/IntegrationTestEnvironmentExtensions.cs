@@ -189,7 +189,7 @@ namespace Centaurus.Test
             var balanceAmount = balance.Amount;
             try
             {
-                var result = await client.Withdraw(provider, keyPair.PublicKey, asset, amount);
+                var result = await client.Withdraw(provider, keyPair.PublicKey, asset, amount, 100);
                 await AssertBalance(client, asset, balanceAmount - amount, 0);
             }
             catch (Exception exc)

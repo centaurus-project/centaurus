@@ -21,7 +21,7 @@ namespace Centaurus.Domain
         }
 
         /// <summary>
-        /// Creates and adds created balance to the acount
+        /// Creates and adds created balance to the account
         /// </summary>
         /// <param name="account">Account record</param>
         /// <param name="asset">Asset id</param>

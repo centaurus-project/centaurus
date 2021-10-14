@@ -4,7 +4,9 @@ using Centaurus.Stellar.Models;
 using stellar_dotnet_sdk;
 using stellar_dotnet_sdk.xdr;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text.Json;
 using System.Threading;
@@ -20,31 +22,20 @@ namespace Centaurus.Stellar.PaymentProvider
         {
             if (config == null)
                 throw new ArgumentNullException(nameof(config));
+
             var configObject = JsonSerializer.Deserialize<Config>(config);
 
             dataSource = new DataSource(configObject.PassPhrase, configObject.Horizon);
 
             secret = KeyPair.FromSecretSeed(configObject.Secret);
 
+            //load account sequence
+            LoadVaultAccountData().Wait();
+
             //wait while all missed transactions will be loaded
             LoadLastTxs().Wait();
 
             Task.Factory.StartNew(ListenTransactions, TaskCreationOptions.LongRunning);
-        }
-
-        private async Task LoadLastTxs()
-        {
-            var pageSize = 200;
-            while (true)
-            {
-                var txs = await dataSource.GetTransactions(Vault, long.Parse(LastRegisteredCursor), pageSize);
-                foreach (var tx in txs)
-                {
-                    ProcessTransaction(tx);
-                }
-                if (txs.Count < pageSize)
-                    break;
-            }
         }
 
         public override bool IsTransactionValid(byte[] rawTransaction, WithdrawalRequestModel withdrawalRequest, out string error)
@@ -64,37 +55,6 @@ namespace Centaurus.Stellar.PaymentProvider
             return true;
         }
 
-        private bool ValidateFee(uint fee)
-        {
-            return true;
-        }
-
-        private Account GetSourceAccount()
-        {
-            return null;
-        }
-
-        private SemaphoreSlim syncRoot = new SemaphoreSlim(1);
-        private AccountModel vaultAccount;
-        private async Task<AccountModel> GetVaultAccount()
-        {
-            if (vaultAccount != null)
-                return vaultAccount;
-
-            await syncRoot.WaitAsync();
-            try
-            {
-                if (vaultAccount != null)
-                    return vaultAccount;
-                vaultAccount = await dataSource.GetAccountData(Vault);
-                return vaultAccount;
-            }
-            finally
-            {
-                syncRoot.Release();
-            }
-        }
-
         public override byte[] BuildTransaction(WithdrawalRequestModel withdrawalRequest)
         {
             if (withdrawalRequest == null)
@@ -102,31 +62,20 @@ namespace Centaurus.Stellar.PaymentProvider
 
             if (!ValidateFee((uint)withdrawalRequest.Fee))
                 throw new InvalidOperationException($"Not fair fee {withdrawalRequest.Fee}.");
-            var options = new TransactionBuilderOptions(GetSourceAccount(), (uint)withdrawalRequest.Fee);
+
+            var sourceAccount = new Account(Vault, vaultAccount.SequenceNumber);
+            var options = new TransactionBuilderOptions(sourceAccount, (uint)withdrawalRequest.Fee);
             if (!Settings.TryGetAsset(withdrawalRequest.Asset, out var stellarAsset))
                 throw new InvalidOperationException($"Asset {withdrawalRequest.Asset} is not supported by provider.");
 
-            var transaction = TransactionHelper.BuildPaymentTransaction(options, stellar_dotnet_sdk.KeyPair.FromPublicKey(withdrawalRequest.Destination), stellarAsset, (long)withdrawalRequest.Amount);
-            var txSourceAccount = transaction.SourceAccount;
-            if (Vault == txSourceAccount.AccountId)
-                throw new InvalidOperationException("Vault account cannot be used as transaction source.");
-
-            if (transaction.TimeBounds == null || transaction.TimeBounds.MaxTime <= 0)
-                throw new InvalidOperationException("Max time must be set.");
-
-            var currentTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            if (transaction.TimeBounds.MaxTime - currentTime > 1000)
-                throw new InvalidOperationException("Transaction expiration time is to far.");
-
-            if (transaction.Operations.Any(o => !(o is PaymentOperation)))
-                throw new InvalidOperationException("Only payment operations are allowed.");
-
-            if (transaction.Operations.Length > 100)
-                throw new InvalidOperationException("Too many operations.");
+            var transaction = TransactionHelper.BuildPaymentTransaction(options, KeyPair.FromPublicKey(withdrawalRequest.Destination), stellarAsset, (long)withdrawalRequest.Amount);
 
             var stream = new XdrDataOutputStream();
             stellar_dotnet_sdk.xdr.Transaction.Encode(stream, transaction.ToXdrV1());
-            return stream.ToArray();
+            var rawTx = stream.ToArray();
+            //inc sequence
+            vaultAccount.SequenceNumber++;
+            return rawTx;
         }
 
         public override SignatureModel SignTransaction(byte[] transaction)
@@ -142,7 +91,7 @@ namespace Centaurus.Stellar.PaymentProvider
             return new SignatureModel { Signer = secret.PublicKey, Signature = signature.Signature.InnerValue };
         }
 
-        public override void SubmitTransaction(byte[] transaction, List<SignatureModel> signatures)
+        public override async Task<bool> SubmitTransaction(byte[] transaction, List<SignatureModel> signatures)
         {
             if (!StellarTransactionExtensions.TryDeserializeTransaction(transaction, out var tx))
                 throw new Exception("Unable to deserialize transaction.");
@@ -150,20 +99,142 @@ namespace Centaurus.Stellar.PaymentProvider
             if (tx.Signatures.Count > 0)
                 throw new ArgumentException("Transaction contains signatures.");
 
-            var accountModel = GetVaultAccount().Result;
+            if (signatures.Count < 1)
+                throw new ArgumentException("Signatures collection is empty.");
+
+            AddSignatures(tx, signatures);
+
+            var txItem = new TransactionItem { Transaction = tx };
+
+            _ = Task.Factory.StartNew(() => TrySubmitTransaction(txItem));
+
+            return await txItem.OnSubmitted.Task;
+        }
+
+        public override int CompareCursors(string left, string right)
+        {
+            if (!(long.TryParse(left, out var leftLong) && long.TryParse(right, out var rightLong)))
+                throw new Exception("Unable to convert cursor to long.");
+            return Comparer<long>.Default.Compare(leftLong, rightLong);
+        }
+
+        private async Task LoadVaultAccountData()
+        {
+            vaultAccount = await dataSource.GetAccountData(Vault);
+            lastSubmitedSequence = GetLastSubmittedSequence().Result;
+            if (lastSubmitedSequence == default)
+                lastSubmitedSequence = vaultAccount.SequenceNumber;
+        }
+
+        private AccountModel vaultAccount;
+
+        private long lastSubmitedSequence;
+
+        private async Task<long> GetLastSubmittedSequence()
+        {
+            var pageSize = 200;
+            while (true)
+            {
+                var txs = await dataSource.GetTransactions(Vault, 0, pageSize, true, true);
+                foreach (var tx in txs)
+                {
+                    var transaction = stellar_dotnet_sdk.Transaction.FromEnvelopeXdr(tx.EnvelopeXdr);
+                    if (transaction.SourceAccount.AccountId != Vault)
+                        continue;
+                    return transaction.SequenceNumber;
+                }
+                if (txs.Count < pageSize)
+                    break;
+            }
+            return 0;
+        }
+
+        private async Task LoadLastTxs()
+        {
+            var pageSize = 200;
+            while (true)
+            {
+                var txs = await dataSource.GetTransactions(Vault, long.Parse(LastRegisteredCursor), pageSize);
+                foreach (var tx in txs)
+                {
+                    ProcessTransaction(tx);
+                }
+                if (txs.Count < pageSize)
+                    break;
+            }
+        }
+
+        private bool ValidateFee(uint fee)
+        {
+            return true;
+        }
+
+        private SortedDictionary<long, TransactionItem> transactions = new SortedDictionary<long, TransactionItem>();
+
+        private void AddSignatures(stellar_dotnet_sdk.Transaction tx, List<SignatureModel> signatures)
+        {
             var currentWeight = 0;
             foreach (var signature in signatures)
             {
                 var signerKey = KeyPair.FromPublicKey(signature.Signer);
-                tx.Signatures.Add(new DecoratedSignature { Hint = signerKey.SignatureHint, Signature = new Signature(signature.Signature) });
-                var currentSigner = accountModel.Signers.FirstOrDefault();
+                var currentSigner = vaultAccount.Signers.FirstOrDefault(s => s.PubKey.AsSpan().SequenceEqual(signerKey.PublicKey));
                 if (currentSigner == null)
-                    throw new Exception($"Unknown signer {signerKey.AccountId}");
+                {
+                    RaiseOnError(new Exception($"Unknown signer {signerKey.AccountId}"));
+                    continue;
+                }
+                tx.Signatures.Add(new DecoratedSignature { Hint = signerKey.SignatureHint, Signature = new Signature(signature.Signature) });
                 currentWeight += currentSigner.Weight;
-                if (currentWeight >= accountModel.Thresholds.High)
+                if (currentWeight >= vaultAccount.Thresholds.Medium)
                     break;
             }
-            dataSource.SubmitTransaction(tx).Wait();
+
+            if (currentWeight < vaultAccount.Thresholds.High)
+                throw new Exception("Unable to reach required threshold weight.");
+        }
+
+        SemaphoreSlim txSubmitSemaphore = new SemaphoreSlim(1);
+        private async Task TrySubmitTransaction(TransactionItem transactionItem)
+        {
+            await txSubmitSemaphore.WaitAsync();
+            try
+            {
+                transactions.Add(transactionItem.Transaction.SequenceNumber, transactionItem);
+                while (transactions.Count > 0)
+                {
+                    transactionItem = transactions.Values.First();
+                    try
+                    {
+                        var txSequence = transactionItem.Transaction.SequenceNumber;
+                        var expectedSequence = lastSubmitedSequence + 1;
+                        if (transactionItem.Transaction.SequenceNumber > expectedSequence)
+                            //wait for previous tx
+                            break;
+                        else if (txSequence == expectedSequence)
+                        {
+                            lastSubmitedSequence = expectedSequence;
+                            var result = await dataSource.SubmitTransaction(transactionItem.Transaction);
+                            transactionItem.OnSubmitted.SetResult(result.IsSuccess);
+                            if (!result.IsSuccess)
+                                RaiseOnError(new Exception($"Transaction with sequence {transactionItem.Transaction.SequenceNumber} submit failed. {result.ResultXdr}"));
+                        }
+                        else if (transactionItem.Transaction.SequenceNumber < expectedSequence)
+                        {
+                            transactionItem.OnSubmitted.SetResult(false);
+                        }
+                        transactions.Remove(transactionItem.Transaction.SequenceNumber);
+                    }
+                    catch (Exception exc)
+                    {
+                        transactionItem.OnSubmitted.TrySetException(exc);
+                        RaiseOnError(exc);
+                    }
+                }
+            }
+            finally
+            {
+                txSubmitSemaphore.Release();
+            }
         }
 
         List<DepositModel> GetVaultPayments(stellar_dotnet_sdk.Transaction transaction, bool isSuccess)
@@ -248,12 +319,6 @@ namespace Centaurus.Stellar.PaymentProvider
                 }
             }
         }
-        public override int CompareCursors(string left, string right)
-        {
-            if (!(long.TryParse(left, out var leftLong) && long.TryParse(right, out var rightLong)))
-                throw new Exception("Unable to convert cursor to long.");
-            return Comparer<long>.Default.Compare(leftLong, rightLong);
-        }
 
         private readonly DataSource dataSource;
 
@@ -282,6 +347,13 @@ namespace Centaurus.Stellar.PaymentProvider
             {
                 return false;
             }
+        }
+
+        class TransactionItem
+        {
+            public stellar_dotnet_sdk.Transaction Transaction { get; set; }
+
+            public TaskCompletionSource<bool> OnSubmitted { get; } = new TaskCompletionSource<bool>();
         }
     }
 

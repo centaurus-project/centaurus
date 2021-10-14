@@ -10,7 +10,7 @@ namespace Centaurus
 {
     public class TransactionBuilderOptions
     {
-        public TransactionBuilderOptions(Account source, uint fee, string memo = null)
+        public TransactionBuilderOptions(ITransactionBuilderAccount source, uint fee, string memo = null)
         {
             if (fee <= 0)
                 throw new ArgumentNullException(nameof(fee));
@@ -20,7 +20,7 @@ namespace Centaurus
             Memo = memo;
         }
 
-        public Account Source { get; set; }
+        public ITransactionBuilderAccount Source { get; set; }
 
         public uint Fee { get; set; }
         
@@ -83,13 +83,16 @@ namespace Centaurus
             }
         }
 
-        public static TransactionsRequestBuilder GetTransactionsRequestBuilder(this Server server, string pubKey, long cursor, int limit = 200, bool includeFailed = true)
+        public static TransactionsRequestBuilder GetTransactionsRequestBuilder(this Server server, string pubKey, long cursor, int limit = 200, bool includeFailed = true, bool isDesc = false)
         {
-            return server.Transactions
+            var requestBuilder = server.Transactions
                 .ForAccount(pubKey)
                 .IncludeFailed(includeFailed)
                 .Limit(limit)
-                .Cursor(cursor.ToString());
+                .Order(isDesc ? OrderDirection.DESC : OrderDirection.ASC);
+            if (cursor != default)
+                requestBuilder = requestBuilder.Cursor(cursor.ToString());
+            return requestBuilder;
         }
     }
 }

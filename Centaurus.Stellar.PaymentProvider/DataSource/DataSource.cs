@@ -16,7 +16,6 @@ namespace Centaurus.Stellar
             if (string.IsNullOrWhiteSpace(networkPassphrase))
                 throw new ArgumentNullException(nameof(networkPassphrase));
 
-
             if (string.IsNullOrWhiteSpace(horizon))
                 throw new ArgumentNullException(nameof(horizon));
 
@@ -45,10 +44,10 @@ namespace Centaurus.Stellar
                 .ToModel();
         }
 
-        public async Task<List<TxModel>> GetTransactions(string pubKey, long cursor, int limit = 200, bool includeFailed = true)
+        public async Task<List<TxModel>> GetTransactions(string pubKey, long cursor = 0, int limit = 200, bool includeFailed = true, bool isDesc = false)
         {
             var result = await Server
-                .GetTransactionsRequestBuilder(pubKey, cursor, limit, includeFailed)
+                .GetTransactionsRequestBuilder(pubKey, cursor, limit, includeFailed, isDesc)
                 .Execute();
 
             return result

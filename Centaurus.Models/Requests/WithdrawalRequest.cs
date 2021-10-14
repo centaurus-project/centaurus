@@ -18,6 +18,6 @@ namespace Centaurus.Models
         public byte[] Destination { get; set; }
 
         [XdrField(4)]
-        public long Fee { get; set; }
+        public ulong Fee { get; set; }
     }
 }

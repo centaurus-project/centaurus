@@ -23,7 +23,7 @@ namespace Centaurus.Domain
             var withdrawalQuantum = (WithdrawalRequestQuantum)quantumProcessingItem.Quantum;
             var withdrawalRequest = (WithdrawalRequest)withdrawalQuantum.RequestMessage;
 
-            quantumProcessingItem.AddBalanceUpdate(quantumProcessingItem.Initiator, withdrawalRequest.Asset, withdrawalRequest.Amount, UpdateSign.Minus);
+            quantumProcessingItem.AddBalanceUpdate(quantumProcessingItem.Initiator, withdrawalRequest.Asset, withdrawalRequest.Amount + withdrawalRequest.Fee, UpdateSign.Minus);
 
             return Task.FromResult((QuantumResultMessageBase)withdrawalQuantum.CreateEnvelope<MessageEnvelopeSignless>().CreateResult(ResultStatusCode.Success));
         }
@@ -50,7 +50,7 @@ namespace Centaurus.Domain
             var baseAsset = Context.Constellation.QuoteAsset.Code;
 
             var minBalance = centaurusAsset.Code == baseAsset ? Context.Constellation.MinAccountBalance : 0;
-            if (!(sourceAccount.GetBalance(centaurusAsset.Code)?.HasSufficientBalance(withdrawalRequest.Amount, minBalance) ?? false))
+            if (!(sourceAccount.GetBalance(centaurusAsset.Code)?.HasSufficientBalance(withdrawalRequest.Amount + withdrawalRequest.Fee, minBalance) ?? false))
                 throw new BadRequestException($"Insufficient balance.");
 
             var withdrawal = withdrawalRequest.ToProviderModel();
