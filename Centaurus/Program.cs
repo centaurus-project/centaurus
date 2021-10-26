@@ -68,7 +68,6 @@ namespace Centaurus
                 if (!isLoggerInited)
                     LogConfigureHelper.Configure("logs");
                 logger.Error(exc);
-                Thread.Sleep(5000);
             }
         }
     }

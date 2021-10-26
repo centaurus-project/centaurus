@@ -92,8 +92,8 @@ namespace Centaurus.Domain
         /// <returns></returns>
         public List<PendingQuantum> GetQuantaAboveApex(ulong apex, int count = 0)
         {
-            var quantaModels = Context.PersistentStorage.LoadQuantaAboveApex(apex);
-            var query = (IEnumerable<QuantumPersistentModel>)quantaModels.OrderBy(q => q.Apex);
+            var query = (IEnumerable<QuantumPersistentModel>)Context.PersistentStorage.LoadQuantaAboveApex(apex)
+                .OrderBy(q => q.Apex);
             if (count > 0)
                 query = query.Take(count);
             return query.Select(q => q.ToPendingQuantum()).ToList();

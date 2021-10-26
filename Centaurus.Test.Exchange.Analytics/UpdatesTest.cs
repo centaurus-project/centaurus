@@ -116,7 +116,7 @@ namespace Centaurus.Test.Exchange.Analytics
                     Timestamp = DateTime.UtcNow.Ticks
                 };
 
-                testTradeResults.Add(trade, new QuantumProcessingItem(trade, System.Threading.Tasks.Task.FromResult(true)));
+                testTradeResults.Add(trade, new QuantumProcessingItem(trade, System.Threading.Tasks.Task.FromResult(true)) { Initiator = account1 });
             }
 
             PerfCounter.MeasureTime(() =>

@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Centaurus.Models;
 
-namespace Centaurus.Domain.Handlers.AlphaHandlers
+namespace Centaurus.Domain
 {
     public class HandshakeRequestHandler : MessageHandlerBase<OutgoingConnection>
     {
@@ -22,7 +22,7 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
         {
             var handshakeRequest = (HandshakeRequest)message.Envelope.Message;
 
-            var quantaCursor = Math.Max(Context.QuantumHandler.LastAddedQuantumApex, Context.QuantumStorage.CurrentApex);
+            var quantaCursor = Context.QuantumHandler.LastAddedQuantumApex;
             //if Prime than the node will receive results from auditors
             var resultCursor = Context.RoleManager.ParticipationLevel == CentaurusNodeParticipationLevel.Prime 
                 ? ulong.MaxValue 

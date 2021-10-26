@@ -100,20 +100,32 @@ namespace Centaurus.Models
         /// </summary>
         ConstellationUpdate = 201,
         /// <summary>
-        /// Quanta batch request
-        /// </summary>
-        QuantaBatchRequest = 203,
-        /// <summary>
-        /// Contains batch of quanta
-        /// </summary>
-        QuantaBatch = 204,
-        /// <summary>
         /// Wrapper for constellation requests.
         /// </summary>
         ConstellationQuantum = 205,
         /// <summary>
-        /// Contains array of auditor's quantum processing results
+        /// Contains last saved Apex
         /// </summary>
-        AuditorResultsBatch = 210
+        CatchupQuantaBatchRequest = 211,
+        /// <summary>
+        /// Contains batch of quanta, that was requested by Alpha
+        /// </summary>
+        CatchupQuantaBatch = 212,
+        /// <summary>
+        /// Contains cursors for quanta and signatures
+        /// </summary>
+        SyncCursorUpdate = 213,
+        /// <summary>
+        /// Contains batch of quanta, that were processed by Alpha
+        /// </summary>
+        AlphaQuantaBatch = 214,
+        /// <summary>
+        /// Contains majority of signatures for quanta (except Alpha signatures, it will be send with quantum)
+        /// </summary>
+        QuantumMajoritySignaturesBatch = 215,
+        /// <summary>
+        /// Contains an array of the current auditor's quantum signatures
+        /// </summary>
+        AuditorSignaturesBatch = 216
     }
 }

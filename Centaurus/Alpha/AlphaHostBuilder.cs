@@ -41,12 +41,12 @@ namespace Centaurus.Alpha
                     logging.ClearProviders();
                     logging.AddConsole();
 
-                    if (Context.Settings.Verbose)
-                        logging.SetMinimumLevel(Microsoft.Extensions.Logging.LogLevel.Trace);
-                    else if (Context.Settings.Silent)
+                    //if (Context.Settings.Verbose)
+                    //    logging.SetMinimumLevel(Microsoft.Extensions.Logging.LogLevel.Trace);
+                    //else if (Context.Settings.Silent)
                         logging.SetMinimumLevel(Microsoft.Extensions.Logging.LogLevel.Error);
-                    else
-                        logging.SetMinimumLevel(Microsoft.Extensions.Logging.LogLevel.Information);
+                    //else
+                    //    logging.SetMinimumLevel(Microsoft.Extensions.Logging.LogLevel.Information);
 
                 })
                 .UseNLog()
@@ -77,8 +77,11 @@ namespace Centaurus.Alpha
 
         private void SetupCertificate(Settings alphaSettings)
         {
-            if (alphaSettings.TlsCertificatePath == null)
+            if (!alphaSettings.UseSecureConnection)
                 return;
+
+            if (string.IsNullOrEmpty(alphaSettings.TlsCertificatePath))
+                throw new Exception("Certificate path is not specified.");
 
             if (!File.Exists(alphaSettings.TlsCertificatePath))
                 throw new FileNotFoundException($"Failed to find a certificate \"{alphaSettings.TlsCertificatePath}\"");

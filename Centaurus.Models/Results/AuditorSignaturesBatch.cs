@@ -5,7 +5,7 @@ using System.Text;
 
 namespace Centaurus.Models
 {
-    public class AuditorResultsBatch : Message
+    public class AuditorSignaturesBatch : Message
     {
         [XdrField(0)]
         public List<AuditorResult> AuditorResultMessages { get; set; }

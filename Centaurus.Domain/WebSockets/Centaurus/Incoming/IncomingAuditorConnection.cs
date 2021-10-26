@@ -30,14 +30,12 @@ namespace Centaurus
 
         public AuditorState AuditorState { get; }
 
-        public void SetSyncCursor(ulong newQuantumCursor, ulong newResultCursor)
+        public void SetSyncCursor(ulong? quantumCursor, ulong? signaturesCursor)
         {
-            var resultCursor = newResultCursor == ulong.MaxValue ? (ulong?)null : newResultCursor;
-
-            logger.Trace($"Connection {PubKeyAddress}, apex cursor reset requested. New quantum cursor {newQuantumCursor}, new result cursor {(resultCursor.HasValue ? newResultCursor.ToString() : "null")}");
+            logger.Trace($"Connection {PubKeyAddress}, apex cursor reset requested. New quantum cursor {(quantumCursor.HasValue ? quantumCursor.ToString() : "null")}, new result cursor {(signaturesCursor.HasValue ? signaturesCursor.ToString() : "null")}");
 
             //set new quantum and result cursors
-            quantumWorker.SetCursors(newQuantumCursor, resultCursor);
+            quantumWorker.SetCursors(quantumCursor, signaturesCursor);
             logger.Trace($"Connection {PubKeyAddress}, cursors reseted.");
         }
 

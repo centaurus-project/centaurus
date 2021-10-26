@@ -43,13 +43,9 @@ namespace Centaurus.Domain
             PendingUpdatesManager = new UpdatesManager(this);
             PendingUpdatesManager.OnBatchSaved += PendingUpdatesManager_OnBatchSaved;
 
-            QuantumStorage = new QuantumStorage(this);
-
             MessageHandlers = new MessageHandlers(this);
 
             InfoCommandsHandlers = new InfoCommandsHandlers(this);
-
-            QuantumHandler = new QuantumHandler(this);
 
             IncomingConnectionManager = new IncomingConnectionManager(this);
 
@@ -70,11 +66,15 @@ namespace Centaurus.Domain
 
             var lastApex = persistentData.snapshot?.Apex ?? 0;
             var lastHash = persistentData.snapshot?.LastHash ?? new byte[32];
-            QuantumStorage.Init(lastApex, lastHash);
+
+            QuantumStorage = new QuantumStorage(this, lastApex, lastHash);
 
             ResultManager = new ResultManager(this);
 
-            QuantumHandler.Start();
+            QuantumHandler = new QuantumHandler(this, lastApex);
+
+            while (!Debugger.IsAttached)
+                Thread.Sleep(10000);
 
             //apply data, if presented in db
             if (persistentData != default)
@@ -106,10 +106,13 @@ namespace Centaurus.Domain
             {
                 try
                 {
+                    //cache current payload hash
+                    var persistentQuantumHash = quantum.Quantum.GetPayloadHash();
+
                     //handle quantum
                     var quantumProcessingItem = QuantumHandler.HandleAsync(quantum.Quantum, QuantumSignatureValidator.Validate(quantum.Quantum));
 
-                    quantumProcessingItem.OnProcessed.Wait();
+                    quantumProcessingItem.OnAcknowledged.Wait();
 
                     //verify that the pending quantum has current node signature
                     var currentNodeSignature = quantum.Signatures.FirstOrDefault(s => s.AuditorId == Constellation.GetAuditorId(Settings.KeyPair)) ?? throw new Exception($"Unable to get signature for quantum {quantum.Quantum.Apex}");
@@ -118,9 +121,12 @@ namespace Centaurus.Domain
                     if (!Settings.KeyPair.Verify(quantum.Quantum.GetPayloadHash(), currentNodeSignature.PayloadSignature.Data))
                         throw new Exception($"Signature for the quantum {quantum.Quantum.Apex} is invalid.");
 
+                    //validate that quantum payload data is the same
+                    if (!persistentQuantumHash.AsSpan().SequenceEqual(quantum.Quantum.GetPayloadHash()))
+                        throw new Exception($"Payload hash for the quantum {quantum.Quantum.Apex} is not equal to persistent.");
+
                     //add signatures
-                    foreach (var signature in quantum.Signatures)
-                        ResultManager.Add(new AuditorResult { Apex = quantum.Quantum.Apex, Signature = signature });
+                    ResultManager.Add(new QuantumSignatures { Apex = quantum.Quantum.Apex, Signatures = quantum.Signatures });
                 }
                 catch (AggregateException exc)
                 {
@@ -149,6 +155,7 @@ namespace Centaurus.Domain
 
             AuditorIds = Constellation.Auditors.ToDictionary(a => Constellation.GetAuditorId(a.PubKey), a => a.PubKey);
             AuditorPubKeys = AuditorIds.ToDictionary(a => a.Value, a => a.Key);
+            AlphaId = AuditorPubKeys[Constellation.Alpha];
 
             //update current auditors
             SetAuditorStates();
@@ -365,5 +372,7 @@ namespace Centaurus.Domain
         public Dictionary<byte, RawPubKey> AuditorIds { get; private set; }
 
         public Dictionary<RawPubKey, byte> AuditorPubKeys { get; private set; }
+
+        public byte AlphaId { get; private set; }
     }
 }

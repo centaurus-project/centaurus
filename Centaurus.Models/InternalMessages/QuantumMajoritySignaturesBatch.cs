@@ -1,22 +1,15 @@
-﻿using System;
+﻿using Centaurus.Xdr;
+using System;
 using System.Collections.Generic;
-using System.Linq;
-using Centaurus.Xdr;
+using System.Text;
 
 namespace Centaurus.Models
 {
     [XdrContract]
-    public class QuantaBatch : Message
+    public class QuantumMajoritySignaturesBatch : Message
     {
-        //TODO: change to List<Quantum> after migrating to MessagePack
         [XdrField(0)]
-        public List<Message> Quanta { get; set; }
-
-        [XdrField(1, Optional = true)]
         public List<QuantumSignatures> Signatures { get; set; }
-
-        [XdrField(2)]
-        public ulong LastKnownApex { get; set; }
     }
 
     [XdrContract]

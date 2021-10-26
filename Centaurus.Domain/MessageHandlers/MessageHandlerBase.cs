@@ -101,7 +101,7 @@ namespace Centaurus.Domain
         private T GetTypedConnection(ConnectionBase connection)
         {
             if (!(connection is T typedConnection))
-                throw new InvalidOperationException($"Invalid connection type. Only {nameof(T)} connections are supported.");
+                throw new UnauthorizedException($"Invalid connection type. Only {nameof(T)} connections are supported.");
             return typedConnection;
         }
 

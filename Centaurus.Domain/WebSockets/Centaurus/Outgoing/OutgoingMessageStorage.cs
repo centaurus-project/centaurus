@@ -79,7 +79,7 @@ namespace Centaurus.Domain
                         if (resultsBatch != default)
                         {
                             outgoingMessageStorage.EnqueueMessage(
-                                new AuditorResultsBatch
+                                new AuditorSignaturesBatch
                                 {
                                     AuditorResultMessages = resultsBatch
                                 }.CreateEnvelope<MessageEnvelopeSignless>());

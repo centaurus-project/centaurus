@@ -45,20 +45,42 @@ namespace Centaurus.Domain
 
         public QuantumPersistentModel PersistentModel { get; private set; }
 
-        public int CurrentAuditorId { get; private set; }
+        public byte AlphaId { get; private set; }
+
+        public byte CurrentAuditorId { get; private set; }
 
         public Task<QuantumResultMessageBase> OnProcessed => onProcessedTaskSource.Task;
 
         QuantumProcessingTaskSource onProcessedTaskSource = new QuantumProcessingTaskSource();
 
+        public Task<QuantumResultMessageBase> OnAcknowledged => onAcknowledgedTaskSource.Task;
+
+        QuantumProcessingTaskSource onAcknowledgedTaskSource = new QuantumProcessingTaskSource();
+
+        public Task<QuantumResultMessageBase> OnFinalized => onFinalizedTaskSource.Task;
+
+        QuantumProcessingTaskSource onFinalizedTaskSource = new QuantumProcessingTaskSource();
+
         public void SetException(Exception exc)
         {
             onProcessedTaskSource.TrySetException(exc);
+            onAcknowledgedTaskSource.TrySetException(exc);
+            onFinalizedTaskSource.TrySetException(exc);
         }
 
         public void Processed()
         {
             onProcessedTaskSource.TrySetResult(ResultMessage);
+        }
+
+        public void Acknowledged()
+        {
+            onAcknowledgedTaskSource.TrySetResult(ResultMessage);
+        }
+
+        public void Finalized()
+        {
+            onFinalizedTaskSource.TrySetResult(ResultMessage);
         }
 
         /// <summary>
@@ -144,6 +166,8 @@ namespace Centaurus.Domain
 
             //add quantum data to updates batch and assign persistent model
             PersistentModel = context.PendingUpdatesManager.AddQuantum(this);
+
+            AlphaId = context.AlphaId;
         }
 
         List<RawEffectsDataContainer> GetRawEffectsDataContainer()

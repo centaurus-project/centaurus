@@ -54,9 +54,9 @@ namespace Centaurus.Test
             context.SetState(State.Ready);
 
             var clientConnection = GetIncomingConnection(context, alphaKeyPair, state);
-            var batch = new QuantaBatch
+            var batch = new AlphaQuantaBatch
             {
-                Quanta = new List<Message>()
+                Quanta = new List<AlphaQuantaBatchItem>()
             }.CreateEnvelope();
             batch.Sign(alphaKeyPair);
 

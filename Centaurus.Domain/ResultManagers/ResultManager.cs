@@ -37,7 +37,7 @@ namespace Centaurus.Domain
             results.Add(processingResult);
         }
 
-        public void Add(AuditorResult resultMessage)
+        public void Add(QuantumSignatures resultMessage)
         {
             auditorResults.Add(resultMessage);
         }
@@ -61,7 +61,6 @@ namespace Centaurus.Domain
 
         public bool IsAddingCompleted => results.IsCompleted && auditorResults.IsCompleted;
 
-
         private void OnPostEviction(object key, object value, EvictionReason reason, object state)
         {
             logger.Info($"Batch {key} with {((List<Aggregate>)value).Count} is removed because of {reason}. State: {state}.");
@@ -74,7 +73,7 @@ namespace Centaurus.Domain
 
         private BlockingCollection<QuantumProcessingItem> results = new BlockingCollection<QuantumProcessingItem>();
 
-        private BlockingCollection<AuditorResult> auditorResults = new BlockingCollection<AuditorResult>();
+        private BlockingCollection<QuantumSignatures> auditorResults = new BlockingCollection<QuantumSignatures>();
 
         private void ProcessResults()
         {
@@ -113,13 +112,15 @@ namespace Centaurus.Domain
             });
         }
 
-        private void AddInternal(AuditorResult resultMessage)
+        private void AddInternal(QuantumSignatures signaturesMessage)
         {
             //auditor can send delayed results
-            if (resultMessage.Apex <= Context.PendingUpdatesManager.LastSavedApex)
+            if (signaturesMessage.Apex <= Context.PendingUpdatesManager.LastSavedApex)
                 return;
             //add the signature to the aggregate
-            GetAggregate(resultMessage.Apex).Add(resultMessage.Signature);
+            var aggregate = GetAggregate(signaturesMessage.Apex);
+            foreach (var signature in signaturesMessage.Signatures)
+                aggregate.Add(signature);
         }
 
         private Aggregate GetAggregate(ulong apex)
@@ -178,24 +179,22 @@ namespace Centaurus.Domain
             {
                 var currentBatchId = currentBatchIds.Last();
                 var nextBatchId = currentBatchId + batchSize;
-                if (nextBatchId - Context.PendingUpdatesManager.LastSavedApex < advanceThreshold)
-                {
+                if (nextBatchId - Context.QuantumStorage.CurrentApex < advanceThreshold)
                     CreateBatch(nextBatchId);
-                    //copy batch to be able to modify original
-                    var _currentBatchIds = currentBatchIds.ToList();
-                    foreach (var batchId in _currentBatchIds)
+                //copy batch to be able to modify original
+                var _currentBatchIds = currentBatchIds.ToList();
+                foreach (var batchId in _currentBatchIds)
+                {
+                    if (batchId == currentBatchId || batchId + batchSize > Context.PendingUpdatesManager.LastSavedApex)
+                        break;
+                    currentBatchIds.Remove(batchId);
+                    if (!resultCache.TryGetValue(batchId, out var batch))
                     {
-                        if (batchId == currentBatchId)
-                            break;
-                        currentBatchIds.Remove(batchId);
-                        if (!resultCache.TryGetValue(batchId, out var batch))
-                        {
-                            Context.StateManager.Failed(new Exception($"Result batch {batchId} is not found."));
-                            return;
-                        }
-                        //replace old entry
-                        resultCache.Set(batchId, batch, new MemoryCacheEntryOptions { SlidingExpiration = TimeSpan.FromSeconds(15) });
+                        Context.StateManager.Failed(new Exception($"Result batch {batchId} is not found."));
+                        return;
                     }
+                    //replace old entry
+                    resultCache.Set(batchId, batch, new MemoryCacheEntryOptions { SlidingExpiration = TimeSpan.FromSeconds(15) });
                 }
                 cacheUpdateTimer?.Start();
             }
@@ -272,7 +271,7 @@ namespace Centaurus.Domain
                         AddValidSignature(signature);
 
                     majorityResult = GetMajorityResult();
-                    if (IsFinalized || majorityResult == MajorityResult.Unknown)
+                    if (IsFinalized || majorityResult == MajorityResult.Unknown || !IsSignedByAlpha())
                         return;
                     else if (majorityResult == MajorityResult.Unreachable)
                     {
@@ -287,12 +286,13 @@ namespace Centaurus.Domain
                             $" {Apex} ({requestMessage?.GetMessageType() ?? quantum.GetMessageType()})" +
                             $" is unreachable. Results received count is {processedAuditors.Count}," +
                             $" valid results count is {votesCount}. The constellation collapsed.");
+                        ProcessingItem.SetException(exc);
                         Manager.Context.StateManager.Failed(exc);
                     }
 
                     IsFinalized = true;
                 }
-                OnResult(majorityResult);
+                OnResult();
             }
 
             public void Add(QuantumProcessingItem quantumProcessingItem)
@@ -301,9 +301,13 @@ namespace Centaurus.Domain
                 {
                     ProcessingItem = quantumProcessingItem;
                     var signature = AddCurrentNodeSignature();
+                    //mark as acknowledged
+                    ProcessingItem.Acknowledged();
                     //send result to auditors
                     Manager.Context.OutgoingConnectionManager.EnqueueResult(new AuditorResult { Apex = Apex, Signature = signature });
                     ProcessOutrunSignatures(this);
+                    if (!IsFinalized)
+                        Manager.Context.QuantumStorage.AddSignatures(Apex, new List<AuditorSignatureInternal> { signature });
                 }
             }
 
@@ -319,6 +323,11 @@ namespace Centaurus.Domain
                 signatures.Add(signature);
                 ProcessingItem.ResultMessage.PayloadProof.Signatures.Add(signature.PayloadSignature);
                 logger.Trace($"Apex: {Apex}, signature set. Count:" + ProcessingItem.ResultMessage.PayloadProof.Signatures.Count);
+            }
+
+            private bool IsSignedByAlpha()
+            {
+                return signatures.Any(s => s.AuditorId == ProcessingItem.AlphaId);
             }
 
             private AuditorSignatureInternal AddCurrentNodeSignature()
@@ -386,10 +395,12 @@ namespace Centaurus.Domain
                 }
             }
 
-            private void OnResult(MajorityResult majorityResult)
+            private void OnResult()
             {
                 SubmitTransaction();
                 PersistSignatures();
+                //mark as finalized
+                ProcessingItem.Finalized();
                 SendResult();
             }
 

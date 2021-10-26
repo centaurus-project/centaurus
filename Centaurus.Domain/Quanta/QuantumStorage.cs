@@ -16,10 +16,14 @@ namespace Centaurus.Domain
         private MemoryCache quantaCache = new MemoryCache(new MemoryCacheOptions { ExpirationScanFrequency = TimeSpan.FromSeconds(5) });
 
         static Logger logger = LogManager.GetCurrentClassLogger();
-        public QuantumStorage(ExecutionContext context)
+        public QuantumStorage(ExecutionContext context, ulong lastApex, byte[] lastQuantumHash)
             : base(context)
         {
             context.PendingUpdatesManager.OnBatchSaved += PendingUpdatesManager_OnBatchSaved;
+            CurrentApex = lastApex;
+            LastQuantumHash = lastQuantumHash;
+            //load current batch
+            GetBatch(GetBatchApexStart(CurrentApex));
         }
 
         const int batchSize = 1_000_000;
@@ -27,14 +31,6 @@ namespace Centaurus.Domain
 
         public ulong CurrentApex { get; private set; }
         public byte[] LastQuantumHash { get; private set; }
-
-        public void Init(ulong lastApex, byte[] lastQuantumHash)
-        {
-            CurrentApex = lastApex;
-            LastQuantumHash = lastQuantumHash;
-            //load current batch
-            GetBatch(GetBatchApexStart(CurrentApex));
-        }
 
         /// <summary>
         /// 
@@ -127,12 +123,9 @@ namespace Centaurus.Domain
         {
             logger.Info($"About to load quanta batch from db. Start apex: {batchStartApex}, size: {batchSize}.");
             var aboveApex = batchStartApex > 0 ? batchStartApex - 1 : 0;
-            var quantaModels = Context.PersistentStorage.LoadQuantaAboveApex(aboveApex); //LoadQuantaAboveApex returns exclusive results
-            var query = quantaModels
-                .OrderBy(q => q.Apex)
-                .Take(batchSize);
+            var quanta = Context.DataProvider.GetQuantaAboveApex(aboveApex, batchSize);
             logger.Info($"Batch with apex start {batchStartApex} is loaded.");
-            return query.Select(q => q.ToPendingQuantum()).ToList();
+            return quanta;
         }
 
         private void OnPostEviction(object key, object value, EvictionReason reason, object state)

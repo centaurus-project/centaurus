@@ -92,7 +92,7 @@ namespace Centaurus.Domain
         {
             lock (syncRoot)
                 UpdateState(State.Running);
-            //after node successfully started, the pending quanta can be removed
+            //after node successfully started, the pending quanta can be deleted
             Context.PersistentStorage.DeletePendingQuanta();
         }
 

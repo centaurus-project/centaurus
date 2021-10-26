@@ -32,8 +32,8 @@ namespace Centaurus.Test
         {
             new object[] { TestEnvironment.Client1KeyPair, State.Rising, typeof(ConnectionCloseException) },
             new object[] { TestEnvironment.Client1KeyPair, State.Ready, null },
-            new object[] { TestEnvironment.Auditor1KeyPair, State.Rising, typeof(InvalidOperationException) },
-            new object[] { TestEnvironment.Auditor1KeyPair,  State.Ready, typeof(InvalidOperationException) }
+            new object[] { TestEnvironment.Auditor1KeyPair, State.Rising, typeof(UnauthorizedException) },
+            new object[] { TestEnvironment.Auditor1KeyPair,  State.Ready, typeof(UnauthorizedException) }
         };
 
         [Test]
@@ -66,8 +66,8 @@ namespace Centaurus.Test
         }
         static object[] AuditorHandshakeTestCases =
         {
-            new object[] { TestEnvironment.Client1KeyPair, State.Rising, typeof(InvalidOperationException) },
-            new object[] { TestEnvironment.Client1KeyPair, State.Ready, typeof(InvalidOperationException) },
+            new object[] { TestEnvironment.Client1KeyPair, State.Rising, typeof(UnauthorizedException) },
+            new object[] { TestEnvironment.Client1KeyPair, State.Ready, typeof(UnauthorizedException) },
             new object[] { TestEnvironment.Auditor1KeyPair, State.Rising, null },
             new object[] { TestEnvironment.Auditor1KeyPair,  State.Ready, null }
         };
@@ -144,47 +144,46 @@ namespace Centaurus.Test
 
         }
 
-        static object[] QuantaBatchRequestTestCases =
+        static object[] QuantaBatchTestCases =
         {
             new object[] { TestEnvironment.Client1KeyPair, ConnectionState.Ready, typeof(UnauthorizedException) },
-            new object[] { TestEnvironment.Auditor1KeyPair, ConnectionState.Connected, typeof(InvalidStateException) },
             new object[] { TestEnvironment.Auditor1KeyPair, ConnectionState.Ready, null }
         };
 
         [Test]
-        [TestCaseSource(nameof(QuantaBatchRequestTestCases))]
-        public async Task QuantaBatchRequestTest(KeyPair clientKeyPair, ConnectionState state, Type excpectedException)
+        [TestCaseSource(nameof(QuantaBatchTestCases))]
+        public async Task CatchupQuantaBatchTest(KeyPair clientKeyPair, ConnectionState state, Type excpectedException)
         {
-            context.SetState(State.Ready);
+            context.SetState(State.Rising);
 
             var clientConnection = GetIncomingConnection(context, clientKeyPair.PublicKey, state);
 
-            var envelope = new QuantaBatchRequest { QuantaCursor = 1 }.CreateEnvelope();
+            var envelope = new CatchupQuantaBatch
+            {
+                Quanta = new List<CatchupQuantaBatchItem>()
+            }.CreateEnvelope();
             envelope.Sign(clientKeyPair);
+
             using var writer = new XdrBufferWriter();
             var inMessage = envelope.ToIncomingMessage(writer);
 
             await AssertMessageHandling(clientConnection, inMessage, excpectedException);
         }
 
-        static object[] QuantaBatchTestCases =
+        static object[] QuantumMajoritySignaturesBatchCases =
         {
             new object[] { TestEnvironment.Client1KeyPair, ConnectionState.Ready, typeof(UnauthorizedException) },
             new object[] { TestEnvironment.Auditor1KeyPair, ConnectionState.Connected, typeof(InvalidStateException) },
             new object[] { TestEnvironment.Auditor1KeyPair, ConnectionState.Ready, null }
         };
-
-        [Test]
-        [TestCaseSource(nameof(QuantaBatchTestCases))]
-        public async Task QuantaBatchTest(KeyPair clientKeyPair, ConnectionState state, Type excpectedException)
+        public async Task QuantumMajoritySignaturesBatchTest(KeyPair clientKeyPair, ConnectionState state, Type excpectedException)
         {
-            context.SetState(State.Rising);
+            context.SetState(State.Ready);
 
             var clientConnection = GetIncomingConnection(context, clientKeyPair.PublicKey, state);
 
-            var envelope = new QuantaBatch
+            var envelope = new QuantumMajoritySignaturesBatch
             {
-                Quanta = new List<Message>(),
                 Signatures = new List<QuantumSignatures>()
             }.CreateEnvelope();
             envelope.Sign(clientKeyPair);

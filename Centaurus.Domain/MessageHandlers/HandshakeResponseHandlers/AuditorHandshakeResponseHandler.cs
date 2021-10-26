@@ -43,9 +43,9 @@ namespace Centaurus.Domain
             //request quanta on rising
             if (Context.StateManager.State == State.Rising)
             {
-                await incomingAuditorConnection.SendMessage(new QuantaBatchRequest
+                await incomingAuditorConnection.SendMessage(new CatchupQuantaBatchRequest
                 {
-                    QuantaCursor = Context.QuantumStorage.CurrentApex
+                    LastKnownApex = Context.QuantumStorage.CurrentApex
                 }.CreateEnvelope<MessageEnvelopeSignless>());
             }
         }

@@ -13,17 +13,14 @@ namespace Centaurus.Domain
 {
     public class QuantumHandler : ContextualBase, IDisposable
     {
-        public QuantumHandler(ExecutionContext context)
+        public QuantumHandler(ExecutionContext context, ulong lastApex)
             : base(context)
         {
+            LastAddedQuantumApex = lastApex;
+            Task.Factory.StartNew(RunQuantumWorker, TaskCreationOptions.LongRunning).Unwrap();
         }
 
         static Logger logger = LogManager.GetCurrentClassLogger();
-
-        public virtual void Start()
-        {
-            Task.Factory.StartNew(RunQuantumWorker, TaskCreationOptions.LongRunning).Unwrap();
-        }
 
         BlockingCollection<QuantumProcessingItem> awaitedQuanta = new BlockingCollection<QuantumProcessingItem>();
 
