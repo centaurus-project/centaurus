@@ -2,6 +2,7 @@
 using Centaurus.PaymentProvider.Models;
 using Centaurus.Stellar.Models;
 using stellar_dotnet_sdk;
+using stellar_dotnet_sdk.responses;
 using stellar_dotnet_sdk.xdr;
 using System;
 using System.Collections.Concurrent;
@@ -25,7 +26,11 @@ namespace Centaurus.Stellar.PaymentProvider
 
             var configObject = JsonSerializer.Deserialize<Config>(config);
 
-            dataSource = new DataSource(configObject.PassPhrase, configObject.Horizon);
+            Network = new Network(configObject.PassPhrase);
+
+            Network.Use(Network);
+
+            Server = new Server(configObject.Horizon);
 
             secret = KeyPair.FromSecretSeed(configObject.Secret);
 
@@ -86,7 +91,7 @@ namespace Centaurus.Stellar.PaymentProvider
             if (tx.Signatures.Count > 0)
                 throw new ArgumentException("Transaction contains signatures.");
 
-            tx.Sign(secret, dataSource.Network);
+            tx.Sign(secret, Network);
             var signature = tx.Signatures.First();
             return new SignatureModel { Signer = secret.PublicKey, Signature = signature.Signature.InnerValue };
         }
@@ -120,31 +125,32 @@ namespace Centaurus.Stellar.PaymentProvider
 
         private async Task LoadVaultAccountData()
         {
-            vaultAccount = await dataSource.GetAccountData(Vault);
+            vaultAccount = await Server.Accounts.Account(Vault);
             lastSubmitedSequence = GetLastSubmittedSequence().Result;
             if (lastSubmitedSequence == default)
                 lastSubmitedSequence = vaultAccount.SequenceNumber;
         }
 
-        private AccountModel vaultAccount;
+        private AccountResponse vaultAccount;
 
         private long lastSubmitedSequence;
 
         private async Task<long> GetLastSubmittedSequence()
         {
             var pageSize = 200;
-            while (true)
+            var transactionResponse = await Server
+                .GetTransactionsRequestBuilder(Vault, 0, pageSize, true, true)
+                .Execute();
+            while (transactionResponse.Records.Count > 0)
             {
-                var txs = await dataSource.GetTransactions(Vault, 0, pageSize, true, true);
-                foreach (var tx in txs)
+                foreach (var tx in transactionResponse.Records)
                 {
                     var transaction = stellar_dotnet_sdk.Transaction.FromEnvelopeXdr(tx.EnvelopeXdr);
                     if (transaction.SourceAccount.AccountId != Vault)
                         continue;
                     return transaction.SequenceNumber;
                 }
-                if (txs.Count < pageSize)
-                    break;
+                transactionResponse = await transactionResponse.NextPage();
             }
             return 0;
         }
@@ -152,15 +158,17 @@ namespace Centaurus.Stellar.PaymentProvider
         private async Task LoadLastTxs()
         {
             var pageSize = 200;
-            while (true)
+            var transactionResponse = await Server
+                .GetTransactionsRequestBuilder(Vault, long.Parse(LastRegisteredCursor), pageSize, true)
+                .Execute();
+
+            while (transactionResponse.Records.Count > 0)
             {
-                var txs = await dataSource.GetTransactions(Vault, long.Parse(LastRegisteredCursor), pageSize);
-                foreach (var tx in txs)
+                foreach (var tx in transactionResponse.Records)
                 {
                     ProcessTransaction(tx);
                 }
-                if (txs.Count < pageSize)
-                    break;
+                transactionResponse = await transactionResponse.NextPage();
             }
         }
 
@@ -177,7 +185,7 @@ namespace Centaurus.Stellar.PaymentProvider
             foreach (var signature in signatures)
             {
                 var signerKey = KeyPair.FromPublicKey(signature.Signer);
-                var currentSigner = vaultAccount.Signers.FirstOrDefault(s => s.PubKey.AsSpan().SequenceEqual(signerKey.PublicKey));
+                var currentSigner = vaultAccount.Signers.FirstOrDefault(s => s.Key == signerKey.AccountId);
                 if (currentSigner == null)
                 {
                     RaiseOnError(new Exception($"Unknown signer {signerKey.AccountId}"));
@@ -185,15 +193,17 @@ namespace Centaurus.Stellar.PaymentProvider
                 }
                 tx.Signatures.Add(new DecoratedSignature { Hint = signerKey.SignatureHint, Signature = new Signature(signature.Signature) });
                 currentWeight += currentSigner.Weight;
-                if (currentWeight >= vaultAccount.Thresholds.Medium)
+                if (currentWeight >= vaultAccount.Thresholds.MedThreshold)
                     break;
             }
 
-            if (currentWeight < vaultAccount.Thresholds.High)
+            if (currentWeight < vaultAccount.Thresholds.MedThreshold)
                 throw new Exception("Unable to reach required threshold weight.");
         }
 
         SemaphoreSlim txSubmitSemaphore = new SemaphoreSlim(1);
+        private Network Network;
+
         private async Task TrySubmitTransaction(TransactionItem transactionItem)
         {
             await txSubmitSemaphore.WaitAsync();
@@ -213,9 +223,10 @@ namespace Centaurus.Stellar.PaymentProvider
                         else if (txSequence == expectedSequence)
                         {
                             lastSubmitedSequence = expectedSequence;
-                            var result = await dataSource.SubmitTransaction(transactionItem.Transaction);
-                            transactionItem.OnSubmitted.SetResult(result.IsSuccess);
-                            if (!result.IsSuccess)
+                            var result = await Server.SubmitTransaction(transactionItem.Transaction);
+                            var isSuccess = result.IsSuccess();
+                            transactionItem.OnSubmitted.SetResult(isSuccess);
+                            if (!isSuccess)
                                 RaiseOnError(new Exception($"Transaction with sequence {transactionItem.Transaction.SequenceNumber} submit failed. {result.ResultXdr}"));
                         }
                         else if (transactionItem.Transaction.SequenceNumber < expectedSequence)
@@ -251,11 +262,11 @@ namespace Centaurus.Stellar.PaymentProvider
             return ledgerPayments;
         }
 
-        void ProcessTransaction(TxModel tx)
+        void ProcessTransaction(TransactionResponse tx)
         {
             try
             {
-                var payments = GetVaultPayments(stellar_dotnet_sdk.Transaction.FromEnvelopeXdr(tx.EnvelopeXdr), tx.IsSuccess);
+                var payments = GetVaultPayments(stellar_dotnet_sdk.Transaction.FromEnvelopeXdr(tx.EnvelopeXdr), tx.Successful);
                 var payment = new DepositNotificationModel
                 {
                     ProviderId = Id,
@@ -286,14 +297,12 @@ namespace Centaurus.Stellar.PaymentProvider
                 if (failedDates.Count > 0)
                     await Task.Delay(new TimeSpan(0, 1, 0));
 
-                var listener = default(TxListener);
+                var listener = default(IEventSource);
                 try
                 {
-                    listener = dataSource.GetTransactionListener(
-                        Vault,
-                        long.Parse(LastRegisteredCursor),
-                        ProcessTransaction
-                    );
+                    listener = Server
+                        .GetTransactionsRequestBuilder(Vault, long.Parse(LastRegisteredCursor), includeFailed: true)
+                        .Stream((_, tx) => ProcessTransaction(tx));
 
                     await listener.Connect();
                 }
@@ -320,8 +329,7 @@ namespace Centaurus.Stellar.PaymentProvider
             }
         }
 
-        private readonly DataSource dataSource;
-
+        private Server Server;
         private readonly KeyPair secret;
 
         public override bool AreSignaturesValid(byte[] transaction, params SignatureModel[] signatures)

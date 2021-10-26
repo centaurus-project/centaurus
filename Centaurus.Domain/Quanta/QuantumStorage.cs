@@ -122,8 +122,14 @@ namespace Centaurus.Domain
         private List<PendingQuantum> LoadQuantaFromDB(ulong batchStartApex)
         {
             logger.Info($"About to load quanta batch from db. Start apex: {batchStartApex}, size: {batchSize}.");
-            var aboveApex = batchStartApex > 0 ? batchStartApex - 1 : 0;
-            var quanta = Context.DataProvider.GetQuantaAboveApex(aboveApex, batchSize);
+            var limit = batchSize;
+            var aboveApex = batchStartApex;
+            if (batchStartApex == 0)
+                //first quantum has 1 apex, and null will be set at 0 index. So we need to load batch size - 1
+                limit = batchSize - 1;
+            else
+                aboveApex = batchStartApex - 1;
+            var quanta = Context.DataProvider.GetQuantaAboveApex(aboveApex, limit);
             logger.Info($"Batch with apex start {batchStartApex} is loaded.");
             return quanta;
         }

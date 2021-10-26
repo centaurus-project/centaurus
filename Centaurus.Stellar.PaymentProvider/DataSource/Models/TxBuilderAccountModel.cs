@@ -1,7 +1,4 @@
 ﻿using stellar_dotnet_sdk;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Centaurus.Stellar.Models
 {
@@ -9,7 +6,7 @@ namespace Centaurus.Stellar.Models
     {
         public long SequenceNumber { get; set; }
 
-        public stellar_dotnet_sdk.KeyPair KeyPair { get; set; }
+        public KeyPair KeyPair { get; set; }
 
         public string AccountId => KeyPair.AccountId;
 

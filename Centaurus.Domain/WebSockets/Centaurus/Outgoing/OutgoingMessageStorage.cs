@@ -10,33 +10,29 @@ namespace Centaurus.Domain
 {
     public class OutgoingMessageStorage
     {
-        private readonly Queue<MessageEnvelopeBase> outgoingMessages = new Queue<MessageEnvelopeBase>();
+        private readonly List<MessageEnvelopeBase> outgoingMessages = new List<MessageEnvelopeBase>();
 
-        public void EnqueueMessage(Message message)
-        {
-            if (message == null)
-                throw new ArgumentNullException(nameof(message));
-            EnqueueMessage(message.CreateEnvelope());
-        }
+        private object syncRoot = new { };
 
         public void EnqueueMessage(MessageEnvelopeBase message)
         {
             if (message == null)
                 throw new ArgumentNullException(nameof(message));
-            lock (outgoingMessages)
-                outgoingMessages.Enqueue(message);
+            lock (syncRoot)
+                outgoingMessages.Add(message);
         }
 
         public bool TryPeek(out MessageEnvelopeBase message)
         {
-            lock (outgoingMessages)
-                return outgoingMessages.TryPeek(out message);
+            lock (syncRoot)
+                message = outgoingMessages.FirstOrDefault();
+            return message != null;
         }
 
-        public bool TryDequeue(out MessageEnvelopeBase message)
+        public void Dequeue()
         {
-            lock (outgoingMessages)
-                return outgoingMessages.TryDequeue(out message);
+            lock (syncRoot)
+                outgoingMessages.RemoveAt(0);
         }
     }
 
@@ -47,6 +43,7 @@ namespace Centaurus.Domain
         static Logger logger = LogManager.GetCurrentClassLogger();
         readonly OutgoingMessageStorage outgoingMessageStorage;
         readonly List<AuditorResult> results = new List<AuditorResult>();
+        object syncRoot = new { };
 
         public OutgoingResultsStorage(OutgoingMessageStorage outgoingMessageStorage)
         {
@@ -65,7 +62,7 @@ namespace Centaurus.Domain
                     try
                     {
                         var resultsBatch = default(List<AuditorResult>);
-                        lock (results)
+                        lock (syncRoot)
                         {
                             if (results.Count != 0)
                             {
@@ -107,7 +104,7 @@ namespace Centaurus.Domain
             if (result == null)
                 throw new ArgumentNullException(nameof(result));
 
-            lock (results)
+            lock (syncRoot)
                 results.Add(result);
         }
 

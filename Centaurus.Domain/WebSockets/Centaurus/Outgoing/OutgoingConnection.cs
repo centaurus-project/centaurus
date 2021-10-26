@@ -38,26 +38,26 @@ namespace Centaurus.Domain
             ProcessOutgoingMessageQueue();
         }
 
+
+        Task sendingMessageTask;
+
         private void ProcessOutgoingMessageQueue()
         {
-            Task.Factory.StartNew(async () =>
+            sendingMessageTask = Task.Factory.StartNew(async () =>
             {
                 while (!cancellationToken.IsCancellationRequested)
                 {
                     try
                     {
                         if (!cancellationToken.IsCancellationRequested
-                            && outgoingMessageStorage.TryPeek(out MessageEnvelopeBase message)
                             && AuditorState.IsRunning
+                            && outgoingMessageStorage.TryPeek(out MessageEnvelopeBase message)
                             )
                         {
                             try
                             {
                                 await base.SendMessage(message);
-                                if (!outgoingMessageStorage.TryDequeue(out message))
-                                {
-                                    logger.Error("Unable to dequeue");
-                                }
+                                outgoingMessageStorage.Dequeue();
                             }
                             catch (Exception exc)
                             {
@@ -74,7 +74,7 @@ namespace Centaurus.Domain
                         logger.Error(e);
                     }
                 }
-            }, cancellationToken, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+            }, cancellationToken, TaskCreationOptions.LongRunning, TaskScheduler.Default).Unwrap();
         }
 
         public override void Dispose()

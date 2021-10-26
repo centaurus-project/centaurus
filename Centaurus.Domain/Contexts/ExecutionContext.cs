@@ -73,9 +73,6 @@ namespace Centaurus.Domain
 
             QuantumHandler = new QuantumHandler(this, lastApex);
 
-            while (!Debugger.IsAttached)
-                Thread.Sleep(10000);
-
             //apply data, if presented in db
             if (persistentData != default)
             {
@@ -301,13 +298,13 @@ namespace Centaurus.Domain
             PerformanceStatisticsManager?.Dispose();
         }
 
-        private void AppState_StateChanged(StateChangedEventArgs stateChangedEventArgs)
+        private async void AppState_StateChanged(StateChangedEventArgs stateChangedEventArgs)
         {
 
             var state = stateChangedEventArgs.State;
             var prevState = stateChangedEventArgs.PrevState;
             if (state != State.Ready && prevState == State.Ready) //close all connections (except auditors)
-                IncomingConnectionManager.CloseAllConnections(false).Wait();
+                await IncomingConnectionManager.CloseAllConnections(false);
         }
 
         private void PendingUpdatesManager_OnBatchSaved(BatchSavedInfo batchInfo)

@@ -156,6 +156,11 @@ namespace Centaurus.Domain
                     var connectionAttempts = 0;
                     while (!isAborted)
                     {
+                        if (Context.StateManager.State == State.Rising) //wait while all pending quanta will be handled
+                        {
+                            Thread.Sleep(1000);
+                            continue;
+                        }
                         auditor = new OutgoingConnection(Context, PubKey, OutgoingMessageStorage, connectionManager.connectionFactory.GetConnection());
                         try
                         {

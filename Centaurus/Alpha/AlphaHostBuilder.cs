@@ -228,14 +228,20 @@ namespace Centaurus.Alpha
                 {
                     logger.Trace($"New connection received. Path: {context.Request.Path}");
                     var path = context.Request.Path.ToString();
-                    if (context.WebSockets.IsWebSocketRequest && webSocketHandlers.Keys.Contains(path))
+                    if (context.WebSockets.IsWebSocketRequest)
                     {
-                        logger.Trace($"Handler for path `{context.Request.Path}` found.");
-                        await webSocketHandlers[path].Invoke(context, next);
+                        if (webSocketHandlers.Keys.Contains(path))
+                        {
+                            logger.Trace($"Handler for path `{context.Request.Path}` found.");
+                            await webSocketHandlers[path].Invoke(context, next);
+                        }
+                        else
+                        {
+                            logger.Trace($"Handler for path `{context.Request.Path}` not found.");
+                        }
                     }
                     else
                     {
-                        logger.Trace($"Handler for path `{context.Request.Path}` not found.");
                         await next();
                     }
                 });
