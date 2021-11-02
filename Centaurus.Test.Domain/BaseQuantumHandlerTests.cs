@@ -35,8 +35,6 @@ namespace Centaurus.Test
         {
             context.SetState(State.Ready);
 
-            var apex = context.QuantumStorage.CurrentApex;
-
             var account1 = context.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
 
             var clientAccountBalance = account1.GetBalance(asset);

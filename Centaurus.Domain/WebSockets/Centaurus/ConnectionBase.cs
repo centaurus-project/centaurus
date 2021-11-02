@@ -163,11 +163,18 @@ namespace Centaurus
                         logger.Trace($"Connection {PubKeyAddress}, message {envelope.Message.GetMessageType()} sent. Size: {writer.Length}");
                 }
             }
+            catch (OperationCanceledException exc)
+            {
+                Context.ExtensionsManager.SendMessageFailed(this, envelope, exc);
+            }
+            catch (WebSocketException exc)
+            {
+                Context.ExtensionsManager.SendMessageFailed(this, envelope, exc);
+                if (!(exc.WebSocketErrorCode == WebSocketError.InvalidState && cancellationToken.IsCancellationRequested))
+                    throw;
+            }
             catch (Exception exc)
             {
-                if (exc is OperationCanceledException
-                    || exc is WebSocketException socketException && (socketException.WebSocketErrorCode == WebSocketError.InvalidState))
-                    return;
                 Context.ExtensionsManager.SendMessageFailed(this, envelope, exc);
                 throw;
             }

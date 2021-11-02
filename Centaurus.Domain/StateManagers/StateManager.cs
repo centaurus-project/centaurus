@@ -74,7 +74,7 @@ namespace Centaurus.Domain
             lock (statesSyncRoot)
             {
                 if (!auditors.TryGetValue(pubKey, out var auditorState))
-                    throw new Exception($"{pubKey.GetAccountId()} is not auditor.");
+                    throw new UnauthorizedException($"{pubKey.GetAccountId()} is not auditor.");
                 return auditorState;
             }
         }
@@ -175,14 +175,15 @@ namespace Centaurus.Domain
             lock (syncRoot)
             {
                 var isDelayed = State.Chasing == State;
+                var currentApex = Context.QuantumHandler.CurrentApex;
                 if (isDelayed)
                 {
-                    if (AlphaApex <= Context.QuantumStorage.CurrentApex || AlphaApex - Context.QuantumStorage.CurrentApex < RunningDelayTreshold)
+                    if (AlphaApex <= currentApex || AlphaApex - currentApex < RunningDelayTreshold)
                         UpdateState(State.Running);
                 }
                 else
                 {
-                    if (AlphaApex > Context.QuantumStorage.CurrentApex && AlphaApex - Context.QuantumStorage.CurrentApex > ChasingDelayTreshold)
+                    if (AlphaApex > currentApex && AlphaApex - currentApex > ChasingDelayTreshold)
                         UpdateState(State.Chasing);
                 }
             }

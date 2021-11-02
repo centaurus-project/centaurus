@@ -58,13 +58,13 @@ namespace Centaurus.Test
             context = new ExecutionContext(settings, storage, new MockPaymentProviderFactory(), new DummyConnectionWrapperFactory());
             Assert.AreEqual(State.Rising, context.StateManager.State);
 
-            var targetQuantum = context.QuantumStorage.GetQuanta(quantum.Quantum.Apex - 1, 1).FirstOrDefault();
+            var targetQuantum = context.SyncStorage.GetQuanta(quantum.Quantum.Apex - 1, 1).FirstOrDefault();
 
             Assert.NotNull(targetQuantum);
+            var quantumFromStorage = (Quantum)targetQuantum.Quantum;
+            Assert.IsTrue(context.Settings.KeyPair.Verify(quantumFromStorage.GetPayloadHash(), quantum.Signatures.First().PayloadSignature.Data));
 
-            Assert.IsTrue(context.Settings.KeyPair.Verify(targetQuantum.Quantum.GetPayloadHash(), quantum.Signatures.First().PayloadSignature.Data));
-
-            Assert.AreEqual(targetQuantum.Quantum.Apex, result.Apex);
+            Assert.AreEqual(quantumFromStorage.Apex, result.Apex);
             Assert.IsInstanceOf<AccountDataRequestQuantum>(targetQuantum.Quantum);
 
             context.StateManager.Rised();

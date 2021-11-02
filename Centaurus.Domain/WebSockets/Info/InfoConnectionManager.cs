@@ -102,7 +102,14 @@ namespace Centaurus.Domain
 
         async Task SendSubscriptionUpdate(BaseSubscription subscription, SubscriptionUpdateBase update, InfoWebSocketConnection connection)
         {
-            await connection.SendSubscriptionUpdate(subscription, update);
+            try
+            {
+                await connection.SendSubscriptionUpdate(subscription, update);
+            }
+            catch (Exception exc)
+            {
+                logger.Error(exc, "Error on info message send.");
+            }
         }
 
         void OnClosed(object sender, EventArgs args)

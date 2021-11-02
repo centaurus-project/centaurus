@@ -6,23 +6,25 @@ using Centaurus.Xdr;
 namespace Centaurus.Models
 {
     [XdrContract]
-    public class AlphaQuantaBatch : Message
+    public class SyncQuantaBatch : Message
     {
         [XdrField(0)]
-        public List<AlphaQuantaBatchItem> Quanta { get; set; }
+        public List<SyncQuantaBatchItem> Quanta { get; set; }
 
         [XdrField(2)]
         public ulong LastKnownApex { get; set; }
     }
 
     [XdrContract]
-    public class AlphaQuantaBatchItem
+    public class SyncQuantaBatchItem : IApex
     {
         //TODO: change type to Quantum after migrating to MessagePack
         [XdrField(0)]
-        public Message Qunatum { get; set; }
+        public Message Quantum { get; set; }
 
         [XdrField(1)]
         public AuditorSignatureInternal AlphaSignature { get; set; }
+
+        public ulong Apex => ((Quantum)Quantum).Apex;
     }
 }

@@ -162,8 +162,8 @@ namespace Centaurus.Test
 
             var depositQuantum = new DepositQuantum
             {
-                Apex = context.QuantumStorage.CurrentApex + 1,
-                PrevHash = context.QuantumStorage.LastQuantumHash,
+                Apex = context.QuantumHandler.CurrentApex + 1,
+                PrevHash = context.QuantumHandler.LastQuantumHash,
                 Source = txNotification.ToDomainModel()
             };
 

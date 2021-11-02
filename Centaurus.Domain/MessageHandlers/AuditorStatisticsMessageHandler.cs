@@ -7,7 +7,7 @@ using Centaurus.Models;
 
 namespace Centaurus.Domain
 {
-    public class AuditorPerfStatisticsMessageHandler : MessageHandlerBase<IncomingAuditorConnection>
+    public class AuditorPerfStatisticsMessageHandler : MessageHandlerBase
     {
         public AuditorPerfStatisticsMessageHandler(ExecutionContext context) 
             : base(context)
@@ -20,7 +20,7 @@ namespace Centaurus.Domain
 
         public override bool IsAuditorOnly => true;
 
-        public override Task HandleMessage(IncomingAuditorConnection connection, IncomingMessage message)
+        public override Task HandleMessage(ConnectionBase connection, IncomingMessage message)
         {
             var auditor = connection.PubKeyAddress;
             var statistics = (AuditorPerfStatistics)message.Envelope.Message;

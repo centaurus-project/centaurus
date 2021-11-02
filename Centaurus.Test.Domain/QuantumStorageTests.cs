@@ -24,10 +24,10 @@ namespace Centaurus.Test
         }
 
         [Test]
-        public async Task QuantumStorageTest()
+        public void QuantumStorageTest()
         {
             var account = context.AccountStorage.GetAll().First();
-            var lastApex = context.QuantumStorage.CurrentApex;
+            var lastApex = context.QuantumHandler.CurrentApex;
             var items = new List<IPersistentModel>();
             for (var i = 0; i < 500_000; i++)
             {
@@ -44,19 +44,20 @@ namespace Centaurus.Test
                     PrevHash = new byte[32],
                     Timestamp = DateTime.UtcNow.Ticks
                 };
-                context.QuantumStorage.AddQuantum(quantum, new byte[32]);
+
+                context.SyncStorage.AddQuantum(quantum.Apex, new SyncQuantaBatchItem { Quantum = quantum });
                 items.Add(new QuantumPersistentModel { Apex = quantum.Apex, RawQuantum = XdrConverter.Serialize(quantum), Signatures = new List<SignatureModel>(), TimeStamp = quantum.Timestamp, Effects = new List<AccountEffects>() });
             }
 
             context.PersistentStorage.SaveBatch(items);
 
             var random = new Random();
-            for (var i = 0ul; i < context.QuantumStorage.CurrentApex;)
+            for (var i = 0ul; i < context.QuantumHandler.CurrentApex;)
             {
-                var quanta = context.QuantumStorage.GetQuanta(i, random.Next(200, 500));
+                var quanta = context.SyncStorage.GetQuanta(i, random.Next(200, 500));
                 foreach (var q in quanta)
                 {
-                    Assert.AreEqual(q.Quantum.Apex, ++i);
+                    Assert.AreEqual(((Quantum)q.Quantum).Apex, ++i);
                 }
             }
         }

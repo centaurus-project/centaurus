@@ -8,26 +8,22 @@ namespace Centaurus.Domain
 {
     public static class QuantumPersistentModelExtensions
     {
-        public static PendingQuantum ToPendingQuantum(this QuantumPersistentModel quantumPersistentModel)
+        public static SyncQuantaBatchItem ToBatchItemQuantum(this QuantumPersistentModel quantumPersistentModel)
         {
-            var quantum = new PendingQuantum
+            return new SyncQuantaBatchItem
             {
                 Quantum = (Quantum)XdrConverter.Deserialize<Message>(quantumPersistentModel.RawQuantum),
-                Signatures = new List<AuditorSignatureInternal>()
+                AlphaSignature = quantumPersistentModel.Signatures.First().ToDomainModel()
             };
+        }
 
-            foreach (var signature in quantumPersistentModel.Signatures)
+        public static QuantumSignatures ToQuantumSignatures(this QuantumPersistentModel quantumPersistentModel)
+        {
+            return new QuantumSignatures
             {
-                quantum.Signatures.Add(new AuditorSignatureInternal
-                {
-                    AuditorId = signature.AuditorId,
-                    PayloadSignature = new TinySignature { Data = signature.PayloadSignature },
-                    TxSignature = signature.TxSignature,
-                    TxSigner = signature.TxSigner
-                });
-            }
-
-            return quantum;
+                Apex = quantumPersistentModel.Apex,
+                Signatures = quantumPersistentModel.Signatures.Skip(1).Select(s => s.ToDomainModel()).ToList()
+            };
         }
     }
 }

@@ -13,16 +13,18 @@ namespace Centaurus.Domain
 {
     public class QuantumHandler : ContextualBase, IDisposable
     {
-        public QuantumHandler(ExecutionContext context, ulong lastApex)
+        public QuantumHandler(ExecutionContext context, ulong lastApex, byte[] lastQuantumHash)
             : base(context)
         {
-            LastAddedQuantumApex = lastApex;
+            CurrentApex = LastAddedQuantumApex = lastApex;
+            LastQuantumHash = lastQuantumHash ?? throw new ArgumentNullException(nameof(lastQuantumHash));
             Task.Factory.StartNew(RunQuantumWorker, TaskCreationOptions.LongRunning).Unwrap();
         }
 
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        BlockingCollection<QuantumProcessingItem> awaitedQuanta = new BlockingCollection<QuantumProcessingItem>();
+        object awaitedQuantaSyncRoot = new { };
+        Queue<QuantumProcessingItem> awaitedQuanta = new Queue<QuantumProcessingItem>();
 
         /// <summary>
         /// Handles the quantum and returns Task.
@@ -37,30 +39,46 @@ namespace Centaurus.Domain
             var processingItem = new QuantumProcessingItem(quantum, signatureValidation);
             if (processingItem.Quantum.Apex > 0)
                 LastAddedQuantumApex = processingItem.Quantum.Apex;
-            awaitedQuanta.Add(processingItem);
+            lock (awaitedQuantaSyncRoot)
+                awaitedQuanta.Enqueue(processingItem);
             return processingItem;
         }
 
         public ulong LastAddedQuantumApex { get; private set; }
 
+        public ulong CurrentApex { get; private set; }
+
+        public byte[] LastQuantumHash { get; private set; }
+
         public int QuantaQueueLenght => awaitedQuanta.Count;
 
         private async Task RunQuantumWorker()
         {
-            foreach (var handlingItem in awaitedQuanta.GetConsumingEnumerable())
+            while (true)
             {
                 try
                 {
-                    await HandleItem(handlingItem);
-                    if (Context.IsAlpha && QuantaThrottlingManager.Current.IsThrottlingEnabled)
-                        Thread.Sleep(QuantaThrottlingManager.Current.SleepTime);
+                    var handlingItem = default(QuantumProcessingItem);
+                    lock (awaitedQuantaSyncRoot)
+                        awaitedQuanta.TryDequeue(out handlingItem);
+                    if (handlingItem != null)
+                    {
+                        await HandleItem(handlingItem);
+                        if (Context.IsAlpha && QuantaThrottlingManager.Current.IsThrottlingEnabled)
+                            Thread.Sleep(QuantaThrottlingManager.Current.SleepTime);
+                    }
+                    else
+                        Thread.Sleep(20);
                 }
                 catch (Exception exc)
                 {
                     //if exception get here, than we faced with fatal exception
-                    awaitedQuanta.CompleteAdding();
-                    foreach (var item in awaitedQuanta)
-                        item.SetException(new Exception("Cancelled."));
+
+                    lock (awaitedQuantaSyncRoot)
+                    {
+                        while (awaitedQuanta.TryDequeue(out var item))
+                            item.SetException(new Exception("Cancelled."));
+                    }
                     Context.StateManager.Failed(new Exception("Quantum worker failed.", exc));
                     return;
                 }
@@ -111,16 +129,16 @@ namespace Centaurus.Domain
             var quantum = processingItem.Quantum;
             if (quantum.Apex == 0)
             {
-                quantum.Apex = Context.QuantumStorage.CurrentApex + 1;
-                quantum.PrevHash = Context.QuantumStorage.LastQuantumHash;
+                quantum.Apex = CurrentApex + 1;
+                quantum.PrevHash = LastQuantumHash;
                 quantum.Timestamp = DateTime.UtcNow.Ticks;
             }
             else
             {
-                if (quantum.Apex != Context.QuantumStorage.CurrentApex + 1)
-                    throw new Exception($"Current quantum apex is {quantum.Apex} but {Context.QuantumStorage.CurrentApex + 1} was expected.");
+                if (quantum.Apex != CurrentApex + 1)
+                    throw new Exception($"Current quantum apex is {quantum.Apex} but {CurrentApex + 1} was expected.");
 
-                if (!quantum.PrevHash.AsSpan().SequenceEqual(Context.QuantumStorage.LastQuantumHash))
+                if (!quantum.PrevHash.AsSpan().SequenceEqual(LastQuantumHash))
                     throw new Exception($"Quantum previous hash doesn't equal to last quantum hash.");
             }
             if (!Context.IsAlpha || Context.StateManager.State == State.Rising)
@@ -162,7 +180,10 @@ namespace Centaurus.Domain
             var resultMessage = await processor.Process(processingItem);
             processingItem.Complete(Context, resultMessage);
 
-            AddToQuantumStorage(processingItem);
+            CurrentApex = quantum.Apex;
+            LastQuantumHash = processingItem.QuantumHash;
+
+            Context.StateManager.UpdateDelay();
 
             ProcessResult(processingItem);
 
@@ -171,13 +192,7 @@ namespace Centaurus.Domain
             logger.Trace($"Message of type {quantum.GetType().Name} with apex {quantum.Apex} is handled.");
         }
 
-        private void AddToQuantumStorage(QuantumProcessingItem processingItem)
-        {
-            Context.QuantumStorage.AddQuantum(processingItem.Quantum, processingItem.QuantumHash);
-            Context.StateManager.UpdateDelay();
-        }
-
-        private void ProcessResult(QuantumProcessingItem processingItem)
+        void ProcessResult(QuantumProcessingItem processingItem)
         {
             //register result
             Context.ResultManager.Add(processingItem);
@@ -215,7 +230,7 @@ namespace Centaurus.Domain
 
         public void Dispose()
         {
-            awaitedQuanta.Dispose();
+            //awaitedQuanta.Dispose();
         }
 
         class QuantumValidationException : Exception

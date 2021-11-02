@@ -81,7 +81,7 @@ namespace Centaurus.Test
             await IntegrationTestEnvironmentExtensions.AssertDuringPeriod(
                 () =>
                 {
-                    return Task.FromResult(auditorStartup.Context.QuantumStorage.CurrentApex == environment.AlphaWrapper.Context.QuantumStorage.CurrentApex);
+                    return Task.FromResult(auditorStartup.Context.QuantumHandler.CurrentApex == environment.AlphaWrapper.Context.QuantumHandler.CurrentApex);
                 },
                 TimeSpan.FromSeconds(5),
                 "Apexes are not equal"
@@ -119,8 +119,8 @@ namespace Centaurus.Test
 
             await environment.PrepareConstellation(1, 3);
 
-            var lastApex = environment.AlphaWrapper.Context.QuantumStorage.CurrentApex;
-            var lastHash = environment.AlphaWrapper.Context.QuantumStorage.LastQuantumHash;
+            var lastApex = environment.AlphaWrapper.Context.QuantumHandler.CurrentApex;
+            var lastHash = environment.AlphaWrapper.Context.QuantumHandler.LastQuantumHash;
 
             var clientPk = environment.Clients.First();
             var client = environment.AlphaWrapper.Context.AccountStorage.GetAccount(clientPk);
@@ -162,10 +162,10 @@ namespace Centaurus.Test
             //change quantum
             environment.AuditorWrappers.Values.ToList().ForEach(a =>
             {
-                var quanta = a.Context.QuantumStorage.GetQuanta(lastApex, 1);
+                var quanta = a.Context.SyncStorage.GetQuanta(lastApex, 1);
                 var quantum = quanta.First();
                 if (invalidHash)
-                    quantum.Quantum.Timestamp = DateTime.UtcNow.Ticks;
+                    ((Quantum)quantum.Quantum).Timestamp = DateTime.UtcNow.Ticks;
                 if (invalidClientSignature)
                 {
                     var request = (RequestQuantum)quantum.Quantum;
@@ -207,7 +207,7 @@ namespace Centaurus.Test
 
             var clientPk = environment.Clients.First();
             var client = environment.AlphaWrapper.Context.AccountStorage.GetAccount(clientPk);
-            var quantaStorage = environment.AlphaWrapper.Context.QuantumStorage;
+            var syncStorage = environment.AlphaWrapper.Context.SyncStorage;
 
             EnvironmentHelper.SetTestEnvironmentVariable();
 
@@ -224,17 +224,29 @@ namespace Centaurus.Test
                 Side = OrderSide.Buy
             }.CreateEnvelope().Sign(useFakeClient ? KeyPair.Random() : clientPk);
 
-            var apex = quantaStorage.CurrentApex + 1;
+            var apex = environment.AlphaWrapper.Context.QuantumHandler.CurrentApex + 1;
+            var lastQuantumHash = environment.AlphaWrapper.Context.QuantumHandler.LastQuantumHash;
             var requestQuantum = new RequestQuantum
             {
-                Apex = quantaStorage.CurrentApex + 1,
+                Apex = apex,
                 EffectsProof = new byte[] { },
-                PrevHash = quantaStorage.LastQuantumHash,
+                PrevHash = lastQuantumHash,
                 RequestEnvelope = sqamRequest,
                 Timestamp = DateTime.UtcNow.Ticks
             };
 
-            quantaStorage.AddQuantum(requestQuantum, requestQuantum.ComputeHash());
+            syncStorage.AddQuantum(apex, new SyncQuantaBatchItem
+            {
+                Quantum = requestQuantum,
+                AlphaSignature = new AuditorSignatureInternal
+                {
+                    AuditorId = environment.AlphaWrapper.Context.AlphaId,
+                    PayloadSignature = new TinySignature
+                    {
+                        Data = environment.AlphaWrapper.Context.Settings.KeyPair.Sign(requestQuantum.GetPayloadHash())
+                    }
+                }
+            });
 
             var expectedState = useFakeClient || useFakeAlpha || invalidBalance ? State.Failed : State.Ready;
 

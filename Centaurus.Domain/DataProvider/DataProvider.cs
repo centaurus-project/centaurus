@@ -90,13 +90,28 @@ namespace Centaurus.Domain
         /// <param name="apex"></param>
         /// <param name="count">Count of quanta to load. Loads all if equal or less than 0</param>
         /// <returns></returns>
-        public List<PendingQuantum> GetQuantaAboveApex(ulong apex, int count = 0)
+        public List<SyncQuantaBatchItem> GetQuantaSyncBatchItemsAboveApex(ulong apex, int count = 0)
         {
             var query = (IEnumerable<QuantumPersistentModel>)Context.PersistentStorage.LoadQuantaAboveApex(apex)
                 .OrderBy(q => q.Apex);
             if (count > 0)
                 query = query.Take(count);
-            return query.Select(q => q.ToPendingQuantum()).ToList();
+            return query.Select(q => q.ToBatchItemQuantum()).ToList();
+        }
+
+        /// <summary>
+        /// Fetches all quanta's signatures where apex is greater than the specified one.
+        /// </summary>
+        /// <param name="apex"></param>
+        /// <param name="count">Count of quanta to load. Loads all if equal or less than 0</param>
+        /// <returns></returns>
+        public List<QuantumSignatures> GetSignaturesSyncBatchItemsAboveApex(ulong apex, int count = 0)
+        {
+            var query = (IEnumerable<QuantumPersistentModel>)Context.PersistentStorage.LoadQuantaAboveApex(apex)
+                .OrderBy(q => q.Apex);
+            if (count > 0)
+                query = query.Take(count);
+            return query.Select(q => q.ToQuantumSignatures()).ToList();
         }
 
         /// <summary>

@@ -23,7 +23,7 @@ namespace Centaurus.Domain
             : base(context)
         {
             //create batch for current apex
-            CreateBatch(GetBatchApexStart(Context.QuantumStorage.CurrentApex));
+            CreateBatch(GetBatchApexStart(Context.QuantumHandler.CurrentApex));
             //update batch if required
             UpdateCache();
 
@@ -179,7 +179,7 @@ namespace Centaurus.Domain
             {
                 var currentBatchId = currentBatchIds.Last();
                 var nextBatchId = currentBatchId + batchSize;
-                if (nextBatchId - Context.QuantumStorage.CurrentApex < advanceThreshold)
+                if (nextBatchId - Context.QuantumHandler.CurrentApex < advanceThreshold)
                     CreateBatch(nextBatchId);
                 //copy batch to be able to modify original
                 var _currentBatchIds = currentBatchIds.ToList();
@@ -193,8 +193,10 @@ namespace Centaurus.Domain
                         Context.StateManager.Failed(new Exception($"Result batch {batchId} is not found."));
                         return;
                     }
+                    var memoryCacheOption = new MemoryCacheEntryOptions { SlidingExpiration = TimeSpan.FromSeconds(15) };
+                    memoryCacheOption.RegisterPostEvictionCallback(OnPostEviction);
                     //replace old entry
-                    resultCache.Set(batchId, batch, new MemoryCacheEntryOptions { SlidingExpiration = TimeSpan.FromSeconds(15) });
+                    resultCache.Set(batchId, batch, memoryCacheOption);
                 }
                 cacheUpdateTimer?.Start();
             }
@@ -206,14 +208,18 @@ namespace Centaurus.Domain
 
         private void CreateBatch(ulong batchId)
         {
+            logger.Info($"About to generate new result items batch {batchId}.");
             var batch = new Lazy<Aggregate>[batchSize];
             Parallel.For(0, batchSize, i =>
             {
                 var apex = batchId + (ulong)i;
                 batch[i] = new Lazy<Aggregate>(() => new Aggregate(apex, this));
             });
-            resultCache.Set(batchId, batch, new MemoryCacheEntryOptions { Priority = CacheItemPriority.NeverRemove });
+            var memoryCacheOption = new MemoryCacheEntryOptions { Priority = CacheItemPriority.NeverRemove };
+            memoryCacheOption.RegisterPostEvictionCallback(OnPostEviction);
+            resultCache.Set(batchId, batch, memoryCacheOption);
             currentBatchIds.Add(batchId);
+            logger.Info($"Batch {batchId} generated and set.");
         }
 
         private System.Timers.Timer cacheUpdateTimer;
@@ -306,8 +312,6 @@ namespace Centaurus.Domain
                     //send result to auditors
                     Manager.Context.OutgoingConnectionManager.EnqueueResult(new AuditorResult { Apex = Apex, Signature = signature });
                     ProcessOutrunSignatures(this);
-                    if (!IsFinalized)
-                        Manager.Context.QuantumStorage.AddSignatures(Apex, new List<AuditorSignatureInternal> { signature });
                 }
             }
 
@@ -316,13 +320,25 @@ namespace Centaurus.Domain
                 processedAuditors.Add(signature.AuditorId);
                 //skip if processed or current auditor already sent the result
                 if (IsFinalized)
-                {
-                    logger.Trace($"Apex: {Apex} finalized already.");
                     return;
+                //Alpha signature must always be first
+                if (signature.AuditorId == ProcessingItem.AlphaId)
+                {
+                    signatures.Insert(0, signature);
+                    ProcessingItem.ResultMessage.PayloadProof.Signatures.Insert(0, signature.PayloadSignature);
+                    //add quantum to quantum sync storage
+                    Manager.Context.SyncStorage.AddQuantum(Apex,
+                        new SyncQuantaBatchItem
+                        {
+                            Quantum = ProcessingItem.Quantum,
+                            AlphaSignature = signature
+                        });
                 }
-                signatures.Add(signature);
-                ProcessingItem.ResultMessage.PayloadProof.Signatures.Add(signature.PayloadSignature);
-                logger.Trace($"Apex: {Apex}, signature set. Count:" + ProcessingItem.ResultMessage.PayloadProof.Signatures.Count);
+                else
+                {
+                    signatures.Add(signature);
+                    ProcessingItem.ResultMessage.PayloadProof.Signatures.Add(signature.PayloadSignature);
+                }
             }
 
             private bool IsSignedByAlpha()
@@ -406,10 +422,14 @@ namespace Centaurus.Domain
 
             private void PersistSignatures()
             {
-                //add signatures to cache
-                Manager.Context.QuantumStorage.AddSignatures(Apex, signatures);
                 //assign signatures to persistent model
                 ProcessingItem.PersistentModel.Signatures = signatures.Select(s => s.ToPersistenModel()).ToList();
+                //add signatures to sync storage
+                Manager.Context.SyncStorage.AddSignatures(Apex, new QuantumSignatures
+                {
+                    Apex = Apex,
+                    Signatures = signatures.Skip(1).ToList() //skip first. The first signature will be synced with quantum
+                });
             }
 
             private MajorityResult GetMajorityResult()

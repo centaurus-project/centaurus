@@ -53,17 +53,27 @@ namespace Centaurus.Test
         {
             context.SetState(State.Ready);
 
-            var clientConnection = GetIncomingConnection(context, alphaKeyPair, state);
-            var batch = new AlphaQuantaBatch
+            var connection = default(ConnectionBase);
+            try
             {
-                Quanta = new List<AlphaQuantaBatchItem>()
+                connection = GetOutgoingConnection(context, alphaKeyPair, state);
+            }
+            catch (UnauthorizedException)
+            {
+                if (excpectedException == typeof(UnauthorizedException))
+                    return;
+                throw;
+            }
+            var batch = new SyncQuantaBatch
+            {
+                Quanta = new List<SyncQuantaBatchItem>()
             }.CreateEnvelope();
             batch.Sign(alphaKeyPair);
 
             using var writer = new XdrBufferWriter();
             var inMessage = batch.ToIncomingMessage(writer);
 
-            await AssertMessageHandling(clientConnection, inMessage, excpectedException);
+            await AssertMessageHandling(connection, inMessage, excpectedException);
         }
     }
 }

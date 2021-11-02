@@ -108,8 +108,8 @@ namespace Centaurus.Test
             Func<Task<bool>> func = () =>
             {
                 return Task.FromResult(
-                    environment.AlphaWrapper.Context.QuantumStorage.CurrentApex == apex
-                    && environment.AuditorWrappers.Values.All(a => a.Context.QuantumStorage.CurrentApex == apex)
+                    environment.AlphaWrapper.Context.QuantumHandler.CurrentApex == apex
+                    && environment.AuditorWrappers.Values.All(a => a.Context.QuantumHandler.CurrentApex == apex)
                 );
             };
 
@@ -237,10 +237,10 @@ namespace Centaurus.Test
             var context = new Domain.ExecutionContext(environment.AlphaWrapper.Context.Settings, new MockStorage(), new MockPaymentProviderFactory(), new MockOutgoingConnectionFactory(new Dictionary<string, StartupWrapper>()));
 
             //wait while all pending updates will be saved
-            while (environment.AlphaWrapper.Context.DataProvider.GetLastApex() != environment.AlphaWrapper.Context.QuantumStorage.CurrentApex)
+            while (environment.AlphaWrapper.Context.DataProvider.GetLastApex() != environment.AlphaWrapper.Context.QuantumHandler.CurrentApex)
                 Thread.Sleep(100);
 
-            context.Setup(environment.AlphaWrapper.Context.DataProvider.GetSnapshot(environment.AlphaWrapper.Context.QuantumStorage.CurrentApex));
+            context.Setup(environment.AlphaWrapper.Context.DataProvider.GetSnapshot(environment.AlphaWrapper.Context.QuantumHandler.CurrentApex));
 
             var messageType = quantum.GetType().Name;
             var account = default(Account);
@@ -259,23 +259,23 @@ namespace Centaurus.Test
 
 
 
-        public static async Task<QuantumResultMessageBase> ProcessQuantumWithoutValidation(Domain.ExecutionContext context, Quantum quantum)
-        {
-            var messageType = quantum.GetType().Name;
-            var account = default(Account);
-            if (quantum is RequestQuantum requestQuantum)
-            {
-                messageType = requestQuantum.RequestMessage.GetMessageType();
-                account = context.AccountStorage.GetAccount(requestQuantum.RequestMessage.Account);
-            }
+        //public static async Task<QuantumResultMessageBase> ProcessQuantumWithoutValidation(Domain.ExecutionContext context, Quantum quantum)
+        //{
+        //    var messageType = quantum.GetType().Name;
+        //    var account = default(Account);
+        //    if (quantum is RequestQuantum requestQuantum)
+        //    {
+        //        messageType = requestQuantum.RequestMessage.GetMessageType();
+        //        account = context.AccountStorage.GetAccount(requestQuantum.RequestMessage.Account);
+        //    }
 
-            context.QuantumProcessor.TryGetValue(messageType, out var processor);
+        //    context.QuantumProcessor.TryGetValue(messageType, out var processor);
 
-            var res = await processor.Process(new QuantumProcessingItem(quantum, Task.FromResult(true)));
+        //    var res = await processor.Process(new QuantumProcessingItem(quantum, Task.FromResult(true)));
 
-            context.QuantumStorage.AddQuantum(quantum, quantum.ComputeHash());
+        //    context.SyncStorage.AddQuantum(quantum, quantum.ComputeHash());
 
-            return res;
-        }
+        //    return res;
+        //}
     }
 }

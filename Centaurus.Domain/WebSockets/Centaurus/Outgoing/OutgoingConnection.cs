@@ -57,7 +57,8 @@ namespace Centaurus.Domain
                             try
                             {
                                 await base.SendMessage(message);
-                                outgoingMessageStorage.Dequeue();
+                                if (!outgoingMessageStorage.TryDequeue(out message))
+                                    logger.Error("Unable to dequeue");
                             }
                             catch (Exception exc)
                             {

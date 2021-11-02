@@ -10,29 +10,33 @@ namespace Centaurus.Domain
 {
     public class OutgoingMessageStorage
     {
-        private readonly List<MessageEnvelopeBase> outgoingMessages = new List<MessageEnvelopeBase>();
+        private readonly Queue<MessageEnvelopeBase> outgoingMessages = new Queue<MessageEnvelopeBase>();
 
-        private object syncRoot = new { };
+        public void EnqueueMessage(Message message)
+        {
+            if (message == null)
+                throw new ArgumentNullException(nameof(message));
+            EnqueueMessage(message.CreateEnvelope());
+        }
 
         public void EnqueueMessage(MessageEnvelopeBase message)
         {
             if (message == null)
                 throw new ArgumentNullException(nameof(message));
-            lock (syncRoot)
-                outgoingMessages.Add(message);
+            lock (outgoingMessages)
+                outgoingMessages.Enqueue(message);
         }
 
         public bool TryPeek(out MessageEnvelopeBase message)
         {
-            lock (syncRoot)
-                message = outgoingMessages.FirstOrDefault();
-            return message != null;
+            lock (outgoingMessages)
+                return outgoingMessages.TryPeek(out message);
         }
 
-        public void Dequeue()
+        public bool TryDequeue(out MessageEnvelopeBase message)
         {
-            lock (syncRoot)
-                outgoingMessages.RemoveAt(0);
+            lock (outgoingMessages)
+                return outgoingMessages.TryDequeue(out message);
         }
     }
 

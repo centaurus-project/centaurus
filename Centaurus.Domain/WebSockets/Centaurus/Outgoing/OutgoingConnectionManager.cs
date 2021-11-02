@@ -53,6 +53,16 @@ namespace Centaurus.Domain
             }
         }
 
+        public async Task SendToAll(MessageEnvelopeBase message)
+        {
+            var sendTasks = new List<Task>();
+            foreach (var c in connections)
+            {
+                sendTasks.Add(c.Value.SendMessage(message));
+            }
+            await Task.WhenAll(sendTasks);
+        }
+
         public void CloseAllConnections()
         {
             foreach (var connection in connections.Values)
@@ -139,6 +149,12 @@ namespace Centaurus.Domain
                 }
             }
 
+            public async Task SendMessage(MessageEnvelopeBase message)
+            {
+                if (auditor != null)
+                    await auditor.SendMessage(message);
+            }
+
             public RawPubKey PubKey { get; }
 
             public Uri Address { get; }
@@ -169,12 +185,16 @@ namespace Centaurus.Domain
                         }
                         catch (Exception exc)
                         {
-                            auditor = null;
 
                             if (!(exc is OperationCanceledException) && connectionAttempts % 100 == 0)
                                 logger.Error(exc, $"Unable establish connection with {connectionUri} after {connectionAttempts} attempts. Retry in 1000ms");
                             Thread.Sleep(1000);
                             connectionAttempts++;
+                        }
+                        finally
+                        {
+                            auditor.Dispose();
+                            auditor = null;
                         }
                     }
                 });

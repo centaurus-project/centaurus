@@ -45,7 +45,7 @@ namespace Centaurus.Domain
             {
                 await incomingAuditorConnection.SendMessage(new CatchupQuantaBatchRequest
                 {
-                    LastKnownApex = Context.QuantumStorage.CurrentApex
+                    LastKnownApex = Context.QuantumHandler.CurrentApex
                 }.CreateEnvelope<MessageEnvelopeSignless>());
             }
         }

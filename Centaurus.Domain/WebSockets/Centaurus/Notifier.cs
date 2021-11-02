@@ -1,5 +1,6 @@
 ﻿using Centaurus.Domain;
 using Centaurus.Models;
+using NLog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,6 +10,7 @@ namespace Centaurus.Domain
 {
     public static class Notifier
     {
+        static Logger logger = LogManager.GetCurrentClassLogger();
         /// <summary>
         /// Sends the message to the account
         /// </summary>
@@ -47,7 +49,19 @@ namespace Centaurus.Domain
                     catch { }
             }
             else //notify all connected auditors
-                context.OutgoingConnectionManager.EnqueueMessage(envelope);
+                NotifyConnectedAuditors(context, envelope);
+        }
+
+        static void NotifyConnectedAuditors(ExecutionContext context, MessageEnvelopeBase envelope)
+        {
+            try
+            {
+                _ = context.OutgoingConnectionManager.SendToAll(envelope);
+            }
+            catch (Exception exc)
+            {
+                logger.Error(exc, "Exception occurred during broadcasting message to auditors.");
+            }
         }
     }
 }

@@ -27,47 +27,52 @@ namespace Centaurus.Domain
         {
             var aboveApex = batchRequest.LastKnownApex;
             var batchSize = Context.Settings.SyncBatchSize;
-            if (aboveApex < Context.QuantumStorage.CurrentApex)
-                while (aboveApex < Context.QuantumStorage.CurrentApex)
-                {
-                    var currentBatch = Context.QuantumStorage.GetQuanta(aboveApex, batchSize);
-                    if (currentBatch.Count < 1)
-                        throw new Exception("No quanta from database.");
+            while (true)
+            {
+                var currentBatch = Context.SyncStorage.GetQuanta(aboveApex, batchSize);
+                if (currentBatch.Count < 1 && aboveApex < Context.QuantumHandler.CurrentApex)
+                    throw new Exception("No quanta from database.");
 
-                    var batch = new CatchupQuantaBatch
-                    {
-                        Quanta = new List<CatchupQuantaBatchItem>(),
-                        HasMore = currentBatch.Count == batchSize
-                    };
+                var signaturesBatch = Context.SyncStorage.GetSignatures(aboveApex, batchSize).ToDictionary(s => s.Apex, s => s.Signatures);
 
-                    foreach (var quantum in currentBatch)
-                    {
-                        var signatures = quantum.Signatures;
-                        //if quantum was persisted, than it contains signatures already. Otherwise we need to obtain it from the result manager
-                        if (quantum.Quantum.Apex > Context.PendingUpdatesManager.LastSavedApex)
-                            Context.ResultManager.TryGetSignatures(quantum.Quantum.Apex, out signatures);
-                        //quantum must contain at least two signatures, Alpha and own one
-                        if (signatures.Count < 2)
-                        {
-                            Context.StateManager.Failed(new Exception($"Unable to find signatures for quantum {quantum.Quantum.Apex}"));
-                            return;
-                        }
-                        batch.Quanta.Add(new CatchupQuantaBatchItem
-                        {
-                            Quantum = quantum.Quantum,
-                            Signatures = signatures
-                        });
-                    }
-
-                    await connection.SendMessage(batch.CreateEnvelope<MessageEnvelopeSignless>());
-                    aboveApex = currentBatch.Last().Quantum.Apex;
-                }
-            else
-                await connection.SendMessage(new CatchupQuantaBatch
+                var batch = new CatchupQuantaBatch
                 {
                     Quanta = new List<CatchupQuantaBatchItem>(),
-                    HasMore = false
-                }.CreateEnvelope<MessageEnvelopeSignless>());
+                    HasMore = currentBatch.Count == batchSize
+                };
+
+                foreach (var quantum in currentBatch)
+                {
+                    var apex = ((Quantum)quantum.Quantum).Apex;
+
+                    var quantumSignatures = default(List<AuditorSignatureInternal>);
+                    //if quantum was persisted, than it contains majority signatures already. Otherwise we need to obtain it from the result manager
+                    if (apex > Context.PendingUpdatesManager.LastSavedApex)
+                        Context.ResultManager.TryGetSignatures(apex, out quantumSignatures);
+                    else
+                    {
+                        var alphaSignature = quantum.AlphaSignature;
+                        if (signaturesBatch.TryGetValue(apex, out quantumSignatures))
+                            quantumSignatures.Insert(0, quantum.AlphaSignature);
+                        else
+                            quantumSignatures = new List<AuditorSignatureInternal> { quantum.AlphaSignature };
+                    }
+                    if (quantumSignatures.Count < 1)
+                    {
+                        Context.StateManager.Failed(new Exception($"Unable to find signatures for quantum {apex}"));
+                        return;
+                    }
+                    batch.Quanta.Add(new CatchupQuantaBatchItem
+                    {
+                        Quantum = quantum.Quantum,
+                        Signatures = quantumSignatures
+                    });
+                    aboveApex = apex;
+                }
+                await connection.SendMessage(batch.CreateEnvelope<MessageEnvelopeSignless>());
+                if (!batch.HasMore)
+                    break;
+            };
         }
     }
 }

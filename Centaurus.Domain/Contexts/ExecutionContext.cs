@@ -67,11 +67,11 @@ namespace Centaurus.Domain
             var lastApex = persistentData.snapshot?.Apex ?? 0;
             var lastHash = persistentData.snapshot?.LastHash ?? new byte[32];
 
-            QuantumStorage = new QuantumStorage(this, lastApex, lastHash);
+            SyncStorage = new SyncStorage(this, lastApex);
+
+            QuantumHandler = new QuantumHandler(this, lastApex, lastHash);
 
             ResultManager = new ResultManager(this);
-
-            QuantumHandler = new QuantumHandler(this, lastApex);
 
             //apply data, if presented in db
             if (persistentData != default)
@@ -324,7 +324,7 @@ namespace Centaurus.Domain
 
         public QuantumProcessorsStorage QuantumProcessor { get; }
 
-        public QuantumStorage QuantumStorage { get; }
+        public SyncStorage SyncStorage { get; }
 
         public RoleManager RoleManager { get; }
 

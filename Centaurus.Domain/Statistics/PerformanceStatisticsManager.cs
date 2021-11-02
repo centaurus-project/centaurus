@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using System.Timers;
 
 namespace Centaurus.Domain
@@ -88,7 +89,7 @@ namespace Centaurus.Domain
                         continue;
                     var auditorApex = auditorConnection.CurrentCursor;
                     if (auditorApex >= 0)
-                        statistics.Delay = (int)(Context.QuantumStorage.CurrentApex - auditorApex);
+                        statistics.Delay = (int)(Context.QuantumHandler.CurrentApex - auditorApex);
                 }
                 return auditorsStatistics.Values.ToList();
             }
@@ -108,7 +109,7 @@ namespace Centaurus.Domain
                 };
                 AddAuditorStatistics(Context.Settings.KeyPair.AccountId, current);
 
-                NotifyAuditors(current);
+                Notifier.NotifyAuditors(Context, current.CreateEnvelope<MessageEnvelopeSignless>());
                 SendToSubscribers();
             }
             catch (Exception exc)
@@ -134,11 +135,6 @@ namespace Centaurus.Domain
             Context.InfoConnectionManager.SendSubscriptionUpdate(subscription, PerformanceStatisticsUpdate.Generate(statistics, PerformanceStatisticsSubscription.SubscriptionName));
         }
 
-        void NotifyAuditors(AuditorPerfStatistics statisticsMessage)
-        {
-            Context.OutgoingConnectionManager.EnqueueMessage(statisticsMessage.CreateEnvelope<MessageEnvelopeSignless>());
-        }
-
         int GetQuantaAvgLength()
         {
             LastQuantaQueueLengths.Add(Context.QuantumHandler.QuantaQueueLenght);
@@ -154,7 +150,7 @@ namespace Centaurus.Domain
 
         int GetItemsPerSecond()
         {
-            RecentApexes.Add(new Apex { UpdatedAt = DateTime.UtcNow, CurrentApex = Context.QuantumStorage.CurrentApex });
+            RecentApexes.Add(new Apex { UpdatedAt = DateTime.UtcNow, CurrentApex = Context.QuantumHandler.CurrentApex });
             if (RecentApexes.Count > 20)
                 RecentApexes.RemoveAt(0);
 

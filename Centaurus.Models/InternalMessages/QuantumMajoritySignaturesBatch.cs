@@ -13,11 +13,14 @@ namespace Centaurus.Models
     }
 
     [XdrContract]
-    public class QuantumSignatures
+    public class QuantumSignatures: IApex
     {
         [XdrField(0)]
         public ulong Apex { get; set; }
 
+        /// <summary>
+        /// Contains all quantum's signatures except Alpha
+        /// </summary>
         [XdrField(1)]
         public List<AuditorSignatureInternal> Signatures { get; set; }
     }
