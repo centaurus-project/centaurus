@@ -18,7 +18,7 @@ namespace Centaurus.Domain
         {
             CurrentApex = LastAddedQuantumApex = lastApex;
             LastQuantumHash = lastQuantumHash ?? throw new ArgumentNullException(nameof(lastQuantumHash));
-            Task.Factory.StartNew(RunQuantumWorker, TaskCreationOptions.LongRunning).Unwrap();
+            Task.Factory.StartNew(RunQuantumWorker).Unwrap();
         }
 
         static Logger logger = LogManager.GetCurrentClassLogger();
@@ -93,7 +93,6 @@ namespace Centaurus.Domain
                 await Context.PendingUpdatesManager.SyncRoot.WaitAsync();
                 try
                 {
-                    Context.PendingUpdatesManager.UpdateBatch();
                     await ProcessQuantum(processingItem);
                 }
                 finally
@@ -183,7 +182,8 @@ namespace Centaurus.Domain
             CurrentApex = quantum.Apex;
             LastQuantumHash = processingItem.QuantumHash;
 
-            Context.StateManager.UpdateDelay();
+            if (CurrentApex % 1000 == 0)
+                Context.StateManager.UpdateDelay();
 
             ProcessResult(processingItem);
 

@@ -32,6 +32,8 @@ namespace Centaurus.Domain
 
             public ulong FirstApex { get; private set; }
 
+            public int AffectedAccountsCount => accounts.Count;
+
             /// <summary>
             /// Date when first quantum was added
             /// </summary>

@@ -40,7 +40,7 @@ namespace Centaurus.Stellar.PaymentProvider
             //wait while all missed transactions will be loaded
             LoadLastTxs().Wait();
 
-            Task.Factory.StartNew(ListenTransactions, TaskCreationOptions.LongRunning);
+            Task.Factory.StartNew(ListenTransactions);
         }
 
         public override bool IsTransactionValid(byte[] rawTransaction, WithdrawalRequestModel withdrawalRequest, out string error)

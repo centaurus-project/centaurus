@@ -75,7 +75,7 @@ namespace Centaurus.Domain
                         logger.Error(e);
                     }
                 }
-            }, cancellationToken, TaskCreationOptions.LongRunning, TaskScheduler.Default).Unwrap();
+            }, cancellationToken).Unwrap();
         }
 
         public override void Dispose()

@@ -71,7 +71,7 @@ namespace Centaurus.NetSDK
             //connect the client websocket
             await webSocketWrapper.Connect(uri, cancellationTokenSource.Token);
             //listen for incoming messages
-            _ = Task.Factory.StartNew(Listen, TaskCreationOptions.LongRunning).Unwrap();
+            _ = Task.Factory.StartNew(Listen).Unwrap();
 
             await HandshakeTask.Task;
         }

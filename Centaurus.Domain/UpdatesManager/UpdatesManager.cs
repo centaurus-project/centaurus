@@ -20,7 +20,7 @@ namespace Centaurus.Domain
         public UpdatesManager(ExecutionContext context)
             : base(context)
         {
-            InitTimer();
+            InitTimers();
 
             LastSavedApex = Context.DataProvider.GetLastApex();
 
@@ -35,11 +35,15 @@ namespace Centaurus.Domain
         public void UpdateBatch(bool force = false)
         {
             if (force || IsBatchUpdateRequired())
+            {
+                SyncRoot.Wait();
                 try
                 {
+                    logger.Info($"About to updated batch. Id: {pendingUpdates.Id}, apex range: {pendingUpdates.FirstApex}-{pendingUpdates.LastApex}, quanta: {pendingUpdates.QuantaCount}, effects: {pendingUpdates.EffectsCount}, affected accounts: {pendingUpdates.AffectedAccountsCount}.");
+
                     pendingUpdates.Complete(Context);
 
-                    logger.Info($"Batch update. Id: {pendingUpdates.Id}, apex range: {pendingUpdates.FirstApex}-{pendingUpdates.LastApex}, quanta: {pendingUpdates.QuantaCount}, effects: {pendingUpdates.EffectsCount}");
+                    logger.Info($"Batch {pendingUpdates.Id} updated.");
 
                     pendingUpdates = new UpdatesContainer(Context, unchecked(pendingUpdates.Id + 1));
                     RegisterUpdates(pendingUpdates);
@@ -51,11 +55,11 @@ namespace Centaurus.Domain
                         Context.StateManager.Failed(new Exception("Batch update failed.", exc));
                     }
                 }
-        }
-
-        public Task ApplyUpdatesAsync()
-        {
-            return Task.Factory.StartNew(() => ApplyUpdates());
+                finally
+                {
+                    SyncRoot.Release();
+                }
+            }
         }
 
         //last saved quantum apex
@@ -64,7 +68,7 @@ namespace Centaurus.Domain
         {
             lock (applyUpdatesSyncRoot)
             {
-                while (awaitedUpdates.TryPeek(out var updates) //verify that there is updates in the queue
+                while (awaitedUpdates.TryPeek(out var updates) //verify that there are updates in the queue
                     && updates.IsCompleted //check if update is completed
                     && (updates.AreSignaturesCollected) //check if it's ready to be saved
                     && awaitedUpdates.TryDequeue(out _)) //remove it from the queue
@@ -88,7 +92,7 @@ namespace Centaurus.Domain
                             ToApex = updates.LastApex
                         };
 
-                        Task.Factory.StartNew(() => OnBatchSaved?.Invoke(batchInfo));
+                        OnBatchSaved?.Invoke(batchInfo);
 
                         logger.Info($"Batch {updates.Id} saved in {sw.ElapsedMilliseconds}.");
                     }
@@ -119,7 +123,8 @@ namespace Centaurus.Domain
                     {
                         hasMoreQuanta = updates.GetPendingQuanta(out var currentPendingQuanta);
                         if (currentPendingQuanta.Count > 0)
-                            pendingQuanta.AddRange(currentPendingQuanta.Select(q => new PendingQuantumPersistentModel { 
+                            pendingQuanta.AddRange(currentPendingQuanta.Select(q => new PendingQuantumPersistentModel
+                            {
                                 RawQuantum = q.RawQuantum,
                                 Signatures = q.Signatures
                             }));
@@ -177,7 +182,8 @@ namespace Centaurus.Domain
         private const int MaxSaveInterval = 5;
 
         private object applyUpdatesSyncRoot = new { };
-        private Timer saveTimer = new Timer();
+        private Timer batchUpdateTimer = new Timer();
+        private Timer batchSaveTimer = new Timer();
         private XdrBufferFactory.RentedBuffer buffer = XdrBufferFactory.Rent(256 * 1024);
 
 
@@ -193,30 +199,28 @@ namespace Centaurus.Domain
                 && (pendingUpdates.QuantaCount >= MaxQuantaCount || DateTime.UtcNow - pendingUpdates.InitDate > TimeSpan.FromSeconds(MaxSaveInterval));
         }
 
-        private void InitTimer()
+        private void InitTimers()
         {
-            saveTimer.Interval = TimeSpan.FromSeconds(5).TotalMilliseconds;
-            saveTimer.Elapsed += SaveTimer_Elapsed;
-            saveTimer.AutoReset = false;
-            saveTimer.Start();
+            batchUpdateTimer.Interval = TimeSpan.FromMilliseconds(300).TotalMilliseconds;
+            batchUpdateTimer.Elapsed += BatchUpdateTimer_Elapsed;
+            batchUpdateTimer.AutoReset = false;
+            batchUpdateTimer.Start();
+
+            batchSaveTimer.Interval = TimeSpan.FromMilliseconds(300).TotalMilliseconds;
+            batchSaveTimer.Elapsed += BatchSaveTimer_Elapsed;
+            batchSaveTimer.AutoReset = false;
+            batchSaveTimer.Start();
         }
 
-        private void SaveTimer_Elapsed(object sender, ElapsedEventArgs e)
+        private void BatchUpdateTimer_Elapsed(object sender, ElapsedEventArgs e)
         {
             try
             {
-                if (Context.StateManager?.State == State.Running || Context.StateManager?.State == State.Ready)
+                if (Context.StateManager?.State == State.Running 
+                    || Context.StateManager?.State == State.Ready
+                    || Context.StateManager?.State == State.Chasing)
                 {
-                    SyncRoot.Wait();
-                    try
-                    {
-                        UpdateBatch();
-                    }
-                    finally
-                    {
-                        SyncRoot.Release();
-                    }
-                    ApplyUpdatesAsync();
+                    UpdateBatch();
                 }
             }
             catch (Exception exc)
@@ -225,15 +229,35 @@ namespace Centaurus.Domain
             }
             finally
             {
-                saveTimer.Start();
+                batchUpdateTimer.Start();
+            }
+        }
+
+        private void BatchSaveTimer_Elapsed(object sender, ElapsedEventArgs e)
+        {
+            try
+            {
+                ApplyUpdates();
+            }
+            catch (Exception exc)
+            {
+                logger.Error(exc);
+            }
+            finally
+            {
+                batchSaveTimer.Start();
             }
         }
 
         public void Dispose()
         {
-            saveTimer.Stop();
-            saveTimer.Elapsed -= SaveTimer_Elapsed;
-            saveTimer.Dispose();
+            batchUpdateTimer.Stop();
+            batchUpdateTimer.Elapsed -= BatchUpdateTimer_Elapsed;
+            batchUpdateTimer.Dispose();
+
+            batchSaveTimer.Stop();
+            batchSaveTimer.Elapsed -= BatchUpdateTimer_Elapsed;
+            batchSaveTimer.Dispose();
 
             buffer.Dispose();
 

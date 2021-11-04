@@ -19,7 +19,7 @@ namespace Centaurus
         {
             this.auditor = auditor ?? throw new ArgumentNullException(nameof(auditor));
             batchSize = Context.Settings.SyncBatchSize;
-            Task.Factory.StartNew(SendQuantums, TaskCreationOptions.LongRunning);
+            Task.Factory.StartNew(SyncQuantaData);
         }
 
         private readonly IncomingAuditorConnection auditor;
@@ -62,7 +62,7 @@ namespace Centaurus
             && Context.StateManager.State != State.Undefined
             && Context.StateManager.State != State.Failed;
 
-        private async Task SendQuantums()
+        private async Task SyncQuantaData()
         {
             var hasPendingQuanta = true;
             while (!cancellationTokenSource.Token.IsCancellationRequested)

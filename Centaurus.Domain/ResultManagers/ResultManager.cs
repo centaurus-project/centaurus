@@ -59,7 +59,7 @@ namespace Centaurus.Domain
             return true;
         }
 
-        public bool IsAddingCompleted => results.IsCompleted && auditorResults.IsCompleted;
+        public bool IsCompleted => results.IsCompleted && auditorResults.IsCompleted;
 
         private void OnPostEviction(object key, object value, EvictionReason reason, object state)
         {

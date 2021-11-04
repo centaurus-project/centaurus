@@ -206,11 +206,8 @@ namespace Centaurus.Domain
         {
             ResultManager.CompleteAdding();
 
-            while (!ResultManager.IsAddingCompleted)
+            while (!ResultManager.IsCompleted)
                 Thread.Sleep(50);
-
-            //sleep for a second to make sure that all results were added
-            Thread.Sleep(1000);
 
             //complete current updates container
             PendingUpdatesManager.UpdateBatch(true);

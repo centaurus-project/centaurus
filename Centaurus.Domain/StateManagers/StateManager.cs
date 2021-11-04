@@ -180,17 +180,21 @@ namespace Centaurus.Domain
                 {
                     if (AlphaApex <= currentApex || AlphaApex - currentApex < RunningDelayTreshold)
                         UpdateState(State.Running);
+                    logger.Info($"Current node delay is {AlphaApex - currentApex}");
                 }
                 else
                 {
                     if (AlphaApex > currentApex && AlphaApex - currentApex > ChasingDelayTreshold)
+                    {
+                        logger.Info($"Current node delay is {AlphaApex - currentApex}");
                         UpdateState(State.Chasing);
+                    }
                 }
             }
         }
 
-        private const ulong ChasingDelayTreshold = 10_000;
-        private const ulong RunningDelayTreshold = 1_000;
+        private const ulong ChasingDelayTreshold = 50_000;
+        private const ulong RunningDelayTreshold = 10_000;
         private ulong AlphaApex;
         private object syncRoot = new { };
         private object statesSyncRoot = new { };
@@ -240,7 +244,7 @@ namespace Centaurus.Domain
                 logger.Error(exc);
             if (State != state)
             {
-                logger.Trace($"State update: new state: {state}, prev state: {State}");
+                logger.Info($"State update: new state: {state}, prev state: {State}");
                 var stateArgs = new StateChangedEventArgs(state, State);
                 State = state;
 
@@ -249,7 +253,7 @@ namespace Centaurus.Domain
                     .CreateEnvelope<MessageEnvelopeSignless>()
                     .Sign(Context.Settings.KeyPair);
                 Context.NotifyAuditors(updateMessage);
-                logger.Trace($"State update {state} sent.");
+                logger.Info($"State update {state} sent.");
             }
         }
 
