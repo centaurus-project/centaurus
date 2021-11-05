@@ -92,7 +92,7 @@ namespace Centaurus.Domain
         /// <returns></returns>
         public List<SyncQuantaBatchItem> GetQuantaSyncBatchItemsAboveApex(ulong apex, int count = 0)
         {
-            var query = (IEnumerable<QuantumPersistentModel>)Context.PersistentStorage.LoadQuantaAboveApex(apex)
+            var query = (IEnumerable<QuantumPersistentModel>)Context.PersistentStorage.LoadQuantaAboveApex(apex, count)
                 .OrderBy(q => q.Apex);
             if (count > 0)
                 query = query.Take(count);
@@ -107,10 +107,8 @@ namespace Centaurus.Domain
         /// <returns></returns>
         public List<QuantumSignatures> GetSignaturesSyncBatchItemsAboveApex(ulong apex, int count = 0)
         {
-            var query = (IEnumerable<QuantumPersistentModel>)Context.PersistentStorage.LoadQuantaAboveApex(apex)
+            var query = (IEnumerable<QuantumPersistentModel>)Context.PersistentStorage.LoadQuantaAboveApex(apex, count)
                 .OrderBy(q => q.Apex);
-            if (count > 0)
-                query = query.Take(count);
             return query.Select(q => q.ToQuantumSignatures()).ToList();
         }
 
@@ -165,7 +163,19 @@ namespace Centaurus.Domain
 
             var exchange = GetRestoredExchange(orders, settings);
 
-            var quanta = Context.PersistentStorage.LoadQuantaAboveApex(apex);
+            var batchSize = 1_000_000;
+            var quanta = new List<QuantumPersistentModel>();
+            while (true)
+            {
+                var items = Context.PersistentStorage.LoadQuantaAboveApex(apex, batchSize).ToList();
+                if (items.Count > 0)
+                {
+                    quanta.AddRange(items);
+                    if (items.Count == batchSize)
+                        continue;
+                }
+                break;
+            }
 
             var effects = quanta
                 .SelectMany(q =>

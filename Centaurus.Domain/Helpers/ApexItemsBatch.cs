@@ -1,8 +1,8 @@
 ﻿using Centaurus.Models;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -11,17 +11,19 @@ namespace Centaurus
     public class ApexItemsBatch<T>
         where T : IApex
     {
-        public ApexItemsBatch(ulong start, int size, List<T> initData = null)
+        public ApexItemsBatch(ulong start, int size, List<T> initData)
         {
             Start = start;
             Size = size;
+            if (initData == null)
+                throw new ArgumentNullException(nameof(initData));
             if (initData.Count > size)
                 throw new ArgumentException("Data size is greater than batch size", nameof(initData));
-            data = initData ?? new List<T>();
+            data = initData;
             data.Capacity = size;
 
-            if (initData.Count > 0)
-                LastApex = initData.Last().Apex;
+            if (data.Count > 0)
+                LastApex = data.LastOrDefault()?.Apex ?? 0; //last item could be null if it's first batch and no quanta were handled
             else
                 LastApex = (start == 0 ? 0 : start - 1);
 

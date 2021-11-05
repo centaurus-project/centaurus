@@ -22,7 +22,7 @@ namespace Centaurus.PersistentStorage.Abstraction
 
         List<QuantumPersistentModel> LoadQuanta(params ulong[] apexes);
 
-        IEnumerable<QuantumPersistentModel> LoadQuantaAboveApex(ulong apex);
+        IEnumerable<QuantumPersistentModel> LoadQuantaAboveApex(ulong apex, int limit);
 
         List<AccountQuantumDTO> LoadQuantaForAccount(byte[] accountPubkey, ulong apex, int limit, QueryOrder order = QueryOrder.Asc);
 

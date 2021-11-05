@@ -80,9 +80,7 @@ namespace Centaurus
                         return;
                     }
 
-                    var quantaDiff = (Context.QuantumHandler.CurrentApex - cursors.quantaCursor) ?? 0;
-
-                    var hasQuantaToSend = quantaDiff > 0;
+                    var hasQuantaToSend = ((Context.QuantumHandler.CurrentApex - cursors.quantaCursor) ?? 0) > 0;
                     var hasSignaturesToSend = ((Context.PendingUpdatesManager.LastSavedApex - cursors.signaturesCursor) ?? 0) > 0;
 
                     if (!Context.IsAlpha //only Alpha should broadcast quanta
@@ -93,9 +91,6 @@ namespace Centaurus
                         hasPendingQuanta = false;
                         continue;
                     }
-
-                    if (quantaDiff > 100_000) //TODO: find a more efficient way to sync far delayed nodes
-                        Thread.Sleep(100); //if the auditor is too delayed, it will load CPU for 100%. Add some sleep time to keep constellation available
 
                     var quantaSendResult = SendQuanta(hasQuantaToSend, cursors.quantaCursor.Value);
 

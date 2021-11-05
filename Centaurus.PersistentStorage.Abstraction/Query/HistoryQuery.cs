@@ -17,9 +17,13 @@ namespace Centaurus.PersistentStorage
             return storage.MutliGet(apexes.Select(a => new QuantumPersistentModel { Apex = a }));
         }
 
-        public StorageIterator<QuantumPersistentModel> LoadQuantaAboveApex(ulong apex)
+        public StorageIterator<QuantumPersistentModel> LoadQuantaAboveApex(ulong apex, int limit)
         {
-            return storage.Find<QuantumPersistentModel>().From(UlongConverter.Encode(apex));
+            var iterator = storage.Find<QuantumPersistentModel>()
+                .From(UlongConverter.Encode(apex));
+            if (limit > 0)
+                iterator = iterator.To(UlongConverter.Encode(apex + (ulong)limit));
+            return iterator;
         }
 
         public List<AccountQuantumDTO> LoadQuantaForAccount(byte[] account, ulong fromApex, int limit, QueryOrder order = QueryOrder.Asc)

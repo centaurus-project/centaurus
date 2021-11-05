@@ -50,9 +50,9 @@ namespace Centaurus.PersistentStorage.Abstraction
             return Query.LoadQuanta(apexes);
         }
 
-        public IEnumerable<QuantumPersistentModel> LoadQuantaAboveApex(ulong apex)
+        public IEnumerable<QuantumPersistentModel> LoadQuantaAboveApex(ulong apex, int limit)
         {
-            return Query.LoadQuantaAboveApex(apex);
+            return Query.LoadQuantaAboveApex(apex, limit);
         }
 
         public List<AccountQuantumDTO> LoadQuantaForAccount(byte[] accountPubkey, ulong apex, int limit, QueryOrder order = QueryOrder.Asc)
