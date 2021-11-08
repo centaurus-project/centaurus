@@ -52,7 +52,11 @@ namespace Centaurus.Stellar.PaymentProvider
             if (withdrawalRequest == null)
                 throw new ArgumentNullException(nameof(withdrawalRequest));
 
-            if (!rawTransaction.AsSpan().SequenceEqual(BuildTransaction(withdrawalRequest)))
+            if (!StellarTransactionExtensions.TryDeserializeTransaction(rawTransaction, out var tx))
+                throw new Exception("Unable to deserialize transaction.");
+
+            //use the sequence from the constructed transaction, otherwise, the transaction will be invalid for the delayed nodes
+            if (!rawTransaction.AsSpan().SequenceEqual(BuildTransactionInternal(withdrawalRequest, tx.SequenceNumber - 1)))
             {
                 error = "Transaction is not equal to expected one.";
                 return false;
@@ -62,13 +66,21 @@ namespace Centaurus.Stellar.PaymentProvider
 
         public override byte[] BuildTransaction(WithdrawalRequestModel withdrawalRequest)
         {
+            var rawTx = BuildTransactionInternal(withdrawalRequest, vaultAccount.SequenceNumber);
+            //inc sequence
+            vaultAccount.SequenceNumber++;
+            return rawTx;
+        }
+
+        private byte[] BuildTransactionInternal(WithdrawalRequestModel withdrawalRequest, long accountSequence)
+        {
             if (withdrawalRequest == null)
                 throw new ArgumentNullException(nameof(withdrawalRequest));
 
             if (!ValidateFee((uint)withdrawalRequest.Fee))
                 throw new InvalidOperationException($"Not fair fee {withdrawalRequest.Fee}.");
 
-            var sourceAccount = new Account(Vault, vaultAccount.SequenceNumber);
+            var sourceAccount = new Account(Vault, accountSequence);
             var options = new TransactionBuilderOptions(sourceAccount, (uint)withdrawalRequest.Fee);
             if (!Settings.TryGetAsset(withdrawalRequest.Asset, out var stellarAsset))
                 throw new InvalidOperationException($"Asset {withdrawalRequest.Asset} is not supported by provider.");
@@ -77,10 +89,7 @@ namespace Centaurus.Stellar.PaymentProvider
 
             var stream = new XdrDataOutputStream();
             stellar_dotnet_sdk.xdr.Transaction.Encode(stream, transaction.ToXdrV1());
-            var rawTx = stream.ToArray();
-            //inc sequence
-            vaultAccount.SequenceNumber++;
-            return rawTx;
+            return stream.ToArray();
         }
 
         public override SignatureModel SignTransaction(byte[] transaction)
