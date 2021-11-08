@@ -41,7 +41,11 @@ namespace Centaurus.Test
                 }.CreateEnvelope().Sign(TestEnvironment.Client1KeyPair)
             }, Task.FromResult(true)).OnProcessed;
 
-            context.Complete();
+            //run it in separate thread to avoid deadlock
+            await Task.Factory.StartNew(() =>
+            {
+                context.Complete();
+            });
 
             //verify that quantum is in the storage
             var quantumModel = storage.LoadPendingQuanta().Quanta.LastOrDefault();

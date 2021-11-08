@@ -61,7 +61,7 @@ namespace Centaurus.Test
         public override Task<WebSocketReceiveResult> ReceiveAsync(ArraySegment<byte> buffer, CancellationToken cancellationToken)
         {
             var bytesToWrite = Math.Min(buffer.Count, remainingPayload);
-            if (bytesToWrite == 0) return Task.FromResult(new WebSocketReceiveResult(0, WebSocketMessageType.Binary, true));
+            if (bytesToWrite == 0) return new TaskCompletionSource<WebSocketReceiveResult>().Task; //return task that never ends, to emulate message awaiting
             Buffer.BlockCopy(payload, payloadCursor, buffer.Array, buffer.Offset, bytesToWrite);
             payloadCursor += bytesToWrite;
             return Task.FromResult(new WebSocketReceiveResult(bytesToWrite, WebSocketMessageType.Binary, payloadCursor == payload.Length));

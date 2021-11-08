@@ -170,8 +170,11 @@ namespace Centaurus.Test
             await context.QuantumHandler.HandleAsync(depositQuantum, Task.FromResult(true)).OnProcessed;
 
             //save all effects
-            context.PendingUpdatesManager.UpdateBatch(true);
-            context.PendingUpdatesManager.ApplyUpdates();
+            await Task.Factory.StartNew(() =>
+            {
+                context.PendingUpdatesManager.UpdateBatch(true);
+                context.PendingUpdatesManager.ApplyUpdates();
+            });
             return context;
         }
 
