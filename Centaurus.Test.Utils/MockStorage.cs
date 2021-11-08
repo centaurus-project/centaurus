@@ -63,9 +63,9 @@ namespace Centaurus.Test
             return quanta.OrderBy(q => q.Apex).ToList();
         }
 
-        public IEnumerable<QuantumPersistentModel> LoadQuantaAboveApex(ulong apex)
+        public IEnumerable<QuantumPersistentModel> LoadQuantaAboveApex(ulong apex, int count)
         {
-            return quantaCollection.OrderBy(q => q.Apex).SkipWhile(q => q.Apex <= apex).ToList();
+            return quantaCollection.OrderBy(q => q.Apex).SkipWhile(q => q.Apex <= apex).Take(count).ToList();
         }
 
         public List<AccountQuantumDTO> LoadQuantaForAccount(byte[] account, ulong fromApex, int limit, QueryOrder order = QueryOrder.Asc)
