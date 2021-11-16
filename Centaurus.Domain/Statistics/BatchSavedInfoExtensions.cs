@@ -6,22 +6,21 @@ namespace Centaurus.Domain
 {
     public static class BatchSavedInfoExtensions
     {
-        public static Models.BatchSavedInfo ToBatchSavedInfoModel(this BatchSavedInfo batchSavedInfo)
+        public static Centaurus.Models.BatchSavedInfo ToBatchSavedInfoModel(this BatchSavedInfo batchSavedInfo)
         {
             if (batchSavedInfo == null)
                 throw new ArgumentNullException(nameof(batchSavedInfo));
 
-            return new Models.BatchSavedInfo
+            return new Centaurus.Models.BatchSavedInfo
             {
                 EffectsCount = batchSavedInfo.EffectsCount,
                 QuantaCount = batchSavedInfo.QuantaCount,
                 ElapsedMilliseconds = batchSavedInfo.ElapsedMilliseconds,
-                Retries = batchSavedInfo.Retries,
                 SavedAt = batchSavedInfo.SavedAt.Ticks
             };
         }
 
-        public static BatchSavedInfo FromModel(this Models.BatchSavedInfo batchSavedInfo)
+        public static BatchSavedInfo FromModel(this Centaurus.Models.BatchSavedInfo batchSavedInfo)
         {
             if (batchSavedInfo == null)
                 throw new ArgumentNullException(nameof(batchSavedInfo));
@@ -31,7 +30,6 @@ namespace Centaurus.Domain
                 EffectsCount = batchSavedInfo.EffectsCount,
                 QuantaCount = batchSavedInfo.QuantaCount,
                 ElapsedMilliseconds = batchSavedInfo.ElapsedMilliseconds,
-                Retries = batchSavedInfo.Retries,
                 SavedAt = new DateTime(batchSavedInfo.SavedAt, DateTimeKind.Utc)
             };
         }

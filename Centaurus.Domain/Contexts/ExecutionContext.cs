@@ -1,191 +1,372 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Timers;
-using Centaurus.DAL;
-using Centaurus.DAL.Mongo;
+﻿using Centaurus.Client;
+using Centaurus.Domain.Models;
 using Centaurus.Exchange.Analytics;
 using Centaurus.Models;
-using Centaurus.Stellar;
-using Centaurus.Xdr;
+using Centaurus.PaymentProvider;
+using Centaurus.PersistentStorage;
+using Centaurus.PersistentStorage.Abstraction;
 using NLog;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public abstract class ExecutionContext: IDisposable
+    public partial class ExecutionContext : IDisposable
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
         /// <param name="settings">Application config</param>
-        /// <param name="storage">Permanent storage object</param>
-        /// <param name="useLegacyOrderbook"></param>
-        public ExecutionContext(BaseSettings settings, IStorage storage, StellarDataProviderBase stellarDataProvider, bool useLegacyOrderbook = false)
+        /// <param name="storage">Persistent storage object</param>
+        public ExecutionContext(Settings settings, IPersistentStorage storage, PaymentProvidersFactoryBase paymentProviderFactory, OutgoingConnectionFactoryBase connectionFactory)
         {
-            PermanentStorage = storage ?? throw new ArgumentNullException(nameof(storage));
+
             Settings = settings ?? throw new ArgumentNullException(nameof(settings));
-            StellarDataProvider = stellarDataProvider ?? throw new ArgumentNullException(nameof(settings));
 
-            ExtensionsManager = new ExtensionsManager(settings.ExtensionsConfigFilePath);
+            PersistentStorage = storage ?? throw new ArgumentNullException(nameof(storage));
+            PersistentStorage.Connect(GetAbsolutePath(Settings.ConnectionString));
 
-            PersistenceManager = new PersistenceManager(PermanentStorage);
-            QuantumProcessor = new QuantumProcessorsStorage();
+            PaymentProviderFactory = paymentProviderFactory ?? throw new ArgumentNullException(nameof(paymentProviderFactory));
 
-            PendingUpdatesManager = new PendingUpdatesManager(this);
+            RoleManager = new RoleManager((CentaurusNodeParticipationLevel)Settings.ParticipationLevel);
+
+            ExtensionsManager = new ExtensionsManager(GetAbsolutePath(Settings.ExtensionsConfigFilePath));
+
+            DataProvider = new DataProvider(this);
+
+            QuantumProcessor = new QuantumProcessorsStorage(this);
+
+            PendingUpdatesManager = new UpdatesManager(this);
             PendingUpdatesManager.OnBatchSaved += PendingUpdatesManager_OnBatchSaved;
 
-            QuantumStorage = new QuantumStorage();
+            MessageHandlers = new MessageHandlers(this);
 
-            this.useLegacyOrderbook = useLegacyOrderbook;
-        }
+            InfoCommandsHandlers = new InfoCommandsHandlers(this);
 
-        /// <summary>
-        /// Delay in seconds
-        /// </summary>
-        public const int MaxTxSubmitDelay = 5 * 60; //5 minutes
+            IncomingConnectionManager = new IncomingConnectionManager(this);
 
-        readonly bool useLegacyOrderbook;
+            OutgoingConnectionManager = new OutgoingConnectionManager(this, connectionFactory);
 
-        public virtual async Task Init()
-        {
+            SubscriptionsManager = new SubscriptionsManager();
+
+            InfoConnectionManager = new InfoConnectionManager(this);
+
+            Catchup = new Catchup(this);
+
+            StateManager = new StateManager(this);
+            StateManager.StateChanged += AppState_StateChanged;
+
             DynamicSerializersInitializer.Init();
 
-            await PermanentStorage.OpenConnection(Settings.ConnectionString);
+            var persistentData = DataProvider.GetPersistentData();
 
-            //try to load last settings, we need it to know current auditors
-            var lastHash = new byte[] { };
-            var lastApex = await PersistenceManager.GetLastApex();
-            if (lastApex >= 0)
+            var lastApex = persistentData.snapshot?.Apex ?? 0;
+            var lastHash = persistentData.snapshot?.LastHash ?? new byte[32];
+
+            SyncStorage = new SyncStorage(this, lastApex);
+
+            QuantumHandler = new QuantumHandler(this, lastApex, lastHash);
+
+            ResultManager = new ResultManager(this);
+
+            //apply data, if presented in db
+            if (persistentData != default)
             {
-                var lastQuantum = await PersistenceManager.GetQuantum(lastApex);
+                StateManager.Init(State.Rising);
+                //apply snapshot if not null
+                if (persistentData.snapshot != null)
+                    Setup(persistentData.snapshot);
 
-                lastHash = lastQuantum.Message.ComputeHash();
-                var snapshot = await PersistenceManager.GetSnapshot(lastApex);
-                await Setup(snapshot);
-                if (IsAlpha)
-                    AppState.State = ApplicationState.Rising;//Alpha should ensure that it has all quanta from auditors
-                else
-                    AppState.State = ApplicationState.Running;
+                if (persistentData.pendingQuanta != null)
+                    HandlePendingQuanta(persistentData.pendingQuanta);
+
+
+                if (!IsAlpha)
+                    StateManager.Rised();
             }
-            else
-                //if no snapshot, the application is in initialization state
-                AppState.State = ApplicationState.WaitingForInit;
 
-            var lastQuantumApex = lastApex < 0 ? 0 : lastApex;
-            QuantumStorage.Init(lastQuantumApex, lastHash);
-            QuantumHandler.Start();
+            if (Constellation == null)
+            {
+                SetAuditorStates();
+                //establish connection with genesis auditors
+                EstablishOutgoingConnections();
+            }
         }
 
-        public virtual Task Setup(Snapshot snapshot)
+        private void HandlePendingQuanta(List<PendingQuantum> pendingQuanta)
         {
+            foreach (var quantum in pendingQuanta)
+            {
+                try
+                {
+                    //cache current payload hash
+                    var persistentQuantumHash = quantum.Quantum.GetPayloadHash();
+
+                    //handle quantum
+                    var quantumProcessingItem = QuantumHandler.HandleAsync(quantum.Quantum, QuantumSignatureValidator.Validate(quantum.Quantum));
+
+                    quantumProcessingItem.OnAcknowledged.Wait();
+
+                    //verify that the pending quantum has current node signature
+                    var currentNodeSignature = quantum.Signatures.FirstOrDefault(s => s.AuditorId == Constellation.GetAuditorId(Settings.KeyPair)) ?? throw new Exception($"Unable to get signature for quantum {quantum.Quantum.Apex}");
+
+                    //verify the payload signature
+                    if (!Settings.KeyPair.Verify(quantum.Quantum.GetPayloadHash(), currentNodeSignature.PayloadSignature.Data))
+                        throw new Exception($"Signature for the quantum {quantum.Quantum.Apex} is invalid.");
+
+                    //validate that quantum payload data is the same
+                    if (!persistentQuantumHash.AsSpan().SequenceEqual(quantum.Quantum.GetPayloadHash()))
+                        throw new Exception($"Payload hash for the quantum {quantum.Quantum.Apex} is not equal to persistent.");
+
+                    //add signatures
+                    ResultManager.Add(new QuantumSignatures { Apex = quantum.Quantum.Apex, Signatures = quantum.Signatures });
+                }
+                catch (AggregateException exc)
+                {
+                    //unwrap aggregate exc
+                    throw exc.GetBaseException();
+                }
+            }
+        }
+
+        private string GetAbsolutePath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+                return path;
+            return Path.IsPathRooted(path)
+                ? path
+                : Path.GetFullPath(Path.Combine(Settings.CWD, path.Trim('.').Trim('\\').Trim('/')));
+        }
+
+        public void Setup(Snapshot snapshot)
+        {
+
+            if (Exchange != null)
+                Exchange.OnUpdates -= Exchange_OnUpdates;
+
             Constellation = snapshot.Settings;
+
+            AuditorIds = Constellation.Auditors.ToDictionary(a => Constellation.GetAuditorId(a.PubKey), a => a.PubKey);
+            AuditorPubKeys = AuditorIds.ToDictionary(a => a.Value, a => a.Key);
+            AlphaId = AuditorPubKeys[Constellation.Alpha];
+
+            //update current auditors
+            SetAuditorStates();
+
+            SetRole();
 
             AccountStorage = new AccountStorage(snapshot.Accounts);
 
-            Exchange?.Dispose(); Exchange = Exchange.RestoreExchange(snapshot.Settings.Assets, snapshot.Orders, IsAlpha, useLegacyOrderbook);
+            Exchange?.Dispose(); Exchange = Exchange.RestoreExchange(snapshot.Settings.Assets, snapshot.Orders, RoleManager.ParticipationLevel == CentaurusNodeParticipationLevel.Prime);
 
-            WithdrawalStorage?.Dispose(); WithdrawalStorage = new WithdrawalStorage(snapshot.Withdrawals);
+            SetupPaymentProviders(snapshot.Cursors);
 
-            TxCursorManager = new TxCursorManager(snapshot.TxCursor);
+            DisposeAnalyticsManager();
 
-            return Task.CompletedTask;
+            AnalyticsManager = new AnalyticsManager(
+                PersistentStorage,
+                DepthsSubscription.Precisions.ToList(),
+                Constellation.Assets.Where(a => !a.IsQuoteAsset).Select(a => a.Code).ToList(), //all but base asset
+                snapshot.Orders.Select(o => o.Order.ToOrderInfo()).ToList()
+            );
+
+            AnalyticsManager.Restore(DateTime.UtcNow);
+            AnalyticsManager.StartTimers();
+
+            AnalyticsManager.OnError += AnalyticsManager_OnError;
+            AnalyticsManager.OnUpdate += AnalyticsManager_OnUpdate;
+            Exchange.OnUpdates += Exchange_OnUpdates;
+
+            PerformanceStatisticsManager?.Dispose(); PerformanceStatisticsManager = new PerformanceStatisticsManager(this);
+
+            IncomingConnectionManager.CleanupAuditorConnections();
+
+            EstablishOutgoingConnections();
         }
 
-        public virtual void Dispose()
+        public void Complete()
         {
-            PendingUpdatesManager?.Stop(TimeSpan.FromMilliseconds(0)); PendingUpdatesManager?.Dispose();
+            StateManager.Stopped();
 
+            //close all connections
+            Task.WaitAll(
+                IncomingConnectionManager.CloseAllConnections(),
+                InfoConnectionManager.CloseAllConnections(),
+                Task.Factory.StartNew(OutgoingConnectionManager.CloseAllConnections)
+            );
+
+            PersistPendingQuanta();
+        }
+
+        private void PersistPendingQuanta()
+        {
+            ResultManager.CompleteAdding();
+
+            while (!ResultManager.IsCompleted)
+                Thread.Sleep(50);
+
+            //complete current updates container
+            PendingUpdatesManager.UpdateBatch(true);
+            //save all completed quanta
+            PendingUpdatesManager.ApplyUpdates();
+            //persist all pending quanta
+            PendingUpdatesManager.PersistPendingQuanta();
+        }
+
+        private void EstablishOutgoingConnections()
+        {
+            var auditors = Constellation != null
+                ? Constellation.Auditors.Select(a => new Settings.Auditor(a.PubKey, a.Address)).ToList()
+                : Settings.GenesisAuditors.ToList();
+            OutgoingConnectionManager.Connect(auditors);
+        }
+
+
+        private void SetAuditorStates()
+        {
+            var auditors = Constellation != null
+                ? Constellation.Auditors.Select(a => a.PubKey).ToList()
+                : Settings.GenesisAuditors.Select(a => (RawPubKey)a.PubKey).ToList();
+            StateManager.SetAuditors(auditors);
+        }
+
+        private void SetRole()
+        {
+            if (RoleManager.ParticipationLevel == CentaurusNodeParticipationLevel.Auditor)
+            {
+                if (Constellation.Alpha.Equals((RawPubKey)Settings.KeyPair))
+                    throw new InvalidOperationException("Server with Auditor level cannot be set as Alpha.");
+                return;
+            }
+            if (Constellation.Alpha.Equals((RawPubKey)Settings.KeyPair))
+            {
+                RoleManager.SetRole(CentaurusNodeRole.Alpha);
+            }
+            else
+                RoleManager.SetRole(CentaurusNodeRole.Beta);
+        }
+
+        private void SetupPaymentProviders(Dictionary<string, string> cursors)
+        {
+            PaymentProvidersManager?.Dispose();
+
+            var settings = Constellation.Providers.Select(p =>
+            {
+                var providerId = PaymentProviderBase.GetProviderId(p.Provider, p.Name);
+                cursors.TryGetValue(providerId, out var cursor);
+                var settings = p.ToProviderModel(cursor);
+                return settings;
+            }).ToList();
+
+            PaymentProvidersManager = new PaymentProvidersManager(PaymentProviderFactory, settings, GetAbsolutePath(Settings.PaymentConfigPath));
+
+            foreach (var paymentProvider in PaymentProvidersManager.GetAll())
+            {
+                paymentProvider.OnPaymentCommit += PaymentProvider_OnPaymentCommit;
+                paymentProvider.OnError += PaymentProvider_OnError;
+            }
+        }
+
+        private void PaymentProvider_OnPaymentCommit(PaymentProviderBase paymentProvider, PaymentProvider.Models.DepositNotificationModel notification)
+        {
+            if (!IsAlpha || StateManager.State != State.Ready)
+                throw new OperationCanceledException($"Current server is not ready to process deposits. Is Alpha: {IsAlpha}, State: {StateManager.State}");
+
+            QuantumHandler.HandleAsync(new DepositQuantum { Source = notification.ToDomainModel() }, Task.FromResult(true));
+        }
+
+        private void PaymentProvider_OnError(PaymentProviderBase paymentProvider, Exception exc)
+        {
+            logger.Error(exc, $"Error occurred in {paymentProvider.Id}");
+        }
+
+        public void Dispose()
+        {
             ExtensionsManager?.Dispose();
-            WithdrawalStorage?.Dispose();
-            TxListener?.Dispose();
+            PaymentProvidersManager?.Dispose();
+
+            QuantumHandler.Dispose();
+            ResultManager.Dispose();
+            DisposeAnalyticsManager();
+            PerformanceStatisticsManager?.Dispose();
         }
 
-        protected virtual void AppState_StateChanged(StateChangedEventArgs stateChangedEventArgs)
+        private async void AppState_StateChanged(StateChangedEventArgs stateChangedEventArgs)
         {
+
             var state = stateChangedEventArgs.State;
-            if (!(PendingUpdatesManager?.IsRunning ?? true) &&
-                (state == ApplicationState.Running
-                || state == ApplicationState.Ready
-                || state == ApplicationState.WaitingForInit))
-                PendingUpdatesManager?.Start();
+            var prevState = stateChangedEventArgs.PrevState;
+            if (state != State.Ready && prevState == State.Ready) //close all connections (except auditors)
+                await IncomingConnectionManager.CloseAllConnections(false);
         }
 
         private void PendingUpdatesManager_OnBatchSaved(BatchSavedInfo batchInfo)
         {
-            var message = $"Batch saved on the {batchInfo.Retries} try. Quanta count: {batchInfo.QuantaCount}; effects count: {batchInfo.EffectsCount}.";
-            if (batchInfo.Retries > 1)
-                logger.Warn(message);
-            else
-                logger.Trace(message);
             PerformanceStatisticsManager?.OnBatchSaved(batchInfo);
         }
 
+        public DataProvider DataProvider { get; }
 
-        public PersistenceManager PersistenceManager { get; }
+        public ResultManager ResultManager { get; }
 
-        public PendingUpdatesManager PendingUpdatesManager { get; }
+        public UpdatesManager PendingUpdatesManager { get; }
 
-        private ConstellationSettings constellation;
-        public ConstellationSettings Constellation
-        {
-            get
-            {
-                return constellation;
-            }
-            private set
-            {
-                constellation = value;
-                AssetIds = constellation != null
-                    ? new HashSet<int>(constellation.Assets.Select(a => a.Id).Concat(new int[] { 0 }))
-                    : new HashSet<int>();
-            }
-        }
-
-        public Exchange Exchange { get; protected set; }
-
-        public AccountStorage AccountStorage { get; protected set; }
-
-        public WithdrawalStorage WithdrawalStorage { get; protected set; }
-
-        public TxListenerBase TxListener { get; protected set; }
-
-        public TxCursorManager TxCursorManager { get; protected set; }
-
-        public PerformanceStatisticsManager PerformanceStatisticsManager { get; protected set; }
-
-        public HashSet<int> AssetIds { get; protected set; }
+        public bool IsAlpha => RoleManager.Role == CentaurusNodeRole.Alpha;
 
         public ExtensionsManager ExtensionsManager { get; }
 
         public QuantumProcessorsStorage QuantumProcessor { get; }
 
-        public QuantumStorage QuantumStorage { get; }
+        public SyncStorage SyncStorage { get; }
 
-        public IStorage PermanentStorage { get; }
+        public RoleManager RoleManager { get; }
 
-        public BaseSettings Settings { get; }
+        public IPersistentStorage PersistentStorage { get; }
 
-        public StellarDataProviderBase StellarDataProvider { get; }
+        public Settings Settings { get; }
 
-        public virtual bool IsAlpha { get; } = false;
+        public PaymentProvidersFactoryBase PaymentProviderFactory { get; }
 
-        public abstract StateManager AppState { get; }
+        public StateManager StateManager { get; }
 
-        public virtual QuantumHandler QuantumHandler { get; }
+        public QuantumHandler QuantumHandler { get; }
 
-        public virtual MessageHandlers MessageHandlers { get; }
-    }
+        public IncomingConnectionManager IncomingConnectionManager { get; }
 
-    public abstract class ExecutionContext<TContext, TSettings> : ExecutionContext
-        where TContext: ExecutionContext
-        where TSettings: BaseSettings
-    {
-        public ExecutionContext(TSettings settings, IStorage storage, StellarDataProviderBase stellarDataProvider, bool useLegacyOrderbook = false)
-            :base(settings, storage, stellarDataProvider, useLegacyOrderbook)
-        {
-        }
+        public OutgoingConnectionManager OutgoingConnectionManager { get; }
 
-        public new TSettings Settings => (TSettings)base.Settings;
+        public SubscriptionsManager SubscriptionsManager { get; }
+
+        public InfoConnectionManager InfoConnectionManager { get; }
+
+        public Catchup Catchup { get; }
+
+        public InfoCommandsHandlers InfoCommandsHandlers { get; }
+
+        public MessageHandlers MessageHandlers { get; }
+
+        public PaymentProvidersManager PaymentProvidersManager { get; private set; }
+
+        public Exchange Exchange { get; private set; }
+
+        public AccountStorage AccountStorage { get; private set; }
+
+        public PerformanceStatisticsManager PerformanceStatisticsManager { get; private set; }
+
+        public HashSet<int> AssetIds { get; private set; }
+
+        public AnalyticsManager AnalyticsManager { get; private set; }
+
+        public ConstellationSettings Constellation { get; private set; }
+
+        public Dictionary<byte, RawPubKey> AuditorIds { get; private set; }
+
+        public Dictionary<RawPubKey, byte> AuditorPubKeys { get; private set; }
+
+        public byte AlphaId { get; private set; }
     }
 }

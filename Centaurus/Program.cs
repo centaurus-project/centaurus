@@ -1,9 +1,13 @@
+using Centaurus.Alpha;
+using Centaurus.Client;
+using Centaurus.Domain;
+using Centaurus.PersistentStorage.Abstraction;
+using CommandLine;
+using NLog;
 using System;
 using System.Diagnostics;
 using System.IO;
 using System.Threading;
-using CommandLine;
-using NLog;
 
 namespace Centaurus
 {
@@ -14,35 +18,41 @@ namespace Centaurus
 
         public static void Main(string[] args)
         {
-            var mergedArgs = CommandLineHelper.GetMergedArgs<AuditorSettings>(CommandLineHelper.GetMergedArgs<AlphaSettings>(args));
-
-            Parser.Default.ParseArguments<AlphaSettings, AuditorSettings>(mergedArgs)
-                .WithParsed<AlphaSettings>(s => ConfigureAndRun(s))
-                .WithParsed<AuditorSettings>(s => ConfigureAndRun(s));
+            var mergedArgs = CommandLineHelper.GetMergedArgs<Settings>(args);
+            var parser = new Parser(s =>
+            {
+                s.AllowMultiInstance = true;
+                s.AutoHelp = true;
+                s.AutoVersion = true;
+                s.HelpWriter = Console.Out;
+            });
+            var errors = parser.ParseArguments<Settings>(mergedArgs)
+                .WithParsed(s => ConfigureAndRun(s));
         }
 
         static void ConfigureAndRun<T>(T settings)
-            where T : BaseSettings
+            where T : Settings
         {
             var isLoggerInited = false;
             try
             {
-                var isAlpha = settings is AlphaSettings;
-                Console.Title = isAlpha ? "CentaurusAlpha" : "CentaurusAuditor";
 
                 settings.Build();
 
+                Console.Title = $"CentaurusAuditor_{settings.KeyPair.AccountId}";
+
                 var logsDirectory = Path.Combine(settings.CWD, "logs");
                 LogConfigureHelper.Configure(logsDirectory, settings.Silent, settings.Verbose);
+                logger = LogManager.GetCurrentClassLogger();
                 isLoggerInited = true;
 
-                var startup = StartupBase.GetStartup(settings);
+                var context = new Domain.ExecutionContext(settings, new PersistentStorageAbstraction(), PaymentProvidersFactoryBase.Default, OutgoingConnectionFactoryBase.Default);
+                var startup = new Startup(context, AlphaHostFactoryBase.Default);
 
                 var resetEvent = new ManualResetEvent(false);
                 startup.Run(resetEvent);
 
-                if (!isAlpha)
-                    logger.Info("Auditor is started");
+                logger.Info("Auditor is started");
                 Console.WriteLine("Press Ctrl+C to quit");
                 Console.CancelKeyPress += (sender, eventArgs) =>
                 {
@@ -58,9 +68,7 @@ namespace Centaurus
                 if (!isLoggerInited)
                     LogConfigureHelper.Configure("logs");
                 logger.Error(exc);
-                Thread.Sleep(5000);
             }
         }
-
     }
 }

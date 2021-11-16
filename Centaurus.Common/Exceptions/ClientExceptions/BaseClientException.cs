@@ -17,6 +17,6 @@ namespace Centaurus
 
         }
 
-        public abstract ResultStatusCodes StatusCode { get; }
+        public abstract ResultStatusCode StatusCode { get; }
     }
 }

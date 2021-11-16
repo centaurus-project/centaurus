@@ -1,49 +1,53 @@
-﻿using Centaurus.DAL.Mongo;
+﻿using Centaurus.Alpha;
 using Centaurus.Domain;
-using Centaurus.Stellar;
+using Centaurus.Models;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net.WebSockets;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace Centaurus
 {
-    public abstract class StartupBase
+    public class Startup : ContextualBase
     {
-        public StartupBase(Domain.ExecutionContext context)
+        private ManualResetEvent resetEvent;
+
+        public Startup(Domain.ExecutionContext context, AlphaHostFactoryBase alphaHostFactory)
+            : base(context)
         {
-            Context = context ?? throw new ArgumentNullException(nameof(context));
+            if (alphaHostFactory == null)
+                throw new ArgumentNullException(nameof(alphaHostFactory));
+
+            if (context.RoleManager.ParticipationLevel == CentaurusNodeParticipationLevel.Prime)
+                AlphaStartup = new AlphaStartup(context, alphaHostFactory);
         }
 
-        public abstract Task Run(ManualResetEvent resetEvent);
-        public abstract Task Shutdown();
-        public Domain.ExecutionContext Context { get; }
+        public AlphaStartup AlphaStartup { get; }
 
-        public static StartupBase GetStartup(BaseSettings settings)
+        public void Run(ManualResetEvent resetEvent)
         {
-            var startup = default(StartupBase);
-            var storage = new MongoStorage();
-            var stellarDataProvider = new StellarDataProvider(settings.NetworkPassphrase, settings.HorizonUrl);
-            if (settings is AlphaSettings alphaSettings)
-                startup = new AlphaStartup(new AlphaContext(alphaSettings, storage, stellarDataProvider));
-            else if (settings is AuditorSettings auditorSettings)
-                startup = new AuditorStartup(new AuditorContext(auditorSettings, storage, stellarDataProvider), () => new ClientConnectionWrapper(new ClientWebSocket()));
-            else
-                throw new NotSupportedException("Unknown settings type.");
-            return startup;
-        }
-    }
+            this.resetEvent = resetEvent ?? throw new ArgumentNullException(nameof(resetEvent));
 
-    public abstract class StartupBase<TContext>: StartupBase
-        where TContext: Domain.ExecutionContext
-    {
-        public StartupBase(TContext context)
-            :base(context)
-        {
+            if (AlphaStartup != null)
+                AlphaStartup.Run();
+
+            Context.StateManager.StateChanged += Current_StateChanged;
         }
 
-        public new TContext Context => (TContext)base.Context;
+        private void Current_StateChanged(StateChangedEventArgs eventArgs)
+        {
+            if (eventArgs.State == State.Failed)
+            {
+                var isSet = resetEvent.WaitOne(0);
+                if (!isSet)
+                    resetEvent.Set();
+            }
+        }
+
+        public void Shutdown()
+        {
+            Context.Complete();
+            if (AlphaStartup != null)
+                AlphaStartup.Shutdown();
+        }
     }
 }

@@ -1,56 +1,28 @@
 ﻿using Centaurus.Models;
-using stellar_dotnet_sdk;
 
 namespace Centaurus
 {
     public class ConstellationInfo
     {
-        public ApplicationState State { get; set; }
+        public State State { get; set; }
 
-        public string Vault { get; set; }
+        public ProviderSettings[] Providers { get; set; }
 
-        public string[] Auditors { get; set; }
+        public Auditor[] Auditors { get; set; }
 
-        public long MinAccountBalance { get; set; }
+        public ulong MinAccountBalance { get; set; }
 
-        public long MinAllowedLotSize { get; set; }
+        public ulong MinAllowedLotSize { get; set; }
 
-        public Network StellarNetwork { get; set; }
-
-        public Asset[] Assets { get; set; }
+        public AssetSettings[] Assets { get; set; }
 
         public RequestRateLimits RequestRateLimits { get; set; }
 
-        public class Network
+        public class Auditor
         {
-            public Network(string passphrase, string horizon)
-            {
-                Passphrase = passphrase;
-                Horizon = horizon;
-            }
+            public string PubKey { get; set; }
 
-            public string Passphrase { get; set; }
-
-            public string Horizon { get; set; }
-        }
-
-        public class Asset
-        {
-            public string Code { get; set; }
-
-            public string Issuer { get; set; }
-
-            public int Id { get; set; }
-
-            public static Asset FromAssetSettings(AssetSettings assetSettings)
-            {
-                return new Asset
-                {
-                    Id = assetSettings.Id,
-                    Code = assetSettings.Code,
-                    Issuer = assetSettings.IsXlm ? null : ((KeyPair)assetSettings.Issuer).AccountId
-                };
-            }
+            public string Address { get; set; }
         }
     }
 }

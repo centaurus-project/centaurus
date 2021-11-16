@@ -19,13 +19,13 @@ namespace Centaurus.Domain
         public override void CommitEffect()
         {
             MarkAsProcessed();
-            accountStorage.CreateAccount(Effect.Account, Effect.Pubkey, requestRateLimits);
+            accountStorage.CreateAccount(Effect.Account, requestRateLimits);
         }
 
         public override void RevertEffect()
         {
             MarkAsProcessed();
-            accountStorage.RemoveAccount(Effect.Pubkey);
+            accountStorage.RemoveAccount(Effect.Account);
         }
     }
 }

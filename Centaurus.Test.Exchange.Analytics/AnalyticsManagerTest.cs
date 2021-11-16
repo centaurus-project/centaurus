@@ -1,12 +1,9 @@
-﻿using Centaurus.Models;
-using Centaurus.DAL;
-using Centaurus.Exchange.Analytics;
+﻿using Centaurus.Exchange.Analytics;
+using Centaurus.Models;
 using NUnit.Framework;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Centaurus.Test.Exchange.Analytics
 {
@@ -14,20 +11,20 @@ namespace Centaurus.Test.Exchange.Analytics
     {
 
         [Test]
-        public async Task RestoreTest()
+        public void RestoreTest()
         {
             GenerateTrades(10_000);
-            await analyticsManager.SaveUpdates(storage);
+            analyticsManager.SaveUpdates(storage);
 
             var restoredAnalyticsManager = new AnalyticsManager(storage, new List<double> { 1 }, markets, new List<OrderInfo>(), historyLength);
-            await restoredAnalyticsManager.Restore(now);
+            restoredAnalyticsManager.Restore(now);
 
             foreach (var market in markets)
             {
                 foreach (var period in Enum.GetValues(typeof(PriceHistoryPeriod)).Cast<PriceHistoryPeriod>())
                 {
-                    var frames = await analyticsManager.PriceHistoryManager.GetPriceHistory(0, market, period);
-                    var restoredFrames = await restoredAnalyticsManager.PriceHistoryManager.GetPriceHistory(0, market, period);
+                    var frames = analyticsManager.PriceHistoryManager.GetPriceHistory(0, market, period);
+                    var restoredFrames = restoredAnalyticsManager.PriceHistoryManager.GetPriceHistory(0, market, period);
                     Assert.AreEqual(frames.frames.Count, restoredFrames.frames.Count, "Current frames unit and restored frames unit have different size.");
                     for (var i = 0; i < frames.frames.Count; i++)
                     {

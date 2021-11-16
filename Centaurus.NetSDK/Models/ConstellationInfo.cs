@@ -1,6 +1,7 @@
-﻿using System;
+﻿using Centaurus.Models;
+using System;
 using System.Collections.Generic;
-using Centaurus.Models;
+using System.Linq;
 
 namespace Centaurus.NetSDK
 {
@@ -8,98 +9,80 @@ namespace Centaurus.NetSDK
     {
         public string RawObject { get; set; }
 
-        public ApplicationStateModel State { get; set; }
+        public StateModel State { get; set; }
 
-        private string vault;
-        public string Vault 
-        {
-            get => vault;
-            set {
-                vault = value;
-                VaultPubKey = StrKey.DecodeStellarAccountId(Vault);
-            }
-        }
+        public List<ProviderSettings> Providers { get; set; }
 
-        public RawPubKey VaultPubKey { get; private set; }
+        public List<Auditor> Auditors { get; set; }
 
-        private string[] auditors;
-        public string[] Auditors 
-        {
-            get => auditors;
-            set {
-                if (value == null)
-                    throw new ArgumentNullException("Auditors");
-                auditors = value;
-                var auditorKeys = new List<RawPubKey>();
-                foreach (var auditor in value)
-                {
-                    auditorKeys.Add(StrKey.DecodeStellarAccountId(auditor));
-                }
-                AuditorPubKeys = auditorKeys.ToArray();
-            }
-        }
+        public ulong MinAccountBalance { get; set; }
 
-        public RawPubKey[] AuditorPubKeys { get; private set; }
+        public ulong MinAllowedLotSize { get; set; }
 
-        public long MinAccountBalance { get; set; }
-
-        public long MinAllowedLotSize { get; set; }
-
-        public Network StellarNetwork { get; set; }
-
-        public Asset[] Assets { get; set; }
+        public List<Asset> Assets { get; set; }
 
         public RequestRateLimits RequestRateLimits { get; set; }
 
-        public class Network
+        private Asset quoteAsset;
+        public Asset QuoteAsset
         {
-            public Network(string passphrase, string horizon)
+            get
             {
-                Passphrase = passphrase;
-                Horizon = horizon;
+                if (quoteAsset == null)
+                    quoteAsset = Assets?.FirstOrDefault(a => a.IsQuoteAsset);
+                return quoteAsset;
             }
-
-            public string Passphrase { get; set; }
-
-            public string Horizon { get; set; }
         }
 
         public class Asset
         {
             public string Code { get; set; }
 
-            public string Issuer { get; set; }
+            public bool IsSuspended { get; set; }
 
-            public int Id { get; set; }
-
-            public static Asset FromAssetSettings(AssetSettings assetSettings)
-            {
-                return new Asset
-                {
-                    Id = assetSettings.Id,
-                    Code = assetSettings.Code,
-                    Issuer = assetSettings.IsXlm ? null : ((KeyPair)assetSettings.Issuer).AccountId
-                };
-            }
-
-            public string DisplayName => Issuer == null ? "XLM" : $"{Code}:{Issuer}";
+            public bool IsQuoteAsset { get; set; }
         }
 
-        public enum ApplicationStateModel
+        public class ProviderSettings
+        {
+            public string Provider { get; set; }
+
+            public string Name { get; set; }
+
+            public string Vault { get; set; }
+
+            public List<ProviderAsset> Assets { get; set; }
+
+            public string Id => PaymentProviderHelper.GetProviderId(Provider, Name);
+
+            public class ProviderAsset
+            {
+                public string Token { get; set; }
+
+                public string CentaurusAsset { get; set; }
+
+                public bool IsVirtual { get; set; }
+            }
+        }
+
+        public class Auditor
+        {
+            public string Address { get; set; }
+
+            public string PubKey { get; set; }
+        }
+
+        public enum StateModel
         {
             Undefined = 0,
             /// <summary>
-            /// First start
-            /// </summary>
-            WaitingForInit = 1,
-            /// <summary>
             /// It has started, but not yet ready. If Alpha, then it waits for the majority to connect. If the Auditor, then it waits for a handshake
             /// </summary>
-            Running = 2,
+            Running = 1,
             /// <summary>
             /// Ready to process quanta
             /// </summary>
-            Ready = 3,
+            Ready = 2,
 
             Rising = 4,
 

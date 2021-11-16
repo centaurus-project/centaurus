@@ -1,9 +1,4 @@
-﻿using stellar_dotnet_sdk;
-using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace Centaurus.Models
+﻿namespace Centaurus.Models
 {
     public class RawPubKey : BinaryData
     {
@@ -16,6 +11,11 @@ namespace Centaurus.Models
         {
             var keypair = KeyPair.FromAccountId(address);
             Data = keypair.PublicKey;
+        }
+
+        public RawPubKey(byte[] publicKey)
+        {
+            Data = publicKey;
         }
 
         public override int ByteLength { get { return 32; } }

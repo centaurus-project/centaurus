@@ -16,6 +16,6 @@ namespace Centaurus
         {
 
         }
-        public override ResultStatusCodes StatusCode => ResultStatusCodes.PayloadTooLarge;
+        public override ResultStatusCode StatusCode => ResultStatusCode.PayloadTooLarge;
     }
 }

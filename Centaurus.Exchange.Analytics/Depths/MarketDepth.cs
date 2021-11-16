@@ -16,7 +16,7 @@ namespace Centaurus.Exchange
             Price = price;
         }
 
-        public long Amount { get; set; }
+        public ulong Amount { get; set; }
 
         public double Price { get; }
 
@@ -26,7 +26,7 @@ namespace Centaurus.Exchange
     public class MarketDepth
     {
 
-        public MarketDepth(int market, double precision, AnalyticsOrderMap orderMap, int maxLevelCount = 20)
+        public MarketDepth(string market, double precision, AnalyticsOrderMap orderMap, int maxLevelCount = 20)
         {
             if (orderMap == null)
                 throw new ArgumentNullException(nameof(orderMap));
@@ -103,7 +103,7 @@ namespace Centaurus.Exchange
 
         public List<MarketDepthPrice> Bids => prices[OrderSide.Sell];
 
-        public int Market { get; }
+        public string Market { get; }
 
         public double Precision { get; }
 
@@ -118,17 +118,16 @@ namespace Centaurus.Exchange
 
         private void Fill(ulong orderId, List<OrderSide> sides)
         {
-            while (true)
+            foreach (var order in orderMap.All().SkipWhile(o => o.Order.OrderId < orderId))
             {
-                var order = orderMap.GetNextOrder(orderId);
                 if (order == null)
                     break;
 
-                orderId = order.OrderId;
-                if (!sides.Contains(order.Side))
+                orderId = order.Order.OrderId;
+                if (!sides.Contains(order.Order.Side))
                     continue;
 
-                if (!AddOrder(order))
+                if (!AddOrder(order.Order))
                     break;
             }
         }
@@ -176,7 +175,7 @@ namespace Centaurus.Exchange
             var currentPrice = source.FirstOrDefault(p => p.Price == price);
             if (currentPrice == null)
                 return false;
-            currentPrice.Amount += -order.AmountDiff;
+            currentPrice.Amount -= order.AmountDiff;
             currentPrice.Orders.Remove(order.OrderId);
             if (currentPrice.Amount == 0)
                 source.Remove(currentPrice);
@@ -193,7 +192,7 @@ namespace Centaurus.Exchange
             var currentPrice = source.FirstOrDefault(p => p.Price == price);
             if (currentPrice == null)
                 return false;
-            currentPrice.Amount += -order.AmountDiff;
+            currentPrice.Amount -= order.AmountDiff;
             return true;
         }
     }

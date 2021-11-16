@@ -1,4 +1,7 @@
 ﻿using Centaurus.Models;
+using System;
+using System.Collections.Generic;
+using System.Text;
 
 namespace Centaurus.NetSDK
 {
@@ -9,11 +12,9 @@ namespace Centaurus.NetSDK
             return (int)(totalAuditorsCount / 2.0) + 1;
         }
 
-        public static bool HasMajority(this MessageEnvelope envelope, int totalAuditorsCount)
+        public static bool HasMajority(int signaturesCount, int totalAuditorsCount)
         {
-            //imply that signatures are unique and were validated beforehand
-            var auditorsSignaturesCount = envelope.Signatures.Count - 1; //1 signature belongs to Alpha
-            return auditorsSignaturesCount >= GetMajorityThreshold(totalAuditorsCount);
+            return signaturesCount >= GetMajorityThreshold(totalAuditorsCount);
         }
     }
 }

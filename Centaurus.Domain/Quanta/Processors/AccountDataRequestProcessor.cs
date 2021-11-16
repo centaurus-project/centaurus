@@ -7,48 +7,55 @@ using Centaurus.Models;
 
 namespace Centaurus.Domain
 {
-    public class AccountDataRequestProcessor : QuantumRequestProcessor
+    public class AccountDataRequestProcessor : QuantumProcessorBase
     {
-        public override MessageTypes SupportedMessageType => MessageTypes.AccountDataRequest;
-
-        public override Task<ResultMessage> Process(ProcessorContext context)
+        public AccountDataRequestProcessor(ExecutionContext context)
+            :base(context)
         {
-            var quantum = (RequestQuantum)context.Envelope.Message;
+
+        }
+
+        public override string SupportedMessageType { get; } = typeof(AccountDataRequest).Name;
+
+        public override Task<QuantumResultMessageBase> Process(QuantumProcessingItem quantumProcessingItem)
+        {
+            var quantum = (AccountDataRequestQuantum)quantumProcessingItem.Quantum;
             var requestMessage = quantum.RequestMessage;
 
-            context.UpdateNonce();
+            UpdateNonce(quantumProcessingItem);
 
-            var accountEffects = context.EffectProcessors.GetEffects(requestMessage.Account).ToList();
-
-            var account = requestMessage.AccountWrapper.Account;
-
-            var resultMessage = (AccountDataResponse)context.Envelope.CreateResult(ResultStatusCodes.Success, accountEffects);
-            resultMessage.Balances = account.Balances
+            var resultMessage = (AccountDataResponse)quantumProcessingItem.Quantum.CreateEnvelope<MessageEnvelopeSignless>().CreateResult(ResultStatusCode.Success);
+            resultMessage.Balances = quantumProcessingItem.Initiator.Balances
+                .Values
                 .Select(balance => new Balance { Amount = balance.Amount, Asset = balance.Asset, Liabilities = balance.Liabilities })
                 .OrderBy(balance => balance.Asset)
                 .ToList();
 
-            resultMessage.Orders = context.CentaurusContext.Exchange.OrderMap.GetAllAccountOrders(requestMessage.AccountWrapper)
+            resultMessage.Orders = quantumProcessingItem.Initiator.Orders
+                .Values
                 .Select(order =>
                     new Order
                     {
-                        AccountWrapper = order.AccountWrapper,
                         Amount = order.Amount,
                         QuoteAmount = order.QuoteAmount,
                         Price = order.Price,
-                        OrderId = order.OrderId
+                        OrderId = order.OrderId,
+                        Asset = order.Asset,
+                        Side = order.Side
                     })
                 .OrderBy(order => order.OrderId)
                 .ToList();
 
+            resultMessage.Sequence = quantumProcessingItem.Initiator.AccountSequence;
 
+            quantum.PayloadHash = resultMessage.ComputePayloadHash();
 
-            return Task.FromResult((ResultMessage)resultMessage);
+            return Task.FromResult((QuantumResultMessageBase)resultMessage);
         }
 
-        public override Task Validate(ProcessorContext context)
+        public override Task Validate(QuantumProcessingItem quantumProcessingItem)
         {
-            context.ValidateNonce();
+            ValidateNonce(quantumProcessingItem);
             return Task.CompletedTask;
         }
     }

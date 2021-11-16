@@ -1,4 +1,5 @@
-﻿using Centaurus.Models;
+﻿using Centaurus.Domain.Models;
+using Centaurus.Models;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -7,8 +8,8 @@ namespace Centaurus.Domain
 {
     public class BalanceCreateEffectProcessor : BaseAccountEffectProcessor<BalanceCreateEffect>
     {
-        public BalanceCreateEffectProcessor(BalanceCreateEffect effect)
-            : base(effect)
+        public BalanceCreateEffectProcessor(BalanceCreateEffect effect, Account account)
+            : base(effect, account)
         {
 
         }
@@ -21,7 +22,7 @@ namespace Centaurus.Domain
         public override void RevertEffect()
         {
             MarkAsProcessed();
-            Account.Balances.Remove(Account.GetBalance(Effect.Asset));
+            Account.Balances.Remove(Effect.Asset);
         }
     }
 }

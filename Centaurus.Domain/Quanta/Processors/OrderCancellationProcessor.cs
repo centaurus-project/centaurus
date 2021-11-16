@@ -1,71 +1,43 @@
-﻿using Centaurus.Domain.Quanta.Contexts;
+﻿using Centaurus.Domain.Models;
 using Centaurus.Models;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public class OrderCancellationProcessor : QuantumRequestProcessor<OrderCancellationProcessorContext>
+    public class OrderCancellationProcessor : QuantumProcessorBase
     {
-        public override MessageTypes SupportedMessageType => MessageTypes.OrderCancellationRequest;
-
-        public override OrderCancellationProcessorContext GetContext(EffectProcessorsContainer effectProcessors)
+        public OrderCancellationProcessor(ExecutionContext context)
+            :base(context)
         {
-            return new OrderCancellationProcessorContext(effectProcessors);
+
         }
 
-        public override Task<ResultMessage> Process(OrderCancellationProcessorContext context)
+        public override string SupportedMessageType { get; } = typeof(OrderCancellationRequest).Name;
+
+        public override Task<QuantumResultMessageBase> Process(QuantumProcessingItem quantumProcessingItem)
         {
-            var quantum = (RequestQuantum)context.Envelope.Message;
+            UpdateNonce(quantumProcessingItem);
 
-            context.UpdateNonce();
+            Context.Exchange.RemoveOrder(quantumProcessingItem, Context.Constellation.QuoteAsset.Code);
 
-            context.CentaurusContext.Exchange.RemoveOrder(context.EffectProcessors, context.Orderbook, context.Order);
-
-            var resultMessage = context.Envelope.CreateResult(ResultStatusCodes.Success, context.EffectProcessors.Effects);
-            return Task.FromResult(resultMessage);
+            var resultMessage = quantumProcessingItem.Quantum.CreateEnvelope<MessageEnvelopeSignless>().CreateResult(ResultStatusCode.Success);
+            return Task.FromResult((QuantumResultMessageBase)resultMessage);
         }
 
-
-        public override Task Validate(OrderCancellationProcessorContext context)
+        public override Task Validate(QuantumProcessingItem quantumProcessingItem)
         {
-            context.ValidateNonce();
+            ValidateNonce(quantumProcessingItem);
 
-            var quantum = context.Envelope.Message as RequestQuantum;
+            var quantum = (RequestQuantum)quantumProcessingItem.Quantum;
             var orderRequest = (OrderCancellationRequest)quantum.RequestMessage;
 
-            var orderData = OrderIdConverter.Decode(orderRequest.OrderId);
-            if (!context.CentaurusContext.Exchange.HasMarket(orderData.Asset))
-                throw new BadRequestException("Asset is not supported.");
+            var orderWrapper = Context.Exchange.OrderMap.GetOrder(orderRequest.OrderId);
+            if (orderWrapper == null)
+                throw new BadRequestException($"Order {orderRequest.OrderId} is not found.");
 
-            context.Orderbook = context.CentaurusContext.Exchange.GetOrderbook(orderData.Asset, orderData.Side);
-
-            context.Order = context.Orderbook.GetOrder(orderRequest.OrderId);
-
-            if (context.Order is null)
-                throw new BadRequestException($"Order {orderRequest.OrderId} is not found.{(quantum.Apex != default ? $" Apex {quantum.Apex}" : "")}");
-
-            //TODO: check that lot size is greater than minimum allowed lot
-            if (context.Order.AccountWrapper.Account.Id != orderRequest.Account)
+            if (!orderWrapper.Account.Pubkey.Equals(orderRequest.Account))
                 throw new ForbiddenException();
-
-            if (context.OrderSide == OrderSide.Buy)
-            {
-                var balance = orderRequest.AccountWrapper.Account.GetBalance(0);
-                if (balance.Liabilities < context.Order.QuoteAmount)
-                    throw new BadRequestException("Quote liabilities is less than order size.");
-            }
-            else
-            {
-                var balance = orderRequest.AccountWrapper.Account.GetBalance(orderData.Asset);
-                if (balance == null)
-                    throw new BadRequestException("Balance for asset not found.");
-                if (balance.Liabilities < context.Order.Amount)
-                    throw new BadRequestException("Asset liabilities is less than order size.");
-            }
 
             return Task.CompletedTask;
         }

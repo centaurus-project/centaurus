@@ -4,25 +4,26 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using System.Timers;
 
 namespace Centaurus.Domain
 {
-    public abstract class PerformanceStatisticsManager : IContextual, IDisposable
+    public class PerformanceStatisticsManager : ContextualBase, IDisposable
     {
         const int updateInterval = 1000;
 
+        static Logger logger = LogManager.GetCurrentClassLogger();
+
         public PerformanceStatisticsManager(ExecutionContext context)
+            : base(context)
         {
-            Context = context ?? throw new ArgumentNullException(nameof(context));
             updateTimer = new System.Timers.Timer();
             updateTimer.Interval = updateInterval;
             updateTimer.AutoReset = false;
             updateTimer.Elapsed += UpdateTimer_Elapsed;
             updateTimer.Start();
         }
-
-        public abstract event Action<PerformanceStatistics> OnUpdates;
 
         public void OnBatchSaved(BatchSavedInfo batchInfo)
         {
@@ -34,52 +35,17 @@ namespace Centaurus.Domain
             }
         }
 
-        private List<Apex> RecentApexes = new List<Apex>();
-        private List<BatchSavedInfo> LastBatchInfos = new List<BatchSavedInfo>();
-        private List<int> LastQuantaQueueLengths = new List<int>();
-
-        private object syncRoot = new { };
-        private Timer updateTimer;
-
-        public ExecutionContext Context { get; }
-
-        private void UpdateTimer_Elapsed(object sender, ElapsedEventArgs e)
+        public void AddAuditorStatistics(string accountId, AuditorPerfStatistics message)
         {
-            lock (syncRoot)
-                CollectStatistics();
-            updateTimer?.Start();
+            lock (auditorsStatistics)
+                auditorsStatistics[accountId] = message.FromModel(accountId);
         }
 
-        protected abstract void CollectStatistics();
-
-        protected int GetQuantaAvgLength()
+        public void RemoveAuditorStatistics(string accountId)
         {
-            LastQuantaQueueLengths.Add(Context.QuantumHandler.QuantaQueueLenght);
-            if (LastQuantaQueueLengths.Count > 20)
-                LastQuantaQueueLengths.RemoveAt(0);
-            return (int)Math.Floor(decimal.Divide(LastQuantaQueueLengths.Sum(), LastQuantaQueueLengths.Count));
+            lock (auditorsStatistics)
+                auditorsStatistics.Remove(accountId);
         }
-
-        protected int GetThrottling()
-        {
-            return QuantaThrottlingManager.Current.IsThrottlingEnabled ? QuantaThrottlingManager.Current.MaxItemsPerSecond : 0;
-        }
-
-        protected int GetItemsPerSecond()
-        {
-            RecentApexes.Add(new Apex { UpdatedAt = DateTime.UtcNow, CurrentApex = Context.QuantumStorage.CurrentApex });
-            if (RecentApexes.Count > 20)
-                RecentApexes.RemoveAt(0);
-
-            if (RecentApexes.Count < 2)
-                return 0;
-            var lastItem = RecentApexes.Last();
-            var firstItem = RecentApexes.First();
-            var timeDiff = (decimal)(lastItem.UpdatedAt - firstItem.UpdatedAt).TotalMilliseconds;
-            return (int)(decimal.Divide(lastItem.CurrentApex - firstItem.CurrentApex, timeDiff) * 1000);
-        }
-
-        protected List<BatchSavedInfo> GetBatchInfos() => LastBatchInfos;
 
         public void Dispose()
         {
@@ -91,101 +57,118 @@ namespace Centaurus.Domain
             }
         }
 
-        protected class Apex
+        List<Apex> RecentApexes = new List<Apex>();
+        List<BatchSavedInfo> LastBatchInfos = new List<BatchSavedInfo>();
+        List<int> LastQuantaQueueLengths = new List<int>();
+
+        object syncRoot = new { };
+        Timer updateTimer;
+
+        void UpdateTimer_Elapsed(object sender, ElapsedEventArgs e)
         {
-            public long CurrentApex { get; set; }
-
-            public DateTime UpdatedAt { get; set; }
-        }
-    }
-
-    public class AlphaPerformanceStatisticsManager : PerformanceStatisticsManager
-    {
-        static Logger logger = LogManager.GetCurrentClassLogger();
-
-        public AlphaPerformanceStatisticsManager(ExecutionContext context)
-            : base(context)
-        {
+            if (Context.StateManager.State == State.Running 
+                || Context.StateManager.State == State.Ready 
+                || Context.StateManager.State == State.Chasing)
+            {
+                lock (syncRoot)
+                    CollectStatistics();
+            }
+            updateTimer?.Start();
         }
 
-        public override event Action<PerformanceStatistics> OnUpdates;
-
-        private Dictionary<string, AuditorPerformanceStatistics> auditorsStatistics { get; set; } = new Dictionary<string, AuditorPerformanceStatistics>();
-
-        public void AddAuditorStatistics(string accountId, AuditorPerfStatistics message)
-        {
-            lock (auditorsStatistics)
-                auditorsStatistics[accountId] = message.FromModel(accountId);
-        }
-        private List<AuditorPerformanceStatistics> GetAuditorsStatistics()
+        Dictionary<string, AuditorPerformanceStatistics> auditorsStatistics { get; set; } = new Dictionary<string, AuditorPerformanceStatistics>();
+        List<AuditorPerformanceStatistics> GetAuditorsStatistics()
         {
             lock (auditorsStatistics)
             {
-                var auditorConnections = ((AlphaContext)Context).ConnectionManager.GetAuditorConnections();
+                var auditorConnections = Context.IncomingConnectionManager.GetAuditorConnections();
                 foreach (var auditorConnection in auditorConnections)
                 {
-                    var accountId = auditorConnection?.ClientKPAccountId;
+                    var accountId = auditorConnection?.PubKeyAddress;
                     if (!auditorsStatistics.TryGetValue(accountId, out var statistics))
                         continue;
-                    var auditorApex = auditorConnection?.QuantumWorker?.CurrentApexCursor ?? -1;
+                    var auditorApex = auditorConnection.CurrentCursor;
                     if (auditorApex >= 0)
-                        statistics.Delay = (int)(Context.QuantumStorage.CurrentApex - auditorApex);
+                        statistics.Delay = (int)(Context.QuantumHandler.CurrentApex - auditorApex);
                 }
                 return auditorsStatistics.Values.ToList();
             }
         }
 
-
-        protected override void CollectStatistics()
+        void CollectStatistics()
         {
             try
             {
-                var statistics = new AlphaPerformanceStatistics
+                var current = new AuditorPerfStatistics
                 {
+                    BatchInfos = GetBatchInfos().Select(b => b.ToBatchSavedInfoModel()).ToList(),
                     QuantaPerSecond = GetItemsPerSecond(),
                     QuantaQueueLength = GetQuantaAvgLength(),
-                    Throttling = GetThrottling(),
-                    AuditorStatistics = GetAuditorsStatistics(),
-                    BatchInfos = GetBatchInfos(),
-                    UpdateDate = DateTime.UtcNow
+                    UpdateDate = DateTime.UtcNow.Ticks,
+                    State = Context.StateManager.State
                 };
-                OnUpdates?.Invoke(statistics);
+                AddAuditorStatistics(Context.Settings.KeyPair.AccountId, current);
+
+                Notifier.NotifyAuditors(Context, current.CreateEnvelope<MessageEnvelopeSignless>());
+                SendToSubscribers();
             }
             catch (Exception exc)
             {
                 logger.Error(exc);
             }
         }
-    }
 
-    public class AuditorPerformanceStatisticsManager : PerformanceStatisticsManager
-    {
-        static Logger logger = LogManager.GetCurrentClassLogger();
-
-        public AuditorPerformanceStatisticsManager(ExecutionContext context)
-            : base(context)
+        void SendToSubscribers()
         {
+            if (!Context.SubscriptionsManager.TryGetSubscription(PerformanceStatisticsSubscription.SubscriptionName, out var subscription))
+                return;
+            var statistics = new AlphaPerformanceStatistics
+            {
+                QuantaPerSecond = GetItemsPerSecond(),
+                QuantaQueueLength = GetQuantaAvgLength(),
+                Throttling = GetThrottling(),
+                AuditorStatistics = GetAuditorsStatistics(),
+                BatchInfos = GetBatchInfos(),
+                UpdateDate = DateTime.UtcNow,
+                State = (int)Context.StateManager.State
+            };
+            Context.InfoConnectionManager.SendSubscriptionUpdate(subscription, PerformanceStatisticsUpdate.Generate(statistics, PerformanceStatisticsSubscription.SubscriptionName));
         }
 
-        public override event Action<PerformanceStatistics> OnUpdates;
-
-        protected override void CollectStatistics()
+        int GetQuantaAvgLength()
         {
-            try
-            {
-                var statistics = new AuditorPerformanceStatistics
-                {
-                    QuantaPerSecond = GetItemsPerSecond(),
-                    QuantaQueueLength = GetQuantaAvgLength(),
-                    BatchInfos = GetBatchInfos(),
-                    UpdateDate = DateTime.UtcNow
-                };
-                OnUpdates?.Invoke(statistics);
-            }
-            catch (Exception exc)
-            {
-                logger.Error(exc);
-            }
+            LastQuantaQueueLengths.Add(Context.QuantumHandler.QuantaQueueLenght);
+            if (LastQuantaQueueLengths.Count > 20)
+                LastQuantaQueueLengths.RemoveAt(0);
+            return (int)Math.Floor(decimal.Divide(LastQuantaQueueLengths.Sum(), LastQuantaQueueLengths.Count));
+        }
+
+        int GetThrottling()
+        {
+            return QuantaThrottlingManager.Current.IsThrottlingEnabled ? QuantaThrottlingManager.Current.MaxItemsPerSecond : 0;
+        }
+
+        int GetItemsPerSecond()
+        {
+            RecentApexes.Add(new Apex { UpdatedAt = DateTime.UtcNow, CurrentApex = Context.QuantumHandler.CurrentApex });
+            if (RecentApexes.Count > 20)
+                RecentApexes.RemoveAt(0);
+
+            if (RecentApexes.Count < 2)
+                return 0;
+            var lastItem = RecentApexes.Last();
+            var firstItem = RecentApexes.First();
+            var timeDiff = (decimal)(lastItem.UpdatedAt - firstItem.UpdatedAt).TotalMilliseconds;
+            return (int)(decimal.Divide(lastItem.CurrentApex - firstItem.CurrentApex, timeDiff) * 1000);
+        }
+
+        List<BatchSavedInfo> GetBatchInfos() => LastBatchInfos;
+
+        class Apex
+        {
+            public ulong CurrentApex { get; set; }
+
+            public DateTime UpdatedAt { get; set; }
         }
     }
 }

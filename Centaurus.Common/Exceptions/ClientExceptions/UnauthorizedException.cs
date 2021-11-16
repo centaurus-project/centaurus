@@ -17,6 +17,6 @@ namespace Centaurus
 
         }
 
-        public override ResultStatusCodes StatusCode => ResultStatusCodes.Unauthorized;
+        public override ResultStatusCode StatusCode => ResultStatusCode.Unauthorized;
     }
 }

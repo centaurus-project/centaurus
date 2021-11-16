@@ -22,54 +22,54 @@ serialization approach.
 
 ## Server roles
 
-Constellation servers share the same set of core modules. Depending on the server role 
-(alpha or auditor) a module can be active or inactive. 
+Constellation servers share the same set of core modules. Depending on the server participation level 
+(Prime or Auditor) a module can be active or inactive. 
 There can be only one alpha server per cluster, and up to 19 auditors. 
 
-|  | **Alpha** | **Auditor** |
+|  | **Prime** | **Auditor** |
 | --- | --- | --- |
 | Communicates directly with clients | yes | no |
-| Communicates with other constellation members | yes | no |
+| Communicates with other constellation members | yes | yes |
 | Maintains the full internal copy of the global state | yes | yes |
+| Maintains the whole operations history | yes | no |
 | Executes operations and applies state changes | yes | yes |
-| Monitors Stellar ledger | no | yes |
-| Confirms (signs) withdrawal requests | no | yes |  
+| Monitors payments | yes | yes |
+| Confirms (signs) withdrawal requests | yes | yes |  
 
-## Server core modules
+## ??Server core modules
 
 - [**Orderbook**](exchange.md) contains active exchange orders for a particular trading pair.
 - [**Matching engine**](exchange.md) executes trades.
-- **Vault manager** controls internal balances and the multisig-protected Stellar account. 
-- [**StellarLink**](stellar-link.md) monitors vault transactions, processes on-chain 
+- **Payment provider manager** launches and initializes payment providers.
+- [**Payment provider**](payment-providers.md) monitors vault transactions, processes on-chain 
 deposits and withdrawals.
-- [**Snapshot manager**](snapshots.md) is responsible for periodical checkpoints creation, 
-verification, and restoration. It also maintains full history archives.
+- [**Pending updates manager**](snapshots.md) is responsible for periodical checkpoints creation. 
+- **Data provider** provides access to history archives.
 - **Herald** is responsible for communication between Alpha and auditors.  
 - **Gateway** introduces public entry point for all client connections.
-- **Сhronicler** service provides queryable interface for the accounts history over WebSockets.
+- **Chronicler** service provides queryable interface for the accounts history over WebSockets.
 
 ## Startup sequence
 
-**Alpha**
+After server is started, it tries to get last snapshot from DB (if there is non than it will wait for 
+**initialization**, see detail below). Snapshot contains all accounts, balances, orders, payment cursors 
+and constellation settings. If current auditor is alpha, than it begins catchup procedure. Alpha requests 
+all known quanta above last persistent apex from all available auditors. When alpha receives all quanta 
+batches, it aggregates quanta signatures, validates it and process quanta. If there are any conflicts (two
+ different quanta with same apex and with current auditor signature, gaps in quanta batches) or majority 
+can't be reached it becomes failed. If current auditor isn't alpha than it starts sync quanta with 
+constellation. When majority of auditors reached alpha quantum apex height, constellation becomes `Ready`, 
+and it can process client requests.
 
-- Сhronicler is started. It fetches the last known snapshot and assumes that the cluster 
-hasn't been started yet if there is none. 
-- Herald is up and waiting for auditors to connect.
-- Snapshot manager restores the state from the snapshot and waits for auditor consensus 
-on the snapshot and pending quanta. Once the consensus on current state is reached, 
-Alpha applies it and sends to all auditors.
-- Gateway initializes the WebSocket server which starts processing requests from clients once 
-the majority of auditors are connected.
+## Initialization
 
-**Auditor**
+For constellation initialization, auditors must compound a [**ContellationUpdate**](quantum-flow.md), sign it 
+and post serialized quantum to alpha initialization endpoint (`{alpha_domain}/api/constellation/init`). 
+Alpha verifies quantum signatures, validates constellation settings and, if it's valid, process it. After 
+alpha initialized, it broadcasts quantum to connected auditors (auditors know about each other addresses and 
+public keys from `auditor` argument passed on a startup, see [**administration**](administration.md) docs). 
+Auditors follow the same validation procedure, and constellation is switched to `Ready` state.
 
-- Сhronicler is started. It fetches the snapshot from the last known checkpoint and subsequent 
-individual quantum records if they are available locally.
-- Herald connects to Alpha, executes handshake routine, and synchronizes the checkpoint with 
-Alpha server. If Alpha is in the rising state, an auditor sends its own state including current 
-snapshot and pending quanta.
-- Auditor restores the internal state to match the consensus state sent by Alpha and validates 
-it against the most recent available checkpoint.
-- StellarLink payment observer is launched. It synchronizes the state with Vault manager and 
-ensures the balances.
-- The auditor is up and awaits for next quantum from Alpha.
+## Deposit/registration
+
+For deposit, a client must follow an implemented payment provider instructions. When the provider receives a new payment it notifies alpha about new pending payment. Pending payment contains public key of account to fund, asset and amount. Alpha generates [**DepositQuantum**](quantum-flow.md) and process it. To register, the client must deposit quote asset and the amount must be greater or equal to the constellation minimum account balance. If registration requirements are completed, account will be created, and the client can send quantum requests.  

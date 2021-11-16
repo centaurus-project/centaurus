@@ -5,12 +5,9 @@ using System.Text;
 
 namespace Centaurus.Models
 {
-    public abstract class BaseBalanceEffect: Effect
+    public abstract class BaseBalanceEffect: AccountEffect
     {
         [XdrField(0)]
-        public long Amount { get; set; }
-
-        [XdrField(1)]
-        public int Asset { get; set; }
+        public string Asset { get; set; }
     }
 }

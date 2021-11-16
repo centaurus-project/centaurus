@@ -1,78 +1,77 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-using System.Threading.Tasks;
+﻿using Centaurus.Domain.Models;
 using Centaurus.Models;
-using NLog;
-using stellar_dotnet_sdk;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public class PaymentRequestProcessor : QuantumRequestProcessor<PaymentProcessorContext>
+    public class PaymentRequestProcessor : QuantumProcessorBase
     {
-        public override MessageTypes SupportedMessageType { get; } = MessageTypes.PaymentRequest;
-
-        public override PaymentProcessorContext GetContext(EffectProcessorsContainer container)
+        public PaymentRequestProcessor(ExecutionContext context)
+            :base(context)
         {
-            return new PaymentProcessorContext(container);
+
         }
 
-        public override Task<ResultMessage> Process(PaymentProcessorContext context)
+        public override string SupportedMessageType { get; } = typeof(PaymentRequest).Name;
+
+        public override Task<QuantumResultMessageBase> Process(QuantumProcessingItem quantumProcessingItem)
         {
-            context.UpdateNonce();
+            UpdateNonce(quantumProcessingItem);
 
-            var payment = context.Payment;
+            var request = (RequestQuantumBase)quantumProcessingItem.Quantum;
+            var payment = (PaymentRequest)request.RequestMessage;
 
-            if (context.DestinationAccount == null)
+            var destinationAccount = Context.AccountStorage.GetAccount(payment.Destination);
+            if (destinationAccount == null)
             {
-                var accId = context.CentaurusContext.AccountStorage.NextAccountId;
-                context.EffectProcessors.AddAccountCreate(context.CentaurusContext.AccountStorage, accId, payment.Destination);
+                quantumProcessingItem.AddAccountCreate(Context.AccountStorage, payment.Destination, Context.Constellation.RequestRateLimits);
+                destinationAccount = Context.AccountStorage.GetAccount(payment.Destination);
             }
 
-            if (!context.DestinationAccount.Account.HasBalance(payment.Asset))
-                context.EffectProcessors.AddBalanceCreate(context.DestinationAccount, payment.Asset);
-            context.EffectProcessors.AddBalanceUpdate(context.DestinationAccount, payment.Asset, payment.Amount);
+            if (!destinationAccount.HasBalance(payment.Asset))
+                quantumProcessingItem.AddBalanceCreate(destinationAccount, payment.Asset);
+            quantumProcessingItem.AddBalanceUpdate(destinationAccount, payment.Asset, payment.Amount, UpdateSign.Plus);
 
-            context.EffectProcessors.AddBalanceUpdate(context.SourceAccount, payment.Asset, -payment.Amount);
-            var effects = context.EffectProcessors.Effects;
+            quantumProcessingItem.AddBalanceUpdate(quantumProcessingItem.Initiator, payment.Asset, payment.Amount, UpdateSign.Minus);
 
-            var accountEffects = effects.Where(e => e.Account == payment.Account).ToList();
-            var result = context.Envelope.CreateResult(ResultStatusCodes.Success, accountEffects);
+            var result = quantumProcessingItem.Quantum.CreateEnvelope<MessageEnvelopeSignless>().CreateResult(ResultStatusCode.Success);
 
-            return Task.FromResult(result);
+            return Task.FromResult((QuantumResultMessageBase)result);
         }
 
-        public override Task Validate(PaymentProcessorContext context)
+        public override Task Validate(QuantumProcessingItem quantumProcessingItem)
         {
-            context.ValidateNonce();
+            ValidateNonce(quantumProcessingItem);
 
-            var payment = context.Payment;
+            var request = (RequestQuantumBase)quantumProcessingItem.Quantum;
+            var payment = (PaymentRequest)request.RequestMessage;
 
             if (payment.Destination == null || payment.Destination.IsZero())
                 throw new BadRequestException("Destination should be valid public key");
 
-            if (context.DestinationAccount == null)
+            var baseAsset = Context.Constellation.QuoteAsset.Code;
+            var destinationAccount = Context.AccountStorage.GetAccount(payment.Destination);
+            //TODO: should we allow payment that is less than min account balance?
+            if (destinationAccount == null)
             {
-                if (payment.Asset != 0)
+                if (payment.Asset != baseAsset)
                     throw new BadRequestException("Account excepts only XLM asset.");
-                if (payment.Amount < context.CentaurusContext.Constellation.MinAccountBalance)
-                    throw new BadRequestException($"Min payment amount is {Amount.FromXdr(context.CentaurusContext.Constellation.MinAccountBalance)} XLM for this account.");
+                if (payment.Amount < Context.Constellation.MinAccountBalance)
+                    throw new BadRequestException($"Min payment amount is {Context.Constellation.MinAccountBalance} for this account.");
             }
 
-            if (payment.Destination.Equals(payment.AccountWrapper.Account.Pubkey))
+            if (payment.Destination.Equals(quantumProcessingItem.Initiator.Pubkey))
                 throw new BadRequestException("Source and destination must be different public keys");
 
             if (payment.Amount <= 0)
                 throw new BadRequestException("Amount should be greater than 0");
 
-            if (!context.CentaurusContext.AssetIds.Contains(payment.Asset))
+            if (!Context.Constellation.Assets.Any(a => a.Code == payment.Asset))
                 throw new BadRequestException($"Asset {payment.Asset} is not supported");
 
-            var balance = payment.AccountWrapper.Account.Balances.Find(b => b.Asset == payment.Asset);
-            if (balance == null || !balance.HasSufficientBalance(payment.Amount))
+            var minBalance = payment.Asset == baseAsset ? Context.Constellation.MinAccountBalance : 0;
+            if (!(quantumProcessingItem.Initiator.GetBalance(payment.Asset)?.HasSufficientBalance(payment.Amount, minBalance) ?? false))
                 throw new BadRequestException("Insufficient funds");
 
             return Task.CompletedTask;

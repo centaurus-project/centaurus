@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>netcoreapp3.1</TargetFramework>
+		<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="stellar-dotnet-sdk" Version="7.1.4" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\Centaurus.PaymentProvider\Centaurus.PaymentProvider.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Folder Include="Properties\" />
+	</ItemGroup>
+
+</Project>

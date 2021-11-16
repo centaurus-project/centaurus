@@ -1,30 +1,31 @@
 ﻿using Centaurus.Models;
+using Centaurus.PaymentProvider;
 using System;
 using System.Collections.Generic;
 using System.Text;
 
 namespace Centaurus.Domain
 {
-    public class TxCursorUpdateEffectProcessor : EffectProcessor<TxCursorUpdateEffect>
+    public class TxCursorUpdateEffectProcessor : EffectProcessor<CursorUpdateEffect>
     {
-        private TxCursorManager txManager;
+        private DepositNotificationManager notificationManager;
 
-        public TxCursorUpdateEffectProcessor(TxCursorUpdateEffect effect, TxCursorManager txManager)
+        public TxCursorUpdateEffectProcessor(CursorUpdateEffect effect, DepositNotificationManager notificationManager)
             : base(effect)
         {
-            this.txManager = txManager;
+            this.notificationManager = notificationManager;
         }
 
         public override void CommitEffect()
         {
             MarkAsProcessed();
-            txManager.SetCursor(Effect.Cursor);
+            notificationManager.Cursor = Effect.Cursor;
         }
 
         public override void RevertEffect()
         {
             MarkAsProcessed();
-            txManager.SetCursor(Effect.PrevCursor);
+            notificationManager.Cursor = Effect.PrevCursor;
         }
     }
 }

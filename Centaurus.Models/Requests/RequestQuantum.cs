@@ -4,22 +4,7 @@ using Centaurus.Xdr;
 
 namespace Centaurus.Models
 {
-    public class RequestQuantum : Quantum
+    public class RequestQuantum : RequestQuantumBase
     {
-        public override MessageTypes MessageType => MessageTypes.RequestQuantum;
-
-        /// <summary>
-        /// Contains original operation request received from a client.
-        /// </summary>
-        [XdrField(0)]
-        public MessageEnvelope RequestEnvelope { get; set; }
-
-        public SequentialRequestMessage RequestMessage
-        {
-            get
-            {
-                return (SequentialRequestMessage)RequestEnvelope.Message;
-            }
-        }
     }
 }

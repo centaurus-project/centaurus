@@ -1,12 +1,9 @@
 ﻿using Centaurus.Domain;
 using Centaurus.Models;
 using Centaurus.Xdr;
-using stellar_dotnet_sdk;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
-using System.Text;
 
 namespace Centaurus
 {
@@ -18,7 +15,7 @@ namespace Centaurus
         /// <param name="messageEnvelope">Envelope</param>
         /// <param name="buffer">Buffer to use for serialization.</param>
         /// <returns>Message hash</returns>
-        public static byte[] ComputeMessageHash(this MessageEnvelope messageEnvelope, byte[] buffer = null)
+        public static byte[] ComputeMessageHash(this MessageEnvelopeBase messageEnvelope, byte[] buffer = null)
         {
             if (messageEnvelope == null)
                 throw new ArgumentNullException(nameof(messageEnvelope));
@@ -26,131 +23,149 @@ namespace Centaurus
         }
 
         /// <summary>
-        /// Signs an envelope with a given <see cref="KeyPair"/> and appends the signature to the <see cref="MessageEnvelope.Signatures"/>.
-        /// </summary>
-        /// <param name="messageEnvelope">Envelope to sign</param>
-        /// <param name="keyPair">Key pair to use for signing</param>
-        public static MessageEnvelope Sign(this MessageEnvelope messageEnvelope, KeyPair keyPair)
-        {
-            if (messageEnvelope == null)
-                throw new ArgumentNullException(nameof(messageEnvelope));
-            if (keyPair == null)
-                throw new ArgumentNullException(nameof(keyPair));
-            var signature = messageEnvelope.ComputeMessageHash().Sign(keyPair);
-            messageEnvelope.Signatures.Add(signature);
-            return messageEnvelope;
-        }
-
-        /// <summary>
-        /// Signs an envelope with a given <see cref="KeyPair"/> and appends the signature to the <see cref="MessageEnvelope.Signatures"/>.
+        /// Signs an envelope with a given <see cref="KeyPair"/> and appends the signature to the <see cref="MessageEnvelopeBase.Signature"/>.
         /// </summary>
         /// <param name="messageEnvelope">Envelope to sign</param>
         /// <param name="keyPair">Key pair to use for signing</param>
         /// <param name="buffer">Buffer to use for computing hash code.</param>
-        public static MessageEnvelope Sign(this MessageEnvelope messageEnvelope, KeyPair keyPair, byte[] buffer)
+        public static T Sign<T>(this T messageEnvelope, KeyPair keyPair, byte[] buffer = null)
+            where T : MessageEnvelopeBase
         {
             if (messageEnvelope == null)
                 throw new ArgumentNullException(nameof(messageEnvelope));
             if (keyPair == null)
                 throw new ArgumentNullException(nameof(keyPair));
+
+            if (messageEnvelope is MessageEnvelopeSignless)
+                return messageEnvelope;
+
+            var writer = default(XdrBufferWriter);
             if (buffer == null)
-                throw new ArgumentNullException(nameof(buffer));
-            using var writer = new XdrBufferWriter(buffer);
+                writer = new XdrBufferWriter();
+            else
+                writer = new XdrBufferWriter(buffer);
+
             XdrConverter.Serialize(messageEnvelope.Message, writer);
             var signature = writer.ToArray().ComputeHash().Sign(keyPair);
-            messageEnvelope.Signatures.Add(signature);
+            if (messageEnvelope is MessageEnvelope envelope)
+                envelope.Signature = signature;
+            else if (messageEnvelope is ConstellationMessageEnvelope multisigEnvelope)
+            {
+                if (multisigEnvelope.Signatures == null)
+                    multisigEnvelope.Signatures = new List<TinySignature>();
+                multisigEnvelope.Signatures.Add(signature);
+            }
             return messageEnvelope;
         }
 
         /// <summary>
-        /// Checks that all envelope signatures are valid
+        /// Checks that envelope signature is valid
         /// </summary>
         /// <param name="envelope">Target envelope</param>
-        /// <returns>True if all signatures valid, otherwise false</returns>
-        public static bool AreSignaturesValid(this MessageEnvelope envelope)
+        /// <returns>True if signature is valid, otherwise false</returns>
+        public static bool IsSignatureValid(this MessageEnvelopeBase envelope, KeyPair keyPair, bool allowSignless = true)
         {
             if (envelope == null)
                 throw new ArgumentNullException(nameof(envelope));
-            if (envelope.Signatures.Count < 1)
+
+            if (keyPair == null)
+                throw new ArgumentNullException(nameof(keyPair));
+
+            if (envelope is MessageEnvelopeSignless)
                 return true;
+
             var messageHash = envelope.Message.ComputeHash();
-            return envelope.Signatures.AreSignaturesValid(messageHash);
+            return envelope.IsSignatureValid(keyPair, messageHash, allowSignless);
         }
 
         /// <summary>
-        /// Checks that all envelope signatures are valid
+        /// Checks that envelope signature is valid
         /// </summary>
         /// <param name="envelope">Target envelope</param>
-        /// <returns>True if all signatures valid, otherwise false</returns>
-        public static bool AreSignaturesValid(this List<Ed25519Signature> signatures, byte[] hash)
-        {
-            if (signatures == null)
-                throw new ArgumentNullException(nameof(signatures));
-            for (var i = 0; i < signatures.Count; i++)
-            {
-                if (!signatures[i].IsValid(hash))
-                    return false;
-            }
-            return true;
-        }
-
-        /// <summary>
-        /// Checks that envelope is signed with specified key
-        /// !!!This method doesn't validate signature
-        /// </summary>
-        /// <param name="envelope">Target envelope</param>
-        /// <param name="pubKey">Required signer public key</param>
-        /// <returns>True if signed, otherwise false</returns>
-        public static bool IsSignedBy(this MessageEnvelope envelope, RawPubKey pubKey)
+        /// <returns>True if signature is valid, otherwise false</returns>
+        public static bool IsSignatureValid(this MessageEnvelopeBase envelope, KeyPair keyPair, byte[] messageHash, bool allowSignless = true)
         {
             if (envelope == null)
                 throw new ArgumentNullException(nameof(envelope));
-            if (pubKey == null)
-                throw new ArgumentNullException(nameof(pubKey));
-            return envelope.Signatures.Any(s => s.Signer.Equals(pubKey));
+
+            if (messageHash == null)
+                throw new ArgumentNullException(nameof(messageHash));
+
+            if (keyPair == null)
+                throw new ArgumentNullException(nameof(keyPair));
+
+            if (envelope is MessageEnvelopeSignless)
+                return allowSignless;
+
+            if (envelope is MessageEnvelope messageEnvelope && messageEnvelope.Signature != null)
+            {
+                return messageEnvelope.Signature.IsValid(keyPair, messageHash);
+            }
+            else if (envelope is ConstellationMessageEnvelope constellationMessageEnvelope
+                && constellationMessageEnvelope.Signatures.Any(s => s.IsValid(keyPair, messageHash)))
+                return true;
+            return false;
         }
 
-        private static TResultMessage CreateResult<TResultMessage>(this MessageEnvelope envelope, ResultStatusCodes status = ResultStatusCodes.InternalError, List<Effect> effects = null)
-            where TResultMessage : ResultMessage
+        private static TResultMessage CreateResult<TResultMessage>(this MessageEnvelopeBase envelope, ResultStatusCode status = ResultStatusCode.InternalError)
+            where TResultMessage : ResultMessageBase
         {
             if (envelope == null)
                 throw new ArgumentNullException(nameof(envelope));
             var resultMessage = Activator.CreateInstance<TResultMessage>();
-            resultMessage.OriginalMessage = envelope;
+            var messageId = envelope.Message.MessageId;
+            if (envelope.Message is RequestQuantumBase request)
+                messageId = request.RequestMessage.MessageId;
+            resultMessage.OriginalMessageId = messageId;
             resultMessage.Status = status;
-            resultMessage.Effects = effects ?? new List<Effect>();
             return resultMessage;
         }
 
-        public static ResultMessage CreateResult(this MessageEnvelope envelope, ResultStatusCodes status = ResultStatusCodes.InternalError, List<Effect> effects = null)
+        public static ResultMessageBase CreateResult(this MessageEnvelopeBase envelope, ResultStatusCode status = ResultStatusCode.InternalError)
         {
             if (envelope == null)
                 throw new ArgumentNullException(nameof(envelope));
-            var messageType = envelope.Message.MessageType;
-            if (envelope.Message is RequestQuantum)
-                messageType = ((RequestQuantum)envelope.Message).RequestEnvelope.Message.MessageType;
 
-            switch (messageType)
+            var messageType = envelope.Message;
+            if (envelope.Message is RequestQuantumBase)
+                messageType = ((RequestQuantumBase)envelope.Message).RequestEnvelope.Message;
+
+            //for not Success result return generic message
+            if (status == ResultStatusCode.Success)
+                switch (messageType)
+                {
+                    case AccountDataRequest _:
+                        return CreateResult<AccountDataResponse>(envelope, status);
+                    default:
+                        break;
+                }
+
+            if (envelope.Message is Quantum)
             {
-                case MessageTypes.HandshakeInit:
-                    return CreateResult<HandshakeResult>(envelope, status, effects);
-                case MessageTypes.AccountDataRequest:
-                    return CreateResult<AccountDataResponse>(envelope, status, effects);
-                case MessageTypes.WithdrawalRequest:
-                    return CreateResult<ITransactionResultMessage>(envelope, status, effects);
-                default:
-                    return CreateResult<ResultMessage>(envelope, status, effects);
+                var quantumResult = CreateResult<QuantumResultMessage>(envelope, status);
+                //TODO: remove it after migrating to another serializer
+                if (status != ResultStatusCode.Success)
+                {
+                    quantumResult.Effects = new List<EffectsInfoBase>();
+                    quantumResult.PayloadProof = new PayloadProof
+                    {
+                        PayloadHash = new byte[] { },
+                        Signatures = new List<TinySignature>()
+                    };
+                }
+                return quantumResult;
             }
+            return CreateResult<ResultMessage>(envelope, status);
         }
 
-        public static ResultMessage CreateResult(this MessageEnvelope envelope, Exception exc)
+        public static ResultMessageBase CreateResult(this MessageEnvelopeBase envelope, Exception exc)
         {
             if (envelope == null)
                 throw new ArgumentNullException(nameof(envelope));
             if (exc == null)
                 throw new ArgumentNullException(nameof(exc));
             var result = envelope.CreateResult(exc.GetStatusCode());
-            if (!(result.Status == ResultStatusCodes.InternalError || string.IsNullOrWhiteSpace(exc.Message)))
+            if (!(result.Status == ResultStatusCode.InternalError || string.IsNullOrWhiteSpace(exc.Message)))
                 result.ErrorMessage = exc.Message;
             else
                 result.ErrorMessage = result.Status.ToString();

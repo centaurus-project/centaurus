@@ -17,6 +17,6 @@ namespace Centaurus
 
         }
 
-        public override ResultStatusCodes StatusCode => ResultStatusCodes.BadRequest;
+        public override ResultStatusCode StatusCode => ResultStatusCode.BadRequest;
     }
 }

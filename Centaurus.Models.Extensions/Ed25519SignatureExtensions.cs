@@ -1,27 +1,22 @@
-﻿using System;
-using System.Collections.Generic;
-using Centaurus.Xdr;
-using Centaurus.Models;
-using stellar_dotnet_sdk;
-using stellar_dotnet_sdk.xdr;
+﻿using Centaurus.Models;
+using System;
 
 namespace Centaurus
 {
     public static class Ed25519SignatureExtensions
     {
-        public static DecoratedSignature ToDecoratedSignature(this Ed25519Signature signature)
+        public static bool IsValid(this TinySignature signature, KeyPair keyPair, byte[] data)
         {
-            return new DecoratedSignature()
-            {
-                Signature = new Signature(signature.Signature),
-                Hint = new SignatureHint(signature.Signer.Data.AsSpan(Index.FromEnd(4)).ToArray())
-            };
-        }
+            if (keyPair == null)
+                throw new ArgumentNullException(nameof(keyPair));
 
-        public static bool IsValid(this Ed25519Signature signature, byte[] data)
-        {
-            var keypair = (KeyPair)signature.Signer;
-            return keypair.Verify(data, signature.Signature);
+            if (signature == null)
+                throw new ArgumentNullException(nameof(signature));
+
+            if (data == null)
+                throw new ArgumentNullException(nameof(data));
+
+            return keyPair.Verify(data, signature.Data);
         }
     }
 }

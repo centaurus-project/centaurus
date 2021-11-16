@@ -1,10 +1,8 @@
 ﻿using Centaurus.Xdr;
 using NUnit.Framework;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Net.WebSockets;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -19,6 +17,8 @@ namespace Centaurus.Test
         {
             var leftWebsocket = new MockWebSocket();
             var rightWebsocket = new MockWebSocket();
+            leftWebsocket.KeyPair = KeyPair.Random();
+            rightWebsocket.KeyPair = KeyPair.Random();
             leftWebsocket.Connect(rightWebsocket);
             rightWebsocket.Connect(leftWebsocket);
 
@@ -30,7 +30,7 @@ namespace Centaurus.Test
                 var segment = receiveData.AsSegment(0, 1024);
                 var res = await leftWebsocket.ReceiveAsync(segment, CancellationToken.None);
                 Assert.AreEqual(data.Length, res.Count);
-                Assert.IsTrue(data.SequenceEqual(segment.Slice(0, res.Count).ToArray()));
+                Assert.IsTrue(data.AsSpan().SequenceEqual(segment.Slice(0, res.Count).ToArray()));
             }
         }
 

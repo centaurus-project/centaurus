@@ -1,11 +1,11 @@
 using Centaurus.Models;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using Centaurus.Xdr;
 using NUnit.Framework;
 using stellar_dotnet_sdk.xdr;
+using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 namespace Centaurus.Test
 {
@@ -21,28 +21,30 @@ namespace Centaurus.Test
         [Test]
         public void OrderSerializationTest()
         {
+
+
             var pubkey = new byte[32];
             var signature = new byte[64];
             Array.Fill(pubkey, (byte)10);
             Array.Fill(signature, (byte)64);
             var original = new OrderRequest()
             {
-                Account = 1,
+                Account = KeyPair.Random(),
                 Amount = 2131231,
                 RequestId = 1,
                 TimeInForce = TimeInForce.ImmediateOrCancel,
-                Asset = 5,
+                Asset = "USD",
                 Price = 23423.4325
             };
-            var message = new MessageEnvelope()
+            var message = new MessageEnvelope
             {
                 Message = original,
-                Signatures = new List<Ed25519Signature> { new Ed25519Signature() { Signer = pubkey, Signature = signature } }
+                Signature = new TinySignature { Data = signature }
             };
             var deserializedMessage = XdrConverter.Deserialize<MessageEnvelope>(XdrConverter.Serialize(message));
             var deserialized = deserializedMessage.Message as OrderRequest;
-            Assert.AreEqual(pubkey, deserializedMessage.Signatures[0].Signer.Data);
-            Assert.AreEqual(signature, deserializedMessage.Signatures[0].Signature);
+            //Assert.AreEqual(pubkey, deserializedMessage.Signatures.Signer.Data);
+            Assert.AreEqual(signature, deserializedMessage.Signature.Data);
             Assert.AreEqual(original.Account, deserialized.Account);
             Assert.AreEqual(original.Amount, deserialized.Amount);
             Assert.AreEqual(original.TimeInForce, deserialized.TimeInForce);
@@ -52,12 +54,12 @@ namespace Centaurus.Test
         }
 
         [Test]
-        public void AssetsNullValueSerializationTest()
+        public void NullValueSerializationTest()
         {
-            var asset = new AssetSettings { Code = AssetsHelper.XLMCode };
-            var rawData = XdrConverter.Serialize(asset);
-            asset = XdrConverter.Deserialize<AssetSettings>(rawData);
-            Assert.AreEqual(null, asset.Issuer);
+            var signature = new AuditorSignatureInternal { AuditorId = 1, PayloadSignature = new TinySignature { Data = BinaryExtensions.RandomBytes(64) } };
+            var rawData = XdrConverter.Serialize(signature);
+            signature = XdrConverter.Deserialize<AuditorSignatureInternal>(rawData);
+            Assert.AreEqual(null, signature.TxSignature);
         }
 
         [Test]

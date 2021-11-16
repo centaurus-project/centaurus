@@ -1,9 +1,4 @@
-﻿using stellar_dotnet_sdk;
-using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace Centaurus.Test
+﻿namespace Centaurus.Test
 {
     public static class TestEnvironment
     {

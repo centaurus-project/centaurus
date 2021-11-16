@@ -13,17 +13,12 @@ namespace Centaurus.Models
         /// An account that initiated a request.
         /// </summary>
         [XdrField(0)]
-        public int Account { get; set; }
+        public RawPubKey Account { get; set; }
 
         /// <summary>
         /// Client request id.
         /// </summary>
         [XdrField(1)]
         public long RequestId { get; set; }
-
-        /// <summary>
-        /// For request processing purposes. Do not serialize it.
-        /// </summary>
-        public AccountWrapper AccountWrapper { get; set; }
     }
 }

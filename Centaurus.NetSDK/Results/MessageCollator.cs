@@ -17,30 +17,26 @@ namespace Centaurus.NetSDK
                 throw new Exception("Failed to schedule request collation.");
         }
 
-        public void Resolve(MessageEnvelope envelope)
+        public bool Resolve(MessageEnvelopeBase envelope, out QuantumResult quantumResult)
         {
-            if (!(envelope.Message is ResultMessage))
+            quantumResult = null;
+            if (!(envelope.Message is ResultMessageBase resultMessage))
             {
                 logger.Trace("Request is not a quantum result message.");
-                return;
+                return false;
             }
-            var resultMessage = envelope.Message as ResultMessage;
-            var messageId = resultMessage.OriginalMessage.Message is RequestQuantum requestQuantum ?
-                requestQuantum.RequestMessage.MessageId :
-                resultMessage.OriginalMessage.Message.MessageId;
-            if (!Requests.TryGetValue(messageId, out var response))
+            var messageId = resultMessage.OriginalMessageId;
+            if (!Requests.TryGetValue(messageId, out quantumResult))
             {
-                logger.Trace($"Unable set result for msg with id {envelope.Message.MessageType}:{messageId}.");
-                return;
+                logger.Trace($"Unable set result for msg with id {envelope.Message.GetMessageType()}:{messageId}.");
+                return false;
             }
-            response.AssignResponse(envelope);
-            if (response.IsFinalized)
-            {
+            quantumResult.AssignResponse(envelope);
+            if (quantumResult.IsFinalized)
                 Requests.TryRemove(messageId, out _);
-            }
 
-            logger.Trace($"{envelope.Message.MessageType}:{messageId} result was set.");
-            return;
+            logger.Trace($"{envelope.Message.GetMessageType()}:{messageId} result was set.");
+            return true;
         }
 
         static Logger logger = LogManager.GetCurrentClassLogger();

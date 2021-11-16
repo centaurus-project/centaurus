@@ -18,7 +18,8 @@ namespace Centaurus.Domain
                 QuantaPerSecond = statistics.QuantaPerSecond,
                 QuantaQueueLength = statistics.QuantaQueueLength,
                 BatchInfos = statistics.BatchInfos.Select(b => b.FromModel()).ToList(),
-                UpdateDate = new DateTime(statistics.UpdateDate, DateTimeKind.Utc)
+                UpdateDate = new DateTime(statistics.UpdateDate, DateTimeKind.Utc),
+                State = (int)statistics.State
             };
         }
 
@@ -29,7 +30,8 @@ namespace Centaurus.Domain
                 QuantaPerSecond = statistics.QuantaPerSecond,
                 QuantaQueueLength = statistics.QuantaQueueLength,
                 BatchInfos = statistics.BatchInfos.Select(b => b.ToBatchSavedInfoModel()).ToList(),
-                UpdateDate = statistics.UpdateDate.Ticks
+                UpdateDate = statistics.UpdateDate.Ticks,
+                State = (State)statistics.State
             };
         }
     }

@@ -19,7 +19,8 @@ namespace Centaurus.Models
         [XdrField(3)]
         public long UpdateDate { get; set; }
 
-        public override MessageTypes MessageType => MessageTypes.AuditorPerfStatistics;
+        [XdrField(4)]
+        public State State { get; set; }
     }
 
     [XdrContract]
@@ -32,12 +33,9 @@ namespace Centaurus.Models
         public int EffectsCount { get; set; }
 
         [XdrField(2)]
-        public int Retries { get; set; }
-
-        [XdrField(3)]
         public long ElapsedMilliseconds { get; set; }
 
-        [XdrField(4)]
+        [XdrField(3)]
         public long SavedAt { get; set; }
     }
 }

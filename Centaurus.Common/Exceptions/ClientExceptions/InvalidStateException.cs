@@ -11,6 +11,6 @@ namespace Centaurus
         {
         }
 
-        public override ResultStatusCodes StatusCode => ResultStatusCodes.InvalidState;
+        public override ResultStatusCode StatusCode => ResultStatusCode.InvalidState;
     }
 }

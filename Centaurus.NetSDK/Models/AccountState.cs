@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using Centaurus.Models;
 
@@ -6,14 +7,14 @@ namespace Centaurus.NetSDK
 {
     public class AccountState
     {
-        public long Nonce { get; internal set; }
+        public ulong Nonce { get; internal set; }
 
-        internal ConstellationInfo constellationInfo;
+        internal ConstellationInfo ConstellationInfo;
 
-        internal Dictionary<int, BalanceModel> balances = new Dictionary<int, BalanceModel>();
+        internal Dictionary<string, BalanceModel> balances = new Dictionary<string, BalanceModel>();
 
         internal Dictionary<ulong, OrderModel> orders = new Dictionary<ulong, OrderModel>();
-        
+
         public List<BalanceModel> GetBalances()
         {
             return balances.Values.ToList();
@@ -35,73 +36,57 @@ namespace Centaurus.NetSDK
                     var assetId = balanceCreateEffect.Asset;
                     balances.Add(assetId, new BalanceModel
                     {
-                        AssetId = assetId
+                        Asset = assetId
                     });
                     break;
                 case BalanceUpdateEffect balanceUpdateEffect:
-                    UpdateBalance(balanceUpdateEffect.Asset, balanceUpdateEffect.Amount);
+                    UpdateBalance(balanceUpdateEffect.Asset, balanceUpdateEffect.Amount, balanceUpdateEffect.Sign);
                     break;
                 case OrderPlacedEffect orderPlacedEffect:
                     {
                         var orderModel = new OrderModel
                         {
+                            OrderId = orderPlacedEffect.OrderId,
+                            Asset = orderPlacedEffect.Asset,
                             Amount = orderPlacedEffect.Amount,
                             Price = orderPlacedEffect.Price,
-                            OrderId = orderPlacedEffect.OrderId
+                            Side = orderPlacedEffect.Side
                         };
-                        orderModel.Asset = constellationInfo.Assets.FirstOrDefault(a => a.Id == orderModel.AssetId)?.DisplayName ?? orderModel.AssetId.ToString();
                         orders.Add(orderPlacedEffect.OrderId, orderModel);
-                        var decodedId = OrderIdConverter.Decode(orderPlacedEffect.OrderId);
-                        if (decodedId.Side == OrderSide.Buy)
-                            UpdateLiabilities(0, orderPlacedEffect.QuoteAmount);
+                        if (orderModel.Side == OrderSide.Buy)
+                            UpdateLiabilities(ConstellationInfo.QuoteAsset.Code, orderPlacedEffect.QuoteAmount, UpdateSign.Plus);
                         else
-                            UpdateLiabilities(decodedId.Asset, orderPlacedEffect.Amount);
+                            UpdateLiabilities(orderModel.Asset, orderPlacedEffect.Amount, UpdateSign.Plus);
                     }
                     break;
                 case OrderRemovedEffect orderRemoveEffect:
                     {
                         orders.Remove(orderRemoveEffect.OrderId);
-                        var decodedId = OrderIdConverter.Decode(orderRemoveEffect.OrderId);
-                        if (decodedId.Side == OrderSide.Buy)
-                            UpdateLiabilities(0, -orderRemoveEffect.QuoteAmount);
+                        if (orderRemoveEffect.Side == OrderSide.Buy)
+                            UpdateLiabilities(ConstellationInfo.QuoteAsset.Code, orderRemoveEffect.QuoteAmount, UpdateSign.Minus);
                         else
-                            UpdateLiabilities(decodedId.Asset, -orderRemoveEffect.Amount);
+                            UpdateLiabilities(orderRemoveEffect.Asset, orderRemoveEffect.Amount, UpdateSign.Minus);
                     }
                     break;
                 case TradeEffect tradeEffect:
                     {
                         if (orders.TryGetValue(tradeEffect.OrderId, out var order)) //trade could occur without adding the order to orderbook
                             order.Amount -= tradeEffect.AssetAmount;
-
-                        var decodedId = OrderIdConverter.Decode(tradeEffect.OrderId);
-                        if (decodedId.Side == OrderSide.Buy)
+                        var quoteAsset = ConstellationInfo.QuoteAsset.Code;
+                        if (tradeEffect.Side == OrderSide.Buy)
                         {
                             if (!tradeEffect.IsNewOrder)
-                                UpdateLiabilities(0, -tradeEffect.QuoteAmount);
-                            UpdateBalance(0, -tradeEffect.QuoteAmount);
-                            UpdateBalance(decodedId.Asset, tradeEffect.AssetAmount);
+                                UpdateLiabilities(quoteAsset, tradeEffect.QuoteAmount, UpdateSign.Minus);
+                            UpdateBalance(quoteAsset, tradeEffect.QuoteAmount, UpdateSign.Minus);
+                            UpdateBalance(tradeEffect.Asset, tradeEffect.AssetAmount, UpdateSign.Plus);
                         }
                         else
                         {
                             if (!tradeEffect.IsNewOrder)
-                                UpdateLiabilities(decodedId.Asset, -tradeEffect.AssetAmount);
-                            UpdateBalance(decodedId.Asset, -tradeEffect.AssetAmount);
-                            UpdateBalance(0, tradeEffect.QuoteAmount);
+                                UpdateLiabilities(tradeEffect.Asset, tradeEffect.AssetAmount, UpdateSign.Minus);
+                            UpdateBalance(tradeEffect.Asset, tradeEffect.AssetAmount, UpdateSign.Minus);
+                            UpdateBalance(quoteAsset, tradeEffect.QuoteAmount, UpdateSign.Plus);
                         }
-                    }
-                    break;
-                case WithdrawalCreateEffect withdrawalCreateEffect:
-                    foreach (var withdrawalItem in withdrawalCreateEffect.Items)
-                    {
-                        UpdateLiabilities(withdrawalItem.Asset, withdrawalItem.Amount);
-                    }
-                    break;
-                case WithdrawalRemoveEffect withdrawalRemoveEffect:
-                    foreach (var withdrawalItem in withdrawalRemoveEffect.Items)
-                    {
-                        if (withdrawalRemoveEffect.IsSuccessful)
-                            UpdateBalance(withdrawalItem.Asset, -withdrawalItem.Amount);
-                        UpdateLiabilities(withdrawalItem.Asset, -withdrawalItem.Amount);
                     }
                     break;
                 default:
@@ -109,14 +94,20 @@ namespace Centaurus.NetSDK
             }
         }
 
-        private void UpdateBalance(int asset, long amount)
+        private void UpdateBalance(string asset, ulong amount, UpdateSign sign)
         {
-            balances[asset].Amount += amount;
+            if (sign == UpdateSign.Plus)
+                balances[asset].Amount += amount;
+            else
+                balances[asset].Amount -= amount;
         }
 
-        private void UpdateLiabilities(int asset, long liabilities)
+        private void UpdateLiabilities(string asset, ulong liabilities, UpdateSign sign)
         {
-            balances[asset].Liabilities += liabilities;
+            if (sign == UpdateSign.Plus)
+                balances[asset].Liabilities += liabilities;
+            else
+                balances[asset].Liabilities -= liabilities;
         }
     }
 }

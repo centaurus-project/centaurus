@@ -1,7 +1,10 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Net.WebSockets;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Web;
 using Centaurus.Models;
 using Centaurus.Xdr;
 using NLog;
@@ -9,22 +12,26 @@ using static Centaurus.Xdr.XdrBufferFactory;
 
 namespace Centaurus.NetSDK
 {
-    public class Connection : IDisposable
+    internal class Connection : IDisposable
     {
-        public Connection(ConstellationConfig constellationConfig)
+        public Connection(CentaurusClient client)
         {
-            Config = constellationConfig;
+            this.client = client;
+            webSocketWrapper = Config.OutgoingConnectionFactory.GetConnection();
         }
 
-        public readonly ConstellationConfig Config;
+        private readonly CentaurusClient client;
+        public ConstellationConfig Config => client.Config;
 
         public ConstellationInfo ConstellationInfo { get; private set; }
 
         public bool IsConnected { get; private set; }
 
-        public ulong AccountId { get; private set; }
+        private readonly OutgoingConnectionWrapperBase webSocketWrapper;
 
-        private readonly ClientWebSocket webSocket = new ClientWebSocket();
+        private readonly TaskCompletionSource<bool> HandshakeTask = new TaskCompletionSource<bool>();
+
+        private WebSocket webSocket => webSocketWrapper?.WebSocket;
 
         private CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
 
@@ -32,13 +39,13 @@ namespace Centaurus.NetSDK
 
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        private const int RequestTimeout = 15000;
+        private const int RequestTimeout = 5000;
 
         public event Action<Exception> OnException;
 
         public event Action OnClose;
 
-        internal event Action<MessageEnvelope> OnMessage;
+        private event Action<MessageEnvelopeBase> OnMessage;
 
         private RentedBuffer readerBuffer = Rent();
 
@@ -46,15 +53,27 @@ namespace Centaurus.NetSDK
 
         public async Task Connect()
         {
-            var wsUri = new Uri($"{(Config.UseSecureConnection ? "wss" : "ws")}://{Config.AlphaServerAddress}/centaurus");
+            UriHelper.TryCreateWsConnection(Config.AlphaServerAddress, Config.UseSecureConnection, out var uri);
+            uri = new Uri(uri, "/centaurus");
+
+            var query = HttpUtility.ParseQueryString(uri.Query);
+            query.Set(WebSocketConstants.PubkeyParamName, Config.ClientKeyPair.AccountId);
+
+            var uriBuilder = new UriBuilder(uri);
+            uriBuilder.Query = query.ToString();
+
+            uri = uriBuilder.Uri;
+
             //fetch constellation info from the server
-            ConstellationInfo = await PublicApi.GetConstellationInfo(Config);
+            ConstellationInfo = await Config.GetConstellationInfo(Config.AlphaServerAddress, Config.UseSecureConnection);
             //we expect that the first message from the server will start the handshake routine
             OnMessage += HandleHandshakeMessage;
             //connect the client websocket
-            await webSocket.ConnectAsync(wsUri, cancellationTokenSource.Token);
+            await webSocketWrapper.Connect(uri, cancellationTokenSource.Token);
             //listen for incoming messages
-            _ = Task.Factory.StartNew(Listen, TaskCreationOptions.LongRunning).Unwrap();
+            _ = Task.Factory.StartNew(Listen).Unwrap();
+
+            await HandshakeTask.Task;
         }
 
         /// <summary>
@@ -62,9 +81,9 @@ namespace Centaurus.NetSDK
         /// </summary>
         /// <param name="envelope"></param>
         /// <returns></returns>
-        public async Task<QuantumResult> SendMessage(MessageEnvelope envelope)
+        public async Task<QuantumResult> SendMessage(MessageEnvelopeBase envelope)
         {
-            if (!envelope.IsSignedBy(Config.ClientKeyPair))
+            if (!envelope.IsSignatureValid(Config.ClientKeyPair))
                 envelope.Sign(Config.ClientKeyPair);
 
             QuantumResult result = null;
@@ -108,7 +127,8 @@ namespace Centaurus.NetSDK
 
         public async Task CloseConnection(WebSocketCloseStatus status = WebSocketCloseStatus.NormalClosure, string statusDescription = "")
         {
-            if (!IsConnected) return;
+            if (!IsConnected)
+                return;
             try
             {
                 if (webSocket.State == WebSocketState.Open)
@@ -155,7 +175,7 @@ namespace Centaurus.NetSDK
 
         public void Dispose()
         {
-            CloseConnection().Wait(); 
+            CloseConnection().Wait();
             cancellationTokenSource.Cancel();
             cancellationTokenSource?.Dispose();
             cancellationTokenSource = null;
@@ -164,6 +184,9 @@ namespace Centaurus.NetSDK
             if (webSocket.State != WebSocketState.Closed)
                 webSocket.Abort();
             webSocket.Dispose();
+
+            OnMessage -= HandleHandshakeMessage;
+            OnMessage -= HandleMessage;
 
             readerBuffer?.Dispose();
             readerBuffer = null;
@@ -194,26 +217,27 @@ namespace Centaurus.NetSDK
                         }
                         continue;
                     }
+                    var envelope = default(MessageEnvelopeBase);
                     try
                     {
-                        var envelope = XdrConverter.Deserialize<MessageEnvelope>(new XdrBufferReader(readerBuffer.Buffer));
-                        OnMessage.Invoke(envelope);
+                        envelope = XdrConverter.Deserialize<MessageEnvelopeBase>(new XdrBufferReader(readerBuffer.Buffer));
                     }
                     catch
                     {
                         OnException?.Invoke(new UnexpectedMessageException("Failed to deserialize a response message received from the server."));
                     }
+                    OnMessage?.Invoke(envelope);
                 }
             }
             catch (OperationCanceledException)
             { }
             catch (Exception e)
             {
-                var status = WebSocketCloseStatus.InternalServerError;
+                var status = WebSocketCloseStatus.NormalClosure;
+                var errorDescription = e.Message;
                 //connection has been already closed by the other side
                 if ((e as WebSocketException)?.WebSocketErrorCode == WebSocketError.ConnectionClosedPrematurely) return;
 
-                string errorDescription = null;
                 if (e is ConnectionCloseException closeException)
                 {
                     status = closeException.Status;
@@ -240,41 +264,56 @@ namespace Centaurus.NetSDK
         /// Handle server quantum response messages.
         /// </summary>
         /// <param name="envelope"></param>
-        private void HandleMessage(MessageEnvelope envelope)
+        private void HandleMessage(MessageEnvelopeBase envelope)
         {
-            collator.Resolve(envelope);
+            if ((!collator.Resolve(envelope, out var quantumResult) || quantumResult.IsFinalized) //if notification or quantum is finalized
+                && envelope.Message is IQuantumInfoContainer quantum)
+                client.HandleQuantumNotification(quantum);
         }
 
         /// <summary>
         /// Handle handshake initialization routine messages.
         /// </summary>
         /// <param name="envelope"></param>
-        private void HandleHandshakeMessage(MessageEnvelope envelope)
+        private void HandleHandshakeMessage(MessageEnvelopeBase envelope)
         {
-            if (!(envelope.Message is HandshakeInit))
+            if (!(envelope.Message is HandshakeRequest handshakeRequest))
             {
                 logger.Trace("Server sent unknown message before the handshake initialization.");
                 return;
             }
-            logger.Trace("Server initialized handshake routine.");
-            try
+
+            //change message handler after handshake received
+            OnMessage -= HandleHandshakeMessage;
+            OnMessage += HandleMessage;
+
+            //start new task to avoid deadlock 
+            Task.Factory.StartNew(async () =>
             {
-                var result = SendMessage(envelope.Message.CreateEnvelope()).Result;
-                logger.Trace("Handshake confirmation message sent.");
-                var handshakeInitResult = result.Result.Message as HandshakeResult;
-                if (handshakeInitResult.Status != ResultStatusCodes.Success)
-                    throw new Exception("Server rejected handshake confirmation.");
-                AccountId = (ulong)handshakeInitResult.AccountId; //TODO: AccountId in server response should be of type ulong
-                logger.Trace("Handshake routine finalized successfully.");
-            }
-            catch (Exception e)
-            {
-                logger.Error(e);
-                logger.Trace("Failed to perform handshake routine.");
-                return;
-            }
-            OnMessage -= HandleMessage;
-            IsConnected = true;
+                logger.Trace("Server initialized handshake routine.");
+                try
+                {
+
+                    var result = await SendMessage(new HandshakeResponse { HandshakeData = handshakeRequest.HandshakeData }.CreateEnvelope());
+                    logger.Trace("Handshake confirmation message sent.");
+
+                    await result.OnAcknowledged;
+
+                    var handshakeInitResult = result.Result.Message as ResultMessageBase;
+                    if (handshakeInitResult.Status != ResultStatusCode.Success)
+                        throw new Exception("Server rejected handshake confirmation.");
+
+                    logger.Trace("Handshake routine finalized successfully.");
+                    HandshakeTask.TrySetResult(true);
+                    IsConnected = true;
+                }
+                catch (Exception e)
+                {
+                    HandshakeTask.TrySetException(e);
+                    logger.Error(e);
+                    logger.Trace("Failed to perform handshake routine.");
+                }
+            });
         }
     }
 }

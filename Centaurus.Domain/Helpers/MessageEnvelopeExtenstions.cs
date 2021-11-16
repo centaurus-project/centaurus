@@ -8,28 +8,13 @@ namespace Centaurus.Domain
 {
     public static class MessageEnvelopeExtenstions
     {
-        public static void TryAssignAccountWrapper(this MessageEnvelope envelope, AccountStorage accountStorage)
-        {
-            var requestMessage = default(RequestMessage);
-            if (envelope.Message is RequestQuantum)
-                requestMessage = ((RequestQuantum)envelope.Message).RequestMessage;
-            else if (envelope.Message is RequestMessage)
-                requestMessage = (RequestMessage)envelope.Message;
-            else
-                return;
-
-            if (accountStorage == null)
-                throw new ArgumentNullException(nameof(accountStorage));
-            requestMessage.AccountWrapper = accountStorage.GetAccount(requestMessage.Account);
-        }
-
-        public static IncomingMessage ToIncomingMessage(this MessageEnvelope envelope, XdrBufferFactory.RentedBuffer rentedBuffer)
+        public static IncomingMessage ToIncomingMessage(this MessageEnvelopeBase envelope, XdrBufferFactory.RentedBuffer rentedBuffer)
         {
             using var writer = new XdrBufferWriter(rentedBuffer.Buffer);
             return envelope.ToIncomingMessage(writer);
         }
 
-        public static IncomingMessage ToIncomingMessage(this MessageEnvelope envelope, XdrBufferWriter writer)
+        public static IncomingMessage ToIncomingMessage(this MessageEnvelopeBase envelope, XdrBufferWriter writer)
         {
             if (envelope == null)
                 throw new ArgumentNullException(nameof(envelope));

@@ -1,9 +1,4 @@
 ﻿using Centaurus.Models;
-using stellar_dotnet_sdk;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 
 namespace Centaurus
 {
@@ -14,15 +9,14 @@ namespace Centaurus
         /// Signs data and returns signature object
         /// </summary>
         /// <param name="binaryData">Data to sign</param>
-        /// <param name="keyPair">KeyPair to sign the data. If null, CentaurusContext.Current.Settings.KeyPair will be used.</param>
+        /// <param name="keyPair">KeyPair to sign the data.</param>
         /// <returns></returns>
-        public static Ed25519Signature Sign(this byte[] binaryData, KeyPair keyPair)
+        public static TinySignature Sign(this byte[] binaryData, KeyPair keyPair)
         {
             var rawSignature = keyPair.Sign(binaryData);
-            return new Ed25519Signature()
+            return new TinySignature
             {
-                Signature = rawSignature,
-                Signer = keyPair.PublicKey
+                Data = rawSignature
             };
         }
     }

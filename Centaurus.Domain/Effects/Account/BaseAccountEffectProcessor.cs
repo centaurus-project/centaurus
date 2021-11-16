@@ -1,18 +1,17 @@
-﻿using Centaurus.Models;
+﻿using Centaurus.Domain.Models;
+using Centaurus.Models;
 using System;
 using System.Collections.Generic;
 using System.Text;
 
 namespace Centaurus.Domain
 {
-    public abstract class BaseAccountEffectProcessor<T>: EffectProcessor<T>
-        where T: Effect
+    public abstract class BaseAccountEffectProcessor<T>: ClientEffectProcessor<T>
+        where T: AccountEffect
     {
-        public BaseAccountEffectProcessor(T effect)
-            :base(effect)
+        public BaseAccountEffectProcessor(T effect, Account account)
+            :base(effect, account)
         {
         }
-
-        public Account Account => Effect.AccountWrapper?.Account;
     }
 }

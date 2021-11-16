@@ -5,11 +5,18 @@ using System.Text;
 
 namespace Centaurus.Models
 {
-    public class EffectsNotification : Message, IEffectsContainer
+    public class EffectsNotification : Message, IQuantumInfoContainer
     {
-        public override MessageTypes MessageType => MessageTypes.EffectsNotification;
-
         [XdrField(0)]
-        public List<Effect> Effects { get; set; }
+        public ulong Apex { get; set; }
+
+        [XdrField(1)]
+        public RequestInfoBase Request { get; set; }
+
+        [XdrField(2)]
+        public PayloadProof PayloadProof { get; set; }
+
+        [XdrField(3)]
+        public List<EffectsInfoBase> Effects { get; set; }
     }
 }

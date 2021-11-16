@@ -7,11 +7,18 @@ namespace Centaurus.Domain
 {
     public static class BalanceExtensions
     {
-        public static void UpdateBalance(this Balance balance, long amount)
+        public enum BalanceUpdateSign
         {
-            balance.Amount += amount;
-            if (balance.Amount < 0)
-                throw new InvalidOperationException("Negative asset balance after update. " + balance.ToString());
+            Plus,
+            Minus
+        }
+
+        public static void UpdateBalance(this Balance balance, ulong amount, UpdateSign balanceUpdateSign)
+        {
+            if (balanceUpdateSign == UpdateSign.Plus)
+                balance.Amount += amount;
+            else
+                balance.Amount -= amount;
         }
 
         /// <summary>
@@ -19,10 +26,14 @@ namespace Centaurus.Domain
         /// </summary>
         /// <param name="balance">Asset balance</param>
         /// <param name="amount">Amount to lock</param>
-        public static void UpdateLiabilities(this Balance balance, long amount)
+        public static void UpdateLiabilities(this Balance balance, ulong amount, UpdateSign balanceUpdateSign)
         {
-            balance.Liabilities += amount;
-            if (balance.Liabilities > balance.Amount || balance.Liabilities < 0) 
+            if (balanceUpdateSign == UpdateSign.Plus)
+                balance.Liabilities += amount;
+            else
+                balance.Liabilities -= amount;
+
+            if (balance.Liabilities > balance.Amount)
                 throw new InvalidOperationException("Invalid liabilities update request. " + balance.ToString());
         }
 
@@ -32,12 +43,27 @@ namespace Centaurus.Domain
         /// <param name="balance">Asset balance</param>
         /// <param name="amount">Required amount</param>
         /// <returns></returns>
-        public static bool HasSufficientBalance(this Balance balance, long amount)
+        public static bool HasSufficientBalance(this Balance balance, ulong amount, ulong minBalance)
         {
             if (amount <= 0) throw new ArgumentException("Invalid operation amount: " + amount);
             if (balance == null)
                 return false;
-            return balance.Amount - balance.Liabilities >= amount;
+            var availableBalance = balance.GetAvailableBalance();
+            if (availableBalance < amount)
+                return false;
+            return availableBalance - amount >= minBalance;
+        }
+
+        /// <summary>
+        /// Returns balance amount minus liabilities
+        /// </summary>
+        /// <param name="balance">Asset balance</param>
+        /// <returns></returns>
+        public static ulong GetAvailableBalance(this Balance balance)
+        {
+            if (balance == null)
+                return 0;
+            return balance.Amount - balance.Liabilities;
         }
     }
 }

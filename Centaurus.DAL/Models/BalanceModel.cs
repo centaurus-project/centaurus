@@ -10,7 +10,5 @@ namespace Centaurus.DAL.Models
         public BsonObjectId Id { get; set; }
 
         public long Amount { get; set; }
-
-        public long Liabilities { get; set; }
     }
 }

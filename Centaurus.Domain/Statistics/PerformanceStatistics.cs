@@ -14,12 +14,13 @@ namespace Centaurus.Domain
 
         public int Throttling { get; set; }
 
+        public int State { get; set; }
+
         public DateTime UpdateDate { get; set; }
     }
 
     public class AlphaPerformanceStatistics : PerformanceStatistics
     {
-
         public List<AuditorPerformanceStatistics> AuditorStatistics { get; set; }
 
         public AlphaPerformanceStatistics Clone()
@@ -46,10 +47,12 @@ namespace Centaurus.Domain
 
         public int EffectsCount { get; set; }
 
-        public int Retries { get; set; }
-
         public long ElapsedMilliseconds { get; set; }
 
         public DateTime SavedAt { get; set; }
+
+        public ulong FromApex { get; internal set; }
+
+        public ulong ToApex { get; internal set; }
     }
 }

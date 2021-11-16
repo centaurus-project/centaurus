@@ -1,304 +1,164 @@
-﻿using Centaurus.Models;
-using Centaurus.DAL;
-using Centaurus.DAL.Models;
-using Centaurus.DAL.Models.Analytics;
+﻿using Centaurus.PersistentStorage;
+using Centaurus.PersistentStorage.Abstraction;
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Centaurus.DAL.Mongo;
-using MongoDB.Bson;
 
 namespace Centaurus.Test
 {
-    public class MockStorage : IStorage
+    public class MockStorage : IPersistentStorage
     {
+        private List<AccountPersistentModel> accountsCollection = new List<AccountPersistentModel>();
+        private List<QuantumPersistentModel> quantaCollection = new List<QuantumPersistentModel>();
+        private List<QuantumRefPersistentModel> quantaRefCollection = new List<QuantumRefPersistentModel>();
+        private List<SettingsPersistentModel> settingsCollection = new List<SettingsPersistentModel>();
+        private List<PriceHistoryFramePersistentModel> frames = new List<PriceHistoryFramePersistentModel>();
+        private CursorsPersistentModel paymentCursors = null;
+        private PendingQuantaPersistentModel pendingQuanta = null;
 
-        private List<OrderModel> ordersCollection = new List<OrderModel>();
-        private List<AccountModel> accountsCollection = new List<AccountModel>();
-        private List<BalanceModel> balancesCollection = new List<BalanceModel>();
-        private List<QuantumModel> quantaCollection = new List<QuantumModel>();
-        private List<SettingsModel> settingsCollection = new List<SettingsModel>();
-        private List<PriceHistoryFrameModel> frames = new List<PriceHistoryFrameModel>();
-        private ConstellationState constellationState;
-
-        public Task OpenConnection(string connectionString)
+        public void Connect(string path)
         {
-            return Task.CompletedTask;
         }
 
-        public Task CloseConnection()
+        public ulong GetLastApex()
         {
-            return Task.CompletedTask;
+            return quantaCollection.LastOrDefault()?.Apex ?? 0;
         }
 
-        public Task<long> GetLastApex()
+        public ulong GetFirstApex()
         {
-            var res = quantaCollection.LastOrDefault()?.Apex ?? -1;
-            return Task.FromResult(res);
+            return quantaCollection.FirstOrDefault()?.Apex ?? 0;
         }
 
-        public Task<long> GetFirstApex()
+        public IEnumerable<AccountPersistentModel> LoadAccounts()
         {
-            var res = quantaCollection.FirstOrDefault()?.Apex ?? -1;
-            return Task.FromResult(res);
+            return accountsCollection.ToList();
         }
 
-        public Task<QuantumModel> LoadQuantum(long apex)
+        public AccountPersistentModel LoadAccount(byte[] accountPubkey)
         {
-            return Task.FromResult(quantaCollection.First(q => q.Apex == apex));
+            return accountsCollection.FirstOrDefault(a => a.AccountPubkey.AsSpan().SequenceEqual(accountPubkey));
         }
 
-        public Task<List<QuantumModel>> LoadQuanta(params long[] apexes)
+        public CursorsPersistentModel LoadCursors()
         {
-            List<QuantumModel> res = quantaCollection;
+            return paymentCursors;
+        }
+
+        public SettingsPersistentModel LoadSettings(ulong fromApex)
+        {
+            return settingsCollection.OrderBy(s => s.Apex).FirstOrDefault(s => s.Apex >= fromApex);
+        }
+
+        public QuantumPersistentModel LoadQuantum(ulong apex)
+        {
+            return quantaCollection.FirstOrDefault(q => q.Apex == apex);
+        }
+
+        public List<QuantumPersistentModel> LoadQuanta(params ulong[] apexes)
+        {
+            var quanta = quantaCollection.AsEnumerable();
             if (apexes.Length > 0)
-                res = quantaCollection
-                    .OrderBy(q => q.Apex)
-                    .Where(q => apexes.Contains(q.Apex))
-                    .ToList();
-            if (res.Count != apexes.Length)
-                throw new Exception("Not all quanta were found");
-            return Task.FromResult(res);
+                quanta = quanta.Where(q => apexes.Contains(q.Apex));
+            return quanta.OrderBy(q => q.Apex).ToList();
         }
 
-        public Task<List<QuantumModel>> LoadQuantaAboveApex(long apex, int count = 0)
+        public IEnumerable<QuantumPersistentModel> LoadQuantaAboveApex(ulong apex, int count)
         {
-            var query = quantaCollection
-                    .OrderBy(q => q.Apex)
-                    .Where(q => q.Apex > apex);
-            if (count > 0)
-                query = query.Take(count);
-            var res = query.ToList();
-            return Task.FromResult(res);
+            return quantaCollection.OrderBy(q => q.Apex).SkipWhile(q => q.Apex <= apex).Take(count).ToList();
         }
 
-        public Task<List<AccountModel>> LoadAccounts()
+        public List<AccountQuantumDTO> LoadQuantaForAccount(byte[] account, ulong fromApex, int limit, QueryOrder order = QueryOrder.Asc)
         {
-            return Task.FromResult(accountsCollection.OrderBy(a => a.Id).ToList());
-        }
-
-        public Task<List<BalanceModel>> LoadBalances()
-        {
-            return Task.FromResult(balancesCollection.OrderBy(b => b.Id).ToList());
-        }
-
-        public Task<SettingsModel> LoadSettings(long apex)
-        {
-            var settings = settingsCollection
-                .OrderByDescending(s => s.Apex)
-                .FirstOrDefault(s => s.Apex <= apex);
-            return Task.FromResult(settings);
-        }
-
-        public Task<List<OrderModel>> LoadOrders()
-        {
-            return Task.FromResult(ordersCollection.OrderBy(o => o.Id).ToList());
-        }
-
-        public Task<ConstellationState> LoadConstellationState()
-        {
-            return Task.FromResult(constellationState);
-        }
-
-        public Task<int> Update(DiffObject update)
-        {
-            UpdateSettings(update.ConstellationSettings);
-
-            UpdateStellarData(update.StellarInfoData);
-
-            UpdateAccount(update.Accounts.Values.ToList());
-
-            GetBalanceUpdates(update.Balances.Values.ToList());
-
-            UpdateOrders(update.Orders.Values.ToList());
-
-            UpdateQuanta(update.Quanta);
-
-            return Task.FromResult(1);
-        }
-
-        private void UpdateQuanta(List<QuantumModel> quanta)
-        {
-            quantaCollection.AddRange(quanta);
-        }
-
-        private void UpdateSettings(SettingsModel settings)
-        {
-            if (settings != null)
-                settingsCollection.Add(settings);
-        }
-
-        private void UpdateStellarData(DiffObject.ConstellationState _stellarData)
-        {
-            if (_stellarData != null)
+            var quantaRefs = quantaRefCollection.Where(q => q.Account.AsSpan().SequenceEqual(account));
+            if (order == QueryOrder.Asc)
             {
-                if (constellationState == null)
-                    constellationState = new ConstellationState();
-                if (_stellarData.TxCursor > 0)
-                    constellationState.TxCursor = _stellarData.TxCursor;
+                quantaRefs = quantaRefs.OrderBy(q => q.Apex);
+                if (fromApex > 0)
+                    quantaRefs = quantaRefs.Where(q => q.Apex > fromApex);
             }
-        }
-
-        private void UpdateAccount(List<DiffObject.Account> accounts)
-        {
-            var accLength = accounts.Count;
-            for (int i = 0; i < accLength; i++)
-            {
-                var acc = accounts[i];
-                var currentAcc = accountsCollection.FirstOrDefault(a => a.Id == acc.Id);
-                if (acc.IsInserted)
-                    accountsCollection.Add(new AccountModel { Id = acc.Id, PubKey = acc.PubKey, Nonce = acc.Nonce, RequestRateLimits = acc.RequestRateLimits });
-                else if (acc.IsDeleted)
-                    accountsCollection.Remove(currentAcc);
-                else
-                {
-                    if (acc.Nonce != 0)
-                        currentAcc.Nonce = acc.Nonce;
-                    if (acc.RequestRateLimits != null)
-                        currentAcc.RequestRateLimits = acc.RequestRateLimits;
-                }
-            }
-        }
-
-        private void GetBalanceUpdates(List<DiffObject.Balance> balances)
-        {
-            var balancesLength = balances.Count;
-
-            for (int i = 0; i < balancesLength; i++)
-            {
-                var balance = balances[i];
-
-                var currentBalance = balancesCollection.FirstOrDefault(b => b.Id == balance.Id);
-
-                if (balance.IsInserted)
-                    balancesCollection.Add(new BalanceModel
-                    {
-                        Id = balance.Id,
-                        Amount = balance.AmountDiff,
-                        Liabilities = balance.LiabilitiesDiff
-                    });
-                else if (balance.IsDeleted)
-                    balancesCollection.Remove(currentBalance);
-                else
-                {
-                    currentBalance.Amount += balance.AmountDiff;
-                    currentBalance.Liabilities += balance.LiabilitiesDiff;
-                }
-            }
-        }
-
-        private void UpdateOrders(List<DiffObject.Order> orders)
-        {
-            var ordersLength = orders.Count;
-
-            for (int i = 0; i < ordersLength; i++)
-            {
-                var order = orders[i];
-
-                var currentOrder = ordersCollection.FirstOrDefault(s => s.Id == (long)order.OrderId);
-
-                if (order.IsInserted)
-                    ordersCollection.Add(new OrderModel
-                    {
-                        Id = (long)order.OrderId,
-                        Amount = order.AmountDiff,
-                        QuoteAmount = order.QuoteAmountDiff,
-                        Price = order.Price,
-                        Account = order.Account
-                    });
-                else if (order.IsDeleted)
-                {
-                    ordersCollection.Remove(currentOrder);
-                }
-                else
-                {
-                    currentOrder.Amount += order.AmountDiff;
-                    currentOrder.QuoteAmount += order.QuoteAmountDiff;
-                }
-            }
-        }
-
-        public Task<List<QuantumModel>> LoadEffects(long apex, bool isDesc, int limit, int account)
-        {
-            if (account == default)
-                throw new ArgumentNullException(nameof(account));
-            IEnumerable<QuantumModel> query = quantaCollection
-                    .Where(e => e.Accounts.Contains(account));
-
-            if (isDesc)
-                query = query.OrderByDescending(e => e.Apex);
             else
-                query = query.OrderBy(e => e.Apex);
-
-            if (apex > 0)
             {
-                if (isDesc)
-                    query = query
-                        .Where(e => e.Apex < apex);
-                else
-                    query = query
-                        .Where(e => e.Apex > apex);
+                quantaRefs = quantaRefs.OrderByDescending(q => q.Apex);
+                if (fromApex > 0)
+                    quantaRefs = quantaRefs.Where(q => q.Apex < fromApex);
             }
 
-            var effects = query
-                .Take(limit)
+            var accountQuanta = quantaRefs.Take(limit).Select(a => a.Apex).ToArray();
+            if (accountQuanta.Length < 1)
+                return new List<AccountQuantumDTO>();
+            return LoadQuanta(accountQuanta)
+                .Select(q => new AccountQuantumDTO
+                {
+                    Quantum = q,
+                    IsInitiator = quantaRefs.First(qr => qr.Apex == q.Apex).IsQuantumInitiator
+                })
                 .ToList();
-
-            return Task.FromResult(effects);
         }
 
-        public Task<List<PriceHistoryFrameModel>> GetPriceHistory(int cursorTimeStamp, int toUnixTimeStamp, int asset, PriceHistoryPeriod period)
+        public IEnumerable<PriceHistoryFramePersistentModel> GetPriceHistory(string asset, int period, int cursorTimeStamp, int toUnixTimeStamp)
         {
-            var cursorId = PriceHistoryExtensions.EncodeId(asset, (int)period, cursorTimeStamp);
-            var toId = PriceHistoryExtensions.EncodeId(asset, (int)period, toUnixTimeStamp);
-
-            var result = frames
-                .Where(f => f.Id >= cursorId && f.Id < toId)
-                .OrderByDescending(f => f.Id)
+            return frames.Where(f =>
+                    f.Period == period
+                    && f.Market == asset
+                    && f.Timestamp >= cursorTimeStamp
+                    && f.Timestamp <= toUnixTimeStamp)
+                .OrderBy(f => f.Timestamp)
                 .ToList();
-
-            return Task.FromResult(result);
         }
 
-        public Task<int> GetFirstPriceHistoryFrameDate(int market, PriceHistoryPeriod period)
+        public void SaveBatch(List<IPersistentModel> batch)
         {
-            var firstId = PriceHistoryExtensions.EncodeId(market, (int)period, 0);
-            var firstFrame = frames
-                .OrderByDescending(f => f.Id)
-                .FirstOrDefault(f => f.Id >= firstId);
-
-            if (firstFrame == null)
-                return Task.FromResult(0);
-
-            return Task.FromResult(PriceHistoryExtensions.DecodeId(firstFrame.Id).timestamp);
-        }
-
-        public Task SaveAnalytics(List<PriceHistoryFrameModel> update)
-        {
-            foreach (var frame in update)
+            foreach (var model in batch)
             {
-                var frameIndex = frames.FindIndex(f => f.Id == frame.Id);
-                if (frameIndex >= 0)
-                    frames[frameIndex] = frame;
-                else
-                    frames.Add(frame);
+                switch (model)
+                {
+                    case AccountPersistentModel account:
+                        {
+                            var pubkey = account.AccountPubkey;
+                            var current = accountsCollection.FirstOrDefault(a => a.AccountPubkey.SequenceEqual(account.AccountPubkey));
+                            if (current != null)
+                                accountsCollection.Insert(accountsCollection.IndexOf(current), account);
+                            else
+                                accountsCollection.Add(account);
+                        }
+                        break;
+                    case QuantumPersistentModel quantum:
+                        quantaCollection.Add(quantum);
+                        break;
+                    case QuantumRefPersistentModel quantumRef:
+                        quantaRefCollection.Add(quantumRef);
+                        break;
+                    case SettingsPersistentModel settings:
+                        settingsCollection.Add(settings);
+                        break;
+                    case PriceHistoryFramePersistentModel frame:
+                        frames.Add(frame);
+                        break;
+                    case CursorsPersistentModel _paymentCursors:
+                        paymentCursors = _paymentCursors;
+                        break;
+                    case PendingQuantaPersistentModel _pendingQuanta:
+                        pendingQuanta = _pendingQuanta;
+                        break;
+                    default:
+                        throw new InvalidOperationException($"Unknown persistent model type.");
+                }
             }
-            return Task.CompletedTask;
         }
 
-        public Task DropDatabase()
+        public void Dispose()
         {
-            ordersCollection.Clear();
-            accountsCollection.Clear();
-            balancesCollection.Clear();
-            quantaCollection.Clear();
-            settingsCollection.Clear();
-            frames.Clear();
-            constellationState = null;
-            return Task.CompletedTask;
+        }
+
+        public PendingQuantaPersistentModel LoadPendingQuanta()
+        {
+            return pendingQuanta;
+        }
+
+        public void DeletePendingQuanta()
+        {
+            pendingQuanta = null;
         }
     }
 }

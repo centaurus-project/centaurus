@@ -7,61 +7,70 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public class OrderRequestProcessor : QuantumRequestProcessor
+    public class OrderRequestProcessor : QuantumProcessorBase
     {
-        public override MessageTypes SupportedMessageType => MessageTypes.OrderRequest;
-
-        public override Task<ResultMessage> Process(ProcessorContext context)
+        public OrderRequestProcessor(ExecutionContext context)
+            :base(context)
         {
-            var quantum = (RequestQuantum)context.Envelope.Message;
-            var requestMessage = quantum.RequestMessage;
 
-            context.UpdateNonce();
+        }
 
-            context.CentaurusContext.Exchange.ExecuteOrder(context.EffectProcessors);
+        public override string SupportedMessageType { get; } = typeof(OrderRequest).Name;
 
-            var accountEffects = context.EffectProcessors.GetEffects(requestMessage.Account).ToList();
+        public override Task<QuantumResultMessageBase> Process(QuantumProcessingItem processingItem)
+        {
+            UpdateNonce(processingItem);
 
-            return Task.FromResult(context.Envelope.CreateResult(ResultStatusCodes.Success, accountEffects));
+            var quantum = (RequestQuantumBase)processingItem.Quantum;
+            var orderRequest = (OrderRequest)quantum.RequestEnvelope.Message;
+
+            Context.Exchange.ExecuteOrder(orderRequest.Asset, Context.Constellation.QuoteAsset.Code, processingItem);
+
+            return Task.FromResult((QuantumResultMessageBase)quantum.CreateEnvelope<MessageEnvelopeSignless>().CreateResult(ResultStatusCode.Success));
         }
 
         private int MaxCrossOrdersCount = 100;
 
-        public override Task Validate(ProcessorContext context)
+        public override Task Validate(QuantumProcessingItem processingItem)
         {
-            context.ValidateNonce();
+            ValidateNonce(processingItem);
 
-            var quantum = context.Envelope.Message as RequestQuantum;
-            var orderRequest = quantum.RequestEnvelope.Message as OrderRequest;
+            var quantum = (RequestQuantumBase)processingItem.Quantum;
+            var orderRequest = (OrderRequest)quantum.RequestEnvelope.Message;
+            var baseAsset = Context.Constellation.QuoteAsset;
 
-            if (orderRequest.Asset <= 0 || !context.CentaurusContext.AssetIds.Contains(orderRequest.Asset))
-                throw new InvalidOperationException("Invalid asset identifier: " + orderRequest.Asset);
+            if (baseAsset.Code == orderRequest.Asset)
+                throw new BadRequestException("Order asset must be different from quote asset.");
+
+            var orderAsset = Context.Constellation.Assets.FirstOrDefault(a => a.Code == orderRequest.Asset);
+            if (orderAsset == null)
+                throw new BadRequestException("Invalid asset identifier: " + orderRequest.Asset);
+
+            if (processingItem.Initiator.Orders.Any(o => o.Value.Asset == orderRequest.Asset && o.Value.Side != orderRequest.Side))
+                throw new BadRequestException("You cannot place order that crosses own order.");
 
             //estimate XLM amount
             var quoteAmount = OrderMatcher.EstimateQuoteAmount(orderRequest.Amount, orderRequest.Price, orderRequest.Side);
 
             //check that lot size is greater than minimum allowed lot
-            if (quoteAmount < context.CentaurusContext.Constellation.MinAllowedLotSize)
+            if (quoteAmount < Context.Constellation.MinAllowedLotSize)
                 throw new BadRequestException("Lot size is smaller than the minimum allowed lot.");
-
-            //fetch user's account record
-            var account = orderRequest.AccountWrapper.Account;
 
             //check required balances
             if (orderRequest.Side == OrderSide.Sell)
             {
-                var balance = account.GetBalance(orderRequest.Asset);
-                if (!balance.HasSufficientBalance(orderRequest.Amount))
+                var balance = processingItem.Initiator.GetBalance(orderRequest.Asset);
+                if (!balance.HasSufficientBalance(orderRequest.Amount, 0))
                     throw new BadRequestException("Insufficient funds");
             }
             else
             {
-                var balance = account.GetBalance(0);
-                if (!balance.HasSufficientBalance(quoteAmount))
+                var balance = processingItem.Initiator.GetBalance(baseAsset.Code);
+                if (!balance.HasSufficientBalance(quoteAmount, Context.Constellation.MinAccountBalance))
                     throw new BadRequestException("Insufficient funds");
             }
 
-            ValidateCounterOrdersCount(orderRequest, context.CentaurusContext.Exchange.GetOrderbook(orderRequest.Asset, orderRequest.Side.Inverse()));
+            ValidateCounterOrdersCount(orderRequest, Context.Exchange.GetOrderbook(orderRequest.Asset, orderRequest.Side.Inverse()));
 
             return Task.CompletedTask;
         }
@@ -71,13 +80,13 @@ namespace Centaurus.Domain
         /// <summary>
         /// Prevents too many trade effects.
         /// </summary>
-        private void ValidateCounterOrdersCount(OrderRequest orderRequest, OrderbookBase orderbook)
+        private void ValidateCounterOrdersCount(OrderRequest orderRequest, Orderbook orderbook)
         {
-            var counterOrdersSum = 0L;
+            var counterOrdersSum = 0ul;
             var counterOrdersCount = 0;
             foreach (var order in orderbook)
             {
-                counterOrdersSum += order.Amount;
+                counterOrdersSum += order.Order.Amount;
                 counterOrdersCount++;
                 if (counterOrdersSum >= orderRequest.Amount)
                     break;

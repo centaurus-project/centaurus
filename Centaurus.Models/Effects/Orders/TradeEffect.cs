@@ -4,20 +4,24 @@ using Centaurus.Xdr;
 
 namespace Centaurus.Models
 {
-    public class TradeEffect: Effect
+    public class TradeEffect: AccountEffect
     {
-        public override EffectTypes EffectType => EffectTypes.Trade;
-
         [XdrField(0)]
         public ulong OrderId { get; set; }
 
         [XdrField(1)]
-        public long AssetAmount { get; set; }
+        public ulong AssetAmount { get; set; }
 
         [XdrField(2)]
-        public long QuoteAmount { get; set; }
+        public ulong QuoteAmount { get; set; }
 
         [XdrField(3)]
         public bool IsNewOrder { get; set; }
+
+        [XdrField(4)]
+        public OrderSide Side { get; set; }
+
+        [XdrField(5)]
+        public string Asset { get; set; }
     }
 }

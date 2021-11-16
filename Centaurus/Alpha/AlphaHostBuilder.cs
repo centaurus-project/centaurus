@@ -21,19 +21,19 @@ using Microsoft.AspNetCore.Server.Kestrel.Https;
 
 namespace Centaurus.Alpha
 {
-    public class AlphaHostBuilder : ContextualBase<AlphaContext>
+    public class AlphaHostBuilder : ContextualBase
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public AlphaHostBuilder(AlphaContext context)
+        public AlphaHostBuilder(ExecutionContext context)
             : base(context)
         {
 
         }
 
-        public IHost CreateHost(AlphaSettings settings)
+        public IHost CreateHost()
         {
-            SetupCertificate(settings);
+            SetupCertificate(Context.Settings);
             return Host.CreateDefaultBuilder()
                 .ConfigureLogging(logging =>
                 {
@@ -41,24 +41,25 @@ namespace Centaurus.Alpha
                     logging.ClearProviders();
                     logging.AddConsole();
 
-                    if (settings.Verbose)
-                        logging.SetMinimumLevel(Microsoft.Extensions.Logging.LogLevel.Trace);
-                    else if (settings.Silent)
+                    //if (Context.Settings.Verbose)
+                    //    logging.SetMinimumLevel(Microsoft.Extensions.Logging.LogLevel.Trace);
+                    //else if (Context.Settings.Silent)
                         logging.SetMinimumLevel(Microsoft.Extensions.Logging.LogLevel.Error);
-                    else
-                        logging.SetMinimumLevel(Microsoft.Extensions.Logging.LogLevel.Information);
+                    //else
+                    //    logging.SetMinimumLevel(Microsoft.Extensions.Logging.LogLevel.Information);
 
                 })
                 .UseNLog()
                 .ConfigureWebHostDefaults(webBuilder =>
                 {
-                    webBuilder.ConfigureServices(s => s.AddSingleton(Context))
+                    webBuilder
+                        .ConfigureServices(services => services.AddSingleton(Context))
                         .UseStartup<HostStartup>()
                         .UseKestrel(options =>
                         {
                             if (Certificate != null)
                             {
-                                options.ListenAnyIP(settings.AlphaPort,
+                                options.ListenAnyIP(Context.Settings.ListeningPort,
                                 listenOptions =>
                                 {
                                     var httpsOptions = new HttpsConnectionAdapterOptions();
@@ -67,20 +68,20 @@ namespace Centaurus.Alpha
                                 });
                             }
                             else
-                                options.ListenAnyIP(settings.AlphaPort);
+                                options.ListenAnyIP(Context.Settings.ListeningPort);
                         });
                 }).Build();
         }
 
-        public static ApplicationState[] ValidApplicationStates = new ApplicationState[] { ApplicationState.Rising, ApplicationState.Running, ApplicationState.Ready };
+        public static State[] ValidStates = new State[] { State.Rising, State.Running, State.Ready };
 
-        public const string centaurusWebSocketEndPoint = "/centaurus";
-        public const string infoWebSocketEndPoint = "/info";
-
-        private void SetupCertificate(AlphaSettings alphaSettings)
+        private void SetupCertificate(Settings alphaSettings)
         {
-            if (alphaSettings.TlsCertificatePath == null)
+            if (!alphaSettings.UseSecureConnection)
                 return;
+
+            if (string.IsNullOrEmpty(alphaSettings.TlsCertificatePath))
+                throw new Exception("Certificate path is not specified.");
 
             if (!File.Exists(alphaSettings.TlsCertificatePath))
                 throw new FileNotFoundException($"Failed to find a certificate \"{alphaSettings.TlsCertificatePath}\"");
@@ -147,7 +148,10 @@ namespace Centaurus.Alpha
             public void ConfigureServices(IServiceCollection services)
             {
                 services
-                    .AddMvc(options => options.EnableEndpointRouting = false);
+                    .AddMvc(options => options.EnableEndpointRouting = false)
+                    .AddControllersAsServices()
+                    .SetCompatibilityVersion(CompatibilityVersion.Version_3_0);
+
                 services.Add(
                     new ServiceDescriptor(
                         typeof(IActionResultExecutor<JsonResult>),
@@ -155,15 +159,24 @@ namespace Centaurus.Alpha
                         ServiceLifetime.Singleton)
                 );
                 services.AddOptions<HostOptions>().Configure(opts => opts.ShutdownTimeout = TimeSpan.FromDays(365));
+
+                services.AddControllers(opts =>
+                {
+                    opts.ModelBinderProviders.Insert(0, new XdrModelBinderProvider());
+                });
             }
 
             static async Task CentaurusWebSocketHandler(HttpContext context, Func<Task> next)
             {
-                var centaurusContext = context.RequestServices.GetService<AlphaContext>();
-                if (centaurusContext.AppState == null || ValidApplicationStates.Contains(centaurusContext.AppState.State))
+                var centaurusContext = context.RequestServices.GetService<ExecutionContext>();
+                if (centaurusContext.StateManager != null 
+                    && ValidStates.Contains(centaurusContext.StateManager.State) 
+                    && TryGetPubKey(context, out var pubKey))
                 {
                     using (var webSocket = await context.WebSockets.AcceptWebSocketAsync())
-                        await centaurusContext.ConnectionManager.OnNewConnection(webSocket, context.Connection.RemoteIpAddress.ToString());
+                        await centaurusContext.IncomingConnectionManager.OnNewConnection(webSocket,
+                            pubKey, 
+                            context.Connection.RemoteIpAddress.ToString());
                 }
                 else
                 {
@@ -171,17 +184,32 @@ namespace Centaurus.Alpha
                 }
             }
 
+            static bool TryGetPubKey(HttpContext context, out RawPubKey pubKey)
+            {
+                pubKey = null;
+                if (context == null)
+                    throw new ArgumentNullException(nameof(context));
+                if (!(context.Request.Query.TryGetValue(WebSocketConstants.PubkeyParamName, out var address)
+                    && KeyPair.TryGetFromAccountId(address, out var keyPair)))
+                {
+                    logger.Trace($"Unable to get pubkey from request {context.Request.Path}.");
+                    return false;
+                }
+                pubKey = keyPair;
+                return true;
+            }
+
             static async Task InfoWebSocketHandler(HttpContext context, Func<Task> next)
             {
-                var centaurusContext = context.RequestServices.GetService<AlphaContext>();
+                var centaurusContext = context.RequestServices.GetService<ExecutionContext>();
                 var webSocket = await context.WebSockets.AcceptWebSocketAsync();
                 await centaurusContext.InfoConnectionManager.OnNewConnection(webSocket, context.Connection.Id, context.Connection.RemoteIpAddress.ToString());
             }
 
             static Dictionary<string, Func<HttpContext, Func<Task>, Task>> webSocketHandlers = new Dictionary<string, Func<HttpContext, Func<Task>, Task>>
             {
-                { centaurusWebSocketEndPoint, CentaurusWebSocketHandler },
-                { infoWebSocketEndPoint, InfoWebSocketHandler }
+                { WebSocketConstants.CentaurusWebSocketEndPoint, CentaurusWebSocketHandler },
+                { WebSocketConstants.InfoWebSocketEndPoint, InfoWebSocketHandler }
             };
 
             // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -198,11 +226,24 @@ namespace Centaurus.Alpha
 
                 app.Use(async (context, next) =>
                 {
+                    logger.Trace($"New connection received. Path: {context.Request.Path}");
                     var path = context.Request.Path.ToString();
-                    if (context.WebSockets.IsWebSocketRequest && webSocketHandlers.Keys.Contains(path))
-                        await webSocketHandlers[path].Invoke(context, next);
+                    if (context.WebSockets.IsWebSocketRequest)
+                    {
+                        if (webSocketHandlers.Keys.Contains(path))
+                        {
+                            logger.Trace($"Handler for path `{context.Request.Path}` found.");
+                            await webSocketHandlers[path].Invoke(context, next);
+                        }
+                        else
+                        {
+                            logger.Trace($"Handler for path `{context.Request.Path}` not found.");
+                        }
+                    }
                     else
+                    {
                         await next();
+                    }
                 });
 
                 app.UseMvc(routes =>

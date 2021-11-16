@@ -1,19 +1,17 @@
 ﻿using Centaurus.Models;
-using Centaurus.DAL.Models.Analytics;
+using Centaurus.PersistentStorage;
 using System;
-using Centaurus.DAL;
 
 namespace Centaurus.Exchange.Analytics
 {
     public static class PriceHistoryFrameExtensions
     {
-        public static PriceHistoryFrame FromModel(this PriceHistoryFrameModel frameModel)
+        public static PriceHistoryFrame FromFramePersistentModel(this PriceHistoryFramePersistentModel frameModel)
         {
             if (frameModel is null)
                 throw new ArgumentNullException(nameof(frameModel));
 
-            var decodedId = PriceHistoryExtensions.DecodeId(frameModel.Id);
-            return new PriceHistoryFrame(DateTimeOffset.FromUnixTimeSeconds(decodedId.timestamp).UtcDateTime, (PriceHistoryPeriod)decodedId.period, decodedId.market, frameModel.Open)
+            return new PriceHistoryFrame(DateTimeOffset.FromUnixTimeSeconds(frameModel.Timestamp).UtcDateTime, (PriceHistoryPeriod)frameModel.Period, frameModel.Market, frameModel.Open)
             {
                 Open = frameModel.Open,
                 Close = frameModel.Close,
@@ -24,21 +22,22 @@ namespace Centaurus.Exchange.Analytics
             };
         }
 
-        public static PriceHistoryFrameModel ToFrameModel(this PriceHistoryFrame frame)
+        public static PriceHistoryFramePersistentModel ToFramePersistentModel(this PriceHistoryFrame frame)
         {
             if (frame is null)
                 throw new ArgumentNullException(nameof(frame));
 
-            var id = PriceHistoryExtensions.EncodeId(frame.Market, (int)frame.Period, (int)((DateTimeOffset)frame.StartTime).ToUnixTimeSeconds());
-            return new PriceHistoryFrameModel
+            return new PriceHistoryFramePersistentModel
             {
-                Id = id,
                 Open = frame.Open,
                 Close = frame.Close,
                 Low = frame.Low,
                 High = frame.High,
                 BaseVolume = frame.BaseVolume,
-                CounterVolume = frame.CounterVolume
+                CounterVolume = frame.CounterVolume,
+                Market = frame.Market,
+                Period = (int)frame.Period,
+                Timestamp = (int)((DateTimeOffset)frame.StartTime).ToUnixTimeSeconds()
             };
         }
     }

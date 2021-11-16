@@ -9,6 +9,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="MockStellarDataProvider.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="NUnit" Version="3.13.1" />
     <PackageReference Include="NUnit3TestAdapter" Version="3.17.0">
       <PrivateAssets>all</PrivateAssets>

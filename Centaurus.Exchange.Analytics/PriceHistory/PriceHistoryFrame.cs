@@ -19,7 +19,7 @@ namespace Centaurus.Exchange.Analytics
         /// </summary>
         /// <param name="startTime">Trimmed date time</param>
         /// <param name="period"></param>
-        public PriceHistoryFrame(DateTime startTime, PriceHistoryPeriod period, int market, double open)
+        public PriceHistoryFrame(DateTime startTime, PriceHistoryPeriod period, string market, double open)
         {
             StartTime = UpdatedAt = startTime;
             Period = period;
@@ -31,7 +31,7 @@ namespace Centaurus.Exchange.Analytics
 
         public PriceHistoryPeriod Period { get; }
 
-        public int Market { get; }
+        public string Market { get; }
 
         public double[] OHLC { get; set; } = new double[4];
 

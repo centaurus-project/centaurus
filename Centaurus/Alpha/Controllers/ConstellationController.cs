@@ -1,50 +1,48 @@
-﻿using System;
-using System.Linq;
-using System.Threading.Tasks;
-using Centaurus.Domain;
+﻿using Centaurus.Domain;
 using Centaurus.Models;
 using Microsoft.AspNetCore.Mvc;
-using stellar_dotnet_sdk;
+using System;
+using System.Diagnostics;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace Centaurus.Controllers
 {
     [Route("api/[controller]")]
-    public class ConstellationController : Controller, IContextual<AlphaContext>
+    public class ConstellationController : Controller, IContextual
     {
-        public ConstellationController(AlphaContext centaurusContext)
+        public ConstellationController(ExecutionContext centaurusContext)
         {
             Context = centaurusContext;
         }
 
-        public AlphaContext Context { get; }
+        public ExecutionContext Context { get; }
 
         [HttpGet("[action]")]
         public ConstellationInfo Info()
         {
             ConstellationInfo info;
 
-            var state = (int)(Context.AppState?.State ?? 0);
-            if (state < (int)ApplicationState.Running)
+            var state = -1;
+            if (Context.StateManager != null)
+                state = (int)Context.StateManager.State;
+            if (state < (int)State.Running)
                 info = new ConstellationInfo
                 {
-                    State = (ApplicationState)state
+                    State = (State)state
                 };
             else
             {
-                var network = new ConstellationInfo.Network(
-                   Context.StellarDataProvider.NetworkPassphrase,
-                   Context.StellarDataProvider.Horizon
-                    );
-                var assets = Context.Constellation.Assets.Select(a => ConstellationInfo.Asset.FromAssetSettings(a)).ToArray();
                 info = new ConstellationInfo
                 {
-                    State = Context.AppState.State,
-                    Vault = ((KeyPair)Context.Constellation.Vault).AccountId,
-                    Auditors = Context.Constellation.Auditors.Select(a => ((KeyPair)a).AccountId).ToArray(),
+                    State = Context.StateManager.State,
+                    Providers = Context.Constellation.Providers.ToArray(),
+                    Auditors = Context.Constellation.Auditors
+                        .Select(a => new ConstellationInfo.Auditor { PubKey = a.PubKey.GetAccountId(), Address = a.Address })
+                        .ToArray(),
                     MinAccountBalance = Context.Constellation.MinAccountBalance,
                     MinAllowedLotSize = Context.Constellation.MinAllowedLotSize,
-                    StellarNetwork = network,
-                    Assets = assets,
+                    Assets = Context.Constellation.Assets.ToArray(),
                     RequestRateLimits = Context.Constellation.RequestRateLimits
                 };
             }
@@ -53,34 +51,26 @@ namespace Centaurus.Controllers
         }
 
         [HttpPost("[action]")]
-        public async Task<IActionResult> Init([FromBody] ConstellationInitModel constellationInit)
+        public async Task<IActionResult> Init(ConstellationMessageEnvelope constellationInitEnvelope)
+        {
+            return await Update(constellationInitEnvelope);
+        }
+
+        [HttpPost("[action]")]
+        public async Task<IActionResult> Update(ConstellationMessageEnvelope constellationInitEnvelope)
         {
             try
             {
-                if (constellationInit == null)
+                if (constellationInitEnvelope == null)
                     return StatusCode(415);
 
-                if (constellationInit.RequestRateLimits == null)
-                    throw new ArgumentNullException(nameof(constellationInit.RequestRateLimits), "RequestRateLimits parameter is required.");
-                var requestRateLimits = new RequestRateLimits
-                {
-                    HourLimit = constellationInit.RequestRateLimits.HourLimit,
-                    MinuteLimit = constellationInit.RequestRateLimits.MinuteLimit
-                };
+                var constellationQuantum = new ConstellationQuantum { RequestEnvelope = constellationInitEnvelope };
 
-                var constellationInitializer = new ConstellationInitializer(
-                    new ConstellationInitInfo
-                    {
-                        Auditors = constellationInit.Auditors.Select(a => KeyPair.FromAccountId(a)).ToArray(),
-                        MinAccountBalance = constellationInit.MinAccountBalance,
-                        MinAllowedLotSize = constellationInit.MinAllowedLotSize,
-                        Assets = constellationInit.Assets.Select(a => AssetSettings.FromCode(a)).ToArray(),
-                        RequestRateLimits = requestRateLimits
-                    },
-                    Context
-                );
+                constellationQuantum.Validate(Context);
 
-                await constellationInitializer.Init();
+                var quantumProcessingItem = Context.QuantumHandler.HandleAsync(constellationQuantum, Task.FromResult(true));
+
+                await quantumProcessingItem.OnProcessed;
 
                 return new JsonResult(new InitResult { IsSuccess = true });
             }

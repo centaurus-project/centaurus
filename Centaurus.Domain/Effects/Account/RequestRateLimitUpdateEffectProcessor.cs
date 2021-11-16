@@ -1,4 +1,5 @@
-﻿using Centaurus.Models;
+﻿using Centaurus.Domain.Models;
+using Centaurus.Models;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -9,8 +10,8 @@ namespace Centaurus.Domain
     {
         private RequestRateLimits globalRateLimits;
 
-        public RequestRateLimitUpdateEffectProcessor(RequestRateLimitUpdateEffect effect, RequestRateLimits globalRateLimits)
-            : base(effect)
+        public RequestRateLimitUpdateEffectProcessor(RequestRateLimitUpdateEffect effect, Account account, RequestRateLimits globalRateLimits)
+            : base(effect, account)
         {
             this.globalRateLimits = globalRateLimits ?? throw new ArgumentNullException(nameof(globalRateLimits)); 
         }
@@ -25,8 +26,8 @@ namespace Centaurus.Domain
             }
             if (Account.RequestRateLimits == null)
             {
-                Account.RequestRateLimits = new RequestRateLimits();
-                Effect.AccountWrapper.RequestCounter.SetLimits(Account.RequestRateLimits); //update reference
+                Account.RequestRateLimits = Effect.RequestRateLimits;
+                Account.RequestCounter.SetLimits(Account.RequestRateLimits); //update reference
             }
             //update values
             Account.RequestRateLimits.Update(newValue);

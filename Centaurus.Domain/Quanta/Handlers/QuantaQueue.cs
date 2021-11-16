@@ -10,20 +10,20 @@ namespace Centaurus.Domain
         /// <summary>
         /// The last processed quantum that was added on Alpha rising
         /// </summary>
-        LinkedListNode<MessageEnvelope> lastAddedQuantum;
+        LinkedListNode<MessageEnvelopeBase> lastAddedQuantum;
 
-        readonly LinkedList<MessageEnvelope> messageQueue;
+        readonly LinkedList<MessageEnvelopeBase> messageQueue;
 
         public QuantaQueue()
         {
-            messageQueue = new LinkedList<MessageEnvelope>();
+            messageQueue = new LinkedList<MessageEnvelopeBase>();
         }
 
         /// <summary>
         /// Adds an envelope to quanta queue
         /// </summary>
         /// <param name="envelope">Quantum to add</param>
-        public void Enqueue(MessageEnvelope envelope)
+        public void Enqueue(MessageEnvelopeBase envelope)
         {
             messageQueue.AddLast(envelope);
         }
@@ -33,10 +33,10 @@ namespace Centaurus.Domain
         /// </summary>
         /// <param name="envelope"></param>
         /// <returns>true if a quantum was find; otherwise, false.</returns>
-        public bool TryDequeue(out MessageEnvelope envelope)
+        public bool TryDequeue(out MessageEnvelopeBase envelope)
         {
             envelope = null;
-            LinkedListNode<MessageEnvelope> quantumItem = messageQueue.First;
+            LinkedListNode<MessageEnvelopeBase> quantumItem = messageQueue.First;
             if (quantumItem != null)
             {
                 envelope = quantumItem.Value;

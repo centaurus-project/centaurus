@@ -1,10 +1,9 @@
-﻿using Centaurus.Models;
-using Microsoft.Extensions.Logging;
+﻿using Centaurus.Domain.Models;
+using Centaurus.Models;
 using NLog;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -42,7 +41,7 @@ namespace Centaurus.Domain
             }
         }
 
-        private Dictionary<int, ExchangeMarket> Markets = new Dictionary<int, ExchangeMarket>();
+        private Dictionary<string, ExchangeMarket> Markets = new Dictionary<string, ExchangeMarket>();
 
         private BlockingCollection<ExchangeUpdate> awaitedUpdates;
 
@@ -51,45 +50,49 @@ namespace Centaurus.Domain
         /// <summary>
         /// Process customer's order request.
         /// </summary>
-        /// <param name="orderRequest">Order request quantum</param>
+        /// <param name="quantumProcessingItem">Order request quantum</param>
         /// <returns></returns>
-        public void ExecuteOrder(EffectProcessorsContainer effectsContainer)
+        public void ExecuteOrder(string asset, string baseAsset, QuantumProcessingItem quantumProcessingItem)
         {
-            RequestQuantum orderRequestQuantum = (RequestQuantum)effectsContainer.Envelope.Message;
-            var orderRequest = (OrderRequest)orderRequestQuantum.RequestEnvelope.Message;
-            var updates = new OrderMatcher(orderRequest, effectsContainer).Match();
+            var market = GetMarket(asset);
+            var updates = new OrderMatcher(market, baseAsset, quantumProcessingItem).Match();
             awaitedUpdates?.Add(updates);
         }
 
-        public void RemoveOrder(EffectProcessorsContainer effectsContainer, OrderbookBase orderbook, Order order)
+        public void RemoveOrder(QuantumProcessingItem quantumProcessingItem, string baseAsset)
         {
-            effectsContainer.AddOrderRemoved(orderbook, order);
+            var request = (RequestQuantumBase)quantumProcessingItem.Quantum;
+            var orderCancellation = (OrderCancellationRequest)request.RequestMessage;
+            var orderWrapper = OrderMap.GetOrder(orderCancellation.OrderId);
+            var orderbook = GetOrderbook(orderWrapper.Order.Asset, orderWrapper.Order.Side);
+
+            quantumProcessingItem.AddOrderRemoved(orderbook, orderWrapper, baseAsset);
             if (awaitedUpdates != null)
             {
-                var updateTime = new DateTime(((Quantum)effectsContainer.Envelope.Message).Timestamp, DateTimeKind.Utc);
+                var updateTime = new DateTime(quantumProcessingItem.Quantum.Timestamp, DateTimeKind.Utc);
                 var exchangeItem = new ExchangeUpdate(orderbook.Market, updateTime);
-                exchangeItem.OrderUpdates.Add(order.ToOrderInfo(OrderState.Deleted));
+                exchangeItem.OrderUpdates.Add(orderWrapper.Order.ToOrderInfo(OrderState.Deleted));
                 awaitedUpdates.Add(exchangeItem);
             }
         }
 
         public event Action<ExchangeUpdate> OnUpdates;
 
-        public ExchangeMarket GetMarket(int asset)
+        public ExchangeMarket GetMarket(string asset)
         {
             if (Markets.TryGetValue(asset, out ExchangeMarket market)) return market;
             throw new InvalidOperationException($"Asset {asset} is not supported");
         }
 
-        public bool HasMarket(int asset)
+        public bool HasMarket(string asset)
         {
             return Markets.ContainsKey(asset);
         }
 
-        public ExchangeMarket AddMarket(AssetSettings asset, bool useLegacyOrderbook = false)
+        public ExchangeMarket AddMarket(AssetSettings asset)
         {
-            var market = asset.CreateMarket(OrderMap, useLegacyOrderbook);
-            Markets.Add(asset.Id, market);
+            var market = asset.CreateMarket(OrderMap);
+            Markets.Add(asset.Code, market);
             return market;
         }
 
@@ -99,28 +102,24 @@ namespace Centaurus.Domain
             OrderMap.Clear();
         }
 
-        public OrderbookBase GetOrderbook(ulong offerId)
-        {
-            var parts = OrderIdConverter.Decode(offerId);
-            return GetOrderbook(parts.Asset, parts.Side);
-        }
-
-        public OrderbookBase GetOrderbook(int asset, OrderSide side)
+        public Orderbook GetOrderbook(string asset, OrderSide side)
         {
             return GetMarket(asset).GetOrderbook(side);
         }
 
-        public static Exchange RestoreExchange(List<AssetSettings> assets, List<Order> orders, bool observeTrades, bool useLegacyOrderbook = false)
+        public static Exchange RestoreExchange(List<AssetSettings> assets, List<OrderWrapper> orders, bool observeTrades)
         {
             var exchange = new Exchange(observeTrades);
             foreach (var asset in assets)
-                exchange.AddMarket(asset, useLegacyOrderbook);
+            {
+                if (asset.IsQuoteAsset)
+                    continue;
+                exchange.AddMarket(asset);
+            }
 
             foreach (var order in orders)
             {
-                var orderData = OrderIdConverter.Decode(order.OrderId);
-                var market = exchange.GetMarket(orderData.Asset);
-                var orderbook = market.GetOrderbook(orderData.Side);
+                var orderbook = exchange.GetOrderbook(order.Order.Asset, order.Order.Side);
                 orderbook.InsertOrder(order);
             }
             return exchange;

@@ -1,4 +1,8 @@
-﻿namespace Centaurus.NetSDK
+﻿using Centaurus.Client;
+using System;
+using System.Threading.Tasks;
+
+namespace Centaurus.NetSDK
 {
     /// <summary>
     /// Basic constellation config containing information about the connection.
@@ -29,8 +33,17 @@
         public readonly KeyPair ClientKeyPair;
 
         /// <summary>
+        /// Whether to use Finalization or Acknowledge for state update.
+        /// </summary>
+        public readonly bool IsMajorityRequired;
+
+        /// <summary>
         /// Whether to use TLS encryption for the connection.
         /// </summary>
         public readonly bool UseSecureConnection;
+
+        internal OutgoingConnectionFactoryBase OutgoingConnectionFactory { get; } = OutgoingConnectionFactoryBase.Default;
+
+        internal Func<string, bool, Task<ConstellationInfo>> GetConstellationInfo { get; } = PublicApi.GetConstellationInfo;
     }
 }

@@ -28,7 +28,7 @@ namespace Centaurus.DAL.Mongo
         private IMongoCollection<AccountModel> accountsCollection;
         private IMongoCollection<BalanceModel> balancesCollection;
         private IMongoCollection<QuantumModel> quantaCollection;
-        private IMongoCollection<ConstellationState> constellationStateCollection;
+        private IMongoCollection<PaymentCursorModel> paymentCursorsCollection;
         private IMongoCollection<SettingsModel> settingsCollection;
 
         private IMongoCollection<PriceHistoryFrameModel> priceHistoryCollection;
@@ -63,7 +63,7 @@ namespace Centaurus.DAL.Mongo
             balancesCollection = await GetCollection<BalanceModel>("balances");
             quantaCollection = await GetCollection<QuantumModel>("quanta");
 
-            constellationStateCollection = await GetCollection<ConstellationState>("constellationState");
+            paymentCursorsCollection = await GetCollection<PaymentCursorModel>("paymentCursors");
 
             settingsCollection = await GetCollection<SettingsModel>("constellationSettings");
 
@@ -97,7 +97,6 @@ namespace Centaurus.DAL.Mongo
         {
             return await accountsCollection
                 .Find(FilterDefinition<AccountModel>.Empty)
-                .SortBy(a => a.Id)
                 .ToListAsync();
         }
 
@@ -109,11 +108,11 @@ namespace Centaurus.DAL.Mongo
                 .ToListAsync();
         }
 
-        public async Task<ConstellationState> LoadConstellationState()
+        public async Task<List<PaymentCursorModel>> LoadCursors()
         {
-            return await constellationStateCollection
-                .Find(FilterDefinition<ConstellationState>.Empty)
-                .FirstOrDefaultAsync();
+            return await paymentCursorsCollection
+                .Find(FilterDefinition<PaymentCursorModel>.Empty)
+                .ToListAsync();
         }
 
         public async Task<QuantumModel> LoadQuantum(long apex)
@@ -193,7 +192,7 @@ namespace Centaurus.DAL.Mongo
             }
             else
             {
-                filter = fBuilder.And(filter, fBuilder.Ne(e => e.Apex, apex)); // 
+                filter = fBuilder.And(filter, fBuilder.Ne(e => e.Apex, apex));
             }
 
             var query = quantaCollection
@@ -249,7 +248,7 @@ namespace Centaurus.DAL.Mongo
         static TransactionOptions txOptions = new TransactionOptions(ReadConcern.Local, writeConcern: WriteConcern.W1.With(journal: false));
         public async Task<int> Update(DiffObject update)
         {
-            var constellationUpdate = GetConstellationUpdate(update.StellarInfoData);
+            var constellationUpdate = GetConstellationUpdate(update.Cursors.Values.ToList());
             var accountUpdates = GetAccountUpdates(update.Accounts.Values.ToList());
             var balanceUpdates = GetBalanceUpdates(update.Balances.Values.ToList());
             var orderUpdates = GetOrderUpdates(update.Orders.Values.ToList());
@@ -262,7 +261,7 @@ namespace Centaurus.DAL.Mongo
                     var updateTasks = new List<Task>();
 
                     if (constellationUpdate != null)
-                        updateTasks.Add(constellationStateCollection.BulkWriteAsync(s, new [] { constellationUpdate }, cancellationToken: ct));
+                        updateTasks.Add(paymentCursorsCollection.BulkWriteAsync(s, constellationUpdate, cancellationToken: ct));
 
                     if (update.ConstellationSettings != null)
                         updateTasks.Add(settingsCollection.InsertOneAsync(s, update.ConstellationSettings, cancellationToken: ct));
@@ -288,26 +287,32 @@ namespace Centaurus.DAL.Mongo
             }
         }
 
-        private WriteModel<ConstellationState> GetConstellationUpdate(DiffObject.ConstellationState constellationState)
+        private List<WriteModel<PaymentCursorModel>> GetConstellationUpdate(List<DiffObject.PaymentCursor> cursors)
         {
-            if (constellationState == null)
+            if (cursors == null || cursors.Count < 1)
                 return null;
-            var cursor = constellationState.TxCursor;
 
-            WriteModel<ConstellationState> updateModel = null;
-            if (constellationState.IsInserted)
-                updateModel = new InsertOneModel<ConstellationState>(new ConstellationState
-                {
-                    TxCursor = cursor
-                });
-            else if (constellationState.IsDeleted)
-                throw new InvalidOperationException("Stellar data entry cannot be deleted");
-            else
+            var cursorUpdates = new List<WriteModel<PaymentCursorModel>>(cursors.Count);
+            foreach (var cursor in cursors)
             {
-                updateModel = new UpdateOneModel<ConstellationState>(Builders<ConstellationState>.Filter.Empty, Builders<ConstellationState>.Update.Set(s => s.TxCursor, cursor));
+                WriteModel<PaymentCursorModel> updateModel = null;
+                if (cursor.IsInserted)
+                    updateModel = new InsertOneModel<PaymentCursorModel>(new PaymentCursorModel
+                    {
+                        Provider = cursor.Provider,
+                        Cursor = cursor.Cursor
+                    });
+                else if (cursor.IsDeleted)
+                    throw new InvalidOperationException($"{cursor.Provider} cursor cannot be deleted.");
+                else
+                {
+                    updateModel = new UpdateOneModel<PaymentCursorModel>(
+                        Builders<PaymentCursorModel>.Filter.Eq(c => c.Provider, cursor.Provider), 
+                        Builders<PaymentCursorModel>.Update.Set(s => s.Cursor, cursor.Cursor)
+                    );
+                }
             }
-
-            return updateModel;
+            return cursorUpdates;
         }
 
         private List<WriteModel<AccountModel>> GetAccountUpdates(List<DiffObject.Account> accounts)
@@ -324,15 +329,13 @@ namespace Centaurus.DAL.Mongo
             Parallel.For(0, accLength, (i) =>
             {
                 var acc = accounts[i];
-                var currentAccFilter = filter.Eq(a => a.Id, acc.Id);
+                var currentAccFilter = filter.Eq(a => a.PubKey, acc.PubKey);
                 if (acc.IsInserted)
                     updates[i] = new InsertOneModel<AccountModel>(new AccountModel
                     {
-                        Id = acc.Id,
                         Nonce = acc.Nonce,
                         PubKey = acc.PubKey,
-                        RequestRateLimits = acc.RequestRateLimits,
-                        Withdrawal = (acc.Withdrawal ?? 0)
+                        RequestRateLimits = acc.RequestRateLimits
                     });
                 else if (acc.IsDeleted)
                     updates[i] = new DeleteOneModel<AccountModel>(currentAccFilter);
@@ -344,9 +347,6 @@ namespace Centaurus.DAL.Mongo
 
                     if (acc.RequestRateLimits != null)
                         updateDefs.Add(update.Set(a => a.RequestRateLimits, acc.RequestRateLimits));
-
-                    if (acc.Withdrawal.HasValue)
-                        updateDefs.Add(update.Set(a => a.Withdrawal, acc.Withdrawal.Value));
 
                     updates[i] = new UpdateOneModel<AccountModel>(currentAccFilter, update.Combine(updateDefs));
                 }
@@ -374,8 +374,7 @@ namespace Centaurus.DAL.Mongo
                     updates[i] = new InsertOneModel<BalanceModel>(new BalanceModel
                     {
                         Id = balance.Id,
-                        Amount = balance.AmountDiff,
-                        Liabilities = balance.LiabilitiesDiff
+                        Amount = balance.AmountDiff
                     });
                 else if (balance.IsDeleted)
                     updates[i] = new DeleteOneModel<BalanceModel>(currentBalanceFilter);
@@ -385,7 +384,6 @@ namespace Centaurus.DAL.Mongo
                         currentBalanceFilter,
                         update
                             .Inc(b => b.Amount, balance.AmountDiff)
-                            .Inc(b => b.Liabilities, balance.LiabilitiesDiff)
                     );
                 }
             });

@@ -1,4 +1,5 @@
-﻿using Centaurus.Models;
+﻿using Centaurus.Domain.Models;
+using Centaurus.Models;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -8,8 +9,8 @@ namespace Centaurus.Domain
 {
     public class NonceUpdateEffectProcessor : BaseAccountEffectProcessor<NonceUpdateEffect>
     {
-        public NonceUpdateEffectProcessor(NonceUpdateEffect effect)
-            : base(effect)
+        public NonceUpdateEffectProcessor(NonceUpdateEffect effect, Account account)
+            : base(effect, account)
         {
         }
 

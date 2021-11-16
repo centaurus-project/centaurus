@@ -8,10 +8,6 @@ namespace Centaurus.Models
     public enum MessageTypes
     {
         /// <summary>
-        /// A client requested funds deposit.
-        /// </summary>
-        DepositRequest = 1,
-        /// <summary>
         /// A client requested funds withdrawal.
         /// </summary>
         WithdrawalRequest = 2,
@@ -32,88 +28,104 @@ namespace Centaurus.Models
         /// </summary>
         AccountDataRequest = 10,
         /// <summary>
+        /// Wrapper for client account data request. Created by Alpha.
+        /// </summary>
+        AccountDataRequestQuantum = 46,
+        /// <summary>
+        /// Wrapper for client request messages that contains withdrawal. Created by Alpha.
+        /// </summary>
+        WithdrawalRequestQuantum = 47,
+        /// <summary>
         /// Wrapper for client request messages. Created by Alpha.
         /// </summary>
         RequestQuantum = 48,
         /// <summary>
-        /// Quantum created by Alpha server that contains aggregated ledger updates provided by <see cref="TxNotification"/>.
+        /// Quantum created by Alpha server that contains aggregated deposits provided by <see cref="DepositNotification"/>.
         /// </summary>
-        TxCommitQuantum = 49,
+        DepositQuantum = 49,
         /// <summary>
         /// A client requested account's effects.
         /// </summary>
-        EffectsRequest = 50,
-        /// <summary>
-        /// Quantum created by Alpha server that contains all withdrawal transaction hashes that are expired.
-        /// </summary>
-        WithrawalsCleanup = 51,
+        QuantumInfoRequest = 50,
         /// <summary>
         /// Initiate connection handshake.
         /// </summary>
-        HandshakeInit = 100,
+        HandshakeRequest = 100,
         /// <summary>
-        /// Handshake result.
+        /// Signed handshake data.
         /// </summary>
-        HandshakeResult = 101,
+        HandshakeResponse = 101,
+        /// <summary>
+        /// Signed handshake data and last known apex.
+        /// </summary>
+        AuditorHandshakeResponse = 102,
+        /// <summary>
+        /// Operation result, containing original message and processing status.
+        /// </summary>
+        ResultMessage = 103,
         /// <summary>
         /// Operation result, containing original quantum and processing status.
         /// </summary>
-        ResultMessage = 102,
+        QuantumResultMessage = 104,
         /// <summary>
         /// ITransaction operation result, containing transaction signature, original quantum and processing status.
         /// </summary>
-        ITransactionResultMessage = 103,
+        ITransactionResultMessage = 105,
         /// <summary>
         /// Message from Alpha to a client with all effects that affects the client, and wasn't triggered by the client (Trade for example).
         /// </summary>
-        EffectsNotification = 104,
-        /// <summary>
-        /// Message from auditor to Alpha server that contains Stellar payments (obtained from the Horizon).
-        /// </summary>
-        TxNotification = 105,
-        /// <summary>
-        /// Auditor current state (the last snapshot, and all quanta after the last snapshot).
-        /// </summary>
-        AuditorState = 106,
+        EffectsNotification = 106,
         /// <summary>
         /// Auditor's performance statistics.
         /// </summary>
-        AuditorPerfStatistics = 107,
+        AuditorPerfStatistics = 107, 
         /// <summary>
-        /// Set auditor apex cursor.
+        /// Internal message. Contains quantum message envelope and effects signatures.
         /// </summary>
-        SetApexCursor = 110,
+        PendingQuantum = 108,
+        /// <summary>
+        /// Internal message. Contains new Auditor state.
+        /// </summary>
+        StateUpdate = 109,
         /// <summary>
         /// Account data request result.
         /// </summary>
-        AccountDataResponse = 150,
+        AccountDataResponse = 151,
         /// <summary>
         /// Account's effects request result.
         /// </summary>
-        EffectsResponse = 151,
+        QuantumInfoResponse = 152,
         /// <summary>
-        /// Contains data for init. It will be created by alpha on init.
+        /// Update quorum, add/remove auditors, apply new settings etc.
         /// </summary>
-        ConstellationInitQuantum = 200,
+        ConstellationUpdate = 201,
         /// <summary>
-        /// Upgrade quorum, add/remove auditors, apply new settings etc.
+        /// Wrapper for constellation requests.
         /// </summary>
-        ConstellationUpgradeQuantum = 201,
+        ConstellationQuantum = 205,
         /// <summary>
-        /// Alpha state message. It contains Alpha state and last snapshot.
+        /// Contains last saved Apex
         /// </summary>
-        AlphaState = 202,
+        CatchupQuantaBatchRequest = 211,
         /// <summary>
-        /// Alpha requests auditor's state for the specified apex
+        /// Contains batch of quanta, that was requested by Alpha
         /// </summary>
-        AuditorStateRequest = 203,
+        CatchupQuantaBatch = 212,
         /// <summary>
-        /// Contains batch of quanta
+        /// Contains cursors for quanta and signatures
         /// </summary>
-        QuantaBatch = 204,
+        SyncCursorUpdate = 213,
         /// <summary>
-        /// Contains array of auditor's quantum processing results
+        /// Contains batch of quanta, that were processed by Alpha
         /// </summary>
-        AuditorResultsBatch = 210
+        AlphaQuantaBatch = 214,
+        /// <summary>
+        /// Contains majority of signatures for quanta (except Alpha signatures, it will be send with quantum)
+        /// </summary>
+        QuantumMajoritySignaturesBatch = 215,
+        /// <summary>
+        /// Contains an array of the current auditor's quantum signatures
+        /// </summary>
+        AuditorSignaturesBatch = 216
     }
 }

@@ -6,14 +6,12 @@ using System.Text;
 namespace Centaurus.Models
 {
     [XdrContract]
-    public class NonceUpdateEffect: Effect
+    public class NonceUpdateEffect: AccountEffect
     {
-        public override EffectTypes EffectType => EffectTypes.NonceUpdate;
-        
         [XdrField(0)]
-        public long Nonce { get; set; }
+        public ulong Nonce { get; set; }
 
         [XdrField(1)]
-        public long PrevNonce { get; set; }
+        public ulong PrevNonce { get; set; }
     }
 }

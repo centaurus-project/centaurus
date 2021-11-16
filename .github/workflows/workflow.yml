@@ -12,13 +12,13 @@ jobs:
       with:
         dotnet-version: 3.1.101
     - name: Clean dependencies
-      run: dotnet clean && dotnet nuget locals all --clear
+      run: dotnet clean Centaurus.sln && dotnet nuget locals all --clear
     - name: Install dependencies
-      run: dotnet restore
+      run: dotnet restore Centaurus.sln
     - name: Build
-      run: dotnet build --no-restore
+      run: dotnet build Centaurus.sln --no-restore
     - name: Test
-      run: dotnet test --no-restore --verbosity normal
+      run: dotnet test Centaurus.sln --no-restore --verbosity quiet
   release:
     env:
       BRANCH: master

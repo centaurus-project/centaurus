@@ -1,97 +1,66 @@
-﻿using Centaurus.Models;
+﻿using Centaurus.Domain.Models;
+using Centaurus.Models;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 
 namespace Centaurus.Domain
 {
     public class AccountStorage
     {
-        public AccountStorage(IEnumerable<AccountWrapper> accounts)
+        public AccountStorage(IEnumerable<Account> accounts)
         {
             if (accounts == null)
-                accounts = new AccountWrapper[] { };
+                accounts = new Account[] { };
 
-            this.accounts = new Dictionary<int, AccountWrapper>(accounts.ToDictionary(m => m.Account.Id));
-            this.accountIds = new Dictionary<RawPubKey, int>(accounts.ToDictionary(m => m.Account.Pubkey, v => v.Account.Id));
+            this.accounts = new Dictionary<RawPubKey, Account>(accounts.ToDictionary(m => m.Pubkey));
         }
         
-        readonly Dictionary<RawPubKey, int> accountIds = new Dictionary<RawPubKey, int>();
-        readonly Dictionary<int, AccountWrapper> accounts = new Dictionary<int, AccountWrapper>();
+        readonly Dictionary<RawPubKey, Account> accounts = new Dictionary<RawPubKey, Account>();
 
         /// <summary>
         /// Retrieve account record by its public key.
         /// </summary>
         /// <param name="pubkey">Account public key</param>
         /// <returns>Account record, or null if not found</returns>
-        public AccountWrapper GetAccount(RawPubKey pubkey)
+        public Account GetAccount(RawPubKey pubkey)
         {
             if (pubkey == null)
                 throw new ArgumentNullException(nameof(pubkey));
-            var accId = accountIds.GetValueOrDefault(pubkey);
-            if (accId == default)
-                return null;
-            return GetAccount(accId);
+            return accounts.GetValueOrDefault(pubkey);
         }
 
-        /// <summary>
-        /// Retrieve account record by its public id.
-        /// </summary>
-        /// <param name="id">Account id</param>
-        /// <returns>Account record, or null if not found</returns>
-        public AccountWrapper GetAccount(int id)
-        {
-            if (id == default)
-                throw new ArgumentNullException(nameof(id));
-            return accounts.GetValueOrDefault(id);
-        }
 
-        public AccountWrapper CreateAccount(int id, RawPubKey pubkey, RequestRateLimits rateLimits)
+        public Account CreateAccount(RawPubKey pubkey, RequestRateLimits rateLimits)
         {
             if (pubkey == null)
                 throw new ArgumentNullException(nameof(pubkey));
 
-            if (accountIds.ContainsKey(pubkey))
+            if (accounts.ContainsKey(pubkey))
                 throw new InvalidOperationException($"Account with public key {pubkey} already exists");
 
-            var acc = new AccountWrapper(new Account
-            {
-                Id = id,
+            var acc = new Account(rateLimits) {
                 Pubkey = pubkey,
-                Balances = new List<Balance>()
-            },
-                rateLimits
-            );
-            accountIds.Add(pubkey, id);
-            accounts.Add(id, acc);
+                Balances = new Dictionary<string, Balance>(),
+                Orders = new Dictionary<ulong, Order>()
+            };
+            accounts.Add(pubkey, acc);
 
             return acc;
         }
 
-        public int NextAccountId => LastAccountId + 1;
-
-        public int LastAccountId => accountIds.Values.LastOrDefault();
-
-        public int Count => accountIds.Count;
+        public int Count => accounts.Count;
 
         public void RemoveAccount(RawPubKey pubkey)
         {
             if (pubkey == null)
                 throw new ArgumentNullException(nameof(pubkey));
 
-            if (!accountIds.TryGetValue(pubkey, out var id))
-                throw new InvalidOperationException($"Account with public key {pubkey} doesn't exist");
-
-            if (!accounts.Remove(id))
-                throw new InvalidOperationException($"Account with id {id} doesn't exist");
-
-            if (!accountIds.Remove(pubkey))
-                throw new Exception($"Account with public key {pubkey} doesn't exist");
+            if (!accounts.Remove(pubkey))
+                throw new InvalidOperationException($"Account with id {pubkey} doesn't exist");
         }
 
-        public IEnumerable<AccountWrapper> GetAll()
+        public IEnumerable<Account> GetAll()
         {
             return accounts.Values;
         }

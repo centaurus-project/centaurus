@@ -2,44 +2,53 @@
 using Centaurus.Models;
 using Centaurus.Xdr;
 using NUnit.Framework;
-using stellar_dotnet_sdk;
 using System;
 using System.Collections.Generic;
-using System.Net.WebSockets;
-using System.Text;
+using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 
 namespace Centaurus.Test
 {
     public class AlphaMessageHandlersTests : BaseMessageHandlerTests
     {
-        [SetUp]
+        [OneTimeSetUp]
         public void Setup()
         {
             EnvironmentHelper.SetTestEnvironmentVariable();
             context = GlobalInitHelper.DefaultAlphaSetup().Result;
         }
 
-        private AlphaContext context;
+        [OneTimeTearDown]
+        public void TearDown()
+        {
+            context?.Dispose();
+        }
+
+        private ExecutionContext context;
 
 
         static object[] HandshakeTestCases =
         {
-            new object[] { TestEnvironment.Client1KeyPair, ApplicationState.Rising, typeof(ConnectionCloseException) },
-            new object[] { TestEnvironment.Client1KeyPair, ApplicationState.Ready, null },
-            new object[] { TestEnvironment.Auditor1KeyPair, ApplicationState.Rising, null },
-            new object[] { TestEnvironment.Auditor1KeyPair,  ApplicationState.Ready, null }
+            new object[] { TestEnvironment.Client1KeyPair, State.Rising, typeof(ConnectionCloseException) },
+            new object[] { TestEnvironment.Client1KeyPair, State.Ready, null },
+            new object[] { TestEnvironment.Auditor1KeyPair, State.Rising, typeof(UnauthorizedException) },
+            new object[] { TestEnvironment.Auditor1KeyPair,  State.Ready, typeof(UnauthorizedException) }
         };
 
         [Test]
         [TestCaseSource(nameof(HandshakeTestCases))]
-        public async Task HandshakeTest(KeyPair clientKeyPair, ApplicationState alphaState, Type expectedException)
+        public async Task HandshakeTest(KeyPair clientKeyPair, State alphaState, Type expectedException)
         {
-            context.AppState.State = alphaState;
+            context.SetState(alphaState);
 
-            var clientConnection = new AlphaWebSocketConnection(context, new FakeWebSocket(), "127.0.0.1");
+            var connection = GetIncomingConnection(context, clientKeyPair);
 
-            var message = new HandshakeInit { HandshakeData = clientConnection.HandshakeData };
+            var handshakeData = (HandshakeData)typeof(IncomingConnectionBase)
+                .GetField("handshakeData", BindingFlags.Instance | BindingFlags.NonPublic)
+                .GetValue(connection);
+
+            var message = new HandshakeResponse { HandshakeData = handshakeData };
             var envelope = message.CreateEnvelope();
             envelope.Sign(clientKeyPair);
 
@@ -47,30 +56,62 @@ namespace Centaurus.Test
             var inMessage = envelope.ToIncomingMessage(writer);
             if (expectedException == null)
             {
-                var isHandled = await context.MessageHandlers.HandleMessage(clientConnection, inMessage);
+                var isHandled = await context.MessageHandlers.HandleMessage(connection, inMessage);
 
                 Assert.IsTrue(isHandled);
-                Assert.AreEqual(clientConnection.ClientPubKey, new RawPubKey(clientKeyPair.AccountId));
-                if (clientConnection.ClientPubKey.Equals((RawPubKey)TestEnvironment.Auditor1KeyPair))
-                    Assert.AreEqual(clientConnection.ConnectionState, ConnectionState.Validated);
-                else
-                    Assert.AreEqual(clientConnection.ConnectionState, ConnectionState.Ready);
+                Assert.AreEqual(connection.ConnectionState, ConnectionState.Ready);
             }
             else
-                Assert.ThrowsAsync(expectedException, async () => await context.MessageHandlers.HandleMessage(clientConnection, inMessage));
+                Assert.ThrowsAsync(expectedException, async () => await context.MessageHandlers.HandleMessage(connection, inMessage));
+        }
+        static object[] AuditorHandshakeTestCases =
+        {
+            new object[] { TestEnvironment.Client1KeyPair, State.Rising, typeof(UnauthorizedException) },
+            new object[] { TestEnvironment.Client1KeyPair, State.Ready, typeof(UnauthorizedException) },
+            new object[] { TestEnvironment.Auditor1KeyPair, State.Rising, null },
+            new object[] { TestEnvironment.Auditor1KeyPair,  State.Ready, null }
+        };
+
+        [Test]
+        [TestCaseSource(nameof(AuditorHandshakeTestCases))]
+        public async Task AuditorHandshakeTest(KeyPair clientKeyPair, State alphaState, Type expectedException)
+        {
+            context.SetState(alphaState);
+
+            var connection = GetIncomingConnection(context, clientKeyPair);
+
+            var handshakeData = (HandshakeData)typeof(IncomingConnectionBase)
+                .GetField("handshakeData", BindingFlags.Instance | BindingFlags.NonPublic)
+                .GetValue(connection);
+
+            var message = new AuditorHandshakeResponse { HandshakeData = handshakeData };
+            var envelope = message.CreateEnvelope();
+            envelope.Sign(clientKeyPair);
+
+            using var writer = new XdrBufferWriter();
+            var inMessage = envelope.ToIncomingMessage(writer);
+            if (expectedException == null)
+            {
+                var isHandled = await context.MessageHandlers.HandleMessage(connection, inMessage);
+
+                Assert.IsTrue(isHandled);
+                Assert.AreEqual(connection.ConnectionState, ConnectionState.Ready);
+            }
+            else
+                Assert.ThrowsAsync(expectedException, async () => await context.MessageHandlers.HandleMessage(connection, inMessage));
         }
 
         [Test]
         public void HandshakeInvalidDataTest()
         {
-            context.AppState.State = ApplicationState.Ready;
+            context.SetState(State.Ready);
 
-            var clientConnection = new AlphaWebSocketConnection(context, new FakeWebSocket(), "127.0.0.1");
+            var clientConnection = GetIncomingConnection(context, TestEnvironment.Client1KeyPair);
 
             var handshake = new HandshakeData();
             handshake.Randomize();
 
-            var envelope = new HandshakeInit { HandshakeData = handshake }.CreateEnvelope();
+            var envelope = new HandshakeResponse { HandshakeData = handshake }.CreateEnvelope();
             envelope.Sign(TestEnvironment.Client1KeyPair);
 
             using var writer = new XdrBufferWriter();
@@ -94,10 +135,7 @@ namespace Centaurus.Test
             envelope.Sign(TestEnvironment.Auditor1KeyPair);
 
 
-            var auditorConnection = new AlphaWebSocketConnection(context, new FakeWebSocket(), "127.0.0.1")
-            {
-                ClientPubKey = TestEnvironment.Auditor1KeyPair
-            };
+            var auditorConnection = GetIncomingConnection(context, TestEnvironment.Auditor1KeyPair.PublicKey, ConnectionState.Ready);
 
             using var writer = new XdrBufferWriter();
             var inMessage = envelope.ToIncomingMessage(writer);
@@ -106,87 +144,47 @@ namespace Centaurus.Test
 
         }
 
-        static object[] SetApexCursorTestCases =
+        static object[] QuantaBatchTestCases =
         {
-            new object[] { TestEnvironment.Client1KeyPair, ConnectionState.Validated, typeof(UnauthorizedException) },
-            new object[] { TestEnvironment.Auditor1KeyPair, ConnectionState.Connected, typeof(InvalidStateException) },
-            new object[] { TestEnvironment.Auditor1KeyPair, ConnectionState.Validated, null }
-        };
-
-        [Test]
-        [TestCaseSource(nameof(SetApexCursorTestCases))]
-        public async Task SetApexCursorTest(KeyPair clientKeyPair, ConnectionState state, Type excpectedException)
-        {
-            context.AppState.State = ApplicationState.Ready;
-
-            var clientConnection = new AlphaWebSocketConnection(context, new FakeWebSocket(), "127.0.0.1")
-            {
-                ClientPubKey = clientKeyPair.PublicKey,
-                ConnectionState = state
-            };
-
-            var envelope = new SetApexCursor { Apex = 1 }.CreateEnvelope();
-            envelope.Sign(clientKeyPair);
-            using var writer = new XdrBufferWriter();
-            var inMessage = envelope.ToIncomingMessage(writer);
-
-            await AssertMessageHandling(clientConnection, inMessage, excpectedException);
-        }
-
-        static object[] TxNotificationTestCases =
-        {
-            new object[] { TestEnvironment.Client1KeyPair, ConnectionState.Validated, typeof(UnauthorizedException) },
-            new object[] { TestEnvironment.Auditor1KeyPair, ConnectionState.Connected, typeof(InvalidStateException) },
+            new object[] { TestEnvironment.Client1KeyPair, ConnectionState.Ready, typeof(UnauthorizedException) },
             new object[] { TestEnvironment.Auditor1KeyPair, ConnectionState.Ready, null }
         };
 
         [Test]
-        [TestCaseSource(nameof(TxNotificationTestCases))]
-        public async Task TxNotificationTest(KeyPair clientKeyPair, ConnectionState state, Type excpectedException)
+        [TestCaseSource(nameof(QuantaBatchTestCases))]
+        public async Task CatchupQuantaBatchTest(KeyPair clientKeyPair, ConnectionState state, Type excpectedException)
         {
-            context.AppState.State = ApplicationState.Ready;
+            context.SetState(State.Rising);
 
-            var clientConnection = new AlphaWebSocketConnection(context, new FakeWebSocket(), "127.0.0.1")
-            {
-                ClientPubKey = clientKeyPair.PublicKey,
-                ConnectionState = state
-            };
+            var clientConnection = GetIncomingConnection(context, clientKeyPair.PublicKey, state);
 
-            var envelope = new TxNotification
+            var envelope = new CatchupQuantaBatch
             {
-                TxCursor = context.TxCursorManager.TxCursor + 1,
-                Payments = new List<PaymentBase>()
+                Quanta = new List<CatchupQuantaBatchItem>()
             }.CreateEnvelope();
             envelope.Sign(clientKeyPair);
+
             using var writer = new XdrBufferWriter();
             var inMessage = envelope.ToIncomingMessage(writer);
 
             await AssertMessageHandling(clientConnection, inMessage, excpectedException);
         }
 
-        static object[] AuditorStateTestCases =
+        static object[] QuantumMajoritySignaturesBatchCases =
         {
-            new object[] { TestEnvironment.Client1KeyPair, ConnectionState.Validated, typeof(UnauthorizedException) },
+            new object[] { TestEnvironment.Client1KeyPair, ConnectionState.Ready, typeof(UnauthorizedException) },
             new object[] { TestEnvironment.Auditor1KeyPair, ConnectionState.Connected, typeof(InvalidStateException) },
             new object[] { TestEnvironment.Auditor1KeyPair, ConnectionState.Ready, null }
         };
-
-        [Test]
-        [TestCaseSource(nameof(AuditorStateTestCases))]
-        public async Task AuditorStateTest(KeyPair clientKeyPair, ConnectionState state, Type excpectedException)
+        public async Task QuantumMajoritySignaturesBatchTest(KeyPair clientKeyPair, ConnectionState state, Type excpectedException)
         {
-            context.AppState.State = ApplicationState.Rising;
+            context.SetState(State.Ready);
 
-            var clientConnection = new AlphaWebSocketConnection(context, new FakeWebSocket(), "127.0.0.1")
-            {
-                ClientPubKey = clientKeyPair.PublicKey,
-                ConnectionState = state
-            };
+            var clientConnection = GetIncomingConnection(context, clientKeyPair.PublicKey, state);
 
-            var envelope = new AuditorState
+            var envelope = new QuantumMajoritySignaturesBatch
             {
-                PendingQuanta = new List<MessageEnvelope>(),
-                State = ApplicationState.Running
+                Signatures = new List<QuantumSignatures>()
             }.CreateEnvelope();
             envelope.Sign(clientKeyPair);
 
@@ -195,12 +193,12 @@ namespace Centaurus.Test
 
             await AssertMessageHandling(clientConnection, inMessage, excpectedException);
             if (excpectedException == null)
-                Assert.AreEqual(context.AppState.State, ApplicationState.Running);
+                Assert.AreEqual(context.StateManager.State, State.Running);
         }
 
         static object[] OrderTestCases =
         {
-            new object[] { ConnectionState.Validated, typeof(InvalidStateException) },
+            new object[] { ConnectionState.Connected, typeof(InvalidStateException) },
             new object[] { ConnectionState.Ready, null }
         };
 
@@ -208,20 +206,20 @@ namespace Centaurus.Test
         [TestCaseSource(nameof(OrderTestCases))]
         public async Task OrderTest(ConnectionState state, Type excpectedException)
         {
-            context.AppState.State = ApplicationState.Ready;
+            context.SetState(State.Ready);
 
-            var clientConnection = new AlphaWebSocketConnection(context, new FakeWebSocket(), "127.0.0.1")
-            {
-                ClientPubKey = TestEnvironment.Client1KeyPair.PublicKey,
-                ConnectionState = state
-            };
+            var clientConnection = GetIncomingConnection(context, TestEnvironment.Client1KeyPair.PublicKey, state);
 
             var account = context.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
 
             var envelope = new OrderRequest
             {
-                Account = account.Account.Id,
-                RequestId = 1
+                Account = account.Pubkey,
+                RequestId = DateTime.UtcNow.Ticks,
+                Amount = 100,
+                Asset = context.Constellation.Assets.First(a => !a.IsQuoteAsset).Code,
+                Price = 1,
+                Side = OrderSide.Buy
             }.CreateEnvelope();
             envelope.Sign(TestEnvironment.Client1KeyPair);
             using var writer = new XdrBufferWriter();
@@ -232,7 +230,7 @@ namespace Centaurus.Test
 
         static object[] AccountDataTestRequestCases =
         {
-            new object[] { ConnectionState.Validated, typeof(InvalidStateException) },
+            new object[] { ConnectionState.Connected, typeof(InvalidStateException) },
             new object[] { ConnectionState.Ready, null }
         };
 
@@ -240,19 +238,13 @@ namespace Centaurus.Test
         [TestCaseSource(nameof(AccountDataTestRequestCases))]
         public async Task AccountDataRequestTest(ConnectionState state, Type excpectedException)
         {
-            context.AppState.State = ApplicationState.Ready;
+            context.SetState(State.Ready);
 
-            var clientConnection = new AlphaWebSocketConnection(context, new FakeWebSocket(), "127.0.0.1")
-            {
-                ClientPubKey = TestEnvironment.Client1KeyPair.PublicKey,
-                ConnectionState = state
-            };
-
-            var account = context.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
+            var clientConnection = (IncomingClientConnection)GetIncomingConnection(context, TestEnvironment.Client1KeyPair.PublicKey, state);
 
             var envelope = new AccountDataRequest
             {
-                Account = account.Account.Id,
+                Account = clientConnection.Account.Pubkey,
                 RequestId = 1
             }.CreateEnvelope();
             envelope.Sign(TestEnvironment.Client1KeyPair);
@@ -262,65 +254,59 @@ namespace Centaurus.Test
             await AssertMessageHandling(clientConnection, inMessage, excpectedException);
         }
 
-        static object[] AccountRequestRateLimitsCases =
-        {
-            new object[] { TestEnvironment.Client2KeyPair, 10 }
-        };
+        //static object[] AccountRequestRateLimitsCases =
+        //{
+        //    new object[] { TestEnvironment.Client2KeyPair, 10 }
+        //};
 
-        [Test]
-        [TestCaseSource(nameof(AccountRequestRateLimitsCases))]
-        public async Task AccountRequestRateLimitTest(KeyPair clientKeyPair, int? requestLimit)
-        {
-            context.AppState.State = ApplicationState.Ready;
+        //[Test]
+        //[TestCaseSource(nameof(AccountRequestRateLimitsCases))]
+        //public async Task AccountRequestRateLimitTest(KeyPair clientKeyPair, int? requestLimit)
+        //{
+        //    context.SetState(State.Ready);
 
-            var account = context.AccountStorage.GetAccount(clientKeyPair);
-            if (requestLimit.HasValue)
-            {
-                //TODO: replace it with quantum
-                var effect = new RequestRateLimitUpdateEffect
-                {
-                    Account = account.Id,
-                    AccountWrapper = account,
-                    RequestRateLimits = new RequestRateLimits
-                    {
-                        HourLimit = (uint)requestLimit.Value,
-                        MinuteLimit = (uint)requestLimit.Value
-                    }
-                };
-                var effectProcessor = new RequestRateLimitUpdateEffectProcessor(effect, context.Constellation.RequestRateLimits);
-                effectProcessor.CommitEffect();
-            }
-            var clientConnection = new AlphaWebSocketConnection(context, new FakeWebSocket(), "127.0.0.1")
-            {
-                ClientPubKey = clientKeyPair,
-                ConnectionState = ConnectionState.Ready,
-                Account = account
-            };
+        //    var account = context.AccountStorage.GetAccount(clientKeyPair);
+        //    if (requestLimit.HasValue)
+        //    {
+        //        //TODO: replace it with quantum
+        //        var effect = new RequestRateLimitUpdateEffect
+        //        {
+        //            Account = account.Pubkey,
+        //            RequestRateLimits = new RequestRateLimits
+        //            {
+        //                HourLimit = (uint)requestLimit.Value,
+        //                MinuteLimit = (uint)requestLimit.Value
+        //            }
+        //        };
+        //        var effectProcessor = new RequestRateLimitUpdateEffectProcessor(effect, account, context.Constellation.RequestRateLimits);
+        //        effectProcessor.CommitEffect();
+        //    }
+        //    var clientConnection = GetIncomingConnection(context, clientKeyPair.PublicKey, ConnectionState.Ready);
 
-            var minuteLimit = (account.Account.RequestRateLimits ?? context.Constellation.RequestRateLimits).MinuteLimit;
-            var minuteIterCount = minuteLimit + 1;
-            for (var i = 0; i < minuteIterCount; i++)
-            {
-                var envelope = new AccountDataRequest
-                {
-                    Account = account.Account.Id,
-                    RequestId = i + 1
-                }.CreateEnvelope();
-                envelope.Sign(clientKeyPair);
-                using var writer = new XdrBufferWriter();
-                var inMessage = envelope.ToIncomingMessage(writer);
-                if (i + 1 > minuteLimit)
-                    await AssertMessageHandling(clientConnection, inMessage, typeof(TooManyRequestsException));
-                else
-                    await AssertMessageHandling(clientConnection, inMessage);
-            }
-        }
+        //    var minuteLimit = (account.RequestRateLimits ?? context.Constellation.RequestRateLimits).MinuteLimit;
+        //    var minuteIterCount = minuteLimit + 1;
+        //    for (var i = 0; i < minuteIterCount; i++)
+        //    {
+        //        var envelope = new AccountDataRequest
+        //        {
+        //            Account = account.Pubkey,
+        //            RequestId = i + 1
+        //        }.CreateEnvelope();
+        //        envelope.Sign(clientKeyPair);
+        //        using var writer = new XdrBufferWriter();
+        //        var inMessage = envelope.ToIncomingMessage(writer);
+        //        if (i + 1 > minuteLimit)
+        //            await AssertMessageHandling(clientConnection, inMessage, typeof(TooManyRequestsException));
+        //        else
+        //            await AssertMessageHandling(clientConnection, inMessage);
+        //    }
+        //}
 
 
 
         static object[] EffectsRequestTestCases =
         {
-            new object[] { TestEnvironment.Client1KeyPair, ConnectionState.Validated, typeof(InvalidStateException) },
+            new object[] { TestEnvironment.Client1KeyPair, ConnectionState.Connected, typeof(InvalidStateException) },
             new object[] { TestEnvironment.Client1KeyPair, ConnectionState.Ready, null }
         };
 
@@ -328,18 +314,13 @@ namespace Centaurus.Test
         [TestCaseSource(nameof(EffectsRequestTestCases))]
         public async Task EffectsRequestTest(KeyPair client, ConnectionState state, Type excpectedException)
         {
-            context.AppState.State = ApplicationState.Ready;
+            context.SetState(State.Ready);
 
             var account = context.AccountStorage.GetAccount(client);
 
-            var clientConnection = new AlphaWebSocketConnection(context, new FakeWebSocket(), "127.0.0.1")
-            {
-                ClientPubKey = client,
-                ConnectionState = state,
-                Account = account
-            };
+            var clientConnection = GetIncomingConnection(context, client.PublicKey, state);
 
-            var envelope = new EffectsRequest { Account = account.Account.Id, AccountWrapper = account }.CreateEnvelope();
+            var envelope = new QuantumInfoRequest { Account = account.Pubkey }.CreateEnvelope();
             envelope.Sign(client);
 
             using var writer = new XdrBufferWriter();

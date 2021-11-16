@@ -1,224 +1,244 @@
-﻿using Centaurus.Models;
-using Centaurus.Xdr;
+﻿using Centaurus.Domain.Models;
+using Centaurus.Models;
 using NLog;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Text;
-using System.Text.Json;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public abstract class QuantumHandler : ContextualBase, IDisposable
+    public class QuantumHandler : ContextualBase, IDisposable
     {
-        protected class HandleItem
-        {
-            public HandleItem(MessageEnvelope quantum, long timestamp = 0)
-            {
-                Quantum = quantum;
-                HandlingTaskSource = new TaskCompletionSource<ResultMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
-                Timestamp = timestamp;
-            }
-            public MessageEnvelope Quantum { get; }
-            public TaskCompletionSource<ResultMessage> HandlingTaskSource { get; }
-            public long Timestamp { get; }
-        }
-
-        public QuantumHandler(ExecutionContext context)
+        public QuantumHandler(ExecutionContext context, ulong lastApex, byte[] lastQuantumHash)
             : base(context)
         {
-            buffer = XdrBufferFactory.Rent(256 * 1024);
+            CurrentApex = LastAddedQuantumApex = lastApex;
+            LastQuantumHash = lastQuantumHash ?? throw new ArgumentNullException(nameof(lastQuantumHash));
+            Task.Factory.StartNew(RunQuantumWorker).Unwrap();
         }
 
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public virtual void Start()
-        {
-            Task.Factory.StartNew(RunQuantumWorker, TaskCreationOptions.LongRunning).Unwrap();
-        }
-
-        BlockingCollection<HandleItem> awaitedQuanta = new BlockingCollection<HandleItem>();
-        protected XdrBufferFactory.RentedBuffer buffer;
+        object awaitedQuantaSyncRoot = new { };
+        Queue<QuantumProcessingItem> awaitedQuanta = new Queue<QuantumProcessingItem>();
 
         /// <summary>
         /// Handles the quantum and returns Task.
         /// </summary>
-        /// <param name="envelope">Quantum to handle</param>
-        /// <param name="long">Quantum timestamp. We need it for quanta recovery, otherwise Alpha will have different hash.</param>
-        public virtual Task<ResultMessage> HandleAsync(MessageEnvelope envelope, long timestamp = 0)
+        /// <param name="quantum">Quantum to handle</param>s
+        public QuantumProcessingItem HandleAsync(Quantum quantum, Task<bool> signatureValidation)
         {
-            if (QuantaThrottlingManager.Current.IsThrottlingEnabled && QuantaThrottlingManager.Current.MaxItemsPerSecond <= awaitedQuanta.Count)
+            if (Context.IsAlpha //if current node is not alpha, than we need to keep process quanta
+                && QuantaThrottlingManager.Current.IsThrottlingEnabled
+                && QuantaThrottlingManager.Current.MaxItemsPerSecond <= awaitedQuanta.Count)
                 throw new TooManyRequestsException("Server is too busy. Try again later.");
-            var newHandleItem = new HandleItem(envelope, timestamp);
-            awaitedQuanta.Add(newHandleItem);
-            return newHandleItem.HandlingTaskSource.Task;
+            var processingItem = new QuantumProcessingItem(quantum, signatureValidation);
+            if (processingItem.Quantum.Apex > 0)
+                LastAddedQuantumApex = processingItem.Quantum.Apex;
+            lock (awaitedQuantaSyncRoot)
+                awaitedQuanta.Enqueue(processingItem);
+            return processingItem;
         }
 
-        public int QuantaQueueLenght => awaitedQuanta?.Count ?? 0;
+        public ulong LastAddedQuantumApex { get; private set; }
+
+        public ulong CurrentApex { get; private set; }
+
+        public byte[] LastQuantumHash { get; private set; }
+
+        public int QuantaQueueLenght => awaitedQuanta.Count;
 
         private async Task RunQuantumWorker()
         {
+            while (true)
+            {
+                try
+                {
+                    var handlingItem = default(QuantumProcessingItem);
+                    lock (awaitedQuantaSyncRoot)
+                        awaitedQuanta.TryDequeue(out handlingItem);
+                    if (handlingItem != null)
+                    {
+                        await HandleItem(handlingItem);
+                        if (Context.IsAlpha && QuantaThrottlingManager.Current.IsThrottlingEnabled)
+                            Thread.Sleep(QuantaThrottlingManager.Current.SleepTime);
+                    }
+                    else
+                        Thread.Sleep(20);
+                }
+                catch (Exception exc)
+                {
+                    //if exception get here, than we faced with fatal exception
+
+                    lock (awaitedQuantaSyncRoot)
+                    {
+                        while (awaitedQuanta.TryDequeue(out var item))
+                            item.SetException(new Exception("Cancelled."));
+                    }
+                    Context.StateManager.Failed(new Exception("Quantum worker failed.", exc));
+                    return;
+                }
+            }
+        }
+
+        async Task HandleItem(QuantumProcessingItem processingItem)
+        {
             try
             {
-                foreach (var handlingItem in awaitedQuanta.GetConsumingEnumerable())
+                Context.ExtensionsManager.BeforeQuantumHandle(processingItem.Quantum);
+                await Context.PendingUpdatesManager.SyncRoot.WaitAsync();
+                try
                 {
-                    await ProcessQuantum(handlingItem);
-                    if (Context.IsAlpha && QuantaThrottlingManager.Current.IsThrottlingEnabled)
-                        Thread.Sleep(QuantaThrottlingManager.Current.SleepTime);
+                    await ProcessQuantum(processingItem);
                 }
+                finally
+                {
+                    Context.PendingUpdatesManager.SyncRoot.Release();
+                }
+                Context.ExtensionsManager.AfterQuantumHandle(processingItem.ResultMessage);
+            }
+            catch (QuantumValidationException exc)
+            {
+                var originalException = exc.InnerException;
+                processingItem.SetException(originalException);
+                NotifyOnException(processingItem, originalException);
+                if (!Context.IsAlpha) //if current node is auditor, than all quanta received from Alpha must pass the validation
+                    throw originalException;
             }
             catch (Exception exc)
             {
-                logger.Error(exc, "Quantum worker failed");
-                Context.AppState.State = ApplicationState.Failed;
+                processingItem.SetException(exc);
+                NotifyOnException(processingItem, exc);
                 throw;
             }
         }
 
-        async Task ProcessQuantum(HandleItem handleItem)
+        void NotifyOnException(QuantumProcessingItem processingItem, Exception exc)
         {
-            var envelope = handleItem.Quantum;
-            var tcs = handleItem.HandlingTaskSource;
-            ResultMessage result = null;
+            if (processingItem.Initiator != null && !EnvironmentHelper.IsTest)
+                Context.Notify(processingItem.Initiator.Pubkey, ((RequestQuantumBase)processingItem.Quantum).RequestEnvelope.CreateResult(exc).CreateEnvelope());
+        }
+
+        void ValidateQuantum(QuantumProcessingItem processingItem)
+        {
+            var quantum = processingItem.Quantum;
+            if (quantum.Apex == 0)
+            {
+                quantum.Apex = CurrentApex + 1;
+                quantum.PrevHash = LastQuantumHash;
+                quantum.Timestamp = DateTime.UtcNow.Ticks;
+            }
+            else
+            {
+                if (quantum.Apex != CurrentApex + 1)
+                    throw new Exception($"Current quantum apex is {quantum.Apex} but {CurrentApex + 1} was expected.");
+
+                if (!quantum.PrevHash.AsSpan().SequenceEqual(LastQuantumHash))
+                    throw new Exception($"Quantum previous hash doesn't equal to last quantum hash.");
+            }
+            if (!Context.IsAlpha || Context.StateManager.State == State.Rising)
+                ValidateRequestQuantum(processingItem);
+        }
+
+        Account GetAccountWrapper(Quantum quantum)
+        {
+            if (quantum is RequestQuantumBase requestQuantum)
+            {
+                var account = Context.AccountStorage.GetAccount(requestQuantum.RequestMessage.Account);
+                if (account == null)
+                    throw new Exception($"{account.Pubkey.GetAccountId()} is not registered.");
+                return account;
+            }
+            else
+                return null; //the quantum is not client quantum
+        }
+
+        async Task ProcessQuantum(QuantumProcessingItem processingItem)
+        {
+            var quantum = processingItem.Quantum;
+            processingItem.Initiator = GetAccountWrapper(quantum);
+
+            var processor = default(QuantumProcessorBase);
             try
             {
-                Context.ExtensionsManager.BeforeQuantumHandle(envelope);
-
-                result = await HandleQuantumInternal(envelope, handleItem.Timestamp);
-                if (result.Status != ResultStatusCodes.Success)
-                    throw new Exception("Failed to handle quantum.");
-                tcs.SetResult(result);
+                if (!await processingItem.SignatureValidationTask)
+                    throw new UnauthorizedException("Signature is invalid.");
+                ValidateQuantum(processingItem);
+                processor = GetProcessor(quantum);
+                await processor.Validate(processingItem);
             }
             catch (Exception exc)
             {
-                tcs.SetException(exc);
-                OnProcessException(handleItem, result, exc);
+                throw new QuantumValidationException(exc);
             }
-            Context.ExtensionsManager.AfterQuantumHandle(result);
+
+            var resultMessage = await processor.Process(processingItem);
+            processingItem.Complete(Context, resultMessage);
+
+            CurrentApex = quantum.Apex;
+            LastQuantumHash = processingItem.QuantumHash;
+
+            if (CurrentApex % 1000 == 0)
+                Context.StateManager.UpdateDelay();
+
+            ProcessResult(processingItem);
+
+            processingItem.Processed();
+
+            logger.Trace($"Message of type {quantum.GetType().Name} with apex {quantum.Apex} is handled.");
         }
 
-        protected abstract void OnProcessException(HandleItem handleItem, ResultMessage result, Exception exc);
-
-        async Task<ResultMessage> HandleQuantumInternal(MessageEnvelope quantumEnvelope, long timestamp)
+        void ProcessResult(QuantumProcessingItem processingItem)
         {
-            quantumEnvelope.TryAssignAccountWrapper(Context.AccountStorage);
-            await Context.PendingUpdatesManager.UpdatesSyncRoot.WaitAsync();
-            try
-            {
-                return await HandleQuantum(quantumEnvelope, timestamp);
-            }
-            finally
-            {
-                Context.PendingUpdatesManager.UpdatesSyncRoot.Release();
-            }
+            //register result
+            Context.ResultManager.Add(processingItem);
         }
 
-        protected abstract Task<ResultMessage> HandleQuantum(MessageEnvelope envelope, long timestamp);
-
-        protected EffectProcessorsContainer GetEffectProcessorsContainer(MessageEnvelope envelope)
+        void ValidateRequestQuantum(QuantumProcessingItem processingItem)
         {
-            return new EffectProcessorsContainer(Context, envelope, Context.PendingUpdatesManager.Current);
+            var request = processingItem.Quantum as RequestQuantumBase;
+            if (request == null)
+                return;
+            if (!processingItem.Initiator.RequestCounter.IncRequestCount(request.Timestamp, out string error))
+                throw new TooManyRequestsException($"Request limit reached for account {processingItem.Initiator.Pubkey}.");
         }
 
         /// <summary>
         /// Looks for a processor for the specified message type
         /// </summary>
-        private IQuantumRequestProcessor GetProcessorItem(MessageEnvelope envelope)
+        QuantumProcessorBase GetProcessor(Quantum quantum)
         {
-            var messageType = GetMessageType(envelope);
+            var messageType = GetMessageType(quantum);
 
             if (!Context.QuantumProcessor.TryGetValue(messageType, out var processor))
-                //TODO: do not fail here - return unsupported error message;
                 throw new InvalidOperationException($"Quantum {messageType} is not supported.");
             return processor;
         }
 
-        protected async Task<QuantumProcessingResult> ProcessQuantumEnvelope(MessageEnvelope envelope)
+        string GetMessageType(Quantum quantum)
         {
-            var processor = GetProcessorItem(envelope);
-
-            var effectsContainer = GetEffectProcessorsContainer(envelope);
-
-            var processorContext = processor.GetContext(effectsContainer);
-
-            await processor.Validate(processorContext);
-
-            var resultMessage = await processor.Process(processorContext);
-
-            var effectsData = GetEffectsData(effectsContainer);
-
-            var result = new QuantumProcessingResult
-            {
-                ResultMessage = resultMessage,
-                Effects = new QuantumProcessingEffects
-                {
-                    Data = effectsData,
-                    Hash = effectsData.ComputeHash()
-                },
-                TxHash = GetTxHash(processorContext),
-                EffectProcessorsContainer = effectsContainer
-            };
-
-            return result;
-        }
-
-        byte[] GetTxHash(ProcessorContext processorContext)
-        {
-            if (processorContext is ITransactionProcessorContext transaction)
-                return transaction.TransactionHash;
-            return null;
-        }
-
-        byte[] GetEffectsData(EffectProcessorsContainer effectsContainer)
-        {
-            var resultEffectsContainer = new EffectsContainer { Effects = effectsContainer.Effects };
-
-            return resultEffectsContainer.ToByteArray(buffer.Buffer);
-        }
-
-        MessageTypes GetMessageType(MessageEnvelope envelope)
-        {
-            if (envelope.Message is RequestQuantum)
-                return ((RequestQuantum)envelope.Message).RequestMessage.MessageType;
-            return envelope.Message.MessageType;
+            if (quantum is RequestQuantumBase requestQuantum)
+                return requestQuantum.RequestMessage.GetMessageType();
+            else if (quantum is ConstellationQuantum constellationQuantum)
+                return constellationQuantum.RequestMessage.GetMessageType();
+            return quantum.GetType().Name;
         }
 
         public void Dispose()
         {
-            awaitedQuanta?.Dispose();
-            awaitedQuanta = null;
+            //awaitedQuanta.Dispose();
         }
 
-        protected class QuantumProcessingResult
+        class QuantumValidationException : Exception
         {
-            public EffectProcessorsContainer EffectProcessorsContainer { get; set; }
-
-            public ResultMessage ResultMessage { get; set; }
-
-            public QuantumProcessingEffects Effects { get; set; }
-
-            public byte[] TxHash { get; set; }
+            public QuantumValidationException(Exception innerException)
+                : base("Quantum validation error", innerException)
+            {
+            }
         }
-
-        protected class QuantumProcessingEffects
-        {
-            public byte[] Data { get; set; }
-
-            public byte[] Hash { get; set; }
-        }
-    }
-
-    public abstract class QuantumHandler<TContext> : QuantumHandler, IContextual<TContext>
-        where TContext : ExecutionContext
-    {
-        public QuantumHandler(TContext context)
-            : base(context)
-        {
-        }
-
-        public new TContext Context => (TContext)base.Context;
     }
 }

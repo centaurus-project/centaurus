@@ -23,10 +23,11 @@
   <ItemGroup>
     <ProjectReference Include="..\Centaurus.Common\Centaurus.Common.csproj" />
     <ProjectReference Include="..\Centaurus.Domain\Centaurus.Domain.csproj" />
+    <ProjectReference Include="..\Centaurus.Models.Extensions\Centaurus.Models.Extensions.csproj" />
     <ProjectReference Include="..\Centaurus.Models\Centaurus.Models.csproj" />
+    <ProjectReference Include="..\Centaurus.NetSDK\Centaurus.NetSDK.csproj" />
     <ProjectReference Include="..\Centaurus.Test.Utils\Centaurus.Test.Utils.csproj" />
     <ProjectReference Include="..\Centaurus\Centaurus.csproj" />
-    <ProjectReference Include="..\SDK\Centaurus.SDK\Centaurus.SDK.csproj" />
   </ItemGroup>
 
 </Project>

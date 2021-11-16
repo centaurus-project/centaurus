@@ -18,11 +18,11 @@ namespace Centaurus.Test
         public async Task GetInputStreamReaderTest()
         {
             using var buffer = XdrBufferFactory.Rent(20480);
-            var result = await new FakeWebSocket(Enumerable.Repeat((byte)1, 10240).ToArray()).GetWebsocketBuffer(buffer, CancellationToken.None);
+            var result = await new DummyWebSocket(Enumerable.Repeat((byte)1, 10240).ToArray()).GetWebsocketBuffer(buffer, CancellationToken.None);
             Assert.AreEqual(10240, buffer.Length);
-            result = await new FakeWebSocket(Enumerable.Repeat((byte)1, 20480).ToArray()).GetWebsocketBuffer(buffer, CancellationToken.None);
+            result = await new DummyWebSocket(Enumerable.Repeat((byte)1, 20480).ToArray()).GetWebsocketBuffer(buffer, CancellationToken.None);
             Assert.AreEqual(20480, buffer.Length);
-            Assert.ThrowsAsync<Exception>(async () => await new FakeWebSocket(Enumerable.Repeat((byte)1, 25000).ToArray()).GetWebsocketBuffer(buffer, CancellationToken.None));
+            Assert.ThrowsAsync<Exception>(async () => await new DummyWebSocket(Enumerable.Repeat((byte)1, 25000).ToArray()).GetWebsocketBuffer(buffer, CancellationToken.None));
         }
     }
 }

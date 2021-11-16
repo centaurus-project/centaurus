@@ -2,19 +2,19 @@
 
 ### Orderbook
 
-An orderbook is a record of outstanding orders between XLM and a given asset. 
+An orderbook is a record of outstanding orders between quote asset and a given asset. 
 There are a few major differences between Centaurus exchange and Stellar DEX:
 
-- Only `{ASSET}/XLM` trading pairs allowed to provide maximum liquidity and simplify path payments.
-- All asset prices  are designated in XLM. 
-- Tick size (the smallest unit of price change) depends on the market, by default 0.001XLM.
+- Only `{ASSET}/{QUOTE_ASSET}` trading pairs allowed to provide maximum liquidity and simplify path payments.
+- All asset prices are designated in quote asset. 
+- Tick size (the smallest unit of price change) depends on the market, by default 0.001.
 - There are a limited number of active markets. 
 Constellation members decide which asset to list with the majority of votes.
 
 ### Orders
 
 Orders are the requests to buy/sell tokens for other tokens on Centaurus exchange. 
-The exchange supports `BID` (buy the asset for XLM) and `ASK` (sell the asset for XLM) orders of 
+The exchange supports `BID` (buy the asset for XLM) and `ASK` (sell the asset for quote asset) orders of 
 the following types:
 
 - Good Till Canceled (`GTC`, default) – an order would stay effective until it is filled in full 
@@ -26,13 +26,13 @@ Each order contains the following fields:
 
 - **`symbol`** (`String`) – the symbol of the asset the user wants to trade.
 - **`side`** (`Enum`) – buy or sell.
-- **`amount`** (`Int64`) – the number of tokens a user wants to buy or sell (multiplied 
+- **`amount`** (`UInt64`) – the number of tokens a user wants to buy or sell (multiplied 
 by 10,000,000 to match Stellar standard 7-digit precision convention). The minimum amount eligible 
-for trade equals 0.1XLM.
-- **`price`** (`Double`) – the price user would like to pay in terms of quote asset (XLM), 
+for trade equals 0.1.
+- **`price`** (`Double`) – the price user would like to pay in terms of quote asset, 
 presented as a 32-bit floating-point number. The price is rounded by tick size. 
 - **`timeInForce`** (`Enum`) – currently supported "Good Till Expire" and "Immediate or Cancel".
-- **`orderId`** (`Int64`) – the identifier of the order to modify. 0 for new orders.
+- **`orderId`** (`UInt64`) – the identifier of the order to modify. 0 for new orders.
 
 ### Matching logic
 

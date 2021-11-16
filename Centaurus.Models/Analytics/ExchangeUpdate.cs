@@ -6,7 +6,7 @@ namespace Centaurus.Models
 {
     public class ExchangeUpdate
     {
-        public ExchangeUpdate(int market, DateTime updateDate)
+        public ExchangeUpdate(string market, DateTime updateDate)
         {
             Market = market;
             UpdateDate = updateDate;
@@ -16,7 +16,7 @@ namespace Centaurus.Models
 
         public List<OrderInfo> OrderUpdates { get; } = new List<OrderInfo>();
 
-        public int Market { get; }
+        public string Market { get; }
 
         public DateTime UpdateDate { get; }
     }

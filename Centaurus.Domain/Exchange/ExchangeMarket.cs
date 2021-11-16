@@ -1,26 +1,23 @@
 ﻿using Centaurus.Models;
+using System;
 
 namespace Centaurus.Domain
 {
     public class ExchangeMarket
     {
-        public ExchangeMarket(int market, OrderMap orderMap, bool useLegacyOrderbook = false)
+        public ExchangeMarket(string market, OrderMap orderMap)
         {
-            Market = market;
-            Asks = useLegacyOrderbook 
-                ? (OrderbookBase)new Orderbook(orderMap, market, OrderSide.Sell)
-                : new OrderbookBinary(orderMap, market, OrderSide.Sell);
-            Bids = useLegacyOrderbook
-                ? (OrderbookBase)new Orderbook(orderMap, market, OrderSide.Buy)
-                : new OrderbookBinary(orderMap, market, OrderSide.Buy);
+            Market = market ?? throw new ArgumentNullException(nameof(market));
+            Asks = new Orderbook(orderMap, market, OrderSide.Sell);
+            Bids = new Orderbook(orderMap, market, OrderSide.Buy);
         }
 
-        public int Market { get; }
+        public string Market { get; }
 
         public double LastPrice { get; set; }
+        
+        public Orderbook Asks { get; }
 
-        public OrderbookBase Asks { get; }
-
-        public OrderbookBase Bids { get; }
+        public Orderbook Bids { get; }
     }
 }

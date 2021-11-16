@@ -3,6 +3,11 @@ using System.Threading.Tasks;
 using System.Net.WebSockets;
 using Centaurus.Models;
 using NLog;
+using System.Linq;
+using Centaurus.Xdr;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Collections.Concurrent;
 
 namespace Centaurus.NetSDK
 {
@@ -10,17 +15,21 @@ namespace Centaurus.NetSDK
     {
         public CentaurusClient(ConstellationConfig constellationConfig)
         {
-            Config = constellationConfig;
+            Config = constellationConfig ?? throw new ArgumentNullException(nameof(constellationConfig));
             AccountState = new AccountState();
         }
 
         public readonly ConstellationConfig Config;
 
-        public AccountState AccountState { get; private set; }
+        public ConstellationInfo ConstellationInfo => connection.ConstellationInfo;
 
-        private Connection connection;
+        public AccountState AccountState { get; }
+
+        internal Connection connection;
 
         public bool IsConnected => connection != null && connection.IsConnected;
+
+        private ulong? lastHandledAccountSequence;
 
         public event Action<Exception> OnException;
 
@@ -32,64 +41,84 @@ namespace Centaurus.NetSDK
         {
             try
             {
-                if (connection.IsConnected) return;
+                if (connection?.IsConnected ?? false)
+                    return;
                 //initialize a connection
-                connection = new Connection(Config);
+                connection = new Connection(this);
                 //subscribe to events
                 connection.OnClose += Connection_OnClose;
                 connection.OnException += Connection_OnException;
                 //try to connect
                 await connection.Connect();
+
                 //fetch current account state
-                AccountState = await GetAccountData();
+                await UpdateAccountData();
                 //track state on the client side
-                if (AccountState != null && OnAccountUpdate != null)
-                {
+                if (OnAccountUpdate != null)
                     _ = Task.Factory.StartNew(() => OnAccountUpdate.Invoke(AccountState));
-                }
             }
             catch (Exception e)
             {
                 //failed to connect - dispose everything
                 if (connection != null)
-                {
                     await connection.CloseConnection(WebSocketCloseStatus.ProtocolError);
-                    connection.Dispose();
-                    connection = null;
-                }
                 throw new Exception("Failed to connect to Centaurus Alpha server", e);
             }
+        }
+
+        public async Task Close()
+        {
+            if (!connection?.IsConnected ?? false)
+                return;
+
+            await connection.CloseConnection(WebSocketCloseStatus.NormalClosure);
         }
 
         /// <summary>
         /// Fetch current account state from the constellation.
         /// </summary>
         /// <returns>Current account state</returns>
-        public async Task<AccountState> GetAccountData()
+        public async Task<AccountState> UpdateAccountData()
         {
-            var result = await connection.SendMessage(new AccountDataRequest().CreateEnvelope());
-            var adr = result.Result.Message as AccountDataResponse;
+            var result = await Send(new AccountDataRequest());
+            await result.OnFinalized;
+
+            var adr = (AccountDataResponse)result.Result.Message;
+
+            //compute payload hash
+            var payloadHash = adr.ComputePayloadHash();
+
+            if (adr.Request is RequestHashInfo)
+                throw new Exception($"Account quantum hash was received instead of full quantum data.");
+
+            var accountQuantumRequest = XdrConverter.Deserialize<AccountDataRequestQuantum>(adr.Request.Data);
+
+            //compare with specified one
+            if (!payloadHash.AsSpan().SequenceEqual(accountQuantumRequest.PayloadHash))
+                throw new Exception("Computed payload hash isn't equal to quantum payload hash.");
+
+            AccountState.ConstellationInfo = connection.ConstellationInfo;
+
+            //get last account sequence
+            var effects = XdrConverter.Deserialize<EffectsGroup>(adr.Effects.First().EffectsGroupData);
             foreach (var balance in adr.Balances)
             {
                 AccountState.balances[balance.Asset] = new BalanceModel
                 {
-                    AssetId = balance.Asset,
+                    Asset = balance.Asset,
                     Amount = balance.Amount,
                     Liabilities = balance.Liabilities
                 };
             }
             foreach (var order in adr.Orders)
             {
-                var decodedOrderId = OrderIdConverter.Decode(order.OrderId);
-                AccountState.orders[order.OrderId] = new OrderModel
-                {
-                    OrderId = order.OrderId,
-                    Price = order.Price,
-                    Amount = order.Amount,
-                    AssetId = decodedOrderId.Asset,
-                    Side = decodedOrderId.Side
-                };
+                AccountState.orders[order.OrderId] = OrderModel.FromOrder(order);
             }
+
+            //set sequence
+            lastHandledAccountSequence = effects.AccountSequence - 1;
+            //process quantum effects
+            ProcessQuantumInfos();
 
             return AccountState;
         }
@@ -100,13 +129,20 @@ namespace Centaurus.NetSDK
             {
                 request.RequestId = DateTime.UtcNow.Ticks * (request is SequentialRequestMessage ? 1 : -1);
             }
-            if (request.Account == 0)
+            if (request.Account == null)
             {
-                request.Account = connection.AccountId;
+                request.Account = connection.Config.ClientKeyPair;
             }
             var envelope = request.CreateEnvelope();
             var result = await connection.SendMessage(envelope);
-            _ = result.OnFinalized.ContinueWith(task => HandleQuantumResult(task.Result));
+            if (result != null)
+            {
+                _ = result.OnFinalized.ContinueWith(task =>
+                {
+                    if (task.IsFaulted)
+                        OnException?.Invoke(task.Exception);
+                });
+            }
             return result;
         }
 
@@ -114,26 +150,33 @@ namespace Centaurus.NetSDK
         /// Request a payment to another account in the constellation.
         /// </summary>
         /// <param name="destination">Public key of the account that will receive funds.</param>
-        /// <param name="assetId">Id of the asset to transfer</param>
+        /// <param name="asset">Asset code to transfer</param>
         /// <param name="amount">Amount to transfer</param>
         /// <returns></returns>
-        public async Task<QuantumResult> Pay(byte[] destination, int assetId, long amount)
+        public async Task<QuantumResult> Pay(byte[] destination, string asset, ulong amount)
         {
-            var paymentRequest = new PaymentRequest { Amount = amount, Destination = destination, Asset = assetId };
+            var paymentRequest = new PaymentRequest { Amount = amount, Destination = destination, Asset = asset };
             return await Send(paymentRequest);
         }
 
         /// <summary>
         /// Withdraw funds from the constellation to the supported blockchain network.
         /// </summary>
-        /// <param name="network">Blockchain provider identifier</param>
+        /// <param name="provider">Blockchain provider identifier</param>
         /// <param name="destination">Destination address</param>
-        /// <param name="assetId">Id of the asset to withdraw</param>
+        /// <param name="asset">Asset code to withdraw</param>
         /// <param name="amount">Amount to withdraw</param>
         /// <returns></returns>
-        public async Task<QuantumResult> Withdraw(string network, string destination, int assetId, long amount)
+        public async Task<QuantumResult> Withdraw(string provider, byte[] destination, string asset, ulong amount, ulong fee)
         {
-            var withdrawalRequest = new WithdrawalRequest(); //TODO: set amount, asset, destination
+            var withdrawalRequest = new WithdrawalRequest
+            {
+                Provider = provider,
+                Destination = destination,
+                Asset = asset,
+                Amount = amount,
+                Fee = fee
+            };
             return await Send(withdrawalRequest);
         }
 
@@ -141,14 +184,14 @@ namespace Centaurus.NetSDK
         /// Place a limit order to the constellation exchange.
         /// </summary>
         /// <param name="side">Order side - buy or sell</param>
-        /// <param name="assetId">Id of the asset to trade</param>
+        /// <param name="asset">Asset code to trade</param>
         /// <param name="amount">Amount of the asset to buy/sell</param>
         /// <param name="price">Desired strike price</param>
         /// <returns></returns>
-        public async Task<QuantumResult> PlaceOrder(OrderSide side, int assetId, long amount, double price)
+        public async Task<QuantumResult> PlaceOrder(OrderSide side, string asset, ulong amount, double price)
         {
             //TODO: check maximum allowed order limit here
-            var orderRequest = new OrderRequest { Amount = amount, Price = price, Side = side, Asset = assetId };
+            var orderRequest = new OrderRequest { Amount = amount, Price = price, Side = side, Asset = asset };
             return await Send(orderRequest);
         }
 
@@ -167,31 +210,98 @@ namespace Centaurus.NetSDK
         /// Generate deposit address for a given blockchain.
         /// </summary>
         /// <param name="network">Blockchain provider identifier</param>
+        /// <param name="asset">Asset to deposit</param>
         /// <returns></returns>
-        public DepositInstructions GetDepositAddress(string network)
+        public DepositInstructions GetDepositAddress(string network, string asset)
         {
-            //TODO: get vault address for the target network from the constellation info
-            switch (network)
-            {
-                case "stellar":
-                    return new DepositInstructions(connection.ConstellationInfo.Vault, Config.ClientKeyPair.PublicKey);
-                default:
-                    throw new PlatformNotSupportedException($"Blockchain network \"{network}\" is not supported.");
-            }
+            var providerSettings = connection.ConstellationInfo.Providers.FirstOrDefault(p => p.Id == network);
+            if (providerSettings == null)
+                throw new InvalidOperationException("Provider not found.");
+
+            var providerAsset = providerSettings.Assets.FirstOrDefault(a => a.CentaurusAsset == asset);
+            if (providerAsset == null)
+                throw new InvalidOperationException($"Provider doesn't support {asset} asset.");
+
+            return new DepositInstructions(Config.ClientKeyPair.AccountId, providerSettings.Vault, providerAsset.Token);
         }
 
-        private void HandleQuantumResult(MessageEnvelope envelope)
+        private object quantaQueueSyncRoot = new { };
+        private SortedDictionary<ulong, (ulong apex, EffectsGroup effectsGroup)> quantaQueue = new SortedDictionary<ulong, (ulong, EffectsGroup)>();
+
+        private object accountUpdateSyncRoot = new { };
+
+        internal void HandleQuantumNotification(IQuantumInfoContainer quantumInfo)
         {
-            if (!(envelope.Message is IEffectsContainer effectsMessage)) return;
-            if (effectsMessage.Effects.Count > 0)
+            //find current account effects group
+            var currentAccountEffects = quantumInfo.Effects.FirstOrDefault(eg => eg is EffectsInfo);
+            if (currentAccountEffects == null)
             {
+                return; //log it
+            }
+
+            //deserialize effects group
+            var accountEffects = XdrConverter.Deserialize<EffectsGroup>(currentAccountEffects.EffectsGroupData);
+            lock (quantaQueueSyncRoot)
+            {
+                if (lastHandledAccountSequence.HasValue && accountEffects.AccountSequence <= lastHandledAccountSequence.Value)
+                    return;//inspect it
+
+                quantaQueue.Add(accountEffects.AccountSequence, (quantumInfo.Apex, accountEffects));
+                if (quantaQueue.Count > 1_000)
+                    throw new Exception("Effects notification length is to big.");
+            }
+            ProcessQuantumInfos();
+        }
+
+        private void ProcessQuantumInfos()
+        {
+
+            lock (accountUpdateSyncRoot)
+            {
+                //sequence wasn't initialized yet
+                if (!lastHandledAccountSequence.HasValue)
+                    return;
                 try
                 {
-                    //apply effects to the client-side state
-                    foreach (var effect in effectsMessage.Effects)
+                    var accountEffects = default((ulong apex, EffectsGroup effectsGroup));
+                    lock (quantaQueueSyncRoot)
+                        accountEffects = quantaQueue.FirstOrDefault().Value;
+
+                    while (accountEffects != default)
                     {
-                        AccountState.ApplyAccountStateChanges(effect);
+                        var currentEffectsSequence = accountEffects.effectsGroup.AccountSequence;
+                        var expectedEffectsSequence = lastHandledAccountSequence.Value + 1;
+                        if (currentEffectsSequence > expectedEffectsSequence)
+                            break;
+
+                        if (currentEffectsSequence == expectedEffectsSequence)
+                        {
+                            var apex = accountEffects.apex;
+                            var effectsGroup = accountEffects.effectsGroup;
+                            //apply effects to the client-side state
+                            foreach (var effect in effectsGroup.Effects)
+                            {
+                                //assign apex and account
+                                effect.Apex = apex;
+                                if (effect is AccountEffect accountEffect)
+                                    accountEffect.Account = effectsGroup.Account;
+                                //notify subscribers about changes
+                                AccountState.ApplyAccountStateChanges(effect);
+                            }
+
+                            //set account sequence
+                            lastHandledAccountSequence = effectsGroup.AccountSequence;
+                        }
+
+                        lock (quantaQueueSyncRoot)
+                        {
+                            //remove current effects group from queue
+                            quantaQueue.Remove(currentEffectsSequence);
+                            //try get next effects group
+                            accountEffects = quantaQueue.FirstOrDefault().Value;
+                        }
                     }
+
                     //notify subscribers about the account state update
                     OnAccountUpdate?.Invoke(AccountState);
                 }
@@ -227,7 +337,5 @@ namespace Centaurus.NetSDK
         {
             DynamicSerializersInitializer.Init();
         }
-
-        static Logger logger = LogManager.GetCurrentClassLogger();
     }
 }

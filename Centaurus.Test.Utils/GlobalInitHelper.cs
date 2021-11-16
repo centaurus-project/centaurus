@@ -1,12 +1,13 @@
-﻿using Centaurus.DAL;
-using Centaurus.DAL.Mongo;
-using Centaurus.Domain;
+﻿using Centaurus.Domain;
 using Centaurus.Models;
-using stellar_dotnet_sdk;
+using Centaurus.PaymentProvider;
+using Centaurus.PaymentProvider.Models;
+using Centaurus.PersistentStorage.Abstraction;
+using NUnit.Framework;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace Centaurus.Test
@@ -17,9 +18,9 @@ namespace Centaurus.Test
         /// Generates alpha server settings
         /// </summary>
         /// <returns>Settings object</returns>
-        public static AlphaSettings GetAlphaSettings()
+        public static Settings GetAlphaSettings()
         {
-            var settings = new AlphaSettings();
+            var settings = new Settings();
             SetCommonSettings(settings, TestEnvironment.AlphaKeyPair.SecretSeed);
             settings.ConnectionString = "mongodb://localhost:27001/alphaDBTest?replicaSet=centaurus";
             settings.Build();
@@ -31,24 +32,21 @@ namespace Centaurus.Test
         /// Generates auditor server settings
         /// </summary>
         /// <returns>Settings object</returns>
-        public static AuditorSettings GetAuditorSettings()
+        public static Settings GetAuditorSettings()
         {
-            var settings = new AuditorSettings();
+            var settings = new Settings();
             SetCommonSettings(settings, TestEnvironment.Auditor1KeyPair.SecretSeed);
-            settings.AlphaAddress = "http://localhost";
             settings.ConnectionString = "mongodb://localhost:27001/auditorDBTest?replicaSet=centaurus";
-            settings.AlphaPubKey = TestEnvironment.AlphaKeyPair.AccountId;
-            settings.GenesisQuorum = new string[] { TestEnvironment.Auditor1KeyPair.AccountId };
             settings.Build();
             return settings;
         }
 
-        private static void SetCommonSettings(BaseSettings settings, string secret)
+        private static void SetCommonSettings(Settings settings, string secret)
         {
-            settings.HorizonUrl = "https://horizon-testnet.stellar.org";
-            settings.NetworkPassphrase = "Test SDF Network ; September 2015";
             settings.CWD = "AppData";
+            settings.GenesisAuditors = new[] { TestEnvironment.AlphaKeyPair.AccountId, TestEnvironment.Auditor1KeyPair.AccountId }.Select(a => new Settings.Auditor($"{a}={a}.com")).ToList();
             settings.Secret = secret;
+            settings.ParticipationLevel = 1;
         }
 
         public static List<KeyPair> GetPredefinedClients()
@@ -58,36 +56,34 @@ namespace Centaurus.Test
 
         public static List<KeyPair> GetPredefinedAuditors()
         {
-            return new List<KeyPair> { TestEnvironment.Auditor1KeyPair };
+            return new List<KeyPair> { TestEnvironment.AlphaKeyPair, TestEnvironment.Auditor1KeyPair };
         }
 
-        private static async Task<IStorage> GetStorage(string connectionString)
+        private static IPersistentStorage GetStorage(string connectionString)
         {
             var storage = new MockStorage();
-            await storage.OpenConnection(connectionString);
-            await storage.DropDatabase();
-            await storage.CloseConnection();
+            storage.Connect(connectionString);
             return storage;
         }
 
         /// <summary>
         /// Setups Global with predefined settings
         /// </summary>
-        public static async Task<AlphaContext> DefaultAlphaSetup()
+        public static async Task<ExecutionContext> DefaultAlphaSetup(IPersistentStorage storage = null, Settings settings = null)
         {
-            var settings = GetAlphaSettings();
-            var storage = await GetStorage(settings.ConnectionString);
-            return (AlphaContext)await Setup(GetPredefinedClients(), GetPredefinedAuditors(), settings, storage);
+            settings = settings ?? GetAlphaSettings();
+            storage = storage ?? GetStorage(settings.ConnectionString);
+            return await Setup(GetPredefinedClients(), GetPredefinedAuditors(), settings, storage);
         }
 
         /// <summary>
         /// Setups Global with predefined settings
         /// </summary>
-        public static async Task<AuditorContext> DefaultAuditorSetup()
+        public static async Task<ExecutionContext> DefaultAuditorSetup()
         {
             var settings = GetAuditorSettings();
-            var storage = await GetStorage(settings.ConnectionString);
-            return (AuditorContext)await Setup(GetPredefinedClients(), GetPredefinedAuditors(), settings, storage);
+            var storage = GetStorage(settings.ConnectionString);
+            return await Setup(GetPredefinedClients(), GetPredefinedAuditors(), settings, storage);
         }
 
         /// <summary>
@@ -96,78 +92,96 @@ namespace Centaurus.Test
         /// <param name="clients">Clients to add to constellation</param>
         /// <param name="auditors">Auditors to add to constellation</param>
         /// <param name="settings">Settings that will be used to init Global</param>
-        public static async Task<ExecutionContext> Setup(List<KeyPair> clients, List<KeyPair> auditors, BaseSettings settings, IStorage storage)
+        public static async Task<ExecutionContext> Setup(List<KeyPair> clients, List<KeyPair> auditors, Settings settings, IPersistentStorage storage)
         {
-            var stellarProvider = new MockStellarDataProvider(settings.NetworkPassphrase, settings.HorizonUrl);
+            var context = new ExecutionContext(settings, storage, new MockPaymentProviderFactory(), new DummyConnectionWrapperFactory());
 
-            var context = settings is AlphaSettings 
-                ? (ExecutionContext)new AlphaContext((AlphaSettings)settings, storage, stellarProvider) 
-                : new AuditorContext((AuditorSettings)settings, storage, stellarProvider);
 
-            await context.Init();
+            var assets = new List<AssetSettings> { new AssetSettings { Code = "XLM", IsQuoteAsset = true }, new AssetSettings { Code = "USD" } };
 
-            var assets = new List<AssetSettings> { new AssetSettings { Id = 1, Code = "X", Issuer = KeyPair.Random() } };
+            var stellarProviderVault = KeyPair.Random().AccountId;
 
-            var initQuantum = new ConstellationInitQuantum
+            var stellarProviderSettings = new ProviderSettings
             {
-                Apex = 1,
-                Assets = assets,
-                Auditors = auditors.Select(a => (RawPubKey)a.PublicKey).ToList(),
-                MinAccountBalance = 1,
-                MinAllowedLotSize = 1,
-                Vault = settings is AlphaSettings ? settings.KeyPair.PublicKey : ((AuditorSettings)settings).AlphaKeyPair.PublicKey,
-                PrevHash = new byte[] { },
-                RequestRateLimits = new RequestRateLimits { HourLimit = 1000, MinuteLimit = 100 }
+                Provider = "Stellar",
+                InitCursor = "0",
+                Vault = stellarProviderVault,
+                Assets = new List<ProviderAsset>
+                        {
+                            new ProviderAsset { CentaurusAsset = "XLM", Token = "native" },
+                            new ProviderAsset { CentaurusAsset = "USD", Token = $"USD-{stellarProviderVault}", IsVirtual = true }
+                        },
+                Name = "Test SDF Network ; September 2015",
+                PaymentSubmitDelay = 0
             };
 
-            if (!context.IsAlpha)
-                initQuantum.Timestamp = DateTime.UtcNow.Ticks;
-
-            var envelope = initQuantum.CreateEnvelope();
-            if (!context.IsAlpha)
+            var initRequest = new ConstellationUpdate
             {
-                var alphaKeyPair = KeyPair.FromSecretSeed(TestEnvironment.AlphaKeyPair.SecretSeed);
-                envelope.Sign(alphaKeyPair);
-            }
+                Alpha = auditors.First().PublicKey,
+                Assets = assets,
+                Auditors = auditors.Select(a => new Auditor { PubKey = a.PublicKey, Address = $"{a.Address}.com" }).ToList(),
+                MinAccountBalance = 1,
+                MinAllowedLotSize = 1,
+                Providers = new List<ProviderSettings> { stellarProviderSettings },
+                RequestRateLimits = new RequestRateLimits { HourLimit = uint.MaxValue, MinuteLimit = uint.MaxValue },
+            }.CreateEnvelope<ConstellationMessageEnvelope>()
+                .Sign(TestEnvironment.AlphaKeyPair)
+                .Sign(TestEnvironment.Auditor1KeyPair);
 
-            await context.QuantumHandler.HandleAsync(envelope);
+            await context.QuantumHandler.HandleAsync(new ConstellationQuantum { RequestEnvelope = initRequest }, Task.FromResult(true)).OnProcessed;
 
-            var deposits = new List<PaymentBase>();
-            Action<byte[], int> addAssetsFn = (acc, asset) =>
+            var deposits = new List<DepositModel>();
+            Action<byte[], string> addAssetsFn = (acc, asset) =>
             {
-                deposits.Add(new Deposit
+                deposits.Add(new DepositModel
                 {
                     Destination = acc,
-                    Amount = 10000,
+                    Amount = ulong.MaxValue / 2,
                     Asset = asset,
-                    PaymentResult = PaymentResults.Success
+                    IsSuccess = true
                 });
             };
 
-            for (int i = 0; i < clients.Count; i++)
+            foreach (var client in clients)
             {
-                //add xlm
-                addAssetsFn(clients[i].PublicKey, 0);
                 for (var c = 0; c < assets.Count; c++)
-                    addAssetsFn(clients[i].PublicKey, assets[c].Id);
+                    addAssetsFn(client.PublicKey, assets[c].Code);
             }
 
-            var depositQuantum = new TxCommitQuantum
+            var providerId = PaymentProviderBase.GetProviderId(stellarProviderSettings.Provider, stellarProviderSettings.Name);
+
+            var txNotification = new DepositNotificationModel
             {
-                Apex = 2,
-                PrevHash = context.QuantumStorage.LastQuantumHash,
-                Source = new TxNotification
-                {
-                    TxCursor = 2,
-                    Payments = deposits
-                }.CreateEnvelope().Sign(TestEnvironment.Auditor1KeyPair)
+                Cursor = "2",
+                Items = deposits,
+                ProviderId = providerId
             };
 
-            await context.QuantumHandler.HandleAsync(depositQuantum.CreateEnvelope().Sign(TestEnvironment.AlphaKeyPair));
+            var paymentProvider = (MockPaymentProvider)context.PaymentProvidersManager.GetManager(providerId);
+            paymentProvider.AddDeposit(txNotification);
+
+            var depositQuantum = new DepositQuantum
+            {
+                Apex = context.QuantumHandler.CurrentApex + 1,
+                PrevHash = context.QuantumHandler.LastQuantumHash,
+                Source = txNotification.ToDomainModel()
+            };
+
+            await context.QuantumHandler.HandleAsync(depositQuantum, Task.FromResult(true)).OnProcessed;
 
             //save all effects
-            await SnapshotHelper.ApplyUpdates(context);
+            await Task.Factory.StartNew(() =>
+            {
+                context.PendingUpdatesManager.UpdateBatch(true);
+                context.PendingUpdatesManager.ApplyUpdates();
+            });
             return context;
+        }
+
+        public static void SetState(this ExecutionContext context, State state)
+        {
+            var method = typeof(StateManager).GetMethod("SetState", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            method.Invoke(context.StateManager, new object[] { state, null });
         }
     }
 }

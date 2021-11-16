@@ -8,16 +8,20 @@ namespace Centaurus.Domain
     public static class BinaryDataExtensions
     {
         private static RNGCryptoServiceProvider _RandomGenerator = new RNGCryptoServiceProvider();
-        public static void Randomize(this BinaryData binaryData)
+        public static T Randomize<T>(this T binaryData)
+            where T: BinaryData
         {
 
             binaryData.Data = new byte[binaryData.ByteLength];
             _RandomGenerator.GetBytes(binaryData.Data.AsSpan());
+            return binaryData;
         }
 
-        public static void Zero(this BinaryData binaryData)
+        public static T Zero<T>(this T binaryData)
+            where T : BinaryData
         {
             binaryData.Data = new byte[binaryData.ByteLength];
+            return binaryData;
         }
 
         public static bool IsZero(this BinaryData binaryData)

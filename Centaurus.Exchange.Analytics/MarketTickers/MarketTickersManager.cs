@@ -10,19 +10,17 @@ namespace Centaurus.Exchange.Analytics
 {
     public class MarketTickersManager
     {
-        public MarketTickersManager(List<int> markets, PriceHistoryManager framesManager)
+        public MarketTickersManager(List<string> markets, PriceHistoryManager framesManager)
         {
             this.framesManager = framesManager ?? throw new ArgumentNullException(nameof(framesManager));
             period = Enum.GetValues(typeof(PriceHistoryPeriod)).Cast<PriceHistoryPeriod>().Min();
             this.markets = markets;
         }
 
-        public async Task Update()
+        public void Update()
         {
-            try
-            {
-                var updateDate = DateTime.UtcNow;
-                await syncRoot.WaitAsync();
+            var updateDate = DateTime.UtcNow;
+            lock (syncRoot)
                 foreach (var market in markets)
                 {
                     if (!tickers.TryGetValue(market, out var currentTicker))
@@ -30,24 +28,19 @@ namespace Centaurus.Exchange.Analytics
                         currentTicker = new MarketTicker(market);
                         tickers.Add(market, currentTicker);
                     }
-                    await UpdateTicker(currentTicker, updateDate);
+                    UpdateTicker(currentTicker, updateDate);
                 }
-            }
-            finally
-            {
-                syncRoot.Release();
-            }
         }
 
-        private SemaphoreSlim syncRoot = new SemaphoreSlim(1);
+        private object syncRoot = new { };
         private PriceHistoryPeriod period;
-        private List<int> markets;
+        private List<string> markets;
         private PriceHistoryManager framesManager;
-        private Dictionary<int, MarketTicker> tickers = new Dictionary<int, MarketTicker>();
+        private Dictionary<string, MarketTicker> tickers = new Dictionary<string, MarketTicker>();
 
-        private async Task UpdateTicker(MarketTicker marketTicker, DateTime updateDate)
+        private void UpdateTicker(MarketTicker marketTicker, DateTime updateDate)
         {
-            var frames = await framesManager.GetPriceHistory(0, marketTicker.Market, period);
+            var frames = framesManager.GetPriceHistory(0, marketTicker.Market, period);
             var fromDate = DateTime.UtcNow.AddDays(-1);
             var framesFor24Hours = frames.frames.TakeWhile(f => f.StartTime >= fromDate);
             if (framesFor24Hours.Count() < 1)
@@ -62,33 +55,20 @@ namespace Centaurus.Exchange.Analytics
             marketTicker.UpdatedAt = updateDate;
         }
 
-        public MarketTicker GetMarketTicker(int market)
+        public MarketTicker GetMarketTicker(string market)
         {
-            try
+            lock (syncRoot)
             {
-                syncRoot.Wait();
                 if (!tickers.TryGetValue(market, out var ticker))
                     throw new Exception($"Market {market} is not supported.");
                 return ticker;
-            }
-            finally
-            {
-                syncRoot.Release();
             }
         }
 
         public List<MarketTicker> GetAllTickers()
         {
-
-            try
-            {
-                syncRoot.Wait();
+            lock (syncRoot)
                 return tickers.Values.ToList();
-            }
-            finally
-            {
-                syncRoot.Release();
-            }
         }
     }
 }

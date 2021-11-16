@@ -1,20 +1,24 @@
-﻿using Centaurus.Models;
+﻿using Centaurus.Domain.Models;
+using Centaurus.Models;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace Centaurus.Domain
 {
-    public class OrderPlacedEffectProcessor : EffectProcessor<OrderPlacedEffect>
+    public class OrderPlacedEffectProcessor : ClientEffectProcessor<OrderPlacedEffect>
     {
-        private OrderbookBase orderBook;
-        private Order order;
+        private Orderbook orderBook;
+        private OrderWrapper order;
+        private string baseAsset;
 
-        public OrderPlacedEffectProcessor(OrderPlacedEffect effect, OrderbookBase orderBook, Order order)
-            :base(effect)
+        public OrderPlacedEffectProcessor(OrderPlacedEffect effect, Account account, Orderbook orderBook, OrderWrapper order, string baseAsset)
+            :base(effect, account)
         {
             this.orderBook = orderBook ?? throw new ArgumentNullException(nameof(orderBook));
             this.order = order ?? throw new ArgumentNullException(nameof(order));
+            this.baseAsset = baseAsset ?? throw new ArgumentNullException(nameof(baseAsset));
         }
 
         public override void CommitEffect()
@@ -22,27 +26,27 @@ namespace Centaurus.Domain
             MarkAsProcessed();
 
             //lock order reserve
-            var decodedId = OrderIdConverter.Decode(order.OrderId);
-            if (decodedId.Side == OrderSide.Buy)
-                order.AccountWrapper.Account.GetBalance(0).UpdateLiabilities(order.QuoteAmount);
+            if (order.Order.Side == OrderSide.Buy)
+                Account.GetBalance(baseAsset).UpdateLiabilities(order.Order.QuoteAmount, UpdateSign.Plus);
             else
-                order.AccountWrapper.Account.GetBalance(decodedId.Asset).UpdateLiabilities(order.Amount);
+                Account.GetBalance(order.Order.Asset).UpdateLiabilities(order.Order.Amount, UpdateSign.Plus);
 
             //add order to the orderbook
             orderBook.InsertOrder(order);
+            Account.Orders.Add(order.OrderId, order.Order);
         }
 
         public override void RevertEffect()
         {
             MarkAsProcessed();
 
+            Account.Orders.Remove(Effect.OrderId);
             orderBook.RemoveOrder(Effect.OrderId, out _);
 
-            var decodedId = OrderIdConverter.Decode(order.OrderId);
-            if (decodedId.Side == OrderSide.Buy)
-                order.AccountWrapper.Account.GetBalance(0).UpdateLiabilities(-order.QuoteAmount);
+            if (order.Order.Side == OrderSide.Buy)
+                Account.GetBalance(baseAsset).UpdateLiabilities(order.Order.QuoteAmount, UpdateSign.Minus);
             else
-                order.AccountWrapper.Account.GetBalance(decodedId.Asset).UpdateLiabilities(-order.Amount);
+                Account.GetBalance(order.Order.Asset).UpdateLiabilities(order.Order.Amount, UpdateSign.Minus);
         }
     }
 }

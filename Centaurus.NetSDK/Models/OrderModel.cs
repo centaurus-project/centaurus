@@ -9,47 +9,29 @@ namespace Centaurus.NetSDK
 {
     public class OrderModel
     {
-        private ulong orderId;
-        public ulong OrderId 
-        {
-            get => orderId;
-            set
-            {
-                orderId = value;
-                if (orderId != default)
-                {
-                    var decoded = OrderIdConverter.Decode(orderId);
-                    AssetId = decoded.Asset;
-                    Side = decoded.Side;
-                }
-            }
-        }
+        public ulong OrderId { get; set; }
 
         public double Price { get; set; }
 
         public string PriceStr => Price.ToString("0.#########", CultureInfo.InvariantCulture);
 
-        public long Amount { get; set; }
+        public ulong Amount { get; set; }
 
-        public string AmountXdr => stellar_dotnet_sdk.Amount.FromXdr(Amount);
-
-        public int AssetId { get; set; }
+        //public string AmountXdr => stellar_dotnet_sdk.Amount.FromXdr(Amount);
 
         public string Asset { get; set; }
 
         public OrderSide Side { get; set; }
 
-        public static OrderModel FromOrder(Order order, ConstellationInfo constellation)
+        public static OrderModel FromOrder(Order order)
         {
-            var orderModel = new OrderModel
+            return new OrderModel
             {
                 OrderId = order.OrderId,
                 Price = order.Price,
-                Amount = order.Amount
+                Amount = order.Amount,
+                Asset = order.Asset
             };
-
-            orderModel.Asset = constellation.Assets.FirstOrDefault(a => a.Id == orderModel.AssetId)?.DisplayName ?? orderModel.AssetId.ToString();
-            return orderModel;
         }
     }
 }

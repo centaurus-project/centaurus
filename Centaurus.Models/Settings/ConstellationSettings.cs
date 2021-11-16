@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Centaurus.Xdr;
 
 namespace Centaurus.Models
@@ -8,24 +9,48 @@ namespace Centaurus.Models
     public class ConstellationSettings
     {
         [XdrField(0)]
-        public long Apex { get; set; }
+        public ulong Apex { get; set; }
 
         [XdrField(1)]
-        public RawPubKey Vault { get; set; }
+        public List<ProviderSettings> Providers { get; set; }
 
         [XdrField(2)]
-        public List<RawPubKey> Auditors { get; set; }
+        public List<Auditor> Auditors { get; set; }
 
         [XdrField(3)]
-        public long MinAccountBalance { get; set; }
+        public ulong MinAccountBalance { get; set; }
 
         [XdrField(4)]
-        public long MinAllowedLotSize { get; set; }
+        public ulong MinAllowedLotSize { get; set; }
 
         [XdrField(5)]
         public List<AssetSettings> Assets { get; set; }
 
-        [XdrField(6, Optional = true)]
+        private AssetSettings quoteAsset;
+        public AssetSettings QuoteAsset
+        {
+            get
+            {
+                if (quoteAsset == null)
+                    quoteAsset = Assets.First(a => a.IsQuoteAsset);
+                return quoteAsset;
+            }
+        }
+
+        [XdrField(6)]
         public RequestRateLimits RequestRateLimits { get; set; }
+
+        [XdrField(7)]
+        public RawPubKey Alpha { get; set; }
+    }
+
+    [XdrContract]
+    public class Auditor
+    {
+        [XdrField(0)]
+        public RawPubKey PubKey { get; set; }
+
+        [XdrField(1, Optional = true)]
+        public string Address { get; set; }
     }
 }

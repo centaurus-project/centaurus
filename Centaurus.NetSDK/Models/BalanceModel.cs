@@ -4,9 +4,9 @@ namespace Centaurus.NetSDK
 {
     public class BalanceModel
     {
-        public int AssetId { get; internal set; }
-        public long Amount { get; internal set; }
-        public long Liabilities { get; internal set; }
+        public string Asset { get; internal set; }
+        public ulong Amount { get; internal set; }
+        public ulong Liabilities { get; internal set; }
 
         public decimal AdjustedAmount
         {

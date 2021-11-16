@@ -31,16 +31,16 @@ Events                   | Arguments
 -------------------------|-----------
 `OnNewConnection`        | `WebSocket` webSocket, `string` ip                                                    
 `OnConnectionValidated`  | `BaseWebSocketConnection` connection                                                   
-`OnBeforeValidateMessage`| `BaseWebSocketConnection` connection, `MessageEnvelope` message                        
-`OnAfterValidateMessage` | `BaseWebSocketConnection` connection, `MessageEnvelope` message                        
-`OnBeforeHandleMessage`  | `BaseWebSocketConnection` connection, `MessageEnvelope` message                        
-`OnAfterHandleMessage`   | `BaseWebSocketConnection` connection, `MessageEnvelope` message                        
-`OnHandleMessageFailed`  | `BaseWebSocketConnection` connection, `MessageEnvelope` message, `Exception` exception 
-`OnBeforeSendMessage`    | `BaseWebSocketConnection` connection, `MessageEnvelope` message                        
-`OnAfterSendMessage`     | `BaseWebSocketConnection` connection, `MessageEnvelope` message                        
-`OnSendMessageFailed`    | `BaseWebSocketConnection` connection, `MessageEnvelope` message, `Exception` exception 
+`OnBeforeValidateMessage`| `BaseWebSocketConnection` connection, `MessageEnvelopeBase` message                        
+`OnAfterValidateMessage` | `BaseWebSocketConnection` connection, `MessageEnvelopeBase` message                        
+`OnBeforeHandleMessage`  | `BaseWebSocketConnection` connection, `MessageEnvelopeBase` message                        
+`OnAfterHandleMessage`   | `BaseWebSocketConnection` connection, `MessageEnvelopeBase` message                        
+`OnHandleMessageFailed`  | `BaseWebSocketConnection` connection, `MessageEnvelopeBase` message, `Exception` exception 
+`OnBeforeSendMessage`    | `BaseWebSocketConnection` connection, `MessageEnvelopeBase` message                        
+`OnAfterSendMessage`     | `BaseWebSocketConnection` connection, `MessageEnvelopeBase` message                        
+`OnSendMessageFailed`    | `BaseWebSocketConnection` connection, `MessageEnvelopeBase` message, `Exception` exception 
 `OnBeforeConnectionClose`| `BaseWebSocketConnection` connection                                                   
 `OnBeforeNotify`         | `RawPubKey` pubKey, `MessageEnvelope` envelope                                         
-`OnBeforeNotifyAuditors` | `MessageEnvelope` envelope                                                             
-`OnBeforeQuantumHandle`  | `MessageEnvelope` quantum                                                              
-`OnAfterQuantumHandle`   | `ResultMessage` resultMessage                              
+`OnBeforeNotifyAuditors` | `MessageEnvelopeBase` envelope                                                             
+`OnBeforeQuantumHandle`  | `MessageEnvelopeBase` quantum                                                              
+`OnAfterQuantumHandle`   | `QuantumResultMessageBase` resultMessage                              

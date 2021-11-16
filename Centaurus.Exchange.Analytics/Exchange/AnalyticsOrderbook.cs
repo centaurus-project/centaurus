@@ -31,9 +31,9 @@ namespace Centaurus.Exchange.Analytics
 
         public int Count { get; set; }
 
-        public long TotalAmount { get; set; }
+        public ulong TotalAmount { get; set; }
 
-        public long Volume { get; set; }
+        public ulong Volume { get; set; }
 
         public IEnumerator<OrderInfoWrapper> GetEnumerator()
         {
@@ -105,7 +105,7 @@ namespace Centaurus.Exchange.Analytics
             //increment count
             Count++;
             TotalAmount += orderWrapper.Order.AmountDiff;
-            Volume += (long)(orderWrapper.Order.AmountDiff * orderWrapper.Order.Price);
+            Volume += (ulong)(orderWrapper.Order.AmountDiff * orderWrapper.Order.Price);
             //add to the map
             orderMap.AddOrder(orderWrapper);
         }

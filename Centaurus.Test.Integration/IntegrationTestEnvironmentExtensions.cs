@@ -1,16 +1,14 @@
 ﻿using Centaurus.Controllers;
-using Centaurus.DAL;
 using Centaurus.Domain;
+using Centaurus.Domain.Models;
 using Centaurus.Models;
-using Centaurus.SDK.Models;
+using Centaurus.NetSDK;
 using Microsoft.AspNetCore.Mvc;
 using NUnit.Framework;
-using stellar_dotnet_sdk;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -24,64 +22,94 @@ namespace Centaurus.Test
                 "USD",
                 "EURO",
                 "GOLD",
-                "SILVER",
+                "SLVR",
                 "OIL",
                 "NGAS",
                 "CORN",
-                "SUGAR"
+                "SGR"
             };
-            var res = await environment.AlphaWrapper.ConstellationController.Init(new ConstellationInitModel
+
+            var assets = new List<AssetSettings>();
+            for (var i = 0; i < assetCodes.Length; i++)
+                assets.Add(new AssetSettings { Code = assetCodes[i], IsQuoteAsset = i == 0 });
+
+            var auditors = environment.AuditorWrappers.Select(a =>
+                new Auditor
+                {
+                    PubKey = a.Value.Settings.KeyPair,
+                    Address = a.Key
+                }).ToList();
+
+            var providers = new List<ProviderSettings> {
+                new ProviderSettings {
+                    Provider = "mock",
+                    InitCursor = "0",
+                    Name = "test",
+                    PaymentSubmitDelay = 0,
+                    Vault = KeyPair.Random().AccountId,
+                    Assets = assets.Select(a => new ProviderAsset { CentaurusAsset = a.Code, IsVirtual = true, Token = a.Code }).ToList()
+                }
+            };
+
+            var constellationInit = new ConstellationUpdate
             {
-                Assets = assetCodes.Select(a => $"{a}-{environment.Issuer.AccountId}-{(a.Length > 4 ? 2 : 1)}").ToArray(),
-                Auditors = environment.AuditorWrappers.Select(a => a.Settings.KeyPair.AccountId).ToArray(),
+                Assets = assets,
+                Auditors = auditors,
+                Providers = providers,
                 MinAccountBalance = 1000,
                 MinAllowedLotSize = 100,
-                RequestRateLimits = new RequestRateLimitsModel { HourLimit = int.MaxValue, MinuteLimit = int.MaxValue }
-            });
+                RequestRateLimits = new RequestRateLimits { HourLimit = int.MaxValue, MinuteLimit = int.MaxValue },
+                Alpha = environment.AlphaWrapper.Settings.KeyPair
+            }.CreateEnvelope<ConstellationMessageEnvelope>();
+
+            foreach (var a in environment.AuditorWrappers.Values)
+                constellationInit.Sign(a.Context.Settings.KeyPair);
+
+            var res = await environment.AlphaWrapper.ConstellationController.Init(constellationInit);
 
             var result = (ConstellationController.InitResult)((JsonResult)res).Value;
 
             Assert.IsTrue(result.IsSuccess, "Init result.");
         }
 
-        public static async Task AssertConstellationState(this IntegrationTestEnvironment environment, ApplicationState targetState, TimeSpan timeOut)
+        public static async Task AssertConstellationState(this IntegrationTestEnvironment environment, TimeSpan timeOut, params State[] validStates)
         {
             Func<Task<bool>> func = () =>
             {
                 var state = environment.AlphaWrapper.ConstellationController.Info().State;
                 Debug.WriteLine(state);
-                return Task.FromResult(state == targetState);
+                return Task.FromResult(validStates.Contains(state));
             };
 
             await AssertDuringPeriod(
                 func,
                 timeOut,
-                $"Unable to rich {targetState} state."
+                $"Unable to reach {string.Join(',', validStates.Select(s => s.ToString()))} state."
             );
         }
 
-        public static async Task AssertState(StartupBase startup, ApplicationState targetState, TimeSpan timeOut)
+        public static async Task AssertState(Startup startup, State targetState, TimeSpan timeOut)
         {
             Func<Task<bool>> func = () =>
             {
-                TestContext.Out.WriteLine(startup.Context.AppState.State);
-                return Task.FromResult(startup.Context.AppState.State == targetState);
+                TestContext.Out.WriteLine(startup.Context.StateManager.State);
+                return Task.FromResult(startup.Context.StateManager.State == targetState);
             };
 
             await AssertDuringPeriod(
                 func,
                 timeOut,
-                $"Unable to rich auditor {targetState} state."
+                $"Unable to reach auditor {targetState} state."
             );
         }
 
-        public static async Task AssertConstellationApex(this IntegrationTestEnvironment environment, long apex, TimeSpan timeOut)
+        public static async Task AssertConstellationApex(this IntegrationTestEnvironment environment, ulong apex, TimeSpan timeOut)
         {
             Func<Task<bool>> func = () =>
             {
                 return Task.FromResult(
-                    environment.AlphaWrapper.Context.QuantumStorage.CurrentApex == apex
-                    && environment.AuditorWrappers.All(a => a.Context.QuantumStorage.CurrentApex == apex)
+                    environment.AlphaWrapper.Context.QuantumHandler.CurrentApex == apex
+                    && environment.AuditorWrappers.Values.All(a => a.Context.QuantumHandler.CurrentApex == apex)
                 );
             };
 
@@ -117,22 +145,20 @@ namespace Centaurus.Test
             await AssertDuringPeriod(
                 func,
                 timeout,
-                $"Client count is not equal to expected."
+                $"Client count {environment.AlphaWrapper.Startup.Context.AccountStorage.Count} is not equal to expected {clientsCount}."
             );
         }
 
-        public static async Task<List<SDK.CentaurusClient>> ConnectClients(this IntegrationTestEnvironment environment, List<KeyPair> clients, SDK.Models.ConstellationInfo info)
+        public static async Task<List<CentaurusClient>> ConnectClients(this IntegrationTestEnvironment environment, List<KeyPair> clients, NetSDK.ConstellationInfo info)
         {
-            var clientConnections = new List<SDK.CentaurusClient>();
+            var connectionFactory = new MockOutgoingConnectionFactory(environment.AuditorWrappers); 
+            var clientConnections = new List<CentaurusClient>();
+            var address = environment.AuditorWrappers.First().Key;
             foreach (var client in clients)
             {
-                var clientConnection = new SDK.CentaurusClient(
-                    new Uri(IntegrationTestEnvironment.AlphaAddress),
-                    client,
-                    info,
-                    environment.StellarProvider,
-                    environment.GetClientConnectionWrapper
-                );
+                var clientConfig = new MockClientConstellationConfig(address,
+                    client.SeedBytes, connectionFactory, environment.SDKConstellationInfo);
+                var clientConnection = new CentaurusClient(clientConfig);
 
                 await clientConnection.Connect();
 
@@ -141,33 +167,15 @@ namespace Centaurus.Test
             return clientConnections;
         }
 
-        public static void AssertFinalize(this IntegrationTestEnvironment environment, MessageEnvelope resultMessage)
+        public static async Task AssertPayment(this IntegrationTestEnvironment environment, CentaurusClient client, KeyPair keyPair, string asset, ulong amount)
         {
-            if (resultMessage.Message.MessageType != MessageTypes.ITransactionResultMessage)
-                Assert.IsTrue(resultMessage.AreSignaturesValid(), "Signatures validation.");
-            Assert.IsTrue(resultMessage.Signatures.Count >= environment.AlphaWrapper.Context.GetMajorityCount(), "Majority validation.");
-        }
-
-        private static void AsserResult(MessageEnvelope resultMessage, ResultStatusCodes targetResult)
-        {
-            if (resultMessage.Message is ResultMessage result)
-            {
-                Assert.AreEqual(result.Status, targetResult, "Result message status assertion.");
-                return;
-            }
-            Assert.Fail("Specified message is not result message.");
-        }
-
-        public static async Task AssertPayment(this IntegrationTestEnvironment environment, SDK.CentaurusClient client, KeyPair keyPair, int assetId, long amount)
-        {
-            var balance = client.AccountData.GetBalances().First(a => a.AssetId == assetId);
+            var balance = client.AccountState.GetBalances().First(a => a.Asset == asset);
             var balanceAmount = balance.Amount;
             try
             {
-                var result = await client.MakePayment(keyPair, amount, environment.SDKConstellationInfo.Assets.First(a => a.Id == assetId));
-                environment.AssertFinalize(result);
-                AsserResult(result, ResultStatusCodes.Success);
-                await AssertBalance(client, assetId, balanceAmount - amount, 0);
+                var result = await client.Pay(keyPair.PublicKey, asset, amount);
+                await result.OnFinalized;
+                await AssertBalance(client, asset, balanceAmount - amount, 0);
             }
             catch (Exception exc)
             {
@@ -175,16 +183,14 @@ namespace Centaurus.Test
             }
         }
 
-        public static async Task AssertWithdrawal(this IntegrationTestEnvironment environment, SDK.CentaurusClient client, KeyPair keyPair, int assetId, string amount)
+        public static async Task AssertWithdrawal(this IntegrationTestEnvironment environment, CentaurusClient client, string provider, KeyPair keyPair, string asset, ulong amount)
         {
-            var balance = client.AccountData.GetBalances().First(a => a.AssetId == assetId);
+            var balance = client.AccountState.GetBalances().First(a => a.Asset == asset);
             var balanceAmount = balance.Amount;
             try
             {
-                var result = await client.Withdrawal(keyPair, amount, environment.SDKConstellationInfo.Assets.First(a => a.Id == assetId));
-                environment.AssertFinalize(result);
-                AsserResult(result, ResultStatusCodes.Success);
-                await AssertBalance(client, assetId, balanceAmount - Amount.ToXdr(amount), 0);
+                var result = await client.Withdraw(provider, keyPair.PublicKey, asset, amount, 100);
+                await AssertBalance(client, asset, balanceAmount - amount, 0);
             }
             catch (Exception exc)
             {
@@ -192,12 +198,12 @@ namespace Centaurus.Test
             }
         }
 
-        public static async Task AssertBalance(SDK.CentaurusClient client, int assetId, long amount, long liabilities)
+        public static async Task AssertBalance(CentaurusClient client, string asset, ulong amount, ulong liabilities)
         {
             Func<Task<bool>> func = async () =>
             {
                 await client.UpdateAccountData();
-                var balance = client.AccountData.GetBalances().First(a => a.AssetId == assetId);
+                var balance = client.AccountState.GetBalances().First(a => a.Asset == asset);
                 return balance.Amount == amount && balance.Liabilities == liabilities;
             };
 
@@ -213,72 +219,63 @@ namespace Centaurus.Test
         {
             environment.Init(auditorsCount);
 
-            await environment.RunAlpha();
+            environment.RunAuditors();
 
             await environment.InitConstellation();
 
-            await environment.AssertConstellationState(ApplicationState.Running, TimeSpan.FromSeconds(5));
+            await environment.AssertConstellationState(TimeSpan.FromSeconds(5), State.Running, State.Ready);
 
-            await environment.RunAuditors();
-
-            await environment.AssertConstellationState(ApplicationState.Ready, TimeSpan.FromSeconds(50 * auditorsCount));
+            await environment.AssertConstellationState(TimeSpan.FromSeconds(5), State.Ready);
 
             environment.GenerateCliens(clientsCount);
 
-            await environment.AssertClientsCount(clientsCount, TimeSpan.FromSeconds(15));
+            await environment.AssertClientsCount(clientsCount, TimeSpan.FromSeconds(5));
         }
 
-        public static async Task<(ResultMessage result, byte[] effectsHash, EffectProcessorsContainer container)> ProcessQuantumIsolated(this IntegrationTestEnvironment environment, MessageEnvelope envelope)
+        public static async Task<QuantumResultMessageBase> ProcessQuantumIsolated(this IntegrationTestEnvironment environment, Quantum quantum)
         {
-            var context = new AlphaContext(environment.AlphaWrapper.Context.Settings, new MockStorage(), environment.AlphaWrapper.Context.StellarDataProvider);
-
-            await context.Init();
+            var context = new Domain.ExecutionContext(environment.AlphaWrapper.Context.Settings, new MockStorage(), new MockPaymentProviderFactory(), new MockOutgoingConnectionFactory(new Dictionary<string, StartupWrapper>()));
 
             //wait while all pending updates will be saved
-            while (await environment.AlphaWrapper.Context.PersistenceManager.GetLastApex() != environment.AlphaWrapper.Context.QuantumStorage.CurrentApex)
+            while (environment.AlphaWrapper.Context.DataProvider.GetLastApex() != environment.AlphaWrapper.Context.QuantumHandler.CurrentApex)
                 Thread.Sleep(100);
-            await context.Setup(await environment.AlphaWrapper.Context.PersistenceManager.GetSnapshot(environment.AlphaWrapper.Context.QuantumStorage.CurrentApex));
 
-            var messageType = envelope.Message.MessageType;
-            if (messageType == MessageTypes.RequestQuantum)
-                messageType = ((RequestQuantum)envelope.Message).RequestMessage.MessageType;
+            context.Setup(environment.AlphaWrapper.Context.DataProvider.GetSnapshot(environment.AlphaWrapper.Context.QuantumHandler.CurrentApex));
 
-            context.QuantumProcessor.TryGetValue(messageType, out var processor);
-
-            var container = new EffectProcessorsContainer(context, envelope, new DiffObject());
-            var processContext = processor.GetContext(container);
-
-            var res = await processor.Process(processContext);
-
-            var effectsHash = new EffectsContainer { Effects = container.Effects }.ComputeHash();
-
-            return (res, effectsHash, container);
-        }
-
-
-
-        public static async Task<(ResultMessage result, byte[] effectsHash, EffectProcessorsContainer container)> ProcessQuantumWithoutValidation(Domain.ExecutionContext context, MessageEnvelope envelope)
-        {
-            var messageType = envelope.Message.MessageType;
-            if (messageType == MessageTypes.RequestQuantum)
+            var messageType = quantum.GetType().Name;
+            var account = default(Account);
+            if (quantum is RequestQuantum requestQuantum)
             {
-                var request = (RequestQuantum)envelope.Message;
-                messageType = request.RequestMessage.MessageType;
-                request.RequestMessage.AccountWrapper = context.AccountStorage.GetAccount(request.RequestMessage.Account);
+                messageType = requestQuantum.RequestMessage.GetMessageType();
+                account = context.AccountStorage.GetAccount(requestQuantum.RequestMessage.Account);
             }
 
             context.QuantumProcessor.TryGetValue(messageType, out var processor);
 
-            var container = new EffectProcessorsContainer(context, envelope, new DiffObject());
-            var processContext = processor.GetContext(container);
+            var res = await processor.Process(new QuantumProcessingItem(quantum, Task.FromResult(true)));
 
-            var res = await processor.Process(processContext);
-
-            context.QuantumStorage.AddQuantum(envelope, envelope.ComputeHash());
-
-            var effectsHash = new EffectsContainer { Effects = container.Effects }.ComputeHash();
-
-            return (res, effectsHash, container);
+            return res;
         }
+
+
+
+        //public static async Task<QuantumResultMessageBase> ProcessQuantumWithoutValidation(Domain.ExecutionContext context, Quantum quantum)
+        //{
+        //    var messageType = quantum.GetType().Name;
+        //    var account = default(Account);
+        //    if (quantum is RequestQuantum requestQuantum)
+        //    {
+        //        messageType = requestQuantum.RequestMessage.GetMessageType();
+        //        account = context.AccountStorage.GetAccount(requestQuantum.RequestMessage.Account);
+        //    }
+
+        //    context.QuantumProcessor.TryGetValue(messageType, out var processor);
+
+        //    var res = await processor.Process(new QuantumProcessingItem(quantum, Task.FromResult(true)));
+
+        //    context.SyncStorage.AddQuantum(quantum, quantum.ComputeHash());
+
+        //    return res;
+        //}
     }
 }
