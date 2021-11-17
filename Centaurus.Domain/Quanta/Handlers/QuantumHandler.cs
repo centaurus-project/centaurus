@@ -37,7 +37,7 @@ namespace Centaurus.Domain
                 && QuantaThrottlingManager.Current.MaxItemsPerSecond <= awaitedQuanta.Count)
                 throw new TooManyRequestsException("Server is too busy. Try again later.");
             var processingItem = new QuantumProcessingItem(quantum, signatureValidation);
-            if (processingItem.Quantum.Apex > 0)
+            if (!Context.IsAlpha)
                 LastAddedQuantumApex = processingItem.Quantum.Apex;
             lock (awaitedQuantaSyncRoot)
                 awaitedQuanta.Enqueue(processingItem);
@@ -186,6 +186,9 @@ namespace Centaurus.Domain
                 Context.StateManager.UpdateDelay();
 
             ProcessResult(processingItem);
+
+            if (Context.IsAlpha)
+                LastAddedQuantumApex = processingItem.Quantum.Apex;
 
             processingItem.Processed();
 

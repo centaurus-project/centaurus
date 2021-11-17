@@ -6,7 +6,7 @@ using System.Text;
 
 namespace Centaurus.Domain
 {
-    public static class ConstellationQuantumHelper
+    public static class ConstellationQuantumExtesnions
     {
         public static void Validate(this ConstellationQuantum constellationQuantum, ExecutionContext context)
         {

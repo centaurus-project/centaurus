@@ -1,4 +1,5 @@
 ﻿using Centaurus.Xdr;
+using System.Collections.Generic;
 
 namespace Centaurus.Models
 {
@@ -18,12 +19,9 @@ namespace Centaurus.Models
     {
 
         [XdrField(0)]
-        public ulong QuantaCursor { get; set; }
+        public State State { get; set; }
 
         [XdrField(1)]
-        public ulong ResultCursor { get; set; }
-
-        [XdrField(2)]
-        public State State { get; set; }
+        public List<SyncCursor> Cursors { get; set; }
     }
 }

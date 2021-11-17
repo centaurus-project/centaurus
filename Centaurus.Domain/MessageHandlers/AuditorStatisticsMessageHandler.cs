@@ -25,7 +25,7 @@ namespace Centaurus.Domain
             var auditor = connection.PubKeyAddress;
             var statistics = (AuditorPerfStatistics)message.Envelope.Message;
 
-            Context.PerformanceStatisticsManager.AddAuditorStatistics(auditor, statistics);
+            Context.PerformanceStatisticsManager?.AddAuditorStatistics(auditor, statistics);
             return Task.CompletedTask;
         }
     }

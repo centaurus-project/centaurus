@@ -1,4 +1,5 @@
-﻿using Centaurus.Models;
+﻿using Centaurus.Domain.Quanta.Sync;
+using Centaurus.Models;
 using NLog;
 using System;
 using System.Collections.Generic;
@@ -37,8 +38,9 @@ namespace Centaurus.Domain
                 State = Context.StateManager.State
             }.CreateEnvelope<MessageEnvelopeSignless>());
 
+            incomingAuditorConnection.SetSyncCursor(true, auditorHandshake.Cursors.ToDomainModel().ToArray());
+
             Context.StateManager.SetAuditorState(connection.PubKey, auditorHandshake.State);
-            incomingAuditorConnection.SetSyncCursor(auditorHandshake.QuantaCursor, auditorHandshake.ResultCursor);
 
             //request quanta on rising
             if (Context.StateManager.State == State.Rising)

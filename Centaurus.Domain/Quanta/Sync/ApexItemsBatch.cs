@@ -6,15 +6,17 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Centaurus
+namespace Centaurus.Domain.Quanta.Sync
 {
-    public class ApexItemsBatch<T>
+    public partial class ApexItemsBatch<T>: ContextualBase
         where T : IApex
     {
-        public ApexItemsBatch(ulong start, int size, List<T> initData)
+        public ApexItemsBatch(ExecutionContext context, ulong start, int size, int portionSize, List<T> initData)
+            :base(context)
         {
             Start = start;
             Size = size;
+            PortionSize = portionSize;
             if (initData == null)
                 throw new ArgumentNullException(nameof(initData));
             if (initData.Count > size)
@@ -33,18 +35,20 @@ namespace Centaurus
         /// <summary>
         /// Returns range of items
         /// </summary>
-        /// <param name="from">Exclusive from</param>
+        /// <param name="from"></param>
         /// <param name="limit"></param>
+        /// <param name="inclusiveFrom"></param>
         /// <returns></returns>
-        public List<T> GetItems(ulong from, int limit)
+        public List<T> GetItems(ulong from, int limit, bool inclusiveFrom = false)
         {
-            from = from + 1;
+            if (!inclusiveFrom || from == 0) //we don't have 0 apex, so force exclusive for 0
+                from = from + 1;
             var skip = from - Start;
-            limit = Math.Min((int)(LastApex - Start + skip), limit);
 
             var result = data
                 .Skip((int)skip)
                 .Take(limit).ToList();
+
             //last item can be null, if inserting is in progress
             if (result.Count > 0 && result[result.Count - 1] == null)
                 result.RemoveAt(result.Count - 1);
@@ -56,6 +60,10 @@ namespace Centaurus
         public ulong LastApex { get; private set; }
 
         public int Size { get; }
+
+        public int PortionSize { get; }
+
+        public bool IsFulfilled => data.Count == Size;
 
         public void Add(ulong apex, T item)
         {
@@ -105,6 +113,19 @@ namespace Centaurus
         {
             data.Add(item);
             LastApex = apex;
+        }
+
+        private Dictionary<ulong, ApexItemsBatchPortion> portions = new Dictionary<ulong, ApexItemsBatchPortion>();
+
+        public SyncPortion GetData(ulong apex, bool force)
+        {
+            var portionStart = apex - (apex % (ulong)PortionSize);
+            if (!portions.TryGetValue(portionStart, out var portion))
+            {
+                portion = new ApexItemsBatchPortion(portionStart, PortionSize, this);
+                portions.Add(portionStart, portion);
+            }
+            return portion.GetBatch(force);
         }
     }
 }

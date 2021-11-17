@@ -85,34 +85,6 @@ namespace Centaurus.Domain
         }
 
         /// <summary>
-        /// Fetches all quanta where apex is greater than the specified one.
-        /// </summary>
-        /// <param name="apex"></param>
-        /// <param name="count">Count of quanta to load. Loads all if equal or less than 0</param>
-        /// <returns></returns>
-        public List<SyncQuantaBatchItem> GetQuantaSyncBatchItemsAboveApex(ulong apex, int count = 0)
-        {
-            var query = (IEnumerable<QuantumPersistentModel>)Context.PersistentStorage.LoadQuantaAboveApex(apex, count)
-                .OrderBy(q => q.Apex);
-            if (count > 0)
-                query = query.Take(count);
-            return query.Select(q => q.ToBatchItemQuantum()).ToList();
-        }
-
-        /// <summary>
-        /// Fetches all quanta's signatures where apex is greater than the specified one.
-        /// </summary>
-        /// <param name="apex"></param>
-        /// <param name="count">Count of quanta to load. Loads all if equal or less than 0</param>
-        /// <returns></returns>
-        public List<QuantumSignatures> GetSignaturesSyncBatchItemsAboveApex(ulong apex, int count = 0)
-        {
-            var query = (IEnumerable<QuantumPersistentModel>)Context.PersistentStorage.LoadQuantaAboveApex(apex, count)
-                .OrderBy(q => q.Apex);
-            return query.Select(q => q.ToQuantumSignatures()).ToList();
-        }
-
-        /// <summary>
         /// Get last persisted apex
         /// </summary>
         /// <returns></returns>

@@ -4,18 +4,19 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Centaurus.Domain.Quanta.Sync;
 using Centaurus.Models;
 
 namespace Centaurus.Domain.Handlers.AlphaHandlers
 {
-    public class SyncCursorUpdateHandler : MessageHandlerBase<IncomingAuditorConnection>
+    public class SyncCursorResetHandler : MessageHandlerBase<IncomingAuditorConnection>
     {
-        public SyncCursorUpdateHandler(ExecutionContext context)
+        public SyncCursorResetHandler(ExecutionContext context)
             : base(context)
         {
         }
 
-        public override string SupportedMessageType { get; } = typeof(SyncCursorUpdate).Name;
+        public override string SupportedMessageType { get; } = typeof(SyncCursorReset).Name;
 
         public override bool IsAuditorOnly { get; } = true;
 
@@ -26,10 +27,9 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
 
         public override Task HandleMessage(IncomingAuditorConnection connection, IncomingMessage message)
         {
-            var batchRequest = (SyncCursorUpdate)message.Envelope.Message;
-            var quantaCursor = batchRequest.QuantaCursor == ulong.MaxValue ? null : (ulong?)batchRequest.QuantaCursor;
-            var signaturesCursor = batchRequest.SignaturesCursor == ulong.MaxValue ? null : (ulong?)batchRequest.SignaturesCursor;
-            connection.SetSyncCursor(quantaCursor, signaturesCursor);
+            var cursorResetRequest = (SyncCursorReset)message.Envelope.Message;
+
+            connection.SetSyncCursor(true, cursorResetRequest.SyncCursors.ToDomainModel().ToArray());
             return Task.CompletedTask;
         }
     }

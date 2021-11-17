@@ -51,9 +51,14 @@ namespace Centaurus.Domain
 
                 if (quantum.Apex != lastKnownApex + 1)
                 {
-                    await connection.SendMessage(new SyncCursorUpdate
+                    await connection.SendMessage(new SyncCursorReset
                     {
-                        QuantaCursor = quantumHandler.LastAddedQuantumApex
+                        SyncCursors = new List<SyncCursor> {
+                            new SyncCursor {
+                                Type = XdrSyncCursorType.Quanta,
+                                Cursor = quantumHandler.LastAddedQuantumApex
+                            }
+                        }
                     }.CreateEnvelope<MessageEnvelopeSignless>());
                     logger.Warn($"Batch has invalid quantum apexes (current: {quantumHandler.LastAddedQuantumApex}, received: {quantum.Apex}). New apex cursor request sent.");
                     return;

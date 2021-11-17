@@ -22,17 +22,19 @@ namespace Centaurus.Domain
         {
             var handshakeRequest = (HandshakeRequest)message.Envelope.Message;
 
-            var quantaCursor = Context.QuantumHandler.LastAddedQuantumApex;
+            var quantaCursor = new SyncCursor { Type = XdrSyncCursorType.Quanta, Cursor = Context.QuantumHandler.LastAddedQuantumApex };
+
             //if Prime than the node will receive results from auditors
-            var resultCursor = Context.RoleManager.ParticipationLevel == CentaurusNodeParticipationLevel.Prime 
-                ? ulong.MaxValue 
-                : Context.PendingUpdatesManager.LastSavedApex;
+            var signaturesCursor = new SyncCursor
+            {
+                Type = XdrSyncCursorType.Signatures,
+                Cursor = Context.PendingUpdatesManager.LastSavedApex,
+                ClearCursor = Context.RoleManager.ParticipationLevel == CentaurusNodeParticipationLevel.Prime
+            };
             await connection.SendMessage(new AuditorHandshakeResponse
             {
                 HandshakeData = handshakeRequest.HandshakeData,
-                QuantaCursor = quantaCursor,
-                ResultCursor = resultCursor,
-                State = Context.StateManager.State
+                Cursors = new List<SyncCursor> { quantaCursor, signaturesCursor }
             });
 
             //after sending auditor handshake the connection becomes ready

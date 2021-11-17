@@ -55,6 +55,8 @@ namespace Centaurus.Domain
 
             InfoConnectionManager = new InfoConnectionManager(this);
 
+            SyncQuantaDataWorker = new SyncQuantaDataWorker(this);
+
             Catchup = new Catchup(this);
 
             StateManager = new StateManager(this);
@@ -124,6 +126,9 @@ namespace Centaurus.Domain
 
                     //add signatures
                     ResultManager.Add(new QuantumSignatures { Apex = quantum.Quantum.Apex, Signatures = quantum.Signatures });
+
+                    if (quantum.Quantum.Apex % 1000 == 0)
+                        logger.Info($"Pending quanta handling. Current apex: {quantum.Quantum.Apex}, last pending quanta: {pendingQuanta.Last().Quantum.Apex}");
                 }
                 catch (AggregateException exc)
                 {
@@ -342,6 +347,8 @@ namespace Centaurus.Domain
         public SubscriptionsManager SubscriptionsManager { get; }
 
         public InfoConnectionManager InfoConnectionManager { get; }
+
+        public SyncQuantaDataWorker SyncQuantaDataWorker { get; }
 
         public Catchup Catchup { get; }
 

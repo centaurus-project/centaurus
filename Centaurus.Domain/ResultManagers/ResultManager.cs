@@ -179,7 +179,7 @@ namespace Centaurus.Domain
             {
                 var currentBatchId = currentBatchIds.Last();
                 var nextBatchId = currentBatchId + batchSize;
-                if (nextBatchId - Context.QuantumHandler.CurrentApex < advanceThreshold)
+                if (nextBatchId - Context.QuantumHandler.LastAddedQuantumApex < advanceThreshold)
                     CreateBatch(nextBatchId);
                 //copy batch to be able to modify original
                 var _currentBatchIds = currentBatchIds.ToList();

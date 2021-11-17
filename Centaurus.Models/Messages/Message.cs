@@ -25,6 +25,7 @@ namespace Centaurus.Models
     [XdrUnion((int)MessageTypes.AuditorSignaturesBatch, typeof(AuditorSignaturesBatch))]
     [XdrUnion((int)MessageTypes.ConstellationUpdate, typeof(ConstellationUpdate))]
     [XdrUnion((int)MessageTypes.ConstellationQuantum, typeof(ConstellationQuantum))]
+    [XdrUnion((int)MessageTypes.SyncCursorReset, typeof(SyncCursorReset))]
     [XdrUnion((int)MessageTypes.AlphaQuantaBatch, typeof(SyncQuantaBatch))]
     [XdrUnion((int)MessageTypes.QuantumMajoritySignaturesBatch, typeof(QuantumMajoritySignaturesBatch))]
     [XdrUnion((int)MessageTypes.CatchupQuantaBatchRequest, typeof(CatchupQuantaBatchRequest))]

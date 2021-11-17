@@ -114,7 +114,7 @@ namespace Centaurus.Models
         /// <summary>
         /// Contains cursors for quanta and signatures
         /// </summary>
-        SyncCursorUpdate = 213,
+        SyncCursorReset = 213,
         /// <summary>
         /// Contains batch of quanta, that were processed by Alpha
         /// </summary>

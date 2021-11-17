@@ -1,6 +1,7 @@
 ﻿using Centaurus.Domain;
-using Centaurus.Models;
+using Centaurus.Domain.Quanta.Sync;
 using NLog;
+using System;
 using System.Net.WebSockets;
 using static Centaurus.Domain.StateManager;
 
@@ -14,7 +15,6 @@ namespace Centaurus
             : base(context, keyPair, webSocket, ip)
         {
             AuditorState = Context.StateManager.GetAuditorState(keyPair);
-            quantumWorker = new QuantumSyncWorker(Context, this);
             SendHandshake();
         }
 
@@ -24,25 +24,52 @@ namespace Centaurus
 
         protected override int outBufferSize => AuditorBufferSize;
 
-        private QuantumSyncWorker quantumWorker;
-
-        public ulong CurrentCursor => quantumWorker.CurrentQuantaCursor ?? 0;
-
         public AuditorState AuditorState { get; }
 
-        public void SetSyncCursor(ulong? quantumCursor, ulong? signaturesCursor)
-        {
-            logger.Trace($"Connection {PubKeyAddress}, apex cursor reset requested. New quantum cursor {(quantumCursor.HasValue ? quantumCursor.ToString() : "null")}, new result cursor {(signaturesCursor.HasValue ? signaturesCursor.ToString() : "null")}");
+        private object syncRoot = new { };
 
-            //set new quantum and result cursors
-            quantumWorker.SetCursors(quantumCursor, signaturesCursor);
-            logger.Trace($"Connection {PubKeyAddress}, cursors reseted.");
+        public ulong? CurrentQuantaCursor { get; private set; }
+        public ulong? CurrentSignaturesCursor { get; private set; }
+        public DateTime LastCursorUpdateDate { get; private set; }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="force">Force means that auditor requested cursor reset</param>
+        /// <param name="cursorUpdates"></param>
+        public void SetSyncCursor(bool force, params SyncCursorUpdate[] cursorUpdates)
+        {
+            //set new quantum and signature cursors
+            lock (syncRoot)
+            {
+                if (cursorUpdates.Length == 0)
+                    return;
+                foreach (var cursorUpdate in cursorUpdates)
+                {
+                    if (!(force || cursorUpdate.TimeToken == LastCursorUpdateDate))
+                        continue;
+                    switch (cursorUpdate.CursorType)
+                    {
+                        case SyncCursorType.Quanta:
+                            CurrentQuantaCursor = cursorUpdate.NewCursor;
+                            break;
+                        case SyncCursorType.Signatures:
+                            CurrentSignaturesCursor = cursorUpdate.NewCursor;
+                            break;
+                        default:
+                            throw new NotImplementedException($"{cursorUpdate.CursorType} cursor type is not supported.");
+                    }
+                }
+                LastCursorUpdateDate = DateTime.UtcNow;
+                if (force)
+                    logger.Info($"Connection {PubKeyAddress}, cursors reset. Quanta cursor: {CurrentQuantaCursor}, signatures cursor: {CurrentSignaturesCursor}");
+            }
         }
 
-        public override void Dispose()
+        public (ulong? quantaCursor, ulong? signaturesCursor, DateTime timeToken) GetCursors()
         {
-            base.Dispose();
-            quantumWorker.Dispose();
+            lock (syncRoot)
+                return (CurrentQuantaCursor, CurrentSignaturesCursor, LastCursorUpdateDate);
         }
     }
 }

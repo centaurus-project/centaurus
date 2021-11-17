@@ -45,17 +45,29 @@ namespace Centaurus.Test
                     Timestamp = DateTime.UtcNow.Ticks
                 };
 
-                context.SyncStorage.AddQuantum(quantum.Apex, new SyncQuantaBatchItem { Quantum = quantum });
+                context.SyncStorage.AddQuantum(quantum.Apex, new SyncQuantaBatchItem
+                {
+                    Quantum = quantum,
+                    AlphaSignature = new AuditorSignatureInternal
+                    {
+                        AuditorId = 0,
+                        PayloadSignature = new TinySignature
+                        {
+                            Data = new byte[64]
+                        }
+                    }
+                });
                 items.Add(new QuantumPersistentModel { Apex = quantum.Apex, RawQuantum = XdrConverter.Serialize(quantum), Signatures = new List<SignatureModel>(), TimeStamp = quantum.Timestamp, Effects = new List<AccountEffects>() });
             }
 
             context.PersistentStorage.SaveBatch(items);
 
-            var random = new Random();
             for (var i = 0ul; i < context.QuantumHandler.CurrentApex;)
             {
-                var quanta = context.SyncStorage.GetQuanta(i, random.Next(200, 500));
-                foreach (var q in quanta)
+                var quantaData = context.SyncStorage.GetQuanta(i, SyncStorage.PortionSize > context.QuantumHandler.CurrentApex);
+                var envelope = XdrConverter.Deserialize<MessageEnvelopeBase>(quantaData.Data);
+                var quanta = (SyncQuantaBatch)envelope.Message;
+                foreach (var q in quanta.Quanta)
                 {
                     Assert.AreEqual(((Quantum)q.Quantum).Apex, ++i);
                 }

@@ -153,11 +153,9 @@ namespace Centaurus
                 using (var writer = new XdrBufferWriter(outgoingBuffer.Buffer))
                 {
                     XdrConverter.Serialize(envelope, writer);
-                    if (webSocket == null)
-                        throw new ObjectDisposedException(nameof(webSocket));
-                    if (webSocket.State == WebSocketState.Open)
-                        await webSocket.SendAsync(outgoingBuffer.Buffer.AsMemory(0, writer.Length), WebSocketMessageType.Binary, true, cancellationToken);
                     Context.ExtensionsManager.AfterSendMessage(this, envelope);
+
+                    await SendRawMessageInternal(outgoingBuffer.Buffer.AsMemory(0, writer.Length));
 
                     if (!(envelope.Message is AuditorPerfStatistics))
                         logger.Trace($"Connection {PubKeyAddress}, message {envelope.Message.GetMessageType()} sent. Size: {writer.Length}");
@@ -182,6 +180,32 @@ namespace Centaurus
             {
                 sendMessageSemaphore.Release();
             }
+        }
+
+        public async Task SendMessage(Memory<byte> message)
+        {
+            await sendMessageSemaphore.WaitAsync();
+            try
+            {
+                await SendRawMessageInternal(message);
+            }
+            //TODO: log failed messages
+            catch (OperationCanceledException) { }
+            catch (WebSocketException exc)
+            {
+                if (!(exc.WebSocketErrorCode == WebSocketError.InvalidState && cancellationToken.IsCancellationRequested))
+                    throw;
+            }
+            finally
+            {
+                sendMessageSemaphore.Release();
+            }
+        }
+
+        private async Task SendRawMessageInternal(Memory<byte> message)
+        {
+            if (webSocket.State == WebSocketState.Open)
+                await webSocket.SendAsync(message, WebSocketMessageType.Binary, true, cancellationToken);
         }
 
         public async Task Listen()
