@@ -9,10 +9,10 @@ namespace Centaurus.Test
     public class LoadEffectsTests
     {
         [SetUp]
-        public void Setup()
+        public async Task Setup()
         {
             EnvironmentHelper.SetTestEnvironmentVariable();
-            context = GlobalInitHelper.DefaultAlphaSetup().Result;
+            context = await GlobalInitHelper.DefaultAlphaSetup();
         }
 
         static object[] EffectsLoadTestCases = new object[]

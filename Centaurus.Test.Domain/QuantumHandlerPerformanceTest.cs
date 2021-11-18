@@ -15,10 +15,10 @@ namespace Centaurus.Test
         private ExecutionContext context;
 
         [SetUp]
-        public void Setup()
+        public async Task Setup()
         {
             EnvironmentHelper.SetTestEnvironmentVariable();
-            context = GlobalInitHelper.DefaultAlphaSetup().Result;
+            context = await GlobalInitHelper.DefaultAlphaSetup();
         }
 
 

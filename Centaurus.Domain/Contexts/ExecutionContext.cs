@@ -294,7 +294,6 @@ namespace Centaurus.Domain
             ExtensionsManager?.Dispose();
             PaymentProvidersManager?.Dispose();
 
-            QuantumHandler.Dispose();
             ResultManager.Dispose();
             DisposeAnalyticsManager();
             PerformanceStatisticsManager?.Dispose();

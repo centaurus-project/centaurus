@@ -15,10 +15,10 @@ namespace Centaurus.Test
     public abstract class BaseQuantumHandlerTests
     {
         [OneTimeSetUp]
-        public void Setup()
+        public async Task Setup()
         {
             EnvironmentHelper.SetTestEnvironmentVariable();
-            context = GlobalInitHelper.DefaultAlphaSetup().Result;
+            context = await GlobalInitHelper.DefaultAlphaSetup();
         }
 
         [OneTimeTearDown]

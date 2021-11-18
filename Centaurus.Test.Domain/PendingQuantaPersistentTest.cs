@@ -16,11 +16,11 @@ namespace Centaurus.Test
         private ExecutionContext context;
 
         [SetUp]
-        public void Setup()
+        public async Task Setup()
         {
             settings = GlobalInitHelper.GetAlphaSettings();
             storage = new MockStorage();
-            context = GlobalInitHelper.DefaultAlphaSetup(storage, settings).Result;
+            context = await GlobalInitHelper.DefaultAlphaSetup(storage, settings);
         }
 
         [TearDown]

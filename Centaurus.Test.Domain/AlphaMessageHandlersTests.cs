@@ -13,10 +13,10 @@ namespace Centaurus.Test
     public class AlphaMessageHandlersTests : BaseMessageHandlerTests
     {
         [OneTimeSetUp]
-        public void Setup()
+        public async Task Setup()
         {
             EnvironmentHelper.SetTestEnvironmentVariable();
-            context = GlobalInitHelper.DefaultAlphaSetup().Result;
+            context = await GlobalInitHelper.DefaultAlphaSetup();
         }
 
         [OneTimeTearDown]
@@ -84,7 +84,7 @@ namespace Centaurus.Test
                 .GetField("handshakeData", BindingFlags.Instance | BindingFlags.NonPublic)
                 .GetValue(connection);
 
-            var message = new AuditorHandshakeResponse { HandshakeData = handshakeData };
+            var message = new AuditorHandshakeResponse { HandshakeData = handshakeData, Cursors = new List<SyncCursor>(), State = State.Running };
             var envelope = message.CreateEnvelope();
             envelope.Sign(clientKeyPair);
 

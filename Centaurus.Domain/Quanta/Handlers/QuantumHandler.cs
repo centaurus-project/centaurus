@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public class QuantumHandler : ContextualBase, IDisposable
+    public class QuantumHandler : ContextualBase
     {
         public QuantumHandler(ExecutionContext context, ulong lastApex, byte[] lastQuantumHash)
             : base(context)
@@ -229,11 +229,6 @@ namespace Centaurus.Domain
             else if (quantum is ConstellationQuantum constellationQuantum)
                 return constellationQuantum.RequestMessage.GetMessageType();
             return quantum.GetType().Name;
-        }
-
-        public void Dispose()
-        {
-            //awaitedQuanta.Dispose();
         }
 
         class QuantumValidationException : Exception
