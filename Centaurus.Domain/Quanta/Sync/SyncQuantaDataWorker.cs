@@ -1,10 +1,8 @@
-﻿using Centaurus.Domain;
-using Centaurus.Domain.Quanta.Sync;
+﻿using Centaurus.Domain.Quanta.Sync;
 using Centaurus.Models;
 using NLog;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,14 +13,12 @@ namespace Centaurus.Domain
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public SyncQuantaDataWorker(Domain.ExecutionContext context)
+        public SyncQuantaDataWorker(ExecutionContext context)
             : base(context)
         {
-            batchSize = Context.Settings.SyncBatchSize;
             Task.Factory.StartNew(SyncQuantaData);
         }
 
-        private readonly int batchSize;
         private CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
 
 
@@ -57,7 +53,7 @@ namespace Centaurus.Domain
             if (cursor.HasValue && cursor.Value < Context.QuantumHandler.CurrentApex)
             {
                 var cursorToLookup = cursor.Value + 1;
-                var quantaCursor = cursorToLookup - cursorToLookup % SyncStorage.PortionSize;
+                var quantaCursor = cursorToLookup - cursorToLookup % (ulong)Context.SyncStorage.PortionSize;
                 if (!cursors.TryGetValue(cursorToLookup, out var currentCursorGroup))
                 {
                     currentCursorGroup = new AuditorCursorGroup(cursorType, quantaCursor);
@@ -125,7 +121,7 @@ namespace Centaurus.Domain
                                     }
                                     return new AuditorSyncCursorUpdate(currentAuditor.Connection, 
                                         new SyncCursorUpdate(currentAuditor.TimeToken, (ulong?)lastBatchApex, cursorType)
-                                        );
+                                    );
                                 })
                         );
                 }

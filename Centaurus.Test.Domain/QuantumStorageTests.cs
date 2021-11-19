@@ -64,7 +64,7 @@ namespace Centaurus.Test
 
             for (var i = 0ul; i < context.QuantumHandler.CurrentApex;)
             {
-                var quantaData = context.SyncStorage.GetQuanta(i, SyncStorage.PortionSize > context.QuantumHandler.CurrentApex);
+                var quantaData = context.SyncStorage.GetQuanta(i, (i + (ulong)context.SyncStorage.PortionSize) > context.QuantumHandler.CurrentApex);
                 var envelope = XdrConverter.Deserialize<MessageEnvelopeBase>(quantaData.Data);
                 var quanta = (SyncQuantaBatch)envelope.Message;
                 foreach (var q in quanta.Quanta)

@@ -57,6 +57,8 @@ namespace Centaurus.Domain
 
             SyncQuantaDataWorker = new SyncQuantaDataWorker(this);
 
+            ProxyWorker = new ProxyWorker(this);
+
             Catchup = new Catchup(this);
 
             StateManager = new StateManager(this);
@@ -348,7 +350,7 @@ namespace Centaurus.Domain
         public InfoConnectionManager InfoConnectionManager { get; }
 
         public SyncQuantaDataWorker SyncQuantaDataWorker { get; }
-
+        public ProxyWorker ProxyWorker { get; }
         public Catchup Catchup { get; }
 
         public InfoCommandsHandlers InfoCommandsHandlers { get; }

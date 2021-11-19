@@ -47,6 +47,7 @@ namespace Centaurus.Test
             settings.GenesisAuditors = new[] { TestEnvironment.AlphaKeyPair.AccountId, TestEnvironment.Auditor1KeyPair.AccountId }.Select(a => new Settings.Auditor($"{a}={a}.com")).ToList();
             settings.Secret = secret;
             settings.ParticipationLevel = 1;
+            settings.SyncBatchSize = 500;
         }
 
         public static List<KeyPair> GetPredefinedClients()

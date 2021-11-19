@@ -21,6 +21,8 @@ namespace Centaurus.Domain
         {
             context.PendingUpdatesManager.OnBatchSaved += PendingUpdatesManager_OnBatchSaved;
 
+            PortionSize = Context.Settings.SyncBatchSize;
+
             var batchId = GetBatchApexStart(lastApex);
             //load current quanta batch
             GetBatch(batchId);
@@ -30,7 +32,7 @@ namespace Centaurus.Domain
 
         public const int BatchSize = 1_000_000;
 
-        public const int PortionSize = 500;
+        public int PortionSize { get; }
 
         /// <summary>
         /// 
@@ -229,18 +231,18 @@ namespace Centaurus.Domain
                 signatures.Insert(0, null);
             }
 
-            return new SyncStorageItem(Context, batchStartApex, quanta, signatures);
+            return new SyncStorageItem(Context, batchStartApex, PortionSize, quanta, signatures);
         }
 
         class SyncStorageItem: ContextualBase
         {
-            public SyncStorageItem(ExecutionContext context, ulong batchId, List<SyncQuantaBatchItem> quanta, List<QuantumSignatures> signatures)
+            public SyncStorageItem(ExecutionContext context, ulong batchId, int portionSize, List<SyncQuantaBatchItem> quanta, List<QuantumSignatures> signatures)
                 :base(context)
             {
                 BatchStart = batchId;
                 BatchEnd = batchId + BatchSize - 1; //batch start is inclusive
-                Quanta = new ApexItemsBatch<SyncQuantaBatchItem>(Context, batchId, BatchSize, PortionSize, quanta);
-                Signatures = new ApexItemsBatch<QuantumSignatures>(Context, batchId, BatchSize, PortionSize, signatures);
+                Quanta = new ApexItemsBatch<SyncQuantaBatchItem>(Context, batchId, BatchSize, portionSize, quanta);
+                Signatures = new ApexItemsBatch<QuantumSignatures>(Context, batchId, BatchSize, portionSize, signatures);
             }
 
             public ApexItemsBatch<QuantumSignatures> Signatures { get; }

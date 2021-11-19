@@ -23,18 +23,13 @@ namespace Centaurus.Domain
         {
             if (Context.IsAlpha)
             {
-                Context.QuantumHandler.HandleAsync(GetQuantum(connection, message), Task.FromResult(true));
+                Context.QuantumHandler.HandleAsync(RequestQuantumHelper.GetQuantum(message.Envelope), Task.FromResult(true));
             }
             else
             {
-                //TODO: send it to Alpha
+                Context.ProxyWorker.AddRequestsToQueue(message.Envelope);
             }
             return Task.CompletedTask;
-        }
-
-        protected virtual Quantum GetQuantum(ConnectionBase connection, IncomingMessage message)
-        {
-            return new RequestQuantum { RequestEnvelope = message.Envelope };
         }
     }
 }

@@ -226,7 +226,7 @@ namespace Centaurus.Domain
                     {
                         if (!(auditorState.Value.CurrentState == State.Ready || auditorState.Value.CurrentState == State.Running))
                             continue;
-                        if (Context.Constellation.Alpha == auditorState.Key)
+                        if (Context.Constellation.Alpha.Equals(auditorState.Key))
                             isAlphaReady = true;
                         connectedCount++;
                     }

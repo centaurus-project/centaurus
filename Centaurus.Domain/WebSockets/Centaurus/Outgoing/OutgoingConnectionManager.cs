@@ -63,6 +63,13 @@ namespace Centaurus.Domain
             await Task.WhenAll(sendTasks);
         }
 
+        public async Task SendTo(RawPubKey rawPubKey, MessageEnvelopeBase message)
+        {
+            if (!connections.TryGetValue(rawPubKey, out var connection))
+                throw new Exception($"Connection {rawPubKey} is not found.");
+            await connection.SendMessage(message);
+        }
+
         public void CloseAllConnections()
         {
             foreach (var connection in connections.Values)

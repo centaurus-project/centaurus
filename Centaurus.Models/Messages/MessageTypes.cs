@@ -118,7 +118,7 @@ namespace Centaurus.Models
         /// <summary>
         /// Contains batch of quanta, that were processed by Alpha
         /// </summary>
-        AlphaQuantaBatch = 214,
+        SyncQuantaBatch = 214,
         /// <summary>
         /// Contains majority of signatures for quanta (except Alpha signatures, it will be send with quantum)
         /// </summary>
@@ -126,6 +126,10 @@ namespace Centaurus.Models
         /// <summary>
         /// Contains an array of the current auditor's quantum signatures
         /// </summary>
-        AuditorSignaturesBatch = 216
+        AuditorSignaturesBatch = 216,
+        /// <summary>
+        /// Contains an array of the client requests that must be resent to Alpha
+        /// </summary>
+        RequestQuantaBatch = 220
     }
 }
