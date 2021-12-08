@@ -8,11 +8,11 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public class AlphaQuantaBatchHandler : MessageHandlerBase<OutgoingConnection>
+    internal class SyncQuantaBatchHandler : MessageHandlerBase<OutgoingConnection>
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public AlphaQuantaBatchHandler(ExecutionContext context)
+        public SyncQuantaBatchHandler(ExecutionContext context)
             : base(context)
         {
         }
@@ -33,9 +33,6 @@ namespace Centaurus.Domain
             var quantumHandler = Context.QuantumHandler;
             var quantaBatch = (SyncQuantaBatch)message.Envelope.Message;
 
-            //update alpha apex
-            Context.StateManager.UpdateAlphaApex(quantaBatch.LastKnownApex);
-
             //get last known apex
             var lastKnownApex = quantumHandler.LastAddedQuantumApex;
 
@@ -53,7 +50,7 @@ namespace Centaurus.Domain
                 {
                     await connection.SendMessage(new SyncCursorReset
                     {
-                        SyncCursors = new List<SyncCursor> {
+                        Cursors = new List<SyncCursor> {
                             new SyncCursor {
                                 Type = XdrSyncCursorType.Quanta,
                                 Cursor = quantumHandler.LastAddedQuantumApex
@@ -68,7 +65,7 @@ namespace Centaurus.Domain
                 Context.ResultManager.Add(new QuantumSignatures
                 {
                     Apex = quantum.Apex,
-                    Signatures = new List<AuditorSignatureInternal> { processedQuantum.AlphaSignature }
+                    Signatures = new List<NodeSignatureInternal> { processedQuantum.AlphaSignature }
                 });
                 lastKnownApex = quantum.Apex;
             }

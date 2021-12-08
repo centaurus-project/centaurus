@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Test
 {
-    public class QuantumHandlerPerformanceTest : BaseMessageHandlerTests
+    internal class QuantumHandlerPerformanceTest : BaseMessageHandlerTests
     {
         private ExecutionContext context;
 

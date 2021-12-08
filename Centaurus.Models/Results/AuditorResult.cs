@@ -12,6 +12,6 @@ namespace Centaurus.Models
         public ulong Apex { get; set; }
 
         [XdrField(1)]
-        public AuditorSignatureInternal Signature { get; set; }
+        public NodeSignatureInternal Signature { get; set; }
     }
 }

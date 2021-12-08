@@ -6,7 +6,7 @@ using Centaurus.Models;
 
 namespace Centaurus.Domain
 {
-    public class OrderMessageHandler : QuantumHandlerBase
+    internal class OrderMessageHandler : QuantumHandlerBase
     {
         public OrderMessageHandler(ExecutionContext context) 
             : base(context)

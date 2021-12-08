@@ -9,42 +9,18 @@ using System.Timers;
 
 namespace Centaurus.Domain
 {
-    public class PerformanceStatisticsManager : ContextualBase, IDisposable
+    internal class PerformanceStatisticsManager : ContextualBase, IDisposable
     {
         const int updateInterval = 1000;
-
-        static Logger logger = LogManager.GetCurrentClassLogger();
 
         public PerformanceStatisticsManager(ExecutionContext context)
             : base(context)
         {
-            updateTimer = new System.Timers.Timer();
+            updateTimer = new Timer();
             updateTimer.Interval = updateInterval;
             updateTimer.AutoReset = false;
             updateTimer.Elapsed += UpdateTimer_Elapsed;
             updateTimer.Start();
-        }
-
-        public void OnBatchSaved(BatchSavedInfo batchInfo)
-        {
-            lock (syncRoot)
-            {
-                LastBatchInfos.Add(batchInfo);
-                if (LastBatchInfos.Count > 20)
-                    LastBatchInfos.RemoveAt(0);
-            }
-        }
-
-        public void AddAuditorStatistics(string accountId, AuditorPerfStatistics message)
-        {
-            lock (auditorsStatistics)
-                auditorsStatistics[accountId] = message.FromModel(accountId);
-        }
-
-        public void RemoveAuditorStatistics(string accountId)
-        {
-            lock (auditorsStatistics)
-                auditorsStatistics.Remove(accountId);
         }
 
         public void Dispose()
@@ -53,122 +29,66 @@ namespace Centaurus.Domain
             {
                 updateTimer?.Stop();
                 updateTimer?.Dispose();
-                updateTimer = null;
             }
         }
 
-        List<Apex> RecentApexes = new List<Apex>();
-        List<BatchSavedInfo> LastBatchInfos = new List<BatchSavedInfo>();
-        List<int> LastQuantaQueueLengths = new List<int>();
+        private object syncRoot = new { };
+        private readonly Timer updateTimer;
 
-        object syncRoot = new { };
-        Timer updateTimer;
-
-        void UpdateTimer_Elapsed(object sender, ElapsedEventArgs e)
+        private void UpdateTimer_Elapsed(object sender, ElapsedEventArgs e)
         {
-            if (Context.StateManager.State == State.Running 
-                || Context.StateManager.State == State.Ready 
-                || Context.StateManager.State == State.Chasing)
+            if (Context.NodesManager.CurrentNode.State != State.Undefined)
             {
                 lock (syncRoot)
-                    CollectStatistics();
+                    SendToSubscribers();
             }
             updateTimer?.Start();
         }
 
-        Dictionary<string, AuditorPerformanceStatistics> auditorsStatistics { get; set; } = new Dictionary<string, AuditorPerformanceStatistics>();
-        List<AuditorPerformanceStatistics> GetAuditorsStatistics()
+        private List<PerformanceStatistics> GetStatistics()
         {
-            lock (auditorsStatistics)
-            {
-                var auditorConnections = Context.IncomingConnectionManager.GetAuditorConnections();
-                foreach (var auditorConnection in auditorConnections)
-                {
-                    var accountId = auditorConnection?.PubKeyAddress;
-                    if (!auditorsStatistics.TryGetValue(accountId, out var statistics))
-                        continue;
-                    var auditorApex = auditorConnection.CurrentQuantaCursor;
-                    if (auditorApex >= 0)
-                        statistics.Delay = (int)(Context.QuantumHandler.CurrentApex - auditorApex);
-                }
-                return auditorsStatistics.Values.ToList();
-            }
+            var statistics = GetRemoteNodesStatistics();
+            statistics.Insert(0, GetNodeStatistics(Context.NodesManager.CurrentNode));
+            return statistics;
         }
 
-        void CollectStatistics()
+        private List<PerformanceStatistics> GetRemoteNodesStatistics()
         {
-            try
+            var nodes = Context.NodesManager.GetRemoteNodes();
+            var statistics = new List<PerformanceStatistics>();
+            foreach (var node in nodes)
             {
-                var current = new AuditorPerfStatistics
-                {
-                    BatchInfos = GetBatchInfos().Select(b => b.ToBatchSavedInfoModel()).ToList(),
-                    QuantaPerSecond = GetItemsPerSecond(),
-                    QuantaQueueLength = GetQuantaAvgLength(),
-                    UpdateDate = DateTime.UtcNow.Ticks,
-                    State = Context.StateManager.State
-                };
-                AddAuditorStatistics(Context.Settings.KeyPair.AccountId, current);
+                var nodeStatistics = GetNodeStatistics(node);
+                statistics.Add(nodeStatistics);
+            }
+            return statistics;
+        }
 
-                Notifier.NotifyAuditors(Context, current.CreateEnvelope<MessageEnvelopeSignless>());
-                SendToSubscribers();
-            }
-            catch (Exception exc)
+        private PerformanceStatistics GetNodeStatistics(NodeBase node)
+        {
+            var accountId = node.PubKey.GetAccountId();
+            var lastApex = node.LastApex;
+            var nodeStatistics = new PerformanceStatistics
             {
-                logger.Error(exc);
-            }
+                PublicKey = accountId,
+                Apex = lastApex,
+                PersistedApex = node.LastPersistedApex,
+                QuantaPerSecond = node.QuantaPerSecond,
+                QuantaQueueLength = node.QuantaQueueLength,
+                //Throttling = GetThrottling(),
+                UpdateDate = DateTime.UtcNow,
+                State = (int)node.State,
+                ApexDiff = (long)(Context.QuantumHandler.CurrentApex - node.LastApex)
+            };
+            return nodeStatistics;
         }
 
         void SendToSubscribers()
         {
             if (!Context.SubscriptionsManager.TryGetSubscription(PerformanceStatisticsSubscription.SubscriptionName, out var subscription))
                 return;
-            var statistics = new AlphaPerformanceStatistics
-            {
-                QuantaPerSecond = GetItemsPerSecond(),
-                QuantaQueueLength = GetQuantaAvgLength(),
-                Throttling = GetThrottling(),
-                AuditorStatistics = GetAuditorsStatistics(),
-                BatchInfos = GetBatchInfos(),
-                UpdateDate = DateTime.UtcNow,
-                State = (int)Context.StateManager.State
-            };
-            Context.InfoConnectionManager.SendSubscriptionUpdate(subscription, PerformanceStatisticsUpdate.Generate(statistics, PerformanceStatisticsSubscription.SubscriptionName));
-        }
 
-        int GetQuantaAvgLength()
-        {
-            LastQuantaQueueLengths.Add(Context.QuantumHandler.QuantaQueueLenght);
-            if (LastQuantaQueueLengths.Count > 20)
-                LastQuantaQueueLengths.RemoveAt(0);
-            return (int)Math.Floor(decimal.Divide(LastQuantaQueueLengths.Sum(), LastQuantaQueueLengths.Count));
-        }
-
-        int GetThrottling()
-        {
-            return QuantaThrottlingManager.Current.IsThrottlingEnabled ? QuantaThrottlingManager.Current.MaxItemsPerSecond : 0;
-        }
-
-        int GetItemsPerSecond()
-        {
-            RecentApexes.Add(new Apex { UpdatedAt = DateTime.UtcNow, CurrentApex = Context.QuantumHandler.CurrentApex });
-            if (RecentApexes.Count > 20)
-                RecentApexes.RemoveAt(0);
-
-            if (RecentApexes.Count < 2)
-                return 0;
-            var lastItem = RecentApexes.Last();
-            var firstItem = RecentApexes.First();
-            var timeDiff = (decimal)(lastItem.UpdatedAt - firstItem.UpdatedAt).TotalMilliseconds;
-            return (int)(decimal.Divide(lastItem.CurrentApex - firstItem.CurrentApex, timeDiff) * 1000);
-        }
-
-        List<BatchSavedInfo> GetBatchInfos() => LastBatchInfos;
-
-        class Apex
-        {
-            public ulong CurrentApex { get; set; }
-
-            public DateTime UpdatedAt { get; set; }
+            Context.InfoConnectionManager.SendSubscriptionUpdate(subscription, PerformanceStatisticsUpdate.Generate(GetStatistics(), PerformanceStatisticsSubscription.SubscriptionName));
         }
     }
 }

@@ -7,21 +7,20 @@ namespace Centaurus.Models
     public enum State
     {
         Undefined = 0,
+        WaitingForInit = 1,
+        Rising = 2,
         /// <summary>
         /// It has started, but not yet ready. If Alpha, then it waits for the majority to connect. If the Auditor, then it waits for a handshake
         /// </summary>
-        Running = 1,
-        /// <summary>
-        /// Ready to process quanta
-        /// </summary>
-        Ready = 2,
-
-        Rising = 3,
-
+        Running = 3,
         /// <summary>
         /// Auditor is delayed
         /// </summary>
         Chasing = 4,
+        /// <summary>
+        /// Ready to process quanta
+        /// </summary>
+        Ready = 5,
 
         Failed = 10,
 

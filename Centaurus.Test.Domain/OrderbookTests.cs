@@ -50,12 +50,12 @@ namespace Centaurus.Test
             account2.CreateBalance(secondAsset);
             account2.GetBalance(secondAsset).UpdateBalance(10000000000, UpdateSign.Plus);
 
-            context.Setup(new Snapshot
+            context.Init(new Snapshot
             {
                 Accounts = new List<Account> { account1, account2 },
                 Apex = 0,
                 Orders = new List<OrderWrapper>(),
-                Settings = new ConstellationSettings
+                ConstellationSettings = new ConstellationSettings
                 {
                     Providers = new List<ProviderSettings> {
                         new ProviderSettings {

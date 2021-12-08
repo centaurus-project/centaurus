@@ -73,8 +73,6 @@ namespace Centaurus.Alpha
                 }).Build();
         }
 
-        public static State[] ValidStates = new State[] { State.Rising, State.Running, State.Ready };
-
         private void SetupCertificate(Settings alphaSettings)
         {
             if (!alphaSettings.UseSecureConnection)
@@ -169,9 +167,7 @@ namespace Centaurus.Alpha
             static async Task CentaurusWebSocketHandler(HttpContext context, Func<Task> next)
             {
                 var centaurusContext = context.RequestServices.GetService<ExecutionContext>();
-                if (centaurusContext.StateManager != null 
-                    && ValidStates.Contains(centaurusContext.StateManager.State) 
-                    && TryGetPubKey(context, out var pubKey))
+                if (TryGetPubKey(context, out var pubKey))
                 {
                     using (var webSocket = await context.WebSockets.AcceptWebSocketAsync())
                         await centaurusContext.IncomingConnectionManager.OnNewConnection(webSocket,

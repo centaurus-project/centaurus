@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public class IncomingConnectionBase : ConnectionBase
+    internal abstract class IncomingConnectionBase : ConnectionBase
     {
         public IncomingConnectionBase(ExecutionContext context, KeyPair keyPair, WebSocket webSocket, string ip)
             : base(context, keyPair, webSocket)

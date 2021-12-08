@@ -10,7 +10,7 @@ namespace Centaurus.Domain
     /// <summary>
     /// This handler should handle all quantum requests
     /// </summary>
-    public abstract class QuantumHandlerBase : MessageHandlerBase
+    internal abstract class QuantumHandlerBase : MessageHandlerBase
     {
         protected QuantumHandlerBase(ExecutionContext context)
             : base(context)

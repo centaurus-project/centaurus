@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public class ResultBatchHandler : MessageHandlerBase
+    internal class ResultBatchHandler : MessageHandlerBase
     {
         public ResultBatchHandler(ExecutionContext context)
             : base(context)
@@ -24,7 +24,7 @@ namespace Centaurus.Domain
                 Context.ResultManager.Add(new QuantumSignatures
                 {
                     Apex = result.Apex,
-                    Signatures = new List<AuditorSignatureInternal> { result.Signature }
+                    Signatures = new List<NodeSignatureInternal> { result.Signature }
                 });
             return Task.CompletedTask;
         }

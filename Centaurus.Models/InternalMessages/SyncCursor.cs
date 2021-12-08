@@ -19,7 +19,7 @@ namespace Centaurus.Models
         /// Set to false, to cancel sync.
         /// </summary>
         [XdrField(2)]
-        public bool ClearCursor { get; set; }
+        public bool DisableSync { get; set; }
     }
 
     public enum XdrSyncCursorType

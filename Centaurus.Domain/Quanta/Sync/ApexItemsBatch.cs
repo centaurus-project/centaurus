@@ -1,4 +1,5 @@
 ﻿using Centaurus.Models;
+using NLog;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -11,6 +12,7 @@ namespace Centaurus.Domain.Quanta.Sync
     public partial class ApexItemsBatch<T>: ContextualBase
         where T : IApex
     {
+        static Logger logger = LogManager.GetCurrentClassLogger();
         public ApexItemsBatch(ExecutionContext context, ulong start, int size, int portionSize, List<T> initData)
             :base(context)
         {
@@ -100,9 +102,8 @@ namespace Centaurus.Domain.Quanta.Sync
                 {
                     AddToData(nextItem, item);
                     if (!outrunData.Remove(nextItem))
-                    {
-                        Console.WriteLine("Unable to remove.");
-                    }
+                        logger.Error($"Unable to remove item from outrun data. {typeof(T).Name} batch, id: {Start}.");
+
                     return true;
                 }
             }

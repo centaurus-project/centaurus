@@ -8,32 +8,17 @@ namespace Centaurus.Domain
 {
     public static class SyncCursorUpdateExtensions
     {
-        public static List<SyncCursorUpdate> ToDomainModel(this List<SyncCursor> syncCursors)
+        public static SyncCursorType ToDomainCursorType(this XdrSyncCursorType syncCursorType)
         {
-            if (syncCursors == null)
-                throw new ArgumentNullException(nameof(syncCursors));
-
-            var cursors = new List<SyncCursorUpdate>();
-
-            foreach (var cursorReset in syncCursors)
+            switch (syncCursorType)
             {
-                var cursorType = default(SyncCursorType);
-                switch (cursorReset.Type)
-                {
-                    case XdrSyncCursorType.Quanta:
-                        cursorType = SyncCursorType.Quanta;
-                        break;
-                    case XdrSyncCursorType.Signatures:
-                        cursorType = SyncCursorType.Signatures;
-                        break;
-                    default:
-                        throw new ArgumentNullException($"{cursorReset.Type} cursor type is not supported.");
-                }
-                var cursor = cursorReset.ClearCursor ? null : (ulong?)cursorReset.Cursor;
-                cursors.Add(new SyncCursorUpdate(default(DateTime), cursor, cursorType));
+                case XdrSyncCursorType.Quanta:
+                    return SyncCursorType.Quanta;
+                case XdrSyncCursorType.Signatures:
+                    return SyncCursorType.Signatures;
+                default:
+                    throw new ArgumentNullException($"{syncCursorType} cursor type is not supported.");
             }
-
-            return cursors;
         }
     }
 }

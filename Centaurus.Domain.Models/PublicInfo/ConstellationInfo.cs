@@ -1,9 +1,13 @@
 ﻿using Centaurus.Models;
 
-namespace Centaurus
+namespace Centaurus.Domain.Models
 {
     public class ConstellationInfo
     {
+        public ulong Apex { get; set; }
+
+        public string PubKey { get; set; }
+
         public State State { get; set; }
 
         public ProviderSettings[] Providers { get; set; }

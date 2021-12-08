@@ -9,7 +9,7 @@ namespace Centaurus.Domain.Models
 
         public byte[] LastHash { get; set; }
 
-        public ConstellationSettings Settings { get; set; }
+        public ConstellationSettings ConstellationSettings { get; set; }
 
         public List<Account> Accounts { get; set; }
 

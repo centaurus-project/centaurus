@@ -26,7 +26,7 @@ namespace Centaurus.Domain
                 Apex = apex,
                 Accounts = accounts ?? throw new ArgumentNullException(nameof(accounts)),
                 Orders = orders ?? throw new ArgumentNullException(nameof(orders)),
-                Settings = settings ?? throw new ArgumentNullException(nameof(settings)),
+                ConstellationSettings = settings ?? throw new ArgumentNullException(nameof(settings)),
                 Cursors = cursors ?? throw new ArgumentNullException(nameof(cursors)),
                 LastHash = quantumHash ?? throw new ArgumentNullException(nameof(quantumHash))
             };

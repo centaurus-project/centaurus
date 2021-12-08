@@ -11,6 +11,8 @@ namespace Centaurus
     {
         private ManualResetEvent resetEvent;
 
+
+
         public Startup(Domain.ExecutionContext context, AlphaHostFactoryBase alphaHostFactory)
             : base(context)
         {
@@ -30,17 +32,14 @@ namespace Centaurus
             if (AlphaStartup != null)
                 AlphaStartup.Run();
 
-            Context.StateManager.StateChanged += Current_StateChanged;
+            Context.OnComplete += Context_OnComplete;
         }
 
-        private void Current_StateChanged(StateChangedEventArgs eventArgs)
+        private void Context_OnComplete()
         {
-            if (eventArgs.State == State.Failed)
-            {
-                var isSet = resetEvent.WaitOne(0);
-                if (!isSet)
-                    resetEvent.Set();
-            }
+            var isSet = resetEvent.WaitOne(0);
+            if (!isSet)
+                resetEvent.Set();
         }
 
         public void Shutdown()

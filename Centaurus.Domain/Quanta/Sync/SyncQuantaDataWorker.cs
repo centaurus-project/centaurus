@@ -1,4 +1,5 @@
 ﻿using Centaurus.Domain.Quanta.Sync;
+using Centaurus.Domain.StateManagers;
 using Centaurus.Models;
 using NLog;
 using System;
@@ -9,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public class SyncQuantaDataWorker : ContextualBase, IDisposable
+    internal partial class SyncQuantaDataWorker : ContextualBase, IDisposable
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
@@ -21,112 +22,140 @@ namespace Centaurus.Domain
 
         private CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
 
-
-        private bool IsAuditorReadyToHandleQuanta(IncomingAuditorConnection auditor)
+        private bool GetIsCurrentNodeReady()
         {
-            return auditor.ConnectionState == ConnectionState.Ready //connection is validated
-                && (auditor.AuditorState.IsRunning || auditor.AuditorState.IsWaitingForInit); //auditor is ready to handle quanta
+            var currentNode = Context.NodesManager.CurrentNode;
+            return currentNode.State == State.Running || currentNode.State == State.Ready;
         }
 
-        private bool IsCurrentNodeReady => Context.StateManager.State != State.Rising
-            && Context.StateManager.State != State.Undefined
-            && Context.StateManager.State != State.Failed;
-
-        private List<AuditorCursorGroup> GetCursors()
+        private List<CursorGroup> GetCursors()
         {
-            var auditorConnections = Context.IncomingConnectionManager.GetAuditorConnections();
-
-            var quantaCursors = new Dictionary<ulong, AuditorCursorGroup>();
-            var signaturesCursors = new Dictionary<ulong, AuditorCursorGroup>();
-            foreach (var connection in auditorConnections)
+            var nodes = Context.NodesManager.GetRemoteNodes();
+            var cursors = new Dictionary<string, CursorGroup>();
+            foreach (var node in nodes)
             {
-                var (quantaCursor, signaturesCursor, timeToken) = connection.GetCursors();
-                SetCursors(quantaCursors, connection, SyncCursorType.Quanta, quantaCursor, timeToken);
-                SetCursors(signaturesCursors, connection, SyncCursorType.Signatures, signaturesCursor, timeToken);
+                if (!node.IsReadyToHandleQuanta())
+                    continue;
+                var nodeCursors = node.GetActiveCursors();
+                SetNodeCursors(cursors, node, nodeCursors);
             }
 
-            return quantaCursors.Values.Union(signaturesCursors.Values).ToList();
+            return cursors.Values.ToList();
         }
 
-        private void SetCursors(Dictionary<ulong, AuditorCursorGroup> cursors, IncomingAuditorConnection connection, SyncCursorType cursorType, ulong? cursor, DateTime timeToken)
+        private void SetNodeCursors(Dictionary<string, CursorGroup> cursors, RemoteNode node, List<RemoteNodeCursor> nodeCursors)
         {
-            if (cursor.HasValue && cursor.Value < Context.QuantumHandler.CurrentApex)
+            foreach (var cursor in nodeCursors)
+                SetCursors(cursors, node, cursor.CursorType, cursor.Cursor, cursor.UpdateDate);
+        }
+
+        private void SetCursors(Dictionary<string, CursorGroup> cursors, RemoteNode node, SyncCursorType cursorType, ulong cursor, DateTime timeToken)
+        {
+            var cursorToLookup = cursor + 1;
+            var batchId = cursorToLookup - cursorToLookup % (ulong)Context.SyncStorage.PortionSize;
+            var groupId = $"{cursorType}-{batchId}";
+            if (!cursors.TryGetValue(groupId, out var currentCursorGroup))
             {
-                var cursorToLookup = cursor.Value + 1;
-                var quantaCursor = cursorToLookup - cursorToLookup % (ulong)Context.SyncStorage.PortionSize;
-                if (!cursors.TryGetValue(cursorToLookup, out var currentCursorGroup))
-                {
-                    currentCursorGroup = new AuditorCursorGroup(cursorType, quantaCursor);
-                    cursors.Add(cursorToLookup, currentCursorGroup);
-                }
-                currentCursorGroup.Auditors.Add(new AuditorCursorGroup.AuditorCursorData(connection, timeToken, cursor.Value));
-                if (currentCursorGroup.LastUpdate == default || currentCursorGroup.LastUpdate > timeToken)
-                    currentCursorGroup.LastUpdate = timeToken;
+                currentCursorGroup = new CursorGroup(cursorType, batchId);
+                cursors.Add(groupId, currentCursorGroup);
             }
+            currentCursorGroup.Nodes.Add(new NodeCursorData(node, timeToken, cursor));
+            if (currentCursorGroup.LastUpdate == default || currentCursorGroup.LastUpdate > timeToken)
+                currentCursorGroup.LastUpdate = timeToken;
         }
 
         const int ForceTimeOut = 100;
 
-        private List<Task<AuditorSyncCursorUpdate>> SendQuantaData(List<AuditorCursorGroup> cursorGroups)
+        private List<Task<NodeSyncCursorUpdate>> SendQuantaData(List<CursorGroup> cursorGroups)
         {
-            var sendingQuantaTasks = new List<Task<AuditorSyncCursorUpdate>>();
+            var sendingQuantaTasks = new List<Task<NodeSyncCursorUpdate>>();
+
             foreach (var cursorGroup in cursorGroups)
             {
-                var currentCursor = cursorGroup.Cursor;
-                if (currentCursor == Context.QuantumHandler.CurrentApex)
-                    continue;
-                if (currentCursor > Context.QuantumHandler.CurrentApex && IsCurrentNodeReady)
-                {
-                    var message = $"Auditors {string.Join(',', cursorGroup.Auditors.Select(a => a.Connection.PubKeyAddress))} is above current constellation state.";
-                    if (cursorGroup.Auditors.Count >= Context.GetMajorityCount() - 1) //-1 is current server
-                        logger.Error(message);
-                    else
-                        logger.Info(message);
-                    continue;
-                }
-
-                var force = (DateTime.UtcNow - cursorGroup.LastUpdate).TotalMilliseconds > ForceTimeOut;
-
-                var batch = default(SyncPortion);
-                var cursorType = cursorGroup.CursorType;
-                switch (cursorType)
-                {
-                    case SyncCursorType.Quanta:
-                        batch = Context.SyncStorage.GetQuanta(currentCursor, force);
-                        break;
-                    case SyncCursorType.Signatures:
-                        batch = Context.SyncStorage.GetSignatures(currentCursor, force);
-                        break;
-                    default:
-                        throw new NotImplementedException($"{cursorType} cursor type is not supported.");
-                }
-
-                if (batch == null)
-                    continue;
-
-                var lastBatchApex = batch.LastDataApex;
-
-                foreach (var auditorConnection in cursorGroup.Auditors)
-                {
-                    var currentAuditor = auditorConnection;
-                    if (IsAuditorReadyToHandleQuanta(currentAuditor.Connection) && auditorConnection.Cursor < lastBatchApex)
-                        sendingQuantaTasks.Add(
-                            currentAuditor.Connection.SendMessage(batch.Data.AsMemory())
-                                .ContinueWith(t =>
-                                {
-                                    if (t.IsFaulted)
-                                    {
-                                        logger.Error(t.Exception, $"Unable to send quanta data to {currentAuditor.Connection.PubKeyAddress}. Cursor: {currentCursor}; CurrentApex: {Context.QuantumHandler.CurrentApex}");
-                                        return null;
-                                    }
-                                    return new AuditorSyncCursorUpdate(currentAuditor.Connection, 
-                                        new SyncCursorUpdate(currentAuditor.TimeToken, (ulong?)lastBatchApex, cursorType)
-                                    );
-                                })
-                        );
-                }
+                var cursorSendingTasks = ProcessCursorGroup(cursorGroup);
+                if (cursorSendingTasks.Count > 0)
+                    sendingQuantaTasks.AddRange(cursorSendingTasks);
             }
             return sendingQuantaTasks;
+        }
+
+        private List<Task<NodeSyncCursorUpdate>> ProcessCursorGroup(CursorGroup cursorGroup)
+        {
+            if (!(ValidateCursorGroup(cursorGroup) && TryGetBatch(cursorGroup, out var batch)))
+                return null;
+
+            var currentCursor = cursorGroup.BatchId;
+            var cursorType = cursorGroup.CursorType;
+
+            var lastBatchApex = batch.LastDataApex;
+
+            var sendingQuantaTasks = new List<Task<NodeSyncCursorUpdate>>();
+            foreach (var node in cursorGroup.Nodes)
+            {
+                var sendMessageTask = SendSingleBatch(batch, currentCursor, cursorType, node);
+                if (sendMessageTask != null)
+                    sendingQuantaTasks.Add(sendMessageTask);
+            }
+            return sendingQuantaTasks;
+        }
+
+        private static Task<NodeSyncCursorUpdate> SendSingleBatch(SyncPortion batch, ulong currentCursor, SyncCursorType cursorType, NodeCursorData currentAuditor)
+        {
+            var connection = currentAuditor.Node.GetConnection();
+            if (currentAuditor.Cursor < batch.LastDataApex || connection == null)
+                return null;
+            var sendMessageTask = connection.SendMessage(batch.Data.AsMemory());
+            return sendMessageTask.ContinueWith(t =>
+            {
+                if (!t.IsFaulted)
+                {
+                    HandleFaultedSendTask(t, currentCursor, batch, cursorType, currentAuditor);
+                    return null;
+                }
+                return new NodeSyncCursorUpdate(currentAuditor.Node,
+                    new SyncCursorUpdate(currentAuditor.TimeToken, batch.LastDataApex, cursorType)
+                );
+            });
+        }
+
+        private bool TryGetBatch(CursorGroup cursorGroup, out SyncPortion batch)
+        {
+            var force = (DateTime.UtcNow - cursorGroup.LastUpdate).TotalMilliseconds > ForceTimeOut;
+
+            switch (cursorGroup.CursorType)
+            {
+                case SyncCursorType.Quanta:
+                    batch = Context.SyncStorage.GetQuanta(cursorGroup.BatchId, force);
+                    break;
+                case SyncCursorType.Signatures:
+                    batch = Context.SyncStorage.GetSignatures(cursorGroup.BatchId, force);
+                    break;
+                default:
+                    throw new NotImplementedException($"{cursorGroup.CursorType} cursor type is not supported.");
+            }
+            return batch != null;
+        }
+
+        private bool ValidateCursorGroup(CursorGroup cursorGroup)
+        {
+            var currentCursor = cursorGroup.BatchId;
+            if (currentCursor == Context.QuantumHandler.CurrentApex)
+                return false;
+            if (currentCursor > Context.QuantumHandler.CurrentApex && GetIsCurrentNodeReady())
+            {
+                var message = $"Auditors {string.Join(',', cursorGroup.Nodes.Select(a => a.Node.AccountId))} is above current constellation state.";
+                if (cursorGroup.Nodes.Count >= Context.GetMajorityCount() - 1) //-1 is current server
+                    logger.Error(message);
+                else
+                    logger.Info(message);
+                return false;
+            }
+            return true;
+        }
+
+        private static void HandleFaultedSendTask(Task t, ulong currentCursor, SyncPortion batch, SyncCursorType cursorType, NodeCursorData currentAuditor)
+        {
+            logger.Error(t.Exception, $"Unable to send quanta data to {currentAuditor.Node.AccountId}. CursorType: {cursorType}; Cursor: {currentCursor}; CurrentApex: {batch.LastDataApex}");
         }
 
         private async Task SyncQuantaData()
@@ -137,75 +166,59 @@ namespace Centaurus.Domain
                 if (!hasPendingQuanta)
                     Thread.Sleep(50);
 
-                if (!Context.IsAlpha || !IsCurrentNodeReady)
+                if (!Context.IsAlpha || !GetIsCurrentNodeReady())
                 {
                     hasPendingQuanta = false;
                     continue;
                 }
 
-                try
-                {
-                    var cursors = GetCursors();
-
-                    var sendingQuantaTasks = SendQuantaData(cursors);
-
-                    if (sendingQuantaTasks.Count > 0)
-                    {
-                        hasPendingQuanta = true;
-
-                        var cursorUpdates = await Task.WhenAll(sendingQuantaTasks);
-                        var auditorUpdates = cursorUpdates.Where(u => u != null).GroupBy(u => u.Connection);
-                        foreach (var connection in auditorUpdates)
-                            connection.Key.SetSyncCursor(false, connection.Select(u => u.CursorUpdate).ToArray());
-                    }
-                }
-                catch (Exception exc)
-                {
-                    if (exc is ObjectDisposedException
-                    || exc.GetBaseException() is ObjectDisposedException)
-                        throw;
-                    logger.Error(exc, "Error on quanta data sync.");
-                }
+                hasPendingQuanta = await TrySendData();
             }
+        }
+
+        private async Task<bool> TrySendData()
+        {
+            var hasPendingQuanta = false;
+            try
+            {
+                var cursors = GetCursors();
+
+                var sendingQuantaTasks = SendQuantaData(cursors);
+                hasPendingQuanta = await HandleSendingTasks(sendingQuantaTasks);
+            }
+            catch (Exception exc)
+            {
+                if (exc is ObjectDisposedException
+                || exc.GetBaseException() is ObjectDisposedException)
+                    throw;
+                logger.Error(exc, "Error on quanta data sync.");
+            }
+
+            return hasPendingQuanta;
+        }
+
+        private static async Task<bool> HandleSendingTasks(List<Task<NodeSyncCursorUpdate>> sendingQuantaTasks)
+        {
+            var hasPendingQuanta = false;
+            if (sendingQuantaTasks.Count < 1)
+                return false;
+
+            var cursorUpdates = await Task.WhenAll(sendingQuantaTasks);
+            foreach (var cursorUpdate in cursorUpdates)
+            {
+                if (cursorUpdate == null)
+                    continue;
+                cursorUpdate.Node.SetCursor(cursorUpdate.CursorUpdate.CursorType, cursorUpdate.CursorUpdate.TimeToken, cursorUpdate.CursorUpdate.NewCursor);
+                hasPendingQuanta = true;
+            }
+
+            return hasPendingQuanta;
         }
 
         public void Dispose()
         {
             cancellationTokenSource.Cancel();
             cancellationTokenSource.Dispose();
-        }
-
-        class AuditorCursorGroup
-        {
-            public AuditorCursorGroup(SyncCursorType cursorType, ulong cursor)
-            {
-                CursorType = cursorType;
-                Cursor = cursor;
-            }
-
-            public SyncCursorType CursorType { get; }
-
-            public ulong Cursor { get; }
-
-            public DateTime LastUpdate { get; set; }
-
-            public List<AuditorCursorData> Auditors { get; } = new List<AuditorCursorData>();
-
-            public class AuditorCursorData
-            {
-                public AuditorCursorData(IncomingAuditorConnection connection, DateTime timeToken, ulong cursor)
-                {
-                    Connection = connection;
-                    TimeToken = timeToken;
-                    Cursor = cursor;
-                }
-
-                public IncomingAuditorConnection Connection { get; }
-
-                public DateTime TimeToken { get; }
-
-                public ulong Cursor { get; }
-            }
         }
     }
 }

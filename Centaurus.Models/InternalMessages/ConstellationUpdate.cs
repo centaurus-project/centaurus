@@ -5,7 +5,7 @@ using System.Text;
 
 namespace Centaurus.Models
 {
-    public class ConstellationUpdate : AlphaUpdate
+    public class ConstellationUpdate : AlphaUpdateBase
     {        
         [XdrField(0)]
         public List<ProviderSettings> Providers { get; set; }

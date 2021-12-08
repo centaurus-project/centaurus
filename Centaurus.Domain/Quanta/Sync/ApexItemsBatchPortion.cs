@@ -53,8 +53,7 @@ namespace Centaurus.Domain.Quanta.Sync
                             var items = quantaBatch.GetItems(Start, Size, true);
                             var batch = new SyncQuantaBatch
                             {
-                                Quanta = items,
-                                LastKnownApex = source.Context.QuantumHandler.CurrentApex
+                                Quanta = items
                             };
                             return new SyncPortion(batch.CreateEnvelope<MessageEnvelopeSignless>().ToByteArray(), items.Last().Apex);
                         }

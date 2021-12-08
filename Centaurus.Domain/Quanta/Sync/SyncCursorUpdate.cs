@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Centaurus.Domain.StateManagers;
+using System;
 
 namespace Centaurus.Domain.Quanta.Sync
 {
@@ -8,31 +9,31 @@ namespace Centaurus.Domain.Quanta.Sync
         Signatures = 1
     }
 
-    public class SyncCursorUpdate
+    internal class SyncCursorUpdate
     {
-        public SyncCursorUpdate(DateTime timeToken, ulong? newCursor, SyncCursorType cursorType)
+        public SyncCursorUpdate(DateTime timeToken, ulong newCursor, SyncCursorType cursorType)
         {
             NewCursor = newCursor;
             CursorType = cursorType;
             TimeToken = timeToken;
         }
 
-        public ulong? NewCursor { get; }
+        public ulong NewCursor { get; }
 
         public SyncCursorType CursorType { get; }
 
         public DateTime TimeToken { get; }
     }
 
-    public class AuditorSyncCursorUpdate
+    internal class NodeSyncCursorUpdate
     {
-        public AuditorSyncCursorUpdate(IncomingAuditorConnection connection, SyncCursorUpdate syncCursorUpdate)
+        public NodeSyncCursorUpdate(RemoteNode node, SyncCursorUpdate syncCursorUpdate)
         {
-            Connection = connection ?? throw new ArgumentNullException(nameof(connection));
+            Node = node ?? throw new ArgumentNullException(nameof(node));
             CursorUpdate = syncCursorUpdate ?? throw new ArgumentNullException(nameof(syncCursorUpdate));
         }
 
-        public IncomingAuditorConnection Connection { get; }
+        public RemoteNode Node { get; }
 
         public SyncCursorUpdate CursorUpdate { get; set; }
     }

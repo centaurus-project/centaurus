@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public class EffectsRequestMessageHandler : MessageHandlerBase<IncomingClientConnection>
+    internal class EffectsRequestMessageHandler : MessageHandlerBase<IncomingClientConnection>
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 

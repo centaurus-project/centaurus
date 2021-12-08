@@ -22,6 +22,6 @@ namespace Centaurus.Models
         /// Contains all quantum's signatures except Alpha
         /// </summary>
         [XdrField(1)]
-        public List<AuditorSignatureInternal> Signatures { get; set; }
+        public List<NodeSignatureInternal> Signatures { get; set; }
     }
 }

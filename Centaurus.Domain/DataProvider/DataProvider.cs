@@ -93,9 +93,9 @@ namespace Centaurus.Domain
             return Context.PersistentStorage.GetLastApex();
         }
 
-        public (Snapshot snapshot, List<PendingQuantum> pendingQuanta) GetPersistentData()
+        public (Snapshot snapshot, List<CatchupQuantaBatchItem> pendingQuanta) GetPersistentData()
         {
-            (Snapshot snapshot, List<PendingQuantum> pendingQuanta) data = default;
+            (Snapshot snapshot, List<CatchupQuantaBatchItem> pendingQuanta) data = default;
             var lastApex = GetLastApex();
             if (lastApex > 0)
                 data.snapshot = GetSnapshot(lastApex);
@@ -247,7 +247,7 @@ namespace Centaurus.Domain
                 Apex = apex,
                 Accounts = accountStorage.GetAll().OrderBy(a => a.Pubkey.ToString()).ToList(),
                 Orders = allOrders.OrderBy(o => o.OrderId).ToList(),
-                Settings = settings,
+                ConstellationSettings = settings,
                 LastHash = lastQuantumData.ComputeHash(),
                 Cursors = cursors
             };
@@ -259,12 +259,12 @@ namespace Centaurus.Domain
                 Context.PersistentStorage.SaveBatch(updates);
         }
 
-        public List<PendingQuantum> LoadPendingQuanta()
+        public List<CatchupQuantaBatchItem> LoadPendingQuanta()
         {
             var pendingQuantaModel = Context.PersistentStorage.LoadPendingQuanta();
             if (pendingQuantaModel == null)
                 return null;
-            return pendingQuantaModel.Quanta.Select(q => q.ToDomainModel()).ToList();
+            return pendingQuantaModel.Quanta.Select(q => q.ToCatchupQuantaBatchItem()).ToList();
         }
 
         /// <summary>

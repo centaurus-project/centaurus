@@ -14,7 +14,7 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Test
 {
-    public static class IntegrationTestEnvironmentExtensions
+    internal static class IntegrationTestEnvironmentExtensions
     {
         public static async Task InitConstellation(this IntegrationTestEnvironment environment)
         {
@@ -92,8 +92,8 @@ namespace Centaurus.Test
         {
             Func<Task<bool>> func = () =>
             {
-                TestContext.Out.WriteLine(startup.Context.StateManager.State);
-                return Task.FromResult(startup.Context.StateManager.State == targetState);
+                TestContext.Out.WriteLine(startup.Context.NodesManager.CurrentNode.State);
+                return Task.FromResult(startup.Context.NodesManager.CurrentNode.State == targetState);
             };
 
             await AssertDuringPeriod(
@@ -240,7 +240,7 @@ namespace Centaurus.Test
             while (environment.AlphaWrapper.Context.DataProvider.GetLastApex() != environment.AlphaWrapper.Context.QuantumHandler.CurrentApex)
                 Thread.Sleep(100);
 
-            context.Setup(environment.AlphaWrapper.Context.DataProvider.GetSnapshot(environment.AlphaWrapper.Context.QuantumHandler.CurrentApex));
+            context.Init(environment.AlphaWrapper.Context.DataProvider.GetSnapshot(environment.AlphaWrapper.Context.QuantumHandler.CurrentApex));
 
             var messageType = quantum.GetType().Name;
             var account = default(Account);

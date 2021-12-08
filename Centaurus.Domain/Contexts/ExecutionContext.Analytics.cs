@@ -78,7 +78,7 @@ namespace Centaurus.Domain
 
         private void AnalyticsManager_OnError(Exception exc)
         {
-            StateManager.Failed(new Exception("Analytics manager error.", exc));
+            NodesManager.CurrentNode.Failed(new Exception("Analytics manager error.", exc));
         }
 
         private void Exchange_OnUpdates(ExchangeUpdate updates)

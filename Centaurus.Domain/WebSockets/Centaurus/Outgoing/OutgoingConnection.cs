@@ -1,26 +1,27 @@
 using Centaurus.Client;
+using Centaurus.Domain.StateManagers;
 using Centaurus.Models;
 using NLog;
 using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using static Centaurus.Domain.StateManager;
+using static Centaurus.Domain.StateNotifierWorker;
 
 namespace Centaurus.Domain
 {
-    public class OutgoingConnection : ConnectionBase, IAuditorConnection
+    internal class OutgoingConnection : ConnectionBase, INodeConnection
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
         private readonly OutgoingConnectionWrapperBase connection;
         private readonly OutgoingMessageStorage outgoingMessageStorage;
 
-        public OutgoingConnection(ExecutionContext context, KeyPair keyPair, OutgoingMessageStorage outgoingMessageStorage, OutgoingConnectionWrapperBase connection)
-            : base(context, keyPair, connection.WebSocket)
+        public OutgoingConnection(ExecutionContext context, RemoteNode node, OutgoingMessageStorage outgoingMessageStorage, OutgoingConnectionWrapperBase connection)
+            : base(context, node?.PubKey, connection.WebSocket)
         {
             this.connection = connection ?? throw new ArgumentNullException(nameof(connection));
             this.outgoingMessageStorage = outgoingMessageStorage ?? throw new ArgumentNullException(nameof(outgoingMessageStorage));
-            AuditorState = Context.StateManager.GetAuditorState(keyPair);
+            Node = node;
             //we know that we connect to auditor so we can set connection state to validated immediately
             ConnectionState = ConnectionState.Ready;
         }
@@ -30,7 +31,9 @@ namespace Centaurus.Domain
         protected override int inBufferSize => BufferSize;
         protected override int outBufferSize => BufferSize;
 
-        public AuditorState AuditorState { get; }
+        public RemoteNode Node { get; }
+
+        public override bool IsAuditor => throw new NotImplementedException();
 
         public async Task EstablishConnection(Uri uri)
         {
@@ -50,7 +53,7 @@ namespace Centaurus.Domain
                     try
                     {
                         if (!cancellationToken.IsCancellationRequested
-                            && AuditorState.IsRunning
+                            && Node.IsRunning()
                             && outgoingMessageStorage.TryPeek(out MessageEnvelopeBase message)
                             )
                         {

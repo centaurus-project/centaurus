@@ -9,7 +9,7 @@ using Centaurus.Models;
 
 namespace Centaurus.Domain.Handlers.AlphaHandlers
 {
-    public class SyncCursorResetHandler : MessageHandlerBase<IncomingAuditorConnection>
+    internal class SyncCursorResetHandler : MessageHandlerBase<IncomingNodeConnection>
     {
         public SyncCursorResetHandler(ExecutionContext context)
             : base(context)
@@ -25,11 +25,19 @@ namespace Centaurus.Domain.Handlers.AlphaHandlers
                 ConnectionState.Ready
             };
 
-        public override Task HandleMessage(IncomingAuditorConnection connection, IncomingMessage message)
+        public override Task HandleMessage(IncomingNodeConnection connection, IncomingMessage message)
         {
             var cursorResetRequest = (SyncCursorReset)message.Envelope.Message;
 
-            connection.SetSyncCursor(true, cursorResetRequest.SyncCursors.ToDomainModel().ToArray());
+            foreach (var cursor in cursorResetRequest.Cursors)
+            {
+                var cursorType = cursor.Type.ToDomainCursorType();
+                if (cursor.DisableSync)
+                    connection.Node.DisableSync(cursorType);
+                else
+                    connection.Node.SetCursor(cursorType, default, cursor.Cursor, true);
+            }
+
             return Task.CompletedTask;
         }
     }

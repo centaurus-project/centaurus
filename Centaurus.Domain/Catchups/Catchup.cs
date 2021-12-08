@@ -13,7 +13,7 @@ namespace Centaurus.Domain
     /// <summary>
     /// This class manages auditor snapshots and quanta when Alpha is rising
     /// </summary>
-    public class Catchup : ContextualBase, IDisposable
+    internal class Catchup : ContextualBase, IDisposable
     {
         public Catchup(ExecutionContext context)
             : base(context)
@@ -34,20 +34,21 @@ namespace Centaurus.Domain
             try
             {
                 logger.Trace($"Auditor state from {pubKey.GetAccountId()} received by AlphaCatchup.");
-                if (Context.StateManager.State != State.Rising)
+                if (Context.NodesManager.CurrentNode.State != State.Rising)
                 {
                     logger.Warn($"Auditor state messages can be only handled when Alpha is in rising state. State sent by {((KeyPair)pubKey).AccountId}");
                     return;
                 }
 
-                if (!applyDataTimer.Enabled) //start timer
+                if (!(applyDataTimer.Enabled || pubKey.Equals(Context.Settings.KeyPair))) //start timer
                     applyDataTimer.Start();
 
                 if (!allAuditorStates.TryGetValue(pubKey, out var pendingAuditorBatch))
                 {
                     pendingAuditorBatch = auditorState;
                     allAuditorStates.Add(pubKey, auditorState);
-                    applyDataTimer.Reset();
+                    if (applyDataTimer.Enabled)
+                        applyDataTimer.Reset();
                     logger.Trace($"Auditor state from {pubKey.GetAccountId()} added.");
                 }
                 else if (!AddQuanta(pubKey, pendingAuditorBatch, auditorState)) //check if auditor sent all quanta already
@@ -69,27 +70,13 @@ namespace Centaurus.Domain
 
                 int majority = Context.GetMajorityCount(),
                 totalAuditorsCount = Context.GetTotalAuditorsCount();
-                var completedStatesCount = allAuditorStates.Count(s => !s.Value.HasMore) + 1; //+1 is current server
+                var completedStatesCount = allAuditorStates.Count(s => !s.Value.HasMore);
                 if (completedStatesCount == totalAuditorsCount)
                     await TryApplyAuditorsData();
             }
             catch (Exception exc)
             {
-                Context.StateManager.Failed(new Exception("Error on adding auditors state", exc));
-            }
-            finally
-            {
-                semaphoreSlim.Release();
-            }
-        }
-
-        public void RemoveState(RawPubKey pubKey)
-        {
-            semaphoreSlim.Wait();
-            try
-            {
-                allAuditorStates.Remove(pubKey);
-                validAuditorStates.Remove(pubKey);
+                Context.NodesManager.CurrentNode.Failed(new Exception("Error on adding auditors state", exc));
             }
             finally
             {
@@ -125,17 +112,18 @@ namespace Centaurus.Domain
             try
             {
                 logger.Trace($"Try apply auditors data.");
-                if (Context.StateManager.State != State.Rising)
+                if (Context.NodesManager.CurrentNode.State != State.Rising)
                     return;
 
                 int majority = Context.GetMajorityCount(),
                 totalAuditorsCount = Context.GetTotalAuditorsCount();
 
-                if (Context.HasMajority(validAuditorStates.Count, false))
+                if (Context.HasMajority(validAuditorStates.Count))
                 {
                     await ApplyAuditorsData();
                     allAuditorStates.Clear();
                     validAuditorStates.Clear();
+                    Context.NodesManager.CurrentNode.Rised();
                     logger.Trace($"Alpha is risen.");
                 }
                 else
@@ -147,7 +135,7 @@ namespace Centaurus.Domain
             }
             catch (Exception exc)
             {
-                Context.StateManager.Failed(new Exception("Error during raising.", exc));
+                Context.NodesManager.CurrentNode.Failed(new Exception("Error during raising.", exc));
             }
             finally
             {
@@ -182,13 +170,9 @@ namespace Centaurus.Domain
             var validQuanta = GetValidQuanta();
 
             await ApplyQuanta(validQuanta);
-
-            var alphaStateManager = Context.StateManager;
-
-            alphaStateManager.Rised();
         }
 
-        private async Task ApplyQuanta(List<(Quantum quantum, List<AuditorSignatureInternal> signatures)> quanta)
+        private async Task ApplyQuanta(List<(Quantum quantum, List<NodeSignatureInternal> signatures)> quanta)
         {
             foreach (var quantumItem in quanta)
             {
@@ -209,7 +193,7 @@ namespace Centaurus.Domain
             }
         }
 
-        private List<(Quantum quantum, List<AuditorSignatureInternal> signatures)> GetValidQuanta()
+        private List<(Quantum quantum, List<NodeSignatureInternal> signatures)> GetValidQuanta()
         {
             //group all quanta by their apex
             var quanta = allAuditorStates.Values
@@ -217,7 +201,7 @@ namespace Centaurus.Domain
                 .GroupBy(q => ((Quantum)q.Quantum).Apex)
                 .OrderBy(q => q.Key);
 
-            var validQuanta = new List<(Quantum quantum, List<AuditorSignatureInternal> signatures)>();
+            var validQuanta = new List<(Quantum quantum, List<NodeSignatureInternal> signatures)>();
 
             if (quanta.Count() == 0)
                 return validQuanta;
@@ -264,11 +248,11 @@ namespace Centaurus.Domain
             return (alphaId, auditors);
         }
 
-        private (Quantum quantum, List<AuditorSignatureInternal> signatures) GetQuantumData(ulong apex, List<CatchupQuantaBatchItem> allQuanta, int alphaId, List<RawPubKey> auditors)
+        private (Quantum quantum, List<NodeSignatureInternal> signatures) GetQuantumData(ulong apex, List<CatchupQuantaBatchItem> allQuanta, int alphaId, List<RawPubKey> auditors)
         {
             var payloadHash = default(byte[]);
             var quantum = default(Quantum);
-            var signatures = new Dictionary<int, AuditorSignatureInternal>();
+            var signatures = new Dictionary<int, NodeSignatureInternal>();
 
             foreach (var currentItem in allQuanta)
             {

@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public class CatchupQuantaBatchRequestHandler : MessageHandlerBase<OutgoingConnection>
+    internal class CatchupQuantaBatchRequestHandler : MessageHandlerBase<OutgoingConnection>
     {
         public CatchupQuantaBatchRequestHandler(ExecutionContext context)
             : base(context)
@@ -45,9 +45,9 @@ namespace Centaurus.Domain
                 {
                     var apex = ((Quantum)quantum.Quantum).Apex;
 
-                    var quantumSignatures = default(List<AuditorSignatureInternal>);
+                    var quantumSignatures = default(List<NodeSignatureInternal>);
                     //if quantum was persisted, than it contains majority signatures already. Otherwise we need to obtain it from the result manager
-                    if (apex > Context.PendingUpdatesManager.LastSavedApex)
+                    if (apex > Context.PendingUpdatesManager.LastPersistedApex)
                         Context.ResultManager.TryGetSignatures(apex, out quantumSignatures);
                     else
                     {
@@ -55,11 +55,11 @@ namespace Centaurus.Domain
                         if (signaturesBatch.TryGetValue(apex, out quantumSignatures))
                             quantumSignatures.Insert(0, quantum.AlphaSignature);
                         else
-                            quantumSignatures = new List<AuditorSignatureInternal> { quantum.AlphaSignature };
+                            quantumSignatures = new List<NodeSignatureInternal> { quantum.AlphaSignature };
                     }
                     if (quantumSignatures.Count < 1)
                     {
-                        Context.StateManager.Failed(new Exception($"Unable to find signatures for quantum {apex}"));
+                        Context.NodesManager.CurrentNode.Failed(new Exception($"Unable to find signatures for quantum {apex}"));
                         return;
                     }
                     batch.Quanta.Add(new CatchupQuantaBatchItem

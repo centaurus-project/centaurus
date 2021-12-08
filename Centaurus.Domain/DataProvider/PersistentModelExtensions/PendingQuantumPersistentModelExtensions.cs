@@ -7,28 +7,34 @@ using System.Text;
 
 namespace Centaurus.Domain
 {
-    public static class PendingQuantumPersistentModelExtensions
+    internal static class PendingQuantumPersistentModelExtensions
     {
-        public static PendingQuantum ToDomainModel(this PendingQuantumPersistentModel quantumModel)
+        public static CatchupQuantaBatchItem ToCatchupQuantaBatchItem(this PendingQuantumPersistentModel quantumModel)
         {
-            var quantum = new PendingQuantum
+            var quantum = new CatchupQuantaBatchItem
             {
-                Quantum = (Quantum)XdrConverter.Deserialize<Message>(quantumModel.RawQuantum),
-                Signatures = new List<AuditorSignatureInternal>()
+                Quantum = XdrConverter.Deserialize<Message>(quantumModel.RawQuantum),
+                Signatures = new List<NodeSignatureInternal>()
             };
 
             foreach (var signature in quantumModel.Signatures)
             {
-                quantum.Signatures.Add(new AuditorSignatureInternal
-                {
-                    AuditorId = signature.AuditorId,
-                    PayloadSignature = new TinySignature { Data = signature.PayloadSignature },
-                    TxSignature = signature.TxSignature,
-                    TxSigner = signature.TxSigner
-                });
+                var nodeSignature = signature.ToNodeSignature();
+                quantum.Signatures.Add(nodeSignature);
             }
 
             return quantum;
+        }
+
+        public static NodeSignatureInternal ToNodeSignature(this SignatureModel signature)
+        {
+            return new NodeSignatureInternal
+            {
+                AuditorId = signature.AuditorId,
+                PayloadSignature = new TinySignature { Data = signature.PayloadSignature },
+                TxSignature = signature.TxSignature,
+                TxSigner = signature.TxSigner
+            };
         }
     }
 }

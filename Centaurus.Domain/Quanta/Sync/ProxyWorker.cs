@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public class ProxyWorker : ContextualBase, IDisposable
+    internal class ProxyWorker : ContextualBase, IDisposable
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
         public ProxyWorker(ExecutionContext context)
@@ -46,7 +46,12 @@ namespace Centaurus.Domain
                         hasQuantaToSend = requestsToSend != null;
                         if (hasQuantaToSend)
                         {
-                            await Context.OutgoingConnectionManager.SendTo(Context.Constellation.Alpha, new RequestQuantaBatch { Requests = requestsToSend }.CreateEnvelope<MessageEnvelopeSignless>());
+                            if (!Context.NodesManager.TryGetNode(Context.Constellation.Alpha, out var node))
+                                throw new Exception($"Unable to get Alpha node.");
+                            var connection = node.GetConnection();
+                            if (connection == null)
+                                throw new Exception($"Alpha node is not connected.");
+                            await connection.SendMessage(new RequestQuantaBatch { Requests = requestsToSend }.CreateEnvelope<MessageEnvelopeSignless>());
                         }
                     }
                     catch (Exception exc)

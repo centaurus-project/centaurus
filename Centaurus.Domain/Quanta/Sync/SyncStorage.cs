@@ -44,7 +44,7 @@ namespace Centaurus.Domain
         {
             var quantaBatchStart = GetBatchApexStart(from + 1);
             var batch = GetBatch(quantaBatchStart);
-
+        
             return batch.Quanta.GetData(from, force);
         }
 

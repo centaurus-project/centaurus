@@ -9,6 +9,6 @@ namespace Centaurus.Models
     public class SyncCursorReset : Message
     {
         [XdrField(0)]
-        public List<SyncCursor> SyncCursors { get; set; } = new List<SyncCursor>();
+        public List<SyncCursor> Cursors { get; set; } = new List<SyncCursor>();
     }
 }

@@ -59,7 +59,7 @@ namespace Centaurus
         protected XdrBufferFactory.RentedBuffer incommingBuffer;
         protected XdrBufferFactory.RentedBuffer outgoingBuffer;
 
-        public bool IsAuditor => this is IAuditorConnection;
+        public abstract bool IsAuditor { get; }
 
         ConnectionState connectionState;
         /// <summary>
@@ -147,7 +147,8 @@ namespace Centaurus
 
                 Context.ExtensionsManager.BeforeSendMessage(this, envelope);
 
-                if (!(envelope.Message is AuditorPerfStatistics))
+                var isStateMessage = envelope.Message is StateMessage;
+                if (!isStateMessage)
                     logger.Trace($"Connection {PubKeyAddress}, about to send {envelope.Message.GetMessageType()} message.");
 
                 using (var writer = new XdrBufferWriter(outgoingBuffer.Buffer))
@@ -157,7 +158,7 @@ namespace Centaurus
 
                     await SendRawMessageInternal(outgoingBuffer.Buffer.AsMemory(0, writer.Length));
 
-                    if (!(envelope.Message is AuditorPerfStatistics))
+                    if (!isStateMessage)
                         logger.Trace($"Connection {PubKeyAddress}, message {envelope.Message.GetMessageType()} sent. Size: {writer.Length}");
                 }
             }
@@ -244,11 +245,12 @@ namespace Centaurus
                                 var reader = new XdrBufferReader(incommingBuffer.Buffer, incommingBuffer.Length);
                                 envelope = XdrConverter.Deserialize<MessageEnvelopeBase>(reader);
 
-                                if (!(envelope.Message is AuditorPerfStatistics))
+                                var isStateMessage = envelope.Message is StateMessage;
+                                if (!isStateMessage)
                                     logger.Trace($"Connection {PubKeyAddress}, message {envelope.Message.GetMessageType()} received.");
                                 if (!await HandleMessage(envelope))
                                     throw new UnexpectedMessageException($"No handler registered for message type {envelope.Message.GetMessageType()}.");
-                                if (!(envelope.Message is AuditorPerfStatistics))
+                                if (!isStateMessage)
                                     logger.Trace($"Connection {PubKeyAddress}, message {envelope.Message.GetMessageType()} handled.");
                             }
                             catch (BaseClientException exc)

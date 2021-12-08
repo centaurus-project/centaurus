@@ -1,12 +1,11 @@
 ﻿using Centaurus.Domain;
+using Centaurus.Domain.StateManagers;
 using Centaurus.Models;
 using Centaurus.PaymentProvider;
 using Centaurus.PaymentProvider.Models;
 using Centaurus.PersistentStorage.Abstraction;
-using NUnit.Framework;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -181,8 +180,8 @@ namespace Centaurus.Test
 
         public static void SetState(this ExecutionContext context, State state)
         {
-            var method = typeof(StateManager).GetMethod("SetState", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            method.Invoke(context.StateManager, new object[] { state, null });
+            var method = typeof(CurrentNode).GetMethod("SetState", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            method.Invoke(context.NodesManager.CurrentNode, new object[] { state, null });
         }
     }
 }

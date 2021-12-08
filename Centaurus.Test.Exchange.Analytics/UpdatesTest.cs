@@ -65,12 +65,12 @@ namespace Centaurus.Test.Exchange.Analytics
                 PaymentSubmitDelay = 0
             };
 
-            context.Setup(new Snapshot
+            context.Init(new Snapshot
             {
                 Accounts = new List<Account> { account1, account2 },
                 Apex = 0,
                 Orders = new List<OrderWrapper>(),
-                Settings = new ConstellationSettings
+                ConstellationSettings = new ConstellationSettings
                 {
                     Providers = new List<ProviderSettings> { stellarPaymentProvider },
                     Assets = new List<AssetSettings> { new AssetSettings { Code = "XLM", IsQuoteAsset = true }, new AssetSettings { Code = "USD" } },

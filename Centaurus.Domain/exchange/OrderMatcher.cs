@@ -152,7 +152,7 @@ namespace Centaurus.Domain
         /// <summary>
         /// Single orders match descriptor.
         /// </summary>
-        internal class OrderMatch
+        class OrderMatch
         {
             /// <summary>
             /// Create new instance of order match.

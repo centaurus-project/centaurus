@@ -8,6 +8,7 @@ using SdkAuditor = Centaurus.NetSDK.ConstellationInfo.Auditor;
 using SdkState = Centaurus.NetSDK.ConstellationInfo.StateModel;
 using SdkProviderSettings = Centaurus.NetSDK.ConstellationInfo.ProviderSettings;
 using SdkProviderAsset = Centaurus.NetSDK.ConstellationInfo.ProviderSettings.ProviderAsset;
+using Centaurus.Domain.Models;
 
 namespace Centaurus
 {

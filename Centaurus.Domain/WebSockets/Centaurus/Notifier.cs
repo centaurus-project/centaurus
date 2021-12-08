@@ -38,30 +38,8 @@ namespace Centaurus.Domain
             if (context == null)
                 throw new ArgumentNullException(nameof(context));
             context.ExtensionsManager.BeforeNotifyAuditors(envelope);
-            if (context.RoleManager.ParticipationLevel == CentaurusNodeParticipationLevel.Prime) //if Prime node than send message to all incoming connection
-            {
-                var auditors = context.IncomingConnectionManager.GetAuditorConnections();
-                foreach (var auditor in auditors)
-                    try
-                    {
-                        _ = auditor.SendMessage(envelope);
-                    }
-                    catch { }
-            }
-            else //notify all connected auditors
-                NotifyConnectedAuditors(context, envelope);
-        }
-
-        static void NotifyConnectedAuditors(ExecutionContext context, MessageEnvelopeBase envelope)
-        {
-            try
-            {
-                _ = context.OutgoingConnectionManager.SendToAll(envelope);
-            }
-            catch (Exception exc)
-            {
-                logger.Error(exc, "Exception occurred during broadcasting message to auditors.");
-            }
+            foreach (var node in context.NodesManager.GetRemoteNodes())
+                node.GetConnection()?.SendMessage(envelope);
         }
     }
 }

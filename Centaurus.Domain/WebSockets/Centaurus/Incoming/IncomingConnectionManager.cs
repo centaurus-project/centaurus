@@ -7,6 +7,9 @@ using System.Collections.Generic;
 using System.Net.WebSockets;
 using System.Threading.Tasks;
 using System.Linq;
+using Centaurus.Domain.WebSockets;
+using Centaurus.Domain.StateManagers;
+using System.Threading;
 
 namespace Centaurus.Domain
 {
@@ -17,37 +20,9 @@ namespace Centaurus.Domain
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        public IncomingConnectionManager(ExecutionContext context)
+        internal IncomingConnectionManager(ExecutionContext context)
             : base(context)
         {
-        }
-
-        /// <summary>
-        /// Gets the connection by the account public key
-        /// </summary>
-        /// <param name="pubKey">Account public key</param>
-        /// <param name="connection">Current account connection</param>
-        /// <returns>True if connection is found, otherwise false</returns>
-        public bool TryGetConnection(RawPubKey pubKey, out IncomingConnectionBase connection)
-        {
-            return connections.TryGetValue(pubKey, out connection);
-        }
-
-
-        /// <summary>
-        /// Gets all auditor connections
-        /// </summary>
-        /// <returns>The list of current auditor connections</returns>
-        public List<IncomingAuditorConnection> GetAuditorConnections()
-        {
-            var auditorConnections = new List<IncomingAuditorConnection>();
-            var auditors = Context.GetAuditors();
-            for (var i = 0; i < auditors.Count; i++)
-            {
-                if (TryGetConnection(auditors[i], out IncomingConnectionBase auditorConnection))
-                    auditorConnections.Add((IncomingAuditorConnection)auditorConnection);
-            }
-            return auditorConnections;
         }
 
         /// <summary>
@@ -56,14 +31,20 @@ namespace Centaurus.Domain
         /// <param name="webSocket">New websocket connection</param>
         public async Task OnNewConnection(WebSocket webSocket, RawPubKey rawPubKey, string ip)
         {
-            Context.ExtensionsManager.BeforeNewConnection(webSocket, ip);
             if (webSocket == null)
                 throw new ArgumentNullException(nameof(webSocket));
 
+            if (!ValidStates.Contains(Context.NodesManager.CurrentNode.State))
+            {
+                await webSocket.CloseAsync(WebSocketCloseStatus.ProtocolError, "Server is not ready.", CancellationToken.None);
+                return;
+            }
+
+            Context.ExtensionsManager.BeforeNewConnection(webSocket, ip);
+
             var connection = default(IncomingConnectionBase);
-            var auditors = Context.GetAuditors();
-            if (auditors.Any(a => a.Equals(rawPubKey)))
-                connection = new IncomingAuditorConnection(Context, rawPubKey, webSocket, ip);
+            if (Context.NodesManager.TryGetNode(rawPubKey, out var node))
+                connection = new IncomingNodeConnection(Context, webSocket, ip, node);
             else
                 connection = new IncomingClientConnection(Context, rawPubKey, webSocket, ip);
             using (connection)
@@ -73,12 +54,17 @@ namespace Centaurus.Domain
             }
         }
 
+        internal bool TryGetConnection(RawPubKey account, out IncomingConnectionBase connection)
+        {
+            return connections.TryGetConnection(account, out connection);
+        }
+
         /// <summary>
         /// Closes all connection
         /// </summary>
-        public async Task CloseAllConnections(bool includingAuditors = true)
+        internal async Task CloseAllConnections(bool includingAuditors = true)
         {
-            var pubkeys = connections.Keys.ToArray();
+            var pubkeys = connections.GetAllPubKeys();
             foreach (var pk in pubkeys)
                 try
                 {
@@ -86,7 +72,7 @@ namespace Centaurus.Domain
                     if (!includingAuditors && Context.Constellation.Auditors.Any(a => a.PubKey.Equals(pk))
                         || !connections.TryRemove(pk, out var connection))
                         continue;
-                    await UnsubscribeAndClose(connection);
+                    await RemoveConnection(connection);
 
                 }
                 catch (Exception e)
@@ -95,23 +81,24 @@ namespace Centaurus.Domain
                 }
         }
 
-        public void CleanupAuditorConnections()
+        internal void CleanupAuditorConnections()
         {
-            var irrelevantAuditors = Context.StateManager.ConnectedAuditors
+            var irrelevantAuditors = Context.NodesManager.GetRemoteNodes()
                 .Where(ca => !Context.Constellation.Auditors.Any(a => a.PubKey.Equals(ca)))
+                .Select(ca => ca.PubKey)
                 .ToList();
 
             foreach (var pk in irrelevantAuditors)
                 try
                 {
-                    if (connections.TryRemove(pk, out var connection))
+                    if (!connections.TryRemove(pk, out var connection))
                         continue;
                     UnsubscribeAndClose(connection)
                         .ContinueWith(t =>
                         {
                             //we need to drop it, to prevent sending private constellation data
                             if (t.IsFaulted)
-                                Context.StateManager.Failed(new Exception("Unable to drop irrelevant auditor connection."));
+                                Context.NodesManager.CurrentNode.Failed(new Exception("Unable to drop irrelevant auditor connection."));
                         });
                 }
                 catch (Exception e)
@@ -122,7 +109,9 @@ namespace Centaurus.Domain
 
         #region Private members
 
-        ConcurrentDictionary<RawPubKey, IncomingConnectionBase> connections = new ConcurrentDictionary<RawPubKey, IncomingConnectionBase>();
+        IncomingConnectionsCollection connections = new IncomingConnectionsCollection();
+
+        private static State[] ValidStates = new State[] { State.Rising, State.Running, State.Ready };
 
         void Subscribe(IncomingConnectionBase connection)
         {
@@ -143,15 +132,8 @@ namespace Centaurus.Domain
 
         void AddConnection(IncomingConnectionBase connection)
         {
-            lock (connection)
-            {
-                connections.AddOrUpdate(connection.PubKey, connection, (key, oldConnection) =>
-                {
-                    RemoveConnection(oldConnection);
-                    return connection;
-                });
-                logger.Trace($"{connection.PubKey} is connected.");
-            }
+            connections.Add(connection);
+            logger.Trace($"{connection.PubKey} is connected.");
         }
 
         void OnConnectionStateChanged((ConnectionBase connection, ConnectionState prev, ConnectionState current) args)
@@ -167,25 +149,22 @@ namespace Centaurus.Domain
                 case ConnectionState.Closed:
                     //if prev connection wasn't validated than the validated connection could be dropped
                     if (args.prev == ConnectionState.Ready)
-                        RemoveConnection(connection);
+                        _ = RemoveConnection(connection);
                     break;
                 default:
                     break;
             }
         }
 
-        void RemoveConnection(IncomingConnectionBase connection)
+        async Task RemoveConnection(IncomingConnectionBase connection)
         {
-            lock (connection)
-            {
-                _ = UnsubscribeAndClose(connection);
+            await UnsubscribeAndClose(connection);
 
-                connections.TryRemove(connection.PubKey, out _);
-                if (connection.IsAuditor)
-                {
-                    Context.StateManager.RemoveAuditorState(connection.PubKey);
-                    Context.PerformanceStatisticsManager.RemoveAuditorStatistics(connection.PubKeyAddress);
-                }
+            connections.TryRemove(connection);
+            if (connection.IsAuditor)
+            {
+                var nodeConnection = (IncomingNodeConnection)connection;
+                nodeConnection.Node.RemoveIncomingConnection();
             }
         }
 

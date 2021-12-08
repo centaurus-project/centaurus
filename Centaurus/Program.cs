@@ -46,7 +46,7 @@ namespace Centaurus
                 logger = LogManager.GetCurrentClassLogger();
                 isLoggerInited = true;
 
-                var context = new Domain.ExecutionContext(settings, new PersistentStorageAbstraction(), PaymentProvidersFactoryBase.Default, OutgoingConnectionFactoryBase.Default);
+                var context = new Domain.ExecutionContext(settings);
                 var startup = new Startup(context, AlphaHostFactoryBase.Default);
 
                 var resetEvent = new ManualResetEvent(false);

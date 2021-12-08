@@ -33,11 +33,12 @@ namespace Centaurus.Domain
                 GetCursors(settings.Providers),
                 processingItem.Quantum.ComputeHash()
             );
-            Context.Setup(updateSnapshot);
+            Context.Init(updateSnapshot);
 
+            var currentNode = Context.NodesManager.CurrentNode;
             //if state is undefined, than we need to init it
-            if (Context.StateManager.State == State.Undefined)
-                Context.StateManager.Init(State.Running);
+            if (currentNode.State == State.WaitingForInit)
+                currentNode.Init(State.Running);
 
             return Task.FromResult((QuantumResultMessageBase)processingItem.Quantum.CreateEnvelope<MessageEnvelopeSignless>().CreateResult(ResultStatusCode.Success));
         }

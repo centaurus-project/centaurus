@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Test
 {
-    public class AlphaMessageHandlersTests : BaseMessageHandlerTests
+    internal class AlphaMessageHandlersTests : BaseMessageHandlerTests
     {
         [OneTimeSetUp]
         public async Task Setup()
@@ -32,8 +32,8 @@ namespace Centaurus.Test
         {
             new object[] { TestEnvironment.Client1KeyPair, State.Rising, typeof(ConnectionCloseException) },
             new object[] { TestEnvironment.Client1KeyPair, State.Ready, null },
-            new object[] { TestEnvironment.Auditor1KeyPair, State.Rising, typeof(UnauthorizedException) },
-            new object[] { TestEnvironment.Auditor1KeyPair,  State.Ready, typeof(UnauthorizedException) }
+            new object[] { TestEnvironment.Auditor1KeyPair, State.Rising, null},
+            new object[] { TestEnvironment.Auditor1KeyPair,  State.Ready, null }
         };
 
         [Test]
@@ -49,42 +49,6 @@ namespace Centaurus.Test
                 .GetValue(connection);
 
             var message = new HandshakeResponse { HandshakeData = handshakeData };
-            var envelope = message.CreateEnvelope();
-            envelope.Sign(clientKeyPair);
-
-            using var writer = new XdrBufferWriter();
-            var inMessage = envelope.ToIncomingMessage(writer);
-            if (expectedException == null)
-            {
-                var isHandled = await context.MessageHandlers.HandleMessage(connection, inMessage);
-
-                Assert.IsTrue(isHandled);
-                Assert.AreEqual(connection.ConnectionState, ConnectionState.Ready);
-            }
-            else
-                Assert.ThrowsAsync(expectedException, async () => await context.MessageHandlers.HandleMessage(connection, inMessage));
-        }
-        static object[] AuditorHandshakeTestCases =
-        {
-            new object[] { TestEnvironment.Client1KeyPair, State.Rising, typeof(UnauthorizedException) },
-            new object[] { TestEnvironment.Client1KeyPair, State.Ready, typeof(UnauthorizedException) },
-            new object[] { TestEnvironment.Auditor1KeyPair, State.Rising, null },
-            new object[] { TestEnvironment.Auditor1KeyPair,  State.Ready, null }
-        };
-
-        [Test]
-        [TestCaseSource(nameof(AuditorHandshakeTestCases))]
-        public async Task AuditorHandshakeTest(KeyPair clientKeyPair, State alphaState, Type expectedException)
-        {
-            context.SetState(alphaState);
-
-            var connection = GetIncomingConnection(context, clientKeyPair);
-
-            var handshakeData = (HandshakeData)typeof(IncomingConnectionBase)
-                .GetField("handshakeData", BindingFlags.Instance | BindingFlags.NonPublic)
-                .GetValue(connection);
-
-            var message = new AuditorHandshakeResponse { HandshakeData = handshakeData, Cursors = new List<SyncCursor>(), State = State.Running };
             var envelope = message.CreateEnvelope();
             envelope.Sign(clientKeyPair);
 
@@ -118,30 +82,6 @@ namespace Centaurus.Test
             var inMessage = envelope.ToIncomingMessage(writer);
 
             Assert.ThrowsAsync<ConnectionCloseException>(async () => await context.MessageHandlers.HandleMessage(clientConnection, inMessage));
-        }
-
-        [Test]
-        public async Task AuditorPerfStatisticsTest()
-        {
-            var auditorPerf = new AuditorPerfStatistics
-            {
-                BatchInfos = new List<Models.BatchSavedInfo>(),
-                QuantaPerSecond = 1,
-                QuantaQueueLength = 2,
-                UpdateDate = DateTime.UtcNow.Ticks
-            };
-
-            var envelope = auditorPerf.CreateEnvelope();
-            envelope.Sign(TestEnvironment.Auditor1KeyPair);
-
-
-            var auditorConnection = GetIncomingConnection(context, TestEnvironment.Auditor1KeyPair.PublicKey, ConnectionState.Ready);
-
-            using var writer = new XdrBufferWriter();
-            var inMessage = envelope.ToIncomingMessage(writer);
-
-            await AssertMessageHandling(auditorConnection, inMessage, null);
-
         }
 
         static object[] QuantaBatchTestCases =
@@ -193,7 +133,7 @@ namespace Centaurus.Test
 
             await AssertMessageHandling(clientConnection, inMessage, excpectedException);
             if (excpectedException == null)
-                Assert.AreEqual(context.StateManager.State, State.Running);
+                Assert.AreEqual(context.NodesManager.CurrentNode.State, State.Running);
         }
 
         static object[] OrderTestCases =

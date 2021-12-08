@@ -22,6 +22,6 @@ namespace Centaurus.Models
         public Message Quantum { get; set; }
 
         [XdrField(1)]
-        public List<AuditorSignatureInternal> Signatures { get; set; }
+        public List<NodeSignatureInternal> Signatures { get; set; }
     }
 }

@@ -16,7 +16,6 @@ namespace Centaurus.Domain
             if (context == null)
                 throw new ArgumentNullException(nameof(context));
 
-
             if (constellationQuantum.RequestMessage == null || !(constellationQuantum.RequestMessage is ConstellationRequestMessage))
                 throw new Exception("Invalid message type.");
 

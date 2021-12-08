@@ -76,14 +76,6 @@ namespace Centaurus.Models
         /// </summary>
         EffectsNotification = 106,
         /// <summary>
-        /// Auditor's performance statistics.
-        /// </summary>
-        AuditorPerfStatistics = 107, 
-        /// <summary>
-        /// Internal message. Contains quantum message envelope and effects signatures.
-        /// </summary>
-        PendingQuantum = 108,
-        /// <summary>
         /// Internal message. Contains new Auditor state.
         /// </summary>
         StateUpdate = 109,
@@ -96,6 +88,10 @@ namespace Centaurus.Models
         /// </summary>
         QuantumInfoResponse = 152,
         /// <summary>
+        /// Contains new Alpha server public key.
+        /// </summary>
+        AlphaUpdate = 200,
+        /// <summary>
         /// Update quorum, add/remove auditors, apply new settings etc.
         /// </summary>
         ConstellationUpdate = 201,
@@ -106,11 +102,15 @@ namespace Centaurus.Models
         /// <summary>
         /// Contains last saved Apex
         /// </summary>
-        CatchupQuantaBatchRequest = 211,
+        CatchupQuantaBatchRequest = 210,
         /// <summary>
         /// Contains batch of quanta, that was requested by Alpha
         /// </summary>
-        CatchupQuantaBatch = 212,
+        CatchupQuantaBatch = 211,
+        /// <summary>
+        /// Contains last apex processed by an auditor
+        /// </summary>
+        ApexUpdate = 212,
         /// <summary>
         /// Contains cursors for quanta and signatures
         /// </summary>

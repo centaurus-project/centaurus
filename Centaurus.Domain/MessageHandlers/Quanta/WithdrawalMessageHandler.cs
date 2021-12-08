@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public class WithdrawalMessageHandler : QuantumHandlerBase
+    internal class WithdrawalMessageHandler : QuantumHandlerBase
     {
         public WithdrawalMessageHandler(ExecutionContext context) 
             : base(context)

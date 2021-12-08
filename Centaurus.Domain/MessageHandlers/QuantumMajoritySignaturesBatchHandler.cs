@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public class QuantumMajoritySignaturesBatchHandler : MessageHandlerBase<OutgoingConnection>
+    internal class QuantumMajoritySignaturesBatchHandler : MessageHandlerBase<OutgoingConnection>
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 

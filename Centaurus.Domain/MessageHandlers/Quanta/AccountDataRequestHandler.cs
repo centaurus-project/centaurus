@@ -6,7 +6,7 @@ using Centaurus.Models;
 
 namespace Centaurus.Domain
 {
-    public class AccountDataRequestHandler : QuantumHandlerBase
+    internal class AccountDataRequestHandler : QuantumHandlerBase
     {
         public AccountDataRequestHandler(ExecutionContext context) 
             : base(context)

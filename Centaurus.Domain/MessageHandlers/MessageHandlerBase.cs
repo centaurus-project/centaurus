@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public abstract class MessageHandlerBase : ContextualBase
+    internal abstract class MessageHandlerBase : ContextualBase
     {
         protected MessageHandlerBase(ExecutionContext context)
             : base(context)
@@ -76,7 +76,7 @@ namespace Centaurus.Domain
         public abstract Task HandleMessage(ConnectionBase connection, IncomingMessage message);
     }
 
-    public abstract class MessageHandlerBase<T> : MessageHandlerBase
+    internal abstract class MessageHandlerBase<T> : MessageHandlerBase
         where T: ConnectionBase
     {
         protected MessageHandlerBase(ExecutionContext context)

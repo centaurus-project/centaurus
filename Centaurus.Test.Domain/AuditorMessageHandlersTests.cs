@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Test
 {
-    public class AuditorMessageHandlersTests : BaseMessageHandlerTests
+    internal class AuditorMessageHandlersTests : BaseMessageHandlerTests
     {
 
         private ExecutionContext context;

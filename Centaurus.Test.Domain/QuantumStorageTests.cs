@@ -48,7 +48,7 @@ namespace Centaurus.Test
                 context.SyncStorage.AddQuantum(quantum.Apex, new SyncQuantaBatchItem
                 {
                     Quantum = quantum,
-                    AlphaSignature = new AuditorSignatureInternal
+                    AlphaSignature = new NodeSignatureInternal
                     {
                         AuditorId = 0,
                         PayloadSignature = new TinySignature

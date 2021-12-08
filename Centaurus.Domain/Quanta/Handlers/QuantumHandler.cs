@@ -63,6 +63,14 @@ namespace Centaurus.Domain
                         awaitedQuanta.TryDequeue(out handlingItem);
                     if (handlingItem != null)
                     {
+                        //after Alpha switch, quanta queue can contain requests that should be send to new Alpha server
+                        if (!Context.IsAlpha && handlingItem.Quantum.Apex == 0)
+                        {
+                            //if the quantum is not client request, than new Alpha will generate it, so we can skip it
+                            if (handlingItem.Quantum is RequestQuantumBase request)
+                                Context.ProxyWorker.AddRequestsToQueue(request.RequestEnvelope);
+                            continue;
+                        }
                         await HandleItem(handlingItem);
                         if (Context.IsAlpha && QuantaThrottlingManager.Current.IsThrottlingEnabled)
                             Thread.Sleep(QuantaThrottlingManager.Current.SleepTime);
@@ -79,7 +87,7 @@ namespace Centaurus.Domain
                         while (awaitedQuanta.TryDequeue(out var item))
                             item.SetException(new Exception("Cancelled."));
                     }
-                    Context.StateManager.Failed(new Exception("Quantum worker failed.", exc));
+                    Context.NodesManager.CurrentNode.Failed(new Exception("Quantum worker failed.", exc));
                     return;
                 }
             }
@@ -140,7 +148,7 @@ namespace Centaurus.Domain
                 if (!quantum.PrevHash.AsSpan().SequenceEqual(LastQuantumHash))
                     throw new Exception($"Quantum previous hash doesn't equal to last quantum hash.");
             }
-            if (!Context.IsAlpha || Context.StateManager.State == State.Rising)
+            if (!Context.IsAlpha || Context.NodesManager.CurrentNode.State == State.Rising)
                 ValidateRequestQuantum(processingItem);
         }
 
@@ -181,9 +189,6 @@ namespace Centaurus.Domain
 
             CurrentApex = quantum.Apex;
             LastQuantumHash = processingItem.QuantumHash;
-
-            if (CurrentApex % 1000 == 0)
-                Context.StateManager.UpdateDelay();
 
             ProcessResult(processingItem);
 

@@ -7,7 +7,7 @@ using Centaurus.Models;
 
 namespace Centaurus.Domain
 {
-    public class HandshakeRequestHandler : MessageHandlerBase<OutgoingConnection>
+    internal class HandshakeRequestHandler : MessageHandlerBase<OutgoingConnection>
     {
         public HandshakeRequestHandler(ExecutionContext context)
             : base(context)
@@ -28,13 +28,12 @@ namespace Centaurus.Domain
             var signaturesCursor = new SyncCursor
             {
                 Type = XdrSyncCursorType.Signatures,
-                Cursor = Context.PendingUpdatesManager.LastSavedApex,
-                ClearCursor = Context.RoleManager.ParticipationLevel == CentaurusNodeParticipationLevel.Prime
+                Cursor = Context.PendingUpdatesManager.LastPersistedApex,
+                DisableSync = Context.RoleManager.ParticipationLevel == CentaurusNodeParticipationLevel.Prime
             };
-            await connection.SendMessage(new AuditorHandshakeResponse
+            await connection.SendMessage(new HandshakeResponse
             {
-                HandshakeData = handshakeRequest.HandshakeData,
-                Cursors = new List<SyncCursor> { quantaCursor, signaturesCursor }
+                HandshakeData = handshakeRequest.HandshakeData
             });
 
             //after sending auditor handshake the connection becomes ready

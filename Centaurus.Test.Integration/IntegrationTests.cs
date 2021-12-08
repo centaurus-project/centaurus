@@ -67,7 +67,7 @@ namespace Centaurus.Test
             var auditorStartup = environment.AuditorWrappers.Values.Skip(1).First(); //first is Alpha
             auditorStartup.Shutdown();
 
-            Assert.AreEqual(1, environment.AlphaWrapper.Context.StateManager.ConnectedAuditorsCount, "Auditors count assertion.");
+            Assert.AreEqual(1, environment.AlphaWrapper.Context.NodesManager.GetRemoteNodes().Count(n => n.State != State.Undefined), "Auditors count assertion.");
             await environment.AssertConstellationState(TimeSpan.FromSeconds(5), State.Ready);
 
             var clientsCount = 100;
@@ -238,7 +238,7 @@ namespace Centaurus.Test
             syncStorage.AddQuantum(apex, new SyncQuantaBatchItem
             {
                 Quantum = requestQuantum,
-                AlphaSignature = new AuditorSignatureInternal
+                AlphaSignature = new NodeSignatureInternal
                 {
                     AuditorId = environment.AlphaWrapper.Context.AlphaId,
                     PayloadSignature = new TinySignature

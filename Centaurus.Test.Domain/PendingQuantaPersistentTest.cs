@@ -52,27 +52,28 @@ namespace Centaurus.Test
 
             Assert.NotNull(quantumModel);
 
-            var quantum = quantumModel.ToDomainModel();
+            var item = quantumModel.ToCatchupQuantaBatchItem();
+            var quantum = (Quantum)item.Quantum;
 
-            Assert.IsTrue(context.Settings.KeyPair.Verify(quantum.Quantum.GetPayloadHash(), quantum.Signatures.First().PayloadSignature.Data));
+            Assert.IsTrue(context.Settings.KeyPair.Verify(quantum.GetPayloadHash(), item.Signatures.First().PayloadSignature.Data));
 
-            Assert.AreEqual(quantum.Quantum.Apex, result.Apex);
-            Assert.IsInstanceOf<AccountDataRequestQuantum>(quantum.Quantum);
+            Assert.AreEqual(quantum.Apex, result.Apex);
+            Assert.IsInstanceOf<AccountDataRequestQuantum>(item.Quantum);
 
             context = new ExecutionContext(settings, storage, new MockPaymentProviderFactory(), new DummyConnectionWrapperFactory());
-            Assert.AreEqual(State.Rising, context.StateManager.State);
+            Assert.AreEqual(State.Rising, context.NodesManager.CurrentNode.State);
 
-            var targetQuantum = context.SyncStorage.GetQuanta(quantum.Quantum.Apex - 1, 1).FirstOrDefault();
+            var targetQuantum = context.SyncStorage.GetQuanta(quantum.Apex - 1, 1).FirstOrDefault();
 
             Assert.NotNull(targetQuantum);
             var quantumFromStorage = (Quantum)targetQuantum.Quantum;
-            Assert.IsTrue(context.Settings.KeyPair.Verify(quantumFromStorage.GetPayloadHash(), quantum.Signatures.First().PayloadSignature.Data));
+            Assert.IsTrue(context.Settings.KeyPair.Verify(quantumFromStorage.GetPayloadHash(), item.Signatures.First().PayloadSignature.Data));
 
             Assert.AreEqual(quantumFromStorage.Apex, result.Apex);
             Assert.IsInstanceOf<AccountDataRequestQuantum>(targetQuantum.Quantum);
 
-            context.StateManager.Rised();
-            Assert.AreEqual(State.Running, context.StateManager.State);
+            //context.NodesManager.CurrentNode.Rised();
+            Assert.AreEqual(State.Running, context.NodesManager.CurrentNode.State);
 
             Assert.IsNull(context.PersistentStorage.LoadPendingQuanta());
         }

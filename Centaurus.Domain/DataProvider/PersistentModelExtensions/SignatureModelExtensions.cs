@@ -8,7 +8,7 @@ namespace Centaurus.Domain
 {
     public static class SignatureModelExtensions
     {
-        public static SignatureModel ToPersistenModel(this AuditorSignatureInternal auditorSignature)
+        public static SignatureModel ToPersistenModel(this NodeSignatureInternal auditorSignature)
         {
             if (auditorSignature == null)
                 throw new ArgumentNullException(nameof(auditorSignature));
@@ -22,12 +22,12 @@ namespace Centaurus.Domain
             };
         }
 
-        public static AuditorSignatureInternal ToDomainModel(this SignatureModel auditorSignature)
+        public static NodeSignatureInternal ToDomainModel(this SignatureModel auditorSignature)
         {
             if (auditorSignature == null)
                 throw new ArgumentNullException(nameof(auditorSignature));
 
-            return new AuditorSignatureInternal
+            return new NodeSignatureInternal
             {
                 AuditorId = auditorSignature.AuditorId,
                 PayloadSignature = new TinySignature { Data = auditorSignature.PayloadSignature },
