@@ -5,8 +5,15 @@ using System.Text;
 
 namespace Centaurus.Models
 {
+    public class SingleNodeSignaturesBatch : Message
+    {
+        [XdrField(0)]
+        public List<SingleNodeSignaturesBatchItem> Items { get; set; }
+    }
+
+
     [XdrContract]
-    public class AuditorResult
+    public class SingleNodeSignaturesBatchItem: IApex
     {
         [XdrField(0)]
         public ulong Apex { get; set; }

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace Centaurus.Domain.StateManagers
+namespace Centaurus.Domain.Nodes.Common
 {
     internal class NodeQuantaQueueLengths : ValueAggregation<int>
     {

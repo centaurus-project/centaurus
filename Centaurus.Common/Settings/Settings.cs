@@ -42,8 +42,11 @@ namespace Centaurus
         [Option("sync_batch_size", Default = 500, HelpText = "Max quanta sync batch size.")]
         public int SyncBatchSize { get; set; }
 
-        [Option("participation_level", Required = true, HelpText = "Centaurus node participation level. '1' = Prime and '2' = Auditor")]
-        public int ParticipationLevel { get; set; }
+        [Option("catchup_timeout", Default = 15, HelpText = "Catchup timeout in seconds.")]
+        public int CatchupTimeout { get; set; }
+
+        [Option('p', "prime_node", Default = false, HelpText = "Centaurus node participation level. If true the node is Prime, otherwise the node is Auditor")]
+        public bool IsPrimeNode { get; set; }
 
         [Option("payment_config", Required = true, HelpText = "Payment providers config path.")]
         public string PaymentConfigPath { get; set; }

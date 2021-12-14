@@ -36,13 +36,14 @@ namespace Centaurus.Domain
                 var lastPersistedApex = Context.PendingUpdatesManager.LastPersistedApex;
                 var quantaQueueLenght = Context.QuantumHandler.QuantaQueueLenght;
                 var updateDate = DateTime.UtcNow;
+                var updateDateInTicks = updateDate.Ticks;
                 var updateMessage = new StateMessage
                 {
                     State = currentNode.State,
                     CurrentApex = currentApex,
                     LastPersistedApex = lastPersistedApex,
                     QuantaQueueLength = quantaQueueLenght,
-                    UpdateDate = updateDate
+                    UpdateDate = updateDateInTicks
                 };
                 currentNode.UpdateData(currentApex, lastPersistedApex, quantaQueueLenght, updateDate);
                 Context.NotifyAuditors(updateMessage.CreateEnvelope<MessageEnvelopeSignless>());

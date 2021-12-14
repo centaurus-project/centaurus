@@ -19,7 +19,9 @@ namespace Centaurus.Domain
             if (constellationQuantum.RequestMessage == null || !(constellationQuantum.RequestMessage is ConstellationRequestMessage))
                 throw new Exception("Invalid message type.");
 
-            var envelope = constellationQuantum.RequestEnvelope;
+            var envelope = constellationQuantum.RequestEnvelope as ConstellationMessageEnvelope;
+            if (envelope == null)
+                throw new InvalidOperationException($"Constellation quantum must be wrapped with {typeof(ConstellationMessageEnvelope).Name}.");
             var signatures = envelope.Signatures;
 
             //validate that signatures are unique

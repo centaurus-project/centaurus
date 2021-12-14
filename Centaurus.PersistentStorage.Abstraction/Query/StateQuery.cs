@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 
 namespace Centaurus.PersistentStorage
 {
@@ -21,7 +22,7 @@ namespace Centaurus.PersistentStorage
 
         public SettingsPersistentModel LoadSettings(ulong fromApex)
         {
-            return storage.Find<SettingsPersistentModel>(QueryOrder.Desc).From(UlongConverter.Encode(fromApex)).First();
+            return storage.Find<SettingsPersistentModel>(QueryOrder.Desc).From(UlongConverter.Encode(fromApex)).FirstOrDefault();
         }
 
         public CursorsPersistentModel LoadCursors()

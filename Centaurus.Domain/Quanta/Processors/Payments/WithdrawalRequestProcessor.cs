@@ -36,7 +36,7 @@ namespace Centaurus.Domain
             var withdrawalQuantum = (WithdrawalRequestQuantum)quantumProcessingItem.Quantum;
             var withdrawalRequest = (WithdrawalRequest)withdrawalQuantum.RequestMessage;
 
-            var centaurusAsset = Context.Constellation.Assets.FirstOrDefault(a => a.Code == withdrawalRequest.Asset);
+            var centaurusAsset = Context.ConstellationSettingsManager.Current.Assets.FirstOrDefault(a => a.Code == withdrawalRequest.Asset);
             if (centaurusAsset == null || centaurusAsset.IsSuspended)
                 throw new BadRequestException($"Constellation doesn't support asset '{withdrawalRequest.Asset}'.");
 
@@ -47,9 +47,9 @@ namespace Centaurus.Domain
             if (providerAsset == null)
                 throw new BadRequestException($"Current provider doesn't support withdrawal of asset {centaurusAsset.Code}.");
 
-            var baseAsset = Context.Constellation.QuoteAsset.Code;
+            var baseAsset = Context.ConstellationSettingsManager.Current.QuoteAsset.Code;
 
-            var minBalance = centaurusAsset.Code == baseAsset ? Context.Constellation.MinAccountBalance : 0;
+            var minBalance = centaurusAsset.Code == baseAsset ? Context.ConstellationSettingsManager.Current.MinAccountBalance : 0;
             if (!(sourceAccount.GetBalance(centaurusAsset.Code)?.HasSufficientBalance(withdrawalRequest.Amount + withdrawalRequest.Fee, minBalance) ?? false))
                 throw new BadRequestException($"Insufficient balance.");
 

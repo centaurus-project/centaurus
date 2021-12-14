@@ -10,22 +10,6 @@ using System.Threading.Tasks;
 
 namespace Centaurus
 {
-    public enum ConnectionState
-    {
-        /// <summary>
-        /// Connection established.
-        /// </summary>
-        Connected = 0,
-        /// <summary>
-        /// Ready to receive and send messages.
-        /// </summary>
-        Ready = 1,
-        /// <summary>
-        /// Connection was closed.
-        /// </summary>
-        Closed = 3
-    }
-
     public abstract class ConnectionBase : ContextualBase, IDisposable
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
@@ -53,40 +37,24 @@ namespace Centaurus
 
         public string PubKeyAddress { get; }
 
+        public abstract bool IsAuditor { get; }
+
+        public bool IsAuthenticated { get; private set; }
+
         protected virtual int inBufferSize { get; } = 1024;
         protected virtual int outBufferSize { get; } = 64 * 1024;
 
         protected XdrBufferFactory.RentedBuffer incommingBuffer;
         protected XdrBufferFactory.RentedBuffer outgoingBuffer;
 
-        public abstract bool IsAuditor { get; }
-
-        ConnectionState connectionState;
-        /// <summary>
-        /// Current connection state
-        /// </summary>
-        public ConnectionState ConnectionState
+        protected void Authenticated()
         {
-            get
-            {
-                return connectionState;
-            }
-            set
-            {
-                if (connectionState != value)
-                {
-                    var prevValue = connectionState;
-                    connectionState = value;
-                    logger.Trace($"Connection {PubKeyAddress} is in {connectionState} state. Prev state is {prevValue}.");
-                    OnConnectionStateChanged?.Invoke((this, prevValue, connectionState));
-
-                    if (value == ConnectionState.Ready && prevValue == ConnectionState.Connected) //prevent multiple invocation
-                        Context.ExtensionsManager.ConnectionReady(this);
-                }
-            }
+            IsAuthenticated = true;
+            OnAuthenticated?.Invoke(this);
         }
 
-        public event Action<(ConnectionBase connection, ConnectionState prev, ConnectionState current)> OnConnectionStateChanged;
+        public event Action<ConnectionBase> OnAuthenticated;
+        public event Action<ConnectionBase> OnClosed;
 
         protected readonly CancellationTokenSource cancellationTokenSource;
         protected readonly CancellationToken cancellationToken;
@@ -216,7 +184,7 @@ namespace Centaurus
                 while (webSocket.State != WebSocketState.Closed && webSocket.State != WebSocketState.Aborted && !cancellationToken.IsCancellationRequested)
                 {
                     //if connection isn't validated yet 256 bytes of max message is enough for handling handshake response
-                    var maxLength = ConnectionState == ConnectionState.Connected ? WebSocketExtension.ChunkSize : 0;
+                    var maxLength = IsAuthenticated ? 0 : WebSocketExtension.ChunkSize;
                     var messageType = await webSocket.GetWebsocketBuffer(incommingBuffer, cancellationToken, maxLength);
                     if (!cancellationToken.IsCancellationRequested)
                     {
@@ -261,8 +229,8 @@ namespace Centaurus
 
                                 //prevent recursive error sending
                                 if (!IsAuditor && !(envelope == null || envelope.Message is ResultMessage))
-                                    _ = SendMessage(envelope.CreateResult(statusCode).CreateEnvelope<MessageEnvelopeSignless>());
-                                if (statusCode == ResultStatusCode.InternalError || !Context.IsAlpha)
+                                    await SendMessage(envelope.CreateResult(statusCode).CreateEnvelope<MessageEnvelopeSignless>());
+                                if (statusCode == ResultStatusCode.InternalError || !Context.NodesManager.IsAlpha)
                                     logger.Error(exc);
                             }
                         }
@@ -291,7 +259,7 @@ namespace Centaurus
             }
             finally
             {
-                ConnectionState = ConnectionState.Closed;
+                OnClosed?.Invoke(this);
             }
         }
 

@@ -39,12 +39,12 @@ namespace Centaurus.Domain.Quanta.Sync
             {
                 switch (source)
                 {
-                    case ApexItemsBatch<QuantumSignatures> signaturesBatch:
+                    case ApexItemsBatch<MajoritySignaturesBatchItem> majoritySignaturesBatch:
                         {
-                            var items = signaturesBatch.GetItems(Start, Size, true);
-                            var batch = new QuantumMajoritySignaturesBatch
+                            var items = majoritySignaturesBatch.GetItems(Start, Size, true);
+                            var batch = new MajoritySignaturesBatch
                             {
-                                Signatures = items
+                                Items = items
                             };
                             return new SyncPortion(batch.CreateEnvelope<MessageEnvelopeSignless>().ToByteArray(), items.Last().Apex);
                         }
@@ -54,6 +54,15 @@ namespace Centaurus.Domain.Quanta.Sync
                             var batch = new SyncQuantaBatch
                             {
                                 Quanta = items
+                            };
+                            return new SyncPortion(batch.CreateEnvelope<MessageEnvelopeSignless>().ToByteArray(), items.Last().Apex);
+                        }
+                    case ApexItemsBatch<SingleNodeSignaturesBatchItem> signaturesBatch:
+                        {
+                            var items = signaturesBatch.GetItems(Start, Size, true);
+                            var batch = new SingleNodeSignaturesBatch
+                            {
+                                Items = items
                             };
                             return new SyncPortion(batch.CreateEnvelope<MessageEnvelopeSignless>().ToByteArray(), items.Last().Apex);
                         }

@@ -15,7 +15,7 @@ namespace Centaurus.Domain
 
             return new SignatureModel
             {
-                AuditorId = (byte)auditorSignature.AuditorId,
+                AuditorId = (byte)auditorSignature.NodeId,
                 PayloadSignature = auditorSignature.PayloadSignature.Data,
                 TxSignature = auditorSignature.TxSignature,
                 TxSigner = auditorSignature.TxSigner
@@ -29,7 +29,7 @@ namespace Centaurus.Domain
 
             return new NodeSignatureInternal
             {
-                AuditorId = auditorSignature.AuditorId,
+                NodeId = auditorSignature.AuditorId,
                 PayloadSignature = new TinySignature { Data = auditorSignature.PayloadSignature },
                 TxSignature = auditorSignature.TxSignature,
                 TxSigner = auditorSignature.TxSigner

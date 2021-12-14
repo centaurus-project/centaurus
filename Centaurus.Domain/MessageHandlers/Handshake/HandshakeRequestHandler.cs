@@ -16,28 +16,18 @@ namespace Centaurus.Domain
 
         public override string SupportedMessageType { get; } = typeof(HandshakeRequest).Name;
 
-        public override ConnectionState[] ValidConnectionStates { get; } = new ConnectionState[] { ConnectionState.Ready };
+        public override bool IsAuthenticatedOnly => false;
 
         public override async Task HandleMessage(OutgoingConnection connection, IncomingMessage message)
         {
             var handshakeRequest = (HandshakeRequest)message.Envelope.Message;
-
-            var quantaCursor = new SyncCursor { Type = XdrSyncCursorType.Quanta, Cursor = Context.QuantumHandler.LastAddedQuantumApex };
-
-            //if Prime than the node will receive results from auditors
-            var signaturesCursor = new SyncCursor
-            {
-                Type = XdrSyncCursorType.Signatures,
-                Cursor = Context.PendingUpdatesManager.LastPersistedApex,
-                DisableSync = Context.RoleManager.ParticipationLevel == CentaurusNodeParticipationLevel.Prime
-            };
             await connection.SendMessage(new HandshakeResponse
             {
                 HandshakeData = handshakeRequest.HandshakeData
             });
 
-            //after sending auditor handshake the connection becomes ready
-            connection.ConnectionState = ConnectionState.Ready;
+            //we know that we connect to auditor so we can mark connection as authenticated
+            connection.HandshakeDataSend();
         }
     }
 }

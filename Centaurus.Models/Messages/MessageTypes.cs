@@ -122,11 +122,11 @@ namespace Centaurus.Models
         /// <summary>
         /// Contains majority of signatures for quanta (except Alpha signatures, it will be send with quantum)
         /// </summary>
-        QuantumMajoritySignaturesBatch = 215,
+        MajoritySignaturesBatch = 215,
         /// <summary>
         /// Contains an array of the current auditor's quantum signatures
         /// </summary>
-        AuditorSignaturesBatch = 216,
+        SingleNodeSignaturesBatch = 216,
         /// <summary>
         /// Contains an array of the client requests that must be resent to Alpha
         /// </summary>

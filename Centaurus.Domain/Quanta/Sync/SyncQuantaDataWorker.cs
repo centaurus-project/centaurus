@@ -1,5 +1,4 @@
 ﻿using Centaurus.Domain.Quanta.Sync;
-using Centaurus.Domain.StateManagers;
 using Centaurus.Models;
 using NLog;
 using System;
@@ -73,7 +72,7 @@ namespace Centaurus.Domain
             foreach (var cursorGroup in cursorGroups)
             {
                 var cursorSendingTasks = ProcessCursorGroup(cursorGroup);
-                if (cursorSendingTasks.Count > 0)
+                if (cursorSendingTasks != null)
                     sendingQuantaTasks.AddRange(cursorSendingTasks);
             }
             return sendingQuantaTasks;
@@ -86,8 +85,6 @@ namespace Centaurus.Domain
 
             var currentCursor = cursorGroup.BatchId;
             var cursorType = cursorGroup.CursorType;
-
-            var lastBatchApex = batch.LastDataApex;
 
             var sendingQuantaTasks = new List<Task<NodeSyncCursorUpdate>>();
             foreach (var node in cursorGroup.Nodes)
@@ -102,12 +99,12 @@ namespace Centaurus.Domain
         private static Task<NodeSyncCursorUpdate> SendSingleBatch(SyncPortion batch, ulong currentCursor, SyncCursorType cursorType, NodeCursorData currentAuditor)
         {
             var connection = currentAuditor.Node.GetConnection();
-            if (currentAuditor.Cursor < batch.LastDataApex || connection == null)
+            if (currentAuditor.Cursor >= batch.LastDataApex || connection == null)
                 return null;
             var sendMessageTask = connection.SendMessage(batch.Data.AsMemory());
             return sendMessageTask.ContinueWith(t =>
             {
-                if (!t.IsFaulted)
+                if (t.IsFaulted)
                 {
                     HandleFaultedSendTask(t, currentCursor, batch, cursorType, currentAuditor);
                     return null;
@@ -127,8 +124,11 @@ namespace Centaurus.Domain
                 case SyncCursorType.Quanta:
                     batch = Context.SyncStorage.GetQuanta(cursorGroup.BatchId, force);
                     break;
-                case SyncCursorType.Signatures:
-                    batch = Context.SyncStorage.GetSignatures(cursorGroup.BatchId, force);
+                case SyncCursorType.MajoritySignatures:
+                    batch = Context.SyncStorage.GetMajoritySignatures(cursorGroup.BatchId, force);
+                    break;
+                case SyncCursorType.SingleNodeSignatures:
+                    batch = Context.SyncStorage.GetCurrentNodeSignatures(cursorGroup.BatchId, force);
                     break;
                 default:
                     throw new NotImplementedException($"{cursorGroup.CursorType} cursor type is not supported.");
@@ -139,11 +139,12 @@ namespace Centaurus.Domain
         private bool ValidateCursorGroup(CursorGroup cursorGroup)
         {
             var currentCursor = cursorGroup.BatchId;
-            if (currentCursor == Context.QuantumHandler.CurrentApex)
+            var currentApex = Context.QuantumHandler.CurrentApex;
+            if (currentCursor == currentApex)
                 return false;
-            if (currentCursor > Context.QuantumHandler.CurrentApex && GetIsCurrentNodeReady())
+            if (currentCursor > currentApex && GetIsCurrentNodeReady())
             {
-                var message = $"Auditors {string.Join(',', cursorGroup.Nodes.Select(a => a.Node.AccountId))} is above current constellation state.";
+                var message = $"Node(s) {string.Join(',', cursorGroup.Nodes.Select(a => a.Node.AccountId))} is above current constellation state, cursor {currentCursor}, current apex {currentApex} type {cursorGroup.CursorType}.";
                 if (cursorGroup.Nodes.Count >= Context.GetMajorityCount() - 1) //-1 is current server
                     logger.Error(message);
                 else
@@ -166,7 +167,7 @@ namespace Centaurus.Domain
                 if (!hasPendingQuanta)
                     Thread.Sleep(50);
 
-                if (!Context.IsAlpha || !GetIsCurrentNodeReady())
+                if (!GetIsCurrentNodeReady())
                 {
                     hasPendingQuanta = false;
                     continue;

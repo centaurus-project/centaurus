@@ -39,9 +39,9 @@ namespace Centaurus.Controllers
                 if (constellationInitEnvelope == null)
                     return StatusCode(415);
 
-                await Context.HandleConstellationQuantum(constellationInitEnvelope);
+                var apex = await Context.HandleConstellationQuantum(constellationInitEnvelope);
 
-                return new JsonResult(new InitResult { IsSuccess = true });
+                return new JsonResult(new InitResult { IsSuccess = true, Apex = apex  });
             }
             catch (Exception exc)
             {
@@ -52,6 +52,8 @@ namespace Centaurus.Controllers
         public class InitResult
         {
             public bool IsSuccess { get; set; }
+
+            public ulong Apex { get; set; }
 
             public string Error { get; set; }
         }

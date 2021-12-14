@@ -9,11 +9,28 @@ namespace Centaurus.Domain
 {
     public static class ConstellationSettingsExtensions
     {
-        public static byte GetAuditorId(this ConstellationSettings constellation, RawPubKey rawPubKey)
+        public static byte GetNodeId(this ConstellationSettings constellation, RawPubKey rawPubKey)
         {
             if (constellation == null)
                 throw new ArgumentNullException(nameof(constellation));
-            return (byte)constellation.Auditors.FindIndex(a => a.PubKey.Equals(rawPubKey));
+
+            var auditorIndex = constellation.Auditors.FindIndex(a => a.PubKey.Equals(rawPubKey));
+            if (auditorIndex == -1)
+                throw new ArgumentNullException($"{rawPubKey.GetAccountId()} is not an auditor.");
+            //all auditor must have id that is greater than zero
+            return (byte)(auditorIndex + 1);
+        }
+
+        public static bool TryGetNodePubKey(this ConstellationSettings constellation, byte nodeId, out RawPubKey pubKey)
+        {
+            pubKey = null;
+            if (constellation == null)
+                return false;
+            if (constellation.Auditors.Count < nodeId)
+                return false;
+            var nodeIndex = nodeId - 1;
+            pubKey = constellation.Auditors[nodeIndex].PubKey;
+            return true;
         }
 
         public static Snapshot ToSnapshot(this ConstellationSettings settings, ulong apex, List<Account> accounts, List<OrderWrapper> orders, Dictionary<string, string> cursors, byte[] quantumHash)

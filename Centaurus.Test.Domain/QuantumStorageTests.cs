@@ -45,18 +45,7 @@ namespace Centaurus.Test
                     Timestamp = DateTime.UtcNow.Ticks
                 };
 
-                context.SyncStorage.AddQuantum(quantum.Apex, new SyncQuantaBatchItem
-                {
-                    Quantum = quantum,
-                    AlphaSignature = new NodeSignatureInternal
-                    {
-                        AuditorId = 0,
-                        PayloadSignature = new TinySignature
-                        {
-                            Data = new byte[64]
-                        }
-                    }
-                });
+                context.SyncStorage.AddQuantum(new SyncQuantaBatchItem { Quantum = quantum });
                 items.Add(new QuantumPersistentModel { Apex = quantum.Apex, RawQuantum = XdrConverter.Serialize(quantum), Signatures = new List<SignatureModel>(), TimeStamp = quantum.Timestamp, Effects = new List<AccountEffects>() });
             }
 

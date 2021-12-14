@@ -37,7 +37,7 @@ namespace Centaurus.Domain
 
         public static void UpdateNonce(QuantumProcessingItem processingItem)
         {
-            var requestQuantum = (RequestQuantumBase)processingItem.Quantum;
+            var requestQuantum = (ClientRequestQuantumBase)processingItem.Quantum;
             var requestMessage = requestQuantum.RequestMessage;
 
             processingItem.AddNonceUpdate(processingItem.Initiator, requestMessage.Nonce, processingItem.Initiator.Nonce);
@@ -45,13 +45,13 @@ namespace Centaurus.Domain
 
         public static void ValidateNonce(QuantumProcessingItem processingItem)
         {
-            var requestQuantum = processingItem.Quantum as RequestQuantumBase;
+            var requestQuantum = processingItem.Quantum as ClientRequestQuantumBase;
             if (requestQuantum == null)
-                throw new BadRequestException($"Invalid message type. Client quantum message should be of type {typeof(RequestQuantumBase).Name}.");
+                throw new BadRequestException($"Invalid message type. Client quantum message should be of type {typeof(ClientRequestQuantumBase).Name}.");
 
             var requestMessage = requestQuantum.RequestEnvelope.Message as SequentialRequestMessage;
             if (requestMessage == null)
-                throw new BadRequestException($"Invalid message type. {typeof(RequestQuantumBase).Name} should contain message of type {typeof(SequentialRequestMessage).Name}.");
+                throw new BadRequestException($"Invalid message type. {typeof(ClientRequestQuantumBase).Name} should contain message of type {typeof(SequentialRequestMessage).Name}.");
 
             if (requestMessage.Nonce < 1 || processingItem.Initiator.Nonce >= requestMessage.Nonce)
                 throw new UnauthorizedException($"Specified nonce is invalid. Current nonce: {processingItem.Initiator.Nonce}; request nonce: {requestMessage.Nonce}.");

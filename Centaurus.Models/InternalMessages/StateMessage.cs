@@ -18,6 +18,6 @@ namespace Centaurus.Models
         public State State { get; set; }
 
         [XdrField(4)]
-        public DateTime UpdateDate { get; set; }
+        public long UpdateDate { get; set; }
     }
 }

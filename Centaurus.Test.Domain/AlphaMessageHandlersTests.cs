@@ -59,7 +59,7 @@ namespace Centaurus.Test
                 var isHandled = await context.MessageHandlers.HandleMessage(connection, inMessage);
 
                 Assert.IsTrue(isHandled);
-                Assert.AreEqual(connection.ConnectionState, ConnectionState.Ready);
+                Assert.IsTrue(connection.IsAuthenticated);
             }
             else
                 Assert.ThrowsAsync(expectedException, async () => await context.MessageHandlers.HandleMessage(connection, inMessage));
@@ -86,17 +86,17 @@ namespace Centaurus.Test
 
         static object[] QuantaBatchTestCases =
         {
-            new object[] { TestEnvironment.Client1KeyPair, ConnectionState.Ready, typeof(UnauthorizedException) },
-            new object[] { TestEnvironment.Auditor1KeyPair, ConnectionState.Ready, null }
+            new object[] { TestEnvironment.Client1KeyPair, true, typeof(UnauthorizedException) },
+            new object[] { TestEnvironment.Auditor1KeyPair, true, null }
         };
 
         [Test]
         [TestCaseSource(nameof(QuantaBatchTestCases))]
-        public async Task CatchupQuantaBatchTest(KeyPair clientKeyPair, ConnectionState state, Type excpectedException)
+        public async Task CatchupQuantaBatchTest(KeyPair clientKeyPair, bool isAuthenticated, Type excpectedException)
         {
             context.SetState(State.Rising);
 
-            var clientConnection = GetIncomingConnection(context, clientKeyPair.PublicKey, state);
+            var clientConnection = GetIncomingConnection(context, clientKeyPair.PublicKey, isAuthenticated);
 
             var envelope = new CatchupQuantaBatch
             {
@@ -112,19 +112,19 @@ namespace Centaurus.Test
 
         static object[] QuantumMajoritySignaturesBatchCases =
         {
-            new object[] { TestEnvironment.Client1KeyPair, ConnectionState.Ready, typeof(UnauthorizedException) },
-            new object[] { TestEnvironment.Auditor1KeyPair, ConnectionState.Connected, typeof(InvalidStateException) },
-            new object[] { TestEnvironment.Auditor1KeyPair, ConnectionState.Ready, null }
+            new object[] { TestEnvironment.Client1KeyPair, true, typeof(UnauthorizedException) },
+            new object[] { TestEnvironment.Auditor1KeyPair, false, typeof(UnauthorizedException) },
+            new object[] { TestEnvironment.Auditor1KeyPair, true, null }
         };
-        public async Task QuantumMajoritySignaturesBatchTest(KeyPair clientKeyPair, ConnectionState state, Type excpectedException)
+        public async Task QuantumMajoritySignaturesBatchTest(KeyPair clientKeyPair, bool isAuthenticated, Type excpectedException)
         {
             context.SetState(State.Ready);
 
-            var clientConnection = GetIncomingConnection(context, clientKeyPair.PublicKey, state);
+            var clientConnection = GetIncomingConnection(context, clientKeyPair.PublicKey, isAuthenticated);
 
-            var envelope = new QuantumMajoritySignaturesBatch
+            var envelope = new MajoritySignaturesBatch
             {
-                Signatures = new List<QuantumSignatures>()
+                Items = new List<MajoritySignaturesBatchItem>()
             }.CreateEnvelope();
             envelope.Sign(clientKeyPair);
 
@@ -138,17 +138,17 @@ namespace Centaurus.Test
 
         static object[] OrderTestCases =
         {
-            new object[] { ConnectionState.Connected, typeof(InvalidStateException) },
-            new object[] { ConnectionState.Ready, null }
+            new object[] { false, typeof(UnauthorizedException) },
+            new object[] { true, null }
         };
 
         [Test]
         [TestCaseSource(nameof(OrderTestCases))]
-        public async Task OrderTest(ConnectionState state, Type excpectedException)
+        public async Task OrderTest(bool isAuthenticated, Type excpectedException)
         {
             context.SetState(State.Ready);
 
-            var clientConnection = GetIncomingConnection(context, TestEnvironment.Client1KeyPair.PublicKey, state);
+            var clientConnection = GetIncomingConnection(context, TestEnvironment.Client1KeyPair.PublicKey, isAuthenticated);
 
             var account = context.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
 
@@ -157,7 +157,7 @@ namespace Centaurus.Test
                 Account = account.Pubkey,
                 RequestId = DateTime.UtcNow.Ticks,
                 Amount = 100,
-                Asset = context.Constellation.Assets.First(a => !a.IsQuoteAsset).Code,
+                Asset = context.ConstellationSettingsManager.Current.Assets.First(a => !a.IsQuoteAsset).Code,
                 Price = 1,
                 Side = OrderSide.Buy
             }.CreateEnvelope();
@@ -170,17 +170,17 @@ namespace Centaurus.Test
 
         static object[] AccountDataTestRequestCases =
         {
-            new object[] { ConnectionState.Connected, typeof(InvalidStateException) },
-            new object[] { ConnectionState.Ready, null }
+            new object[] { false, typeof(UnauthorizedException) },
+            new object[] {true, null }
         };
 
         [Test]
         [TestCaseSource(nameof(AccountDataTestRequestCases))]
-        public async Task AccountDataRequestTest(ConnectionState state, Type excpectedException)
+        public async Task AccountDataRequestTest(bool isAuthenticated, Type excpectedException)
         {
             context.SetState(State.Ready);
 
-            var clientConnection = (IncomingClientConnection)GetIncomingConnection(context, TestEnvironment.Client1KeyPair.PublicKey, state);
+            var clientConnection = (IncomingClientConnection)GetIncomingConnection(context, TestEnvironment.Client1KeyPair.PublicKey, isAuthenticated);
 
             var envelope = new AccountDataRequest
             {
@@ -218,12 +218,12 @@ namespace Centaurus.Test
         //                MinuteLimit = (uint)requestLimit.Value
         //            }
         //        };
-        //        var effectProcessor = new RequestRateLimitUpdateEffectProcessor(effect, account, context.Constellation.RequestRateLimits);
+        //        var effectProcessor = new RequestRateLimitUpdateEffectProcessor(effect, account, context.ConstellationSettingsManager.Current.RequestRateLimits);
         //        effectProcessor.CommitEffect();
         //    }
         //    var clientConnection = GetIncomingConnection(context, clientKeyPair.PublicKey, ConnectionState.Ready);
 
-        //    var minuteLimit = (account.RequestRateLimits ?? context.Constellation.RequestRateLimits).MinuteLimit;
+        //    var minuteLimit = (account.RequestRateLimits ?? context.ConstellationSettingsManager.Current.RequestRateLimits).MinuteLimit;
         //    var minuteIterCount = minuteLimit + 1;
         //    for (var i = 0; i < minuteIterCount; i++)
         //    {
@@ -246,19 +246,19 @@ namespace Centaurus.Test
 
         static object[] EffectsRequestTestCases =
         {
-            new object[] { TestEnvironment.Client1KeyPair, ConnectionState.Connected, typeof(InvalidStateException) },
-            new object[] { TestEnvironment.Client1KeyPair, ConnectionState.Ready, null }
+            new object[] { TestEnvironment.Client1KeyPair, false, typeof(UnauthorizedException) },
+            new object[] { TestEnvironment.Client1KeyPair, true, null }
         };
 
         [Test]
         [TestCaseSource(nameof(EffectsRequestTestCases))]
-        public async Task EffectsRequestTest(KeyPair client, ConnectionState state, Type excpectedException)
+        public async Task EffectsRequestTest(KeyPair client, bool isAuthenticated, Type excpectedException)
         {
             context.SetState(State.Ready);
 
             var account = context.AccountStorage.GetAccount(client);
 
-            var clientConnection = GetIncomingConnection(context, client.PublicKey, state);
+            var clientConnection = GetIncomingConnection(context, client.PublicKey, isAuthenticated);
 
             var envelope = new QuantumInfoRequest { Account = account.Pubkey }.CreateEnvelope();
             envelope.Sign(client);

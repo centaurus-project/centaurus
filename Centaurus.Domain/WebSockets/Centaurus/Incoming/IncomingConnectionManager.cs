@@ -1,15 +1,11 @@
-﻿using Centaurus.Domain;
+﻿using Centaurus.Domain.WebSockets;
 using Centaurus.Models;
 using NLog;
 using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Net.WebSockets;
-using System.Threading.Tasks;
 using System.Linq;
-using Centaurus.Domain.WebSockets;
-using Centaurus.Domain.StateManagers;
+using System.Net.WebSockets;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
@@ -69,37 +65,10 @@ namespace Centaurus.Domain
                 try
                 {
                     //skip if auditor
-                    if (!includingAuditors && Context.Constellation.Auditors.Any(a => a.PubKey.Equals(pk))
+                    if (!includingAuditors && Context.NodesManager.IsNode(pk)
                         || !connections.TryRemove(pk, out var connection))
                         continue;
                     await RemoveConnection(connection);
-
-                }
-                catch (Exception e)
-                {
-                    logger.Error(e, "Unable to close connection");
-                }
-        }
-
-        internal void CleanupAuditorConnections()
-        {
-            var irrelevantAuditors = Context.NodesManager.GetRemoteNodes()
-                .Where(ca => !Context.Constellation.Auditors.Any(a => a.PubKey.Equals(ca)))
-                .Select(ca => ca.PubKey)
-                .ToList();
-
-            foreach (var pk in irrelevantAuditors)
-                try
-                {
-                    if (!connections.TryRemove(pk, out var connection))
-                        continue;
-                    UnsubscribeAndClose(connection)
-                        .ContinueWith(t =>
-                        {
-                            //we need to drop it, to prevent sending private constellation data
-                            if (t.IsFaulted)
-                                Context.NodesManager.CurrentNode.Failed(new Exception("Unable to drop irrelevant auditor connection."));
-                        });
                 }
                 catch (Exception e)
                 {
@@ -113,17 +82,28 @@ namespace Centaurus.Domain
 
         private static State[] ValidStates = new State[] { State.Rising, State.Running, State.Ready };
 
-        void Subscribe(IncomingConnectionBase connection)
+        private void Subscribe(IncomingConnectionBase connection)
         {
-            connection.OnConnectionStateChanged += OnConnectionStateChanged;
+            connection.OnAuthenticated += Connection_OnAuthenticated;
+            connection.OnClosed += Connection_OnClosed;
         }
 
-        void Unsubscribe(IncomingConnectionBase connection)
+        private void Unsubscribe(IncomingConnectionBase connection)
         {
-            connection.OnConnectionStateChanged -= OnConnectionStateChanged;
+            connection.OnAuthenticated -= Connection_OnAuthenticated;
+            connection.OnClosed -= Connection_OnClosed;
+        }
+        private void Connection_OnAuthenticated(ConnectionBase connection)
+        {
+            AddConnection((IncomingConnectionBase)connection);
         }
 
-        async Task UnsubscribeAndClose(IncomingConnectionBase connection)
+        private void Connection_OnClosed(ConnectionBase connection)
+        {
+            _ = RemoveConnection((IncomingConnectionBase)connection);
+        }
+
+        private async Task UnsubscribeAndClose(IncomingConnectionBase connection)
         {
             Unsubscribe(connection);
             await connection.CloseConnection();
@@ -136,35 +116,18 @@ namespace Centaurus.Domain
             logger.Trace($"{connection.PubKey} is connected.");
         }
 
-        void OnConnectionStateChanged((ConnectionBase connection, ConnectionState prev, ConnectionState current) args)
-        {
-            var connection = (IncomingConnectionBase)args.connection;
-            switch (args.current)
-            {
-                case ConnectionState.Ready:
-                    //avoid multiple validation event firing
-                    if (args.prev == ConnectionState.Connected)
-                        AddConnection(connection);
-                    break;
-                case ConnectionState.Closed:
-                    //if prev connection wasn't validated than the validated connection could be dropped
-                    if (args.prev == ConnectionState.Ready)
-                        _ = RemoveConnection(connection);
-                    break;
-                default:
-                    break;
-            }
-        }
-
         async Task RemoveConnection(IncomingConnectionBase connection)
         {
             await UnsubscribeAndClose(connection);
 
-            connections.TryRemove(connection);
-            if (connection.IsAuditor)
+            if (connection.IsAuthenticated)
             {
-                var nodeConnection = (IncomingNodeConnection)connection;
-                nodeConnection.Node.RemoveIncomingConnection();
+                connections.TryRemove(connection);
+                if (connection.IsAuditor)
+                {
+                    var nodeConnection = (IncomingNodeConnection)connection;
+                    nodeConnection.Node.RemoveIncomingConnection();
+                }
             }
         }
 

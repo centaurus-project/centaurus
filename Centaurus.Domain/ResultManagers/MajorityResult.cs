@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace Centaurus.Models
+﻿namespace Centaurus.Domain
 {
     public enum MajorityResult
     {

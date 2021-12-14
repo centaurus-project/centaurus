@@ -5,7 +5,6 @@ using System.Text;
 
 namespace Centaurus.Models
 {
-    //TODO: convert ulong to ulong? after migration to MessagePack
     [XdrContract]
     public class SyncCursor
     {
@@ -25,6 +24,7 @@ namespace Centaurus.Models
     public enum XdrSyncCursorType
     {
         Quanta = 0,
-        Signatures = 1
+        MajoritySignatures = 1,
+        SingleNodeSignatures = 2
     }
 }

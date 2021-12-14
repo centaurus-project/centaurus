@@ -119,7 +119,8 @@ namespace Centaurus.Domain
             if (minRevertApex == 0 && apex != lastApex || apex < minRevertApex)
                 throw new InvalidOperationException($"Lack of data to revert to {apex} apex.");
 
-            var settings = GetConstellationSettings();
+            //get current settings
+            var settings = GetConstellationSettings(ulong.MaxValue);
             if (settings == null)
                 return null;
 
@@ -272,9 +273,9 @@ namespace Centaurus.Domain
         /// </summary>
         /// <param name="apex"></param>
         /// <returns></returns>
-        private ConstellationSettings GetConstellationSettings()
+        public ConstellationSettings GetConstellationSettings(ulong apex)
         {
-            var settingsModel = Context.PersistentStorage.LoadSettings(ulong.MaxValue);
+            var settingsModel = Context.PersistentStorage.LoadSettings(apex);
             if (settingsModel == null)
                 return null;
 

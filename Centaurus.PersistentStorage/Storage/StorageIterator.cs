@@ -75,6 +75,16 @@ namespace Centaurus.PersistentStorage
             return res;
         }
 
+        public T FirstOrDefault()
+        {
+            var value = iterator.Value();
+            if (value == null || value.Length < 1)
+                return default(T);
+            var res = ParseCurrent(iterator.Key());
+            Next();
+            return res;
+        }
+
         private StorageIterator<T> SetBoundaryCheck(Func<byte[], bool> checkKeyIsWithinBoundaries)
         {
             isKeyWithinBoundaries = checkKeyIsWithinBoundaries;

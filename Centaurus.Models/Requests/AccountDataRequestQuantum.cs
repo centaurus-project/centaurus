@@ -5,7 +5,7 @@ using System.Text;
 
 namespace Centaurus.Models
 {
-    public class AccountDataRequestQuantum : RequestQuantumBase
+    public class AccountDataRequestQuantum : ClientRequestQuantumBase
     {
         [XdrField(0)]
         public byte[] PayloadHash { get; set; }

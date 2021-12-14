@@ -1,12 +1,12 @@
-﻿using Centaurus.Domain.StateManagers;
-using System;
+﻿using System;
 
 namespace Centaurus.Domain.Quanta.Sync
 {
     public enum SyncCursorType
     {
         Quanta = 0,
-        Signatures = 1
+        MajoritySignatures = 1,
+        SingleNodeSignatures = 2
     }
 
     internal class SyncCursorUpdate

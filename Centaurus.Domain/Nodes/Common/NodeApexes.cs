@@ -1,4 +1,4 @@
-﻿namespace Centaurus.Domain.StateManagers
+﻿namespace Centaurus.Domain.Nodes.Common
 {
     internal class NodeApexes : ValueAggregation<ulong>
     {

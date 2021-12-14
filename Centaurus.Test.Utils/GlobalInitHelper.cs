@@ -1,5 +1,4 @@
 ﻿using Centaurus.Domain;
-using Centaurus.Domain.StateManagers;
 using Centaurus.Models;
 using Centaurus.PaymentProvider;
 using Centaurus.PaymentProvider.Models;
@@ -45,8 +44,9 @@ namespace Centaurus.Test
             settings.CWD = "AppData";
             settings.GenesisAuditors = new[] { TestEnvironment.AlphaKeyPair.AccountId, TestEnvironment.Auditor1KeyPair.AccountId }.Select(a => new Settings.Auditor($"{a}={a}.com")).ToList();
             settings.Secret = secret;
-            settings.ParticipationLevel = 1;
+            settings.IsPrimeNode = true;
             settings.SyncBatchSize = 500;
+            settings.CatchupTimeout = 1;
         }
 
         public static List<KeyPair> GetPredefinedClients()
@@ -128,7 +128,11 @@ namespace Centaurus.Test
                 .Sign(TestEnvironment.AlphaKeyPair)
                 .Sign(TestEnvironment.Auditor1KeyPair);
 
-            await context.QuantumHandler.HandleAsync(new ConstellationQuantum { RequestEnvelope = initRequest }, Task.FromResult(true)).OnProcessed;
+            var quantumItem = context.QuantumHandler.HandleAsync(new ConstellationQuantum { RequestEnvelope = initRequest }, Task.FromResult(true));
+
+            await quantumItem.OnProcessed;
+
+            context.ResultManager.Add(GetAuditorSignatures(context, quantumItem));
 
             var deposits = new List<DepositModel>();
             Action<byte[], string> addAssetsFn = (acc, asset) =>
@@ -167,7 +171,11 @@ namespace Centaurus.Test
                 Source = txNotification.ToDomainModel()
             };
 
-            await context.QuantumHandler.HandleAsync(depositQuantum, Task.FromResult(true)).OnProcessed;
+            quantumItem = context.QuantumHandler.HandleAsync(depositQuantum, Task.FromResult(true));
+
+            await quantumItem.OnProcessed;
+
+            context.ResultManager.Add(GetAuditorSignatures(context, quantumItem));
 
             //save all effects
             await Task.Factory.StartNew(() =>
@@ -176,6 +184,21 @@ namespace Centaurus.Test
                 context.PendingUpdatesManager.ApplyUpdates();
             });
             return context;
+        }
+
+        public static MajoritySignaturesBatchItem GetAuditorSignatures(ExecutionContext context, QuantumProcessingItem processingItem)
+        {
+            var payloadSignature = processingItem.Quantum.GetPayloadHash().Sign(TestEnvironment.Auditor1KeyPair);
+            return new MajoritySignaturesBatchItem
+            {
+                Apex = processingItem.Apex,
+                Signatures = new List<NodeSignatureInternal> {
+                    new NodeSignatureInternal {
+                        NodeId = context.NodesManager.NodePubKeys[TestEnvironment.Auditor1KeyPair],
+                        PayloadSignature = payloadSignature
+                    }
+                }
+            };
         }
 
         public static void SetState(this ExecutionContext context, State state)

@@ -30,7 +30,7 @@ namespace Centaurus.Domain
         {
             return new NodeSignatureInternal
             {
-                AuditorId = signature.AuditorId,
+                NodeId = signature.AuditorId,
                 PayloadSignature = new TinySignature { Data = signature.PayloadSignature },
                 TxSignature = signature.TxSignature,
                 TxSigner = signature.TxSigner

@@ -24,7 +24,7 @@ namespace Centaurus.Domain
 
             var settings = updateQuantum.ToConstellationSettings(processingItem.Apex);
 
-            processingItem.AddConstellationUpdate(settings, Context.Constellation);
+            processingItem.AddConstellationUpdate(settings, Context.ConstellationSettingsManager.Current);
 
             var updateSnapshot = settings.ToSnapshot(
                 processingItem.Apex,
@@ -73,6 +73,9 @@ namespace Centaurus.Domain
             if (constellationUpdate.Auditors == null || constellationUpdate.Auditors.Count() < minAuditorsCount)
                 throw new ArgumentException($"Min auditors count is {minAuditorsCount}");
 
+            if (constellationUpdate.LastUpdateApex != (Context.ConstellationSettingsManager.Current?.Apex ?? 0ul))
+                throw new InvalidOperationException($"Last update apex is invalid.");
+
             if (!constellationUpdate.Auditors.All(a => a.Address == null || Uri.TryCreate($"http://{a.Address}", UriKind.Absolute, out _)))
                 throw new InvalidOperationException("At least one auditor's address is invalid.");
 
@@ -90,7 +93,7 @@ namespace Centaurus.Domain
                 throw new ArgumentException("All asset values must be unique");
 
             if (constellationUpdate.Assets.Count(a => a.IsQuoteAsset) != 1)
-                throw new ArgumentException("Constellation must contain one quote asset.");
+                throw new ArgumentException("ConstellationSettingsManager.Current must contain one quote asset.");
 
             if (constellationUpdate.Assets.Any(a => a.Code.Length > 4))
                 throw new Exception("Asset code should not exceed 4 bytes");

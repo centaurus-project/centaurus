@@ -15,7 +15,7 @@ namespace Centaurus.Domain
 
         public override bool IsAuditorOnly => true;
 
-        public override ConnectionState[] ValidConnectionStates => new[] { ConnectionState.Ready };
+        public override bool IsAuthenticatedOnly => true;
 
         public override Task HandleMessage(ConnectionBase connection, IncomingMessage message)
         {

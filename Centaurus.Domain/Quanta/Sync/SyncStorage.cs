@@ -54,12 +54,26 @@ namespace Centaurus.Domain
         /// <param name="from">Exclusive</param>
         /// <param name="force">if force, than batch would be return even if it's not fulfilled yet</param>
         /// <returns></returns>
-        public SyncPortion GetSignatures(ulong from, bool force)
+        public SyncPortion GetMajoritySignatures(ulong from, bool force)
         {
             var quantaBatchStart = GetBatchApexStart(from + 1);
             var batch = GetBatch(quantaBatchStart);
 
-            return batch.Signatures.GetData(from, force);
+            return batch.MajoritySignatures.GetData(from, force);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="from">Exclusive</param>
+        /// <param name="force">if force, than batch would be return even if it's not fulfilled yet</param>
+        /// <returns></returns>
+        public SyncPortion GetCurrentNodeSignatures(ulong from, bool force)
+        {
+            var quantaBatchStart = GetBatchApexStart(from + 1);
+            var batch = GetBatch(quantaBatchStart);
+
+            return batch.CurrentNodeSignatures.GetData(from, force);
         }
 
         /// <summary>
@@ -82,26 +96,47 @@ namespace Centaurus.Domain
         /// <param name="from">Exclusive</param>
         /// <param name="limit"></param>
         /// <returns></returns>
-        public List<QuantumSignatures> GetSignatures(ulong from, int limit)
+        public List<MajoritySignaturesBatchItem> GetMajoritySignatures(ulong from, int limit)
         {
             var quantaBatchStart = GetBatchApexStart(from + 1);
             var batch = GetBatch(quantaBatchStart);
 
-            return batch.Signatures.GetItems(from, limit);
+            return batch.MajoritySignatures.GetItems(from, limit);
         }
 
-        public void AddQuantum(ulong apex, SyncQuantaBatchItem quantum)
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="from">Exclusive</param>
+        /// <param name="limit"></param>
+        /// <returns></returns>
+        public List<SingleNodeSignaturesBatchItem> GetCurrentNodeSignatures(ulong from, int limit)
         {
-            var batchStart = GetBatchApexStart(apex);
-            var batch = GetBatch(batchStart);
-            batch.Quanta.Add(apex, quantum);
+            var quantaBatchStart = GetBatchApexStart(from + 1);
+            var batch = GetBatch(quantaBatchStart);
+
+            return batch.CurrentNodeSignatures.GetItems(from, limit);
         }
 
-        public void AddSignatures(ulong apex, QuantumSignatures signatures)
+        public void AddQuantum(SyncQuantaBatchItem quantum)
         {
-            var batchStart = GetBatchApexStart(apex);
+            var batchStart = GetBatchApexStart(quantum.Apex);
             var batch = GetBatch(batchStart);
-            batch.Signatures.Add(apex, signatures);
+            batch.Quanta.Add(quantum.Apex, quantum);
+        }
+
+        public void AddSignatures(MajoritySignaturesBatchItem signatures)
+        {
+            var batchStart = GetBatchApexStart(signatures.Apex);
+            var batch = GetBatch(batchStart);
+            batch.MajoritySignatures.Add(signatures.Apex, signatures);
+        }
+
+        public void AddCurrentNodeSignature(SingleNodeSignaturesBatchItem signature)
+        {
+            var batchStart = GetBatchApexStart(signature.Apex);
+            var batch = GetBatch(batchStart);
+            batch.CurrentNodeSignatures.Add(signature.Apex, signature);
         }
 
         private object persistedBatchIdsSyncRoot = new { };
@@ -218,38 +253,43 @@ namespace Centaurus.Domain
             logger.Info($"Quanta batch with apex start {batchStartApex} is loaded.");
 
             var quanta = new List<SyncQuantaBatchItem>();
-            var signatures = new List<QuantumSignatures>();
+            var majoritySignatures = new List<MajoritySignaturesBatchItem>();
+            var currentNodeSignatures = new List<SingleNodeSignaturesBatchItem>();
             foreach (var rawQuantum in rawQuanta)
             {
                 quanta.Add(rawQuantum.ToBatchItemQuantum());
-                signatures.Add(rawQuantum.ToQuantumSignatures());
+                majoritySignatures.Add(rawQuantum.ToMajoritySignatures());
             }
 
             if (batchStartApex == 0) //insert null at 0 position, otherwise index will not be relevant to apex
             {
                 quanta.Insert(0, null);
-                signatures.Insert(0, null);
+                majoritySignatures.Insert(0, null);
+                currentNodeSignatures.Insert(0, null);
             }
 
-            return new SyncStorageItem(Context, batchStartApex, PortionSize, quanta, signatures);
+            return new SyncStorageItem(Context, batchStartApex, PortionSize, quanta, majoritySignatures, currentNodeSignatures);
         }
 
         class SyncStorageItem: ContextualBase
         {
-            public SyncStorageItem(ExecutionContext context, ulong batchId, int portionSize, List<SyncQuantaBatchItem> quanta, List<QuantumSignatures> signatures)
+            public SyncStorageItem(ExecutionContext context, ulong batchId, int portionSize, List<SyncQuantaBatchItem> quanta, List<MajoritySignaturesBatchItem> majoritySignatures, List<SingleNodeSignaturesBatchItem> signatures)
                 :base(context)
             {
                 BatchStart = batchId;
                 BatchEnd = batchId + BatchSize - 1; //batch start is inclusive
                 Quanta = new ApexItemsBatch<SyncQuantaBatchItem>(Context, batchId, BatchSize, portionSize, quanta);
-                Signatures = new ApexItemsBatch<QuantumSignatures>(Context, batchId, BatchSize, portionSize, signatures);
+                MajoritySignatures = new ApexItemsBatch<MajoritySignaturesBatchItem>(Context, batchId, BatchSize, portionSize, majoritySignatures);
+                CurrentNodeSignatures = new ApexItemsBatch<SingleNodeSignaturesBatchItem>(Context, batchId, BatchSize, portionSize, signatures);
             }
 
-            public ApexItemsBatch<QuantumSignatures> Signatures { get; }
+            public ApexItemsBatch<MajoritySignaturesBatchItem> MajoritySignatures { get; }
 
             public ApexItemsBatch<SyncQuantaBatchItem> Quanta { get; }
 
-            public bool IsFulfilled => Quanta.IsFulfilled && Signatures.IsFulfilled;
+            public ApexItemsBatch<SingleNodeSignaturesBatchItem> CurrentNodeSignatures { get; }
+
+            public bool IsFulfilled => Quanta.IsFulfilled && MajoritySignatures.IsFulfilled;
 
             public ulong BatchStart { get; }
 

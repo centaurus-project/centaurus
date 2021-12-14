@@ -14,8 +14,10 @@ namespace Centaurus.Domain
             {
                 case XdrSyncCursorType.Quanta:
                     return SyncCursorType.Quanta;
-                case XdrSyncCursorType.Signatures:
-                    return SyncCursorType.Signatures;
+                case XdrSyncCursorType.MajoritySignatures:
+                    return SyncCursorType.MajoritySignatures;
+                case XdrSyncCursorType.SingleNodeSignatures:
+                    return SyncCursorType.SingleNodeSignatures;
                 default:
                     throw new ArgumentNullException($"{syncCursorType} cursor type is not supported.");
             }

@@ -11,7 +11,7 @@ namespace Centaurus.Models
     public class AuditorSignatureBase
     {
         [XdrField(0)]
-        public int AuditorId { get; set; }
+        public int NodeId { get; set; }
 
         [XdrField(1)]
         public TinySignature PayloadSignature { get; set; }

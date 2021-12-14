@@ -97,12 +97,12 @@ namespace Centaurus.Test
         private void ExecuteWithOrderbook(int iterations, bool useNormalDistribution, Action<Action> executor)
         {
             var rnd = new Random();
-            var asset = context.Constellation.Assets[1].Code;
+            var asset = context.ConstellationSettingsManager.Current.Assets[1].Code;
             var market = context.Exchange.GetMarket(asset);
 
 
             var orderRequestProcessor = new OrderRequestProcessor(context);
-            var testTradeResults = new Dictionary<RequestQuantum, QuantumProcessingItem>();
+            var testTradeResults = new Dictionary<ClientRequestQuantum, QuantumProcessingItem>();
             for (var i = 1; i < iterations; i++)
             {
                 var price = useNormalDistribution ? rnd.NextNormallyDistributed() + 50 : rnd.NextDouble() * 100;
@@ -127,7 +127,7 @@ namespace Centaurus.Test
                     request.Side = OrderSide.Sell;
                 }
 
-                var trade = new RequestQuantum
+                var trade = new ClientRequestQuantum
                 {
                     Apex = (ulong)i,
                     RequestEnvelope = new MessageEnvelope
@@ -140,7 +140,7 @@ namespace Centaurus.Test
 
                 testTradeResults.Add(trade, new QuantumProcessingItem(trade, System.Threading.Tasks.Task.FromResult(true)) { Initiator = initiator });
             }
-            var baseAsset = context.Constellation.QuoteAsset.Code;
+            var baseAsset = context.ConstellationSettingsManager.Current.QuoteAsset.Code;
             var xlmStartBalance = account1.GetBalance(baseAsset).Amount + account2.GetBalance(baseAsset).Amount;
             var assetStartBalance = account1.GetBalance(asset).Amount + account2.GetBalance(asset).Amount;
 
@@ -192,7 +192,7 @@ namespace Centaurus.Test
         {
             ExecuteWithOrderbook(iterations, useNormalDistribution, executeOrders => PerfCounter.MeasureTime(executeOrders, () =>
             {
-                var market = context.Exchange.GetMarket(context.Constellation.Assets[1].Code);
+                var market = context.Exchange.GetMarket(context.ConstellationSettingsManager.Current.Assets[1].Code);
                 return $"{iterations} iterations, orderbook size: {market.Bids.Count} bids,  {market.Asks.Count} asks, {market.Bids.GetBestPrice().ToString("G3")}/{market.Asks.GetBestPrice().ToString("G3")} spread.";
             }));
         }
@@ -206,7 +206,7 @@ namespace Centaurus.Test
             var random = new Random();
             var price = 1D;
             var side = OrderSide.Buy;
-            var asset = context.Constellation.Assets[1].Code;
+            var asset = context.ConstellationSettingsManager.Current.Assets[1].Code;
 
             var orderbook = context.Exchange.GetOrderbook(asset, side);
             var ordersCount = 1000;

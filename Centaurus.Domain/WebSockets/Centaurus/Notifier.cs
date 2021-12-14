@@ -20,10 +20,10 @@ namespace Centaurus.Domain
         {
             if (context == null)
                 throw new ArgumentNullException(nameof(context));
-            context.ExtensionsManager.BeforeNotify(account, envelope);
             if (context.IncomingConnectionManager.TryGetConnection(account, out IncomingConnectionBase connection))
                 try
                 {
+                    context.ExtensionsManager.BeforeNotify(account, envelope);
                     _ = connection.SendMessage(envelope);
                 }
                 catch { }

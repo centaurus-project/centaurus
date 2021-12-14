@@ -93,11 +93,11 @@ namespace Centaurus.Test.Exchange.Analytics
             var rnd = new Random();
             var asset = "USD";
             var orderRequestProcessor = new OrderRequestProcessor(context);
-            var testTradeResults = new Dictionary<RequestQuantum, QuantumProcessingItem>();
+            var testTradeResults = new Dictionary<ClientRequestQuantum, QuantumProcessingItem>();
             for (var i = 1; i < iterations; i++)
             {
                 var price = useNormalDistribution ? rnd.NextNormallyDistributed() + 50 : rnd.NextDouble() * 100;
-                var trade = new RequestQuantum
+                var trade = new ClientRequestQuantum
                 {
                     Apex = (ulong)i,
                     RequestEnvelope = new MessageEnvelope
@@ -122,7 +122,7 @@ namespace Centaurus.Test.Exchange.Analytics
             PerfCounter.MeasureTime(() =>
             {
                 foreach (var trade in testTradeResults)
-                    context.Exchange.ExecuteOrder(asset, context.Constellation.QuoteAsset.Code, trade.Value);
+                    context.Exchange.ExecuteOrder(asset, context.ConstellationSettingsManager.Current.QuoteAsset.Code, trade.Value);
             }, () =>
             {
                 var market = context.Exchange.GetMarket(asset);
@@ -141,7 +141,7 @@ namespace Centaurus.Test.Exchange.Analytics
         {
             try
             {
-                foreach (var asset in context.Constellation.Assets)
+                foreach (var asset in context.ConstellationSettingsManager.Current.Assets)
                 {
                     if (asset.IsQuoteAsset) //base asset
                         continue;

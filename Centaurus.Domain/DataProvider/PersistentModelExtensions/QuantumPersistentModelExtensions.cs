@@ -12,17 +12,16 @@ namespace Centaurus.Domain
         {
             return new SyncQuantaBatchItem
             {
-                Quantum = (Quantum)XdrConverter.Deserialize<Message>(quantumPersistentModel.RawQuantum),
-                AlphaSignature = quantumPersistentModel.Signatures.First().ToDomainModel()
+                Quantum = (Quantum)XdrConverter.Deserialize<Message>(quantumPersistentModel.RawQuantum)
             };
         }
 
-        public static QuantumSignatures ToQuantumSignatures(this QuantumPersistentModel quantumPersistentModel)
+        public static MajoritySignaturesBatchItem ToMajoritySignatures(this QuantumPersistentModel quantumPersistentModel)
         {
-            return new QuantumSignatures
+            return new MajoritySignaturesBatchItem
             {
                 Apex = quantumPersistentModel.Apex,
-                Signatures = quantumPersistentModel.Signatures.Skip(1).Select(s => s.ToDomainModel()).ToList()
+                Signatures = quantumPersistentModel.Signatures.Select(s => s.ToDomainModel()).ToList()
             };
         }
     }

@@ -39,6 +39,9 @@ namespace Centaurus.Domain
                 SyncRoot.Wait();
                 try
                 {
+                    if (pendingUpdates.QuantaCount < 1)
+                        return;
+
                     logger.Info($"About to updated batch. Id: {pendingUpdates.Id}, apex range: {pendingUpdates.FirstApex}-{pendingUpdates.LastApex}, quanta: {pendingUpdates.QuantaCount}, effects: {pendingUpdates.EffectsCount}, affected accounts: {pendingUpdates.AffectedAccountsCount}.");
 
                     pendingUpdates.Complete(Context);
@@ -98,11 +101,11 @@ namespace Centaurus.Domain
                     }
                     catch (Exception exc)
                     {
-                        updates = null;
                         if (Context.NodesManager.CurrentNode.State != State.Failed)
                         {
                             Context.NodesManager.CurrentNode.Failed(new Exception("Saving failed.", exc));
                         }
+                        return;
                     }
                 }
             }
@@ -164,7 +167,7 @@ namespace Centaurus.Domain
                 }));
 
             if (quantumProcessingItem.HasSettingsUpdate)
-                pendingUpdates.AddConstellation(Context.Constellation.ToPesrsistentModel());
+                pendingUpdates.AddConstellation(Context.ConstellationSettingsManager.Current.ToPesrsistentModel());
 
             pendingUpdates.AddAffectedAccounts(quantumProcessingItem.Effects.Select(e => e.Account).Where(a => a != null));
 

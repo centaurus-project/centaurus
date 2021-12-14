@@ -21,7 +21,7 @@ namespace Centaurus
         {
             if (context == null)
                 throw new ArgumentNullException(nameof(context));
-            return context.Constellation.Auditors.Count;
+            return context.NodesManager.AllNodes.Count;
         }
 
         public static int GetMajorityCount(int totalAuditorsCount)
@@ -42,9 +42,6 @@ namespace Centaurus
         {
             if (context == null)
                 throw new ArgumentNullException(nameof(context));
-
-            if (context.Constellation == null)
-                return false;
 
             if (!isCurrentIncluded)
                 //+1 is current auditor

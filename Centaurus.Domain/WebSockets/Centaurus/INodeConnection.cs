@@ -1,5 +1,4 @@
-﻿using Centaurus.Domain.StateManagers;
-using Centaurus.Models;
+﻿using Centaurus.Models;
 
 namespace Centaurus.Domain
 {

@@ -15,7 +15,7 @@ namespace Centaurus.Domain
         {
         }
 
-        public override ConnectionState[] ValidConnectionStates { get; } = new ConnectionState[] { ConnectionState.Connected };
+        public override bool IsAuthenticatedOnly => false;
 
         public override string SupportedMessageType { get; } = typeof(HandshakeResponse).Name;
 
@@ -42,7 +42,7 @@ namespace Centaurus.Domain
         {
             //if Alpha is not ready, close connection
             if (clientConnection.Context.NodesManager.CurrentNode.State != State.Ready)
-                throw new ConnectionCloseException(WebSocketCloseStatus.ProtocolError, "Alpha is not in Ready state.");
+                throw new ConnectionCloseException(WebSocketCloseStatus.ProtocolError, "Server is not ready.");
 
             //if account not presented, throw UnauthorizedException
             if (clientConnection.Account == null)

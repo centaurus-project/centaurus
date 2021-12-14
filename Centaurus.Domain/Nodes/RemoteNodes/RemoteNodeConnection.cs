@@ -7,7 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
 
-namespace Centaurus.Domain.StateManagers
+namespace Centaurus.Domain.RemoteNodes
 {
     internal class RemoteNodeConnection : ContextualBase
     {
@@ -16,15 +16,9 @@ namespace Centaurus.Domain.StateManagers
         {
             Node = node ?? throw new ArgumentNullException(nameof(node));
 
-            OutgoingMessageStorage = new OutgoingMessageStorage();
-            OutgoingResultsStorage = new OutgoingResultsStorage(OutgoingMessageStorage);
         }
 
         public RemoteNode Node { get; }
-
-        public OutgoingMessageStorage OutgoingMessageStorage { get; }
-
-        public OutgoingResultsStorage OutgoingResultsStorage { get; }
 
         public void Run()
         {
@@ -39,19 +33,25 @@ namespace Centaurus.Domain.StateManagers
             }
         }
 
-        public void Shutdown()
+        public async Task Shutdown()
         {
+            var closeTask = Task.CompletedTask;
             lock (syncRoot)
             {
                 isAborted = true;
-                Connection?.CloseConnection();
-                OutgoingResultsStorage.Dispose();
+                if (Connection != null)
+                    closeTask = Connection.CloseConnection();
             }
+            await closeTask;
         }
 
         public RawPubKey PubKey => Node.PubKey;
 
         public Uri Address => Node.Address;
+
+        public event Action OnConnected;
+
+        public event Action OnConnectionClosed;
 
         private void ConnectToAuditor()
         {
@@ -59,7 +59,6 @@ namespace Centaurus.Domain.StateManagers
             {
                 Uri connectionUri = GetConnectionUri();
                 var connectionAttempts = 0;
-                var listenTask = default(Task);
                 while (!isAborted)
                 {
                     //TODO: remove this condition after refactoring result message broadcasting
@@ -71,8 +70,10 @@ namespace Centaurus.Domain.StateManagers
                     }
                     lock (syncRoot)
                     {
-                        if (!isAborted)
-                            Connection = new OutgoingConnection(Context, Node, OutgoingMessageStorage, Context.OutgoingConnectionFactory.GetConnection());
+                        if (isAborted)
+                            return;
+                        Connection = new OutgoingConnection(Context, Node, Context.OutgoingConnectionFactory.GetConnection());
+                        Connection.OnAuthenticated += Connection_OnAuthenticated;
                     }
                     try
                     {
@@ -89,16 +90,23 @@ namespace Centaurus.Domain.StateManagers
                     }
                     finally
                     {
+                        Connection.OnAuthenticated -= Connection_OnAuthenticated;
                         Connection.Dispose();
                         Connection = null;
+                        OnConnectionClosed?.Invoke();
                     }
                 }
             });
         }
 
+        private void Connection_OnAuthenticated(ConnectionBase obj)
+        {
+            OnConnected?.Invoke();
+        }
+
         private Uri GetConnectionUri()
         {
-            var uriBuilder = new UriBuilder(Address);
+            var uriBuilder = new UriBuilder(new Uri(Address, WebSocketConstants.CentaurusWebSocketEndPoint));
             var query = HttpUtility.ParseQueryString(uriBuilder.Query);
             query[WebSocketConstants.PubkeyParamName] = Context.Settings.KeyPair.AccountId;
             uriBuilder.Query = query.ToString();

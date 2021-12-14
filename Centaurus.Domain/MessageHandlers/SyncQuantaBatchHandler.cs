@@ -21,7 +21,7 @@ namespace Centaurus.Domain
 
         public override string SupportedMessageType { get; } = typeof(SyncQuantaBatch).Name;
 
-        public override ConnectionState[] ValidConnectionStates => new ConnectionState[] { ConnectionState.Ready };
+        public override bool IsAuthenticatedOnly => true;
 
         public override async Task HandleMessage(OutgoingConnection connection, IncomingMessage message)
         {
@@ -30,21 +30,14 @@ namespace Centaurus.Domain
 
         private async Task AddQuantaToQueue(OutgoingConnection connection, IncomingMessage message)
         {
-            var quantumHandler = Context.QuantumHandler;
             var quantaBatch = (SyncQuantaBatch)message.Envelope.Message;
-
-            //get last known apex
-            var lastKnownApex = quantumHandler.LastAddedQuantumApex;
-
             var quanta = quantaBatch.Quanta;
+            var lastKnownApex = Context.QuantumHandler.CurrentApex;
             foreach (var processedQuantum in quanta)
             {
                 var quantum = (Quantum)processedQuantum.Quantum;
-                if (quantum.Apex <= lastKnownApex)
-                {
-                    logger.Trace($"Received {quantum.Apex}, expected {lastKnownApex + 1}");
+                if (quantum.Apex <= lastKnownApex) //delayed quantum
                     continue;
-                }
 
                 if (quantum.Apex != lastKnownApex + 1)
                 {
@@ -53,20 +46,15 @@ namespace Centaurus.Domain
                         Cursors = new List<SyncCursor> {
                             new SyncCursor {
                                 Type = XdrSyncCursorType.Quanta,
-                                Cursor = quantumHandler.LastAddedQuantumApex
+                                Cursor = Context.QuantumHandler.CurrentApex
                             }
                         }
                     }.CreateEnvelope<MessageEnvelopeSignless>());
-                    logger.Warn($"Batch has invalid quantum apexes (current: {quantumHandler.LastAddedQuantumApex}, received: {quantum.Apex}). New apex cursor request sent.");
+                    logger.Warn($"Batch has invalid quantum apexes (current: {Context.QuantumHandler.CurrentApex}, received: {quantum.Apex}). New apex cursor request sent.");
                     return;
                 }
 
                 Context.QuantumHandler.HandleAsync(quantum, QuantumSignatureValidator.Validate(quantum));
-                Context.ResultManager.Add(new QuantumSignatures
-                {
-                    Apex = quantum.Apex,
-                    Signatures = new List<NodeSignatureInternal> { processedQuantum.AlphaSignature }
-                });
                 lastKnownApex = quantum.Apex;
             }
         }

@@ -15,9 +15,9 @@ namespace Centaurus.Domain
             if (context == null)
                 throw new ArgumentNullException(nameof(context));
 
-            return (context.Constellation == null
+            return (context.ConstellationSettingsManager.Current == null
                     ? context.Settings.GenesisAuditors.Select(a => (RawPubKey)a.PubKey)
-                    : context.Constellation.Auditors.Select(a => a.PubKey))
+                    : context.ConstellationSettingsManager.Current.Auditors.Select(a => a.PubKey))
                     .ToList();
         }
 
@@ -34,13 +34,14 @@ namespace Centaurus.Domain
                 PubKey = currentNode.AccountId
             };
 
-            var constellationSettings = context.Constellation; 
+            var constellationSettings = context.ConstellationSettingsManager.Current; 
             if (constellationSettings != null)
             {
                 info.Providers = constellationSettings.Providers.ToArray();
                 info.Auditors = constellationSettings.Auditors
                     .Select(a => new ConstellationInfo.Auditor { PubKey = a.PubKey.GetAccountId(), Address = a.Address })
                     .ToArray();
+                info.Alpha = context.NodesManager.AlphaNode?.AccountId ?? "";
                 info.MinAccountBalance = constellationSettings.MinAccountBalance;
                 info.MinAllowedLotSize = constellationSettings.MinAllowedLotSize;
                 info.Assets = constellationSettings.Assets.ToArray();
@@ -49,7 +50,7 @@ namespace Centaurus.Domain
             return info;
         }
 
-        public static async Task HandleConstellationQuantum(this ExecutionContext context, ConstellationMessageEnvelope constellationInitEnvelope)
+        public static async Task<ulong> HandleConstellationQuantum(this ExecutionContext context, ConstellationMessageEnvelope constellationInitEnvelope)
         {
             if (context == null)
                 throw new ArgumentNullException(nameof(context));
@@ -61,6 +62,8 @@ namespace Centaurus.Domain
             var quantumProcessingItem = context.QuantumHandler.HandleAsync(constellationQuantum, Task.FromResult(true));
 
             await quantumProcessingItem.OnProcessed;
+
+            return quantumProcessingItem.Apex;
         }
     }
 }

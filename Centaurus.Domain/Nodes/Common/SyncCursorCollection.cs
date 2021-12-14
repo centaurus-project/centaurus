@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace Centaurus.Domain.StateManagers
+namespace Centaurus.Domain.Nodes.Common
 {
     internal class SyncCursorCollection
     {

@@ -19,9 +19,6 @@ namespace Centaurus.Models
         [XdrField(0)]
         public Message Quantum { get; set; }
 
-        [XdrField(1)]
-        public NodeSignatureInternal AlphaSignature { get; set; }
-
         public ulong Apex => ((Quantum)Quantum).Apex;
     }
 }

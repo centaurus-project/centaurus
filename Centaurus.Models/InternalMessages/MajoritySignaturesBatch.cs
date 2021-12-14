@@ -6,21 +6,18 @@ using System.Text;
 namespace Centaurus.Models
 {
     [XdrContract]
-    public class QuantumMajoritySignaturesBatch : Message
+    public class MajoritySignaturesBatch : Message
     {
         [XdrField(0)]
-        public List<QuantumSignatures> Signatures { get; set; }
+        public List<MajoritySignaturesBatchItem> Items { get; set; }
     }
 
     [XdrContract]
-    public class QuantumSignatures: IApex
+    public class MajoritySignaturesBatchItem: IApex
     {
         [XdrField(0)]
         public ulong Apex { get; set; }
 
-        /// <summary>
-        /// Contains all quantum's signatures except Alpha
-        /// </summary>
         [XdrField(1)]
         public List<NodeSignatureInternal> Signatures { get; set; }
     }

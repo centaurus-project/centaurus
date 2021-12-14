@@ -19,7 +19,7 @@ namespace Centaurus.Domain
         {
             UpdateNonce(quantumProcessingItem);
 
-            Context.Exchange.RemoveOrder(quantumProcessingItem, Context.Constellation.QuoteAsset.Code);
+            Context.Exchange.RemoveOrder(quantumProcessingItem, Context.ConstellationSettingsManager.Current.QuoteAsset.Code);
 
             var resultMessage = quantumProcessingItem.Quantum.CreateEnvelope<MessageEnvelopeSignless>().CreateResult(ResultStatusCode.Success);
             return Task.FromResult((QuantumResultMessageBase)resultMessage);
@@ -29,7 +29,7 @@ namespace Centaurus.Domain
         {
             ValidateNonce(quantumProcessingItem);
 
-            var quantum = (RequestQuantum)quantumProcessingItem.Quantum;
+            var quantum = (ClientRequestQuantum)quantumProcessingItem.Quantum;
             var orderRequest = (OrderCancellationRequest)quantum.RequestMessage;
 
             var orderWrapper = Context.Exchange.OrderMap.GetOrder(orderRequest.OrderId);

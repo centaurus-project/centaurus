@@ -45,6 +45,7 @@ namespace Centaurus.Test
             await Task.Factory.StartNew(() =>
             {
                 context.Complete();
+                context.Dispose();
             });
 
             //verify that quantum is in the storage
@@ -63,6 +64,10 @@ namespace Centaurus.Test
             context = new ExecutionContext(settings, storage, new MockPaymentProviderFactory(), new DummyConnectionWrapperFactory());
             Assert.AreEqual(State.Rising, context.NodesManager.CurrentNode.State);
 
+            await context.Catchup.AddNodeBatch(TestEnvironment.Auditor1KeyPair, new CatchupQuantaBatch { Quanta = new List<CatchupQuantaBatchItem>(), HasMore = false });
+
+            Assert.AreEqual(State.Running, context.NodesManager.CurrentNode.State);
+
             var targetQuantum = context.SyncStorage.GetQuanta(quantum.Apex - 1, 1).FirstOrDefault();
 
             Assert.NotNull(targetQuantum);
@@ -71,9 +76,6 @@ namespace Centaurus.Test
 
             Assert.AreEqual(quantumFromStorage.Apex, result.Apex);
             Assert.IsInstanceOf<AccountDataRequestQuantum>(targetQuantum.Quantum);
-
-            //context.NodesManager.CurrentNode.Rised();
-            Assert.AreEqual(State.Running, context.NodesManager.CurrentNode.State);
 
             Assert.IsNull(context.PersistentStorage.LoadPendingQuanta());
         }

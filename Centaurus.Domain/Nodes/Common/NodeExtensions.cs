@@ -1,5 +1,4 @@
-﻿using Centaurus.Domain.StateManagers;
-using Centaurus.Models;
+﻿using Centaurus.Models;
 using System;
 
 namespace Centaurus.Domain
@@ -37,13 +36,6 @@ namespace Centaurus.Domain
                 throw new ArgumentNullException(nameof(node));
 
             return node.IsRunning() || node.IsWaitingForInit();
-        }
-
-        public static ConnectionBase GetConnection(this RemoteNode node)
-        {
-            if (node == null)
-                throw new ArgumentNullException(nameof(node));
-            return (ConnectionBase)node.IncomingConnection ?? node.OutgoingConnection;
         }
     }
 }

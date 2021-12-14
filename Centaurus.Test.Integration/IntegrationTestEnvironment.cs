@@ -110,7 +110,7 @@ namespace Centaurus.Test
                 SyncBatchSize = 500,
                 GenesisAuditors = auditors,
                 ConnectionString = "",
-                ParticipationLevel = 1
+                IsPrimeNode = true
             };
             settings.Build();
             return settings;

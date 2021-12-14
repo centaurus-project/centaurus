@@ -4,6 +4,8 @@ namespace Centaurus.Domain.Models
 {
     public class ConstellationInfo
     {
+        public string Alpha { get; set; }
+
         public ulong Apex { get; set; }
 
         public string PubKey { get; set; }

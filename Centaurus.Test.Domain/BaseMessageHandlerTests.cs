@@ -27,7 +27,7 @@ namespace Centaurus.Test
                     });
         }
 
-        protected IncomingConnectionBase GetIncomingConnection(ExecutionContext context, RawPubKey pubKey, ConnectionState? state = null)
+        protected IncomingConnectionBase GetIncomingConnection(ExecutionContext context, RawPubKey pubKey, bool isAuthenticated = false)
         {
             var connection = default(IncomingConnectionBase);
             if (context.NodesManager.TryGetNode(pubKey, out var node))
@@ -35,17 +35,19 @@ namespace Centaurus.Test
             else
                 connection = new IncomingClientConnection(context, pubKey, new DummyWebSocket(), "127.0.0.1");
 
-            if (state != null)
-                connection.ConnectionState = state.Value;
+            if (isAuthenticated)
+            {
+                var connectionType = typeof(IncomingConnectionBase);
+                var authField = connectionType.GetField("isAuthenticated", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                authField.SetValue(connection, true);
+            }
             return connection;
         }
 
-        protected OutgoingConnection GetOutgoingConnection(ExecutionContext context, RawPubKey pubKey, ConnectionState? state = null)
+        protected OutgoingConnection GetOutgoingConnection(ExecutionContext context, RawPubKey pubKey)
         {
             context.NodesManager.TryGetNode(pubKey, out var node);
-            var connection = new OutgoingConnection(context, node, new OutgoingMessageStorage(), new DummyConnectionWrapper(new DummyWebSocket()));
-            if (state != null)
-                connection.ConnectionState = state.Value;
+            var connection = new OutgoingConnection(context, node, new DummyConnectionWrapper(new DummyWebSocket()));
             return connection;
         }
     }

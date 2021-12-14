@@ -33,7 +33,9 @@ namespace Centaurus.Domain
                 if (currentBatch.Count < 1 && aboveApex < Context.QuantumHandler.CurrentApex)
                     throw new Exception("No quanta from database.");
 
-                var signaturesBatch = Context.SyncStorage.GetSignatures(aboveApex, batchSize).ToDictionary(s => s.Apex, s => s.Signatures);
+                var majoritySignaturesBatch = Context.SyncStorage
+                    .GetMajoritySignatures(aboveApex, batchSize)
+                    .ToDictionary(s => s.Apex, s => s.Signatures);
 
                 var batch = new CatchupQuantaBatch
                 {
@@ -49,19 +51,12 @@ namespace Centaurus.Domain
                     //if quantum was persisted, than it contains majority signatures already. Otherwise we need to obtain it from the result manager
                     if (apex > Context.PendingUpdatesManager.LastPersistedApex)
                         Context.ResultManager.TryGetSignatures(apex, out quantumSignatures);
-                    else
-                    {
-                        var alphaSignature = quantum.AlphaSignature;
-                        if (signaturesBatch.TryGetValue(apex, out quantumSignatures))
-                            quantumSignatures.Insert(0, quantum.AlphaSignature);
-                        else
-                            quantumSignatures = new List<NodeSignatureInternal> { quantum.AlphaSignature };
-                    }
-                    if (quantumSignatures.Count < 1)
+                    else if (!majoritySignaturesBatch.TryGetValue(apex, out quantumSignatures))
                     {
                         Context.NodesManager.CurrentNode.Failed(new Exception($"Unable to find signatures for quantum {apex}"));
                         return;
                     }
+
                     batch.Quanta.Add(new CatchupQuantaBatchItem
                     {
                         Quantum = quantum.Quantum,

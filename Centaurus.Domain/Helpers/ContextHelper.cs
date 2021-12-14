@@ -14,9 +14,9 @@ namespace Centaurus.Domain
         /// <returns></returns>
         public static List<KeyPair> GetRelevantAuditors(this ExecutionContext context)
         {
-            return (context.Constellation == null
+            return (context.ConstellationSettingsManager.Current == null
                 ? context.Settings.GenesisAuditors.Select(a => a.PubKey)
-                : context.Constellation.Auditors.Select(a => (KeyPair)a.PubKey))
+                : context.ConstellationSettingsManager.Current.Auditors.Select(a => (KeyPair)a.PubKey))
                 .ToList();
         }
     }

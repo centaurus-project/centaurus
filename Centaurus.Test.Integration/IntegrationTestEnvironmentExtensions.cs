@@ -244,7 +244,7 @@ namespace Centaurus.Test
 
             var messageType = quantum.GetType().Name;
             var account = default(Account);
-            if (quantum is RequestQuantum requestQuantum)
+            if (quantum is ClientRequestQuantum requestQuantum)
             {
                 messageType = requestQuantum.RequestMessage.GetMessageType();
                 account = context.AccountStorage.GetAccount(requestQuantum.RequestMessage.Account);

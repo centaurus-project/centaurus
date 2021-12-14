@@ -31,9 +31,9 @@ namespace Centaurus.Domain
         /// <param name="settings">Application config</param>
         /// <param name="storage">Persistent storage object</param>
         internal ExecutionContext(
-            Settings settings, 
-            IPersistentStorage storage, 
-            PaymentProvidersFactoryBase paymentProviderFactory, 
+            Settings settings,
+            IPersistentStorage storage,
+            PaymentProvidersFactoryBase paymentProviderFactory,
             OutgoingConnectionFactoryBase connectionFactory)
         {
             DynamicSerializersInitializer.Init();
@@ -48,15 +48,11 @@ namespace Centaurus.Domain
 
             PersistentStorage.Connect(GetAbsolutePath(Settings.ConnectionString));
 
-            RoleManager = new RoleManager((CentaurusNodeParticipationLevel)Settings.ParticipationLevel);
-
             ExtensionsManager = new ExtensionsManager(GetAbsolutePath(Settings.ExtensionsConfigFilePath));
 
             DataProvider = new DataProvider(this);
 
             QuantumProcessor = new QuantumProcessorsStorage(this);
-
-            PendingUpdatesManager = new UpdatesManager(this);
 
             MessageHandlers = new MessageHandlers(this);
 
@@ -68,48 +64,58 @@ namespace Centaurus.Domain
 
             InfoConnectionManager = new InfoConnectionManager(this);
 
-            SyncQuantaDataWorker = new SyncQuantaDataWorker(this);
-
             ProxyWorker = new ProxyWorker(this);
 
             Catchup = new Catchup(this);
 
-            var persistentData = DataProvider.GetPersistentData();
+            ConstellationSettingsManager = new ConstellationSettingsManager(this);
 
-            StateNotifier = new StateNotifierWorker(this);
+            var persistentData = DataProvider.GetPersistentData();
             var currentState = persistentData == default ? State.WaitingForInit : State.Rising;
             NodesManager = new NodesManager(this, currentState);
+            NodesManager.CurrentNode.StateChanged += CurrentNode_StateChanged;
 
             var lastApex = persistentData.snapshot?.Apex ?? 0;
             var lastHash = persistentData.snapshot?.LastHash ?? new byte[32];
 
-            SyncStorage = new SyncStorage(this, lastApex);
+            StateNotifier = new StateNotifierWorker(this);
+
+            PendingUpdatesManager = new UpdatesManager(this);
 
             QuantumHandler = new QuantumHandler(this, lastApex, lastHash);
 
             ResultManager = new ResultManager(this);
 
-            //apply data, if presented in db
-            if (persistentData != default)
-            {
-                //apply snapshot if not null
-                if (persistentData.snapshot != null)
-                    Init(persistentData.snapshot);
+            PerformanceStatisticsManager = new PerformanceStatisticsManager(this);
 
-                if (persistentData.pendingQuanta != null)
-                    HandlePendingQuanta(persistentData.pendingQuanta);
+            //apply snapshot if not null
+            if (persistentData.snapshot != null)
+                Init(persistentData.snapshot);
+            else
+                SetNodes().Wait();
 
-                if (!IsAlpha)
-                    NodesManager.CurrentNode.Rised();
-            }
+            if (persistentData.pendingQuanta != null)
+                HandlePendingQuanta(persistentData.pendingQuanta);
 
-            if (Constellation == null)
-                SetNodes();
+            SyncStorage = new SyncStorage(this, lastApex);
+
+            SyncQuantaDataWorker = new SyncQuantaDataWorker(this);
+        }
+
+        private void CurrentNode_StateChanged(StateChangedEventArgs stateChangedEventArgs)
+        {
+            var state = stateChangedEventArgs.State;
+            var prevState = stateChangedEventArgs.PrevState;
+            if (state != State.Ready && prevState == State.Ready) //close all connections (except auditors)
+                IncomingConnectionManager.CloseAllConnections(false).Wait();
+            if (prevState == State.Rising && (state == State.Running || state == State.Ready))
+                //after node successfully started, the pending quanta can be deleted
+                PersistentStorage.DeletePendingQuanta();
         }
 
         private void HandlePendingQuanta(List<CatchupQuantaBatchItem> pendingQuanta)
         {
-            _ = Catchup.AddAuditorState(Settings.KeyPair, new CatchupQuantaBatch { Quanta = pendingQuanta, HasMore = false });
+            _ = Catchup.AddNodeBatch(Settings.KeyPair, new CatchupQuantaBatch { Quanta = pendingQuanta, HasMore = false });
         }
 
         private string GetAbsolutePath(string path)
@@ -123,18 +129,18 @@ namespace Centaurus.Domain
 
         public void Init(Snapshot snapshot)
         {
-            UpdateConstellationSettings(snapshot.ConstellationSettings);
+            UpdateConstellationSettings(snapshot.ConstellationSettings).Wait();
 
             AccountStorage = new AccountStorage(snapshot.Accounts);
 
-            Exchange = Exchange.RestoreExchange(Constellation.Assets, snapshot.Orders, RoleManager.ParticipationLevel == CentaurusNodeParticipationLevel.Prime);
+            Exchange = Exchange.RestoreExchange(ConstellationSettingsManager.Current.Assets, snapshot.Orders, Settings.IsPrimeNode);
 
             SetupPaymentProviders(snapshot.Cursors);
 
             AnalyticsManager = new AnalyticsManager(
                 PersistentStorage,
                 DepthsSubscription.Precisions.ToList(),
-                Constellation.Assets.Where(a => !a.IsQuoteAsset).Select(a => a.Code).ToList(), //all but quote asset
+                ConstellationSettingsManager.Current.Assets.Where(a => !a.IsQuoteAsset).Select(a => a.Code).ToList(), //all but quote asset
                 snapshot.Orders.Select(o => o.Order.ToOrderInfo()).ToList()
             );
 
@@ -146,20 +152,12 @@ namespace Centaurus.Domain
             Exchange.OnUpdates += Exchange_OnUpdates;
         }
 
-        public void UpdateConstellationSettings(ConstellationSettings constellationSettings)
+        public async Task UpdateConstellationSettings(ConstellationSettings constellationSettings)
         {
-            Constellation = constellationSettings;
-
-            AuditorIds = Constellation.Auditors.ToDictionary(a => Constellation.GetAuditorId(a.PubKey), a => a.PubKey);
-            AuditorPubKeys = AuditorIds.ToDictionary(a => a.Value, a => a.Key);
-            AlphaId = AuditorPubKeys[Constellation.Alpha];
+            ConstellationSettingsManager.Add(constellationSettings);
 
             //update current auditors
-            SetNodes();
-
-            SetRole();
-
-            IncomingConnectionManager.CleanupAuditorConnections();
+            await SetNodes();
         }
 
         public void Complete()
@@ -187,39 +185,28 @@ namespace Centaurus.Domain
             PendingUpdatesManager.UpdateBatch(true);
             //save all completed quanta
             PendingUpdatesManager.ApplyUpdates();
+
+            //if init quantum wasn't save, don't save pending quanta
+            if (PendingUpdatesManager.LastPersistedApex == 0)
+                return;
+
             //persist all pending quanta
             PendingUpdatesManager.PersistPendingQuanta();
         }
 
-        private void SetNodes()
+        private async Task SetNodes()
         {
-            var auditors = Constellation != null
-                ? Constellation.Auditors.ToList()
+            var auditors = ConstellationSettingsManager.Current != null
+                ? ConstellationSettingsManager.Current.Auditors.ToList()
                 : Settings.GenesisAuditors.Select(a => new Auditor { PubKey = a.PubKey, Address = a.Address }).ToList();
-            NodesManager.SetAuditors(auditors);
-        }
-
-        private void SetRole()
-        {
-            if (RoleManager.ParticipationLevel == CentaurusNodeParticipationLevel.Auditor)
-            {
-                if (Constellation.Alpha.Equals((RawPubKey)Settings.KeyPair))
-                    throw new InvalidOperationException("Server with Auditor level cannot be set as Alpha.");
-                return;
-            }
-            if (Constellation.Alpha.Equals((RawPubKey)Settings.KeyPair))
-            {
-                RoleManager.SetRole(CentaurusNodeRole.Alpha);
-            }
-            else
-                RoleManager.SetRole(CentaurusNodeRole.Beta);
+            await NodesManager.SetAuditors(auditors);
         }
 
         private void SetupPaymentProviders(Dictionary<string, string> cursors)
         {
             PaymentProvidersManager?.Dispose();
 
-            var settings = Constellation.Providers.Select(p =>
+            var settings = ConstellationSettingsManager.Current.Providers.Select(p =>
             {
                 var providerId = PaymentProviderBase.GetProviderId(p.Provider, p.Name);
                 cursors.TryGetValue(providerId, out var cursor);
@@ -238,8 +225,8 @@ namespace Centaurus.Domain
 
         private void PaymentProvider_OnPaymentCommit(PaymentProviderBase paymentProvider, PaymentProvider.Models.DepositNotificationModel notification)
         {
-            if (!IsAlpha || NodesManager.CurrentNode.State != State.Ready)
-                throw new OperationCanceledException($"Current server is not ready to process deposits. Is Alpha: {IsAlpha}, State: {NodesManager.CurrentNode.State}");
+            if (!(NodesManager.IsAlpha && NodesManager.CurrentNode.State == State.Ready))
+                throw new OperationCanceledException($"Current server is not ready to process deposits. Is Alpha: {NodesManager.IsAlpha}, State: {NodesManager.CurrentNode.State}");
 
             QuantumHandler.HandleAsync(new DepositQuantum { Source = notification.ToDomainModel() }, Task.FromResult(true));
         }
@@ -259,16 +246,7 @@ namespace Centaurus.Domain
             PerformanceStatisticsManager.Dispose();
         }
 
-        private async void AppState_StateChanged(StateChangedEventArgs stateChangedEventArgs)
-        {
-            var state = stateChangedEventArgs.State;
-            var prevState = stateChangedEventArgs.PrevState;
-            if (state != State.Ready && prevState == State.Ready) //close all connections (except auditors)
-                await IncomingConnectionManager.CloseAllConnections(false);
-            if (prevState == State.Rising && state == State.Running || state == State.Ready)
-                //after node successfully started, the pending quanta can be deleted
-                PersistentStorage.DeletePendingQuanta();
-        }
+        public event Action OnComplete;
 
         public DataProvider DataProvider { get; }
 
@@ -276,15 +254,11 @@ namespace Centaurus.Domain
 
         public UpdatesManager PendingUpdatesManager { get; }
 
-        public bool IsAlpha => RoleManager.Role == CentaurusNodeRole.Alpha;
-
         public ExtensionsManager ExtensionsManager { get; }
 
         public QuantumProcessorsStorage QuantumProcessor { get; }
 
         public SyncStorage SyncStorage { get; }
-
-        public RoleManager RoleManager { get; }
 
         public IPersistentStorage PersistentStorage { get; }
 
@@ -295,6 +269,8 @@ namespace Centaurus.Domain
         internal NodesManager NodesManager { get; }
 
         internal StateNotifierWorker StateNotifier { get; }
+
+        internal ConstellationSettingsManager ConstellationSettingsManager { get; }
 
         public QuantumHandler QuantumHandler { get; }
 
@@ -322,20 +298,8 @@ namespace Centaurus.Domain
 
         private PerformanceStatisticsManager PerformanceStatisticsManager { get; }
 
-        public HashSet<int> AssetIds { get; private set; }
-
         public AnalyticsManager AnalyticsManager { get; private set; }
 
-        public ConstellationSettings Constellation { get; private set; }
-
-        public Dictionary<byte, RawPubKey> AuditorIds { get; private set; }
-
-        public Dictionary<RawPubKey, byte> AuditorPubKeys { get; private set; }
-
         public OutgoingConnectionFactoryBase OutgoingConnectionFactory { get; }
-
-        public byte AlphaId { get; private set; }
-
-        public event Action OnComplete;
     }
 }

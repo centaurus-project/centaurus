@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    internal class RequestQuantaBatchHandler : MessageHandlerBase<IncomingNodeConnection>
+    internal class RequestQuantaBatchHandler : MessageHandlerBase
     {
         public RequestQuantaBatchHandler(ExecutionContext context)
             : base(context)
@@ -14,12 +14,14 @@ namespace Centaurus.Domain
 
         }
 
+        public override bool IsAuditorOnly => true;
+
         public override string SupportedMessageType { get; } = typeof(RequestQuantaBatch).Name;
 
-        public override Task HandleMessage(IncomingNodeConnection connection, IncomingMessage message)
+        public override Task HandleMessage(ConnectionBase connection, IncomingMessage message)
         {
             var requests = (RequestQuantaBatch)message.Envelope.Message;
-            if (Context.IsAlpha)
+            if (Context.NodesManager.IsAlpha)
             {
                 foreach (var request in requests.Requests)
                 {

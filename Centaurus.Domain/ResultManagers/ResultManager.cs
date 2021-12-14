@@ -37,7 +37,7 @@ namespace Centaurus.Domain
             results.Add(processingResult);
         }
 
-        public void Add(QuantumSignatures resultMessage)
+        public void Add(MajoritySignaturesBatchItem resultMessage)
         {
             auditorResults.Add(resultMessage);
         }
@@ -73,7 +73,7 @@ namespace Centaurus.Domain
 
         private BlockingCollection<QuantumProcessingItem> results = new BlockingCollection<QuantumProcessingItem>();
 
-        private BlockingCollection<QuantumSignatures> auditorResults = new BlockingCollection<QuantumSignatures>();
+        private BlockingCollection<MajoritySignaturesBatchItem> auditorResults = new BlockingCollection<MajoritySignaturesBatchItem>();
 
         private void ProcessResults()
         {
@@ -112,7 +112,7 @@ namespace Centaurus.Domain
             });
         }
 
-        private void AddInternal(QuantumSignatures signaturesMessage)
+        private void AddInternal(MajoritySignaturesBatchItem signaturesMessage)
         {
             //auditor can send delayed results
             if (signaturesMessage.Apex <= Context.PendingUpdatesManager.LastPersistedApex)
@@ -179,7 +179,7 @@ namespace Centaurus.Domain
             {
                 var currentBatchId = currentBatchIds.Last();
                 var nextBatchId = currentBatchId + batchSize;
-                if (nextBatchId - Context.QuantumHandler.LastAddedQuantumApex < advanceThreshold)
+                if (nextBatchId - Context.QuantumHandler.CurrentApex < advanceThreshold)
                     CreateBatch(nextBatchId);
                 //copy batch to be able to modify original
                 var _currentBatchIds = currentBatchIds.ToList();
@@ -258,7 +258,7 @@ namespace Centaurus.Domain
                 lock (syncRoot)
                 {
 
-                    if (processedAuditors.Contains(signature.AuditorId))
+                    if (processedAuditors.Contains(signature.NodeId))
                         return;
 
                     //if current server is not Alpha than it can delay
@@ -269,22 +269,23 @@ namespace Centaurus.Domain
                     }
 
                     //obtain auditor from constellation
-                    if (!Manager.Context.AuditorIds.TryGetValue((byte)signature.AuditorId, out var auditor))
+                    if (!(Manager.Context.ConstellationSettingsManager.TryGetForApex(Apex, out var constellation) 
+                        && constellation.TryGetNodePubKey((byte)signature.NodeId, out var nodePubKey)))
                         return;
 
                     //check if signature is valid and tx signature is presented for TxResultMessage
-                    if (signature.PayloadSignature.IsValid(auditor, ProcessingItem.PayloadHash))
+                    if (signature.PayloadSignature.IsValid(nodePubKey, ProcessingItem.PayloadHash))
                         AddValidSignature(signature);
 
                     majorityResult = GetMajorityResult();
-                    if (IsFinalized || majorityResult == MajorityResult.Unknown || !IsSignedByAlpha())
+                    if (IsFinalized || majorityResult == MajorityResult.Unknown)
                         return;
                     else if (majorityResult == MajorityResult.Unreachable)
                     {
                         var votesCount = signatures.Count;
 
                         var quantum = ProcessingItem.Quantum;
-                        SequentialRequestMessage requestMessage = quantum is RequestQuantumBase requestQuantum
+                        SequentialRequestMessage requestMessage = quantum is ClientRequestQuantumBase requestQuantum
                             ? requestQuantum.RequestMessage
                             : null;
 
@@ -310,40 +311,20 @@ namespace Centaurus.Domain
                     //mark as acknowledged
                     ProcessingItem.Acknowledged();
                     //send result to auditors
-                    Manager.Context.NodesManager.EnqueueResult(new AuditorResult { Apex = Apex, Signature = signature });
+                    Manager.Context.SyncStorage.AddCurrentNodeSignature(new SingleNodeSignaturesBatchItem { Apex = Apex, Signature = signature });
                     ProcessOutrunSignatures(this);
                 }
             }
 
             private void AddValidSignature(NodeSignatureInternal signature)
             {
-                processedAuditors.Add(signature.AuditorId);
+                processedAuditors.Add(signature.NodeId);
                 //skip if processed or current auditor already sent the result
                 if (IsFinalized)
                     return;
-                //Alpha signature must always be first
-                if (signature.AuditorId == ProcessingItem.AlphaId)
-                {
-                    signatures.Insert(0, signature);
-                    ProcessingItem.ResultMessage.PayloadProof.Signatures.Insert(0, signature.PayloadSignature);
-                    //add quantum to quantum sync storage
-                    Manager.Context.SyncStorage.AddQuantum(Apex,
-                        new SyncQuantaBatchItem
-                        {
-                            Quantum = ProcessingItem.Quantum,
-                            AlphaSignature = signature
-                        });
-                }
-                else
-                {
-                    signatures.Add(signature);
-                    ProcessingItem.ResultMessage.PayloadProof.Signatures.Add(signature.PayloadSignature);
-                }
-            }
 
-            private bool IsSignedByAlpha()
-            {
-                return signatures.Any(s => s.AuditorId == ProcessingItem.AlphaId);
+                signatures.Add(signature);
+                ProcessingItem.ResultMessage.PayloadProof.Signatures.Add(signature.PayloadSignature);
             }
 
             private NodeSignatureInternal AddCurrentNodeSignature()
@@ -359,7 +340,7 @@ namespace Centaurus.Domain
             {
                 var currentAuditorSignature = new NodeSignatureInternal
                 {
-                    AuditorId = ProcessingItem.CurrentAuditorId,
+                    NodeId = ProcessingItem.CurrentAuditorId,
                     PayloadSignature = ProcessingItem.PayloadHash.Sign(Manager.Context.Settings.KeyPair)
                 };
 
@@ -425,10 +406,10 @@ namespace Centaurus.Domain
                 //assign signatures to persistent model
                 ProcessingItem.PersistentModel.Signatures = signatures.Select(s => s.ToPersistenModel()).ToList();
                 //add signatures to sync storage
-                Manager.Context.SyncStorage.AddSignatures(Apex, new QuantumSignatures
-                {
-                    Apex = Apex,
-                    Signatures = signatures.Skip(1).ToList() //skip first. The first signature will be synced with quantum
+                Manager.Context.SyncStorage.AddSignatures(new MajoritySignaturesBatchItem 
+                { 
+                    Apex = Apex, 
+                    Signatures = signatures.ToList() 
                 });
             }
 

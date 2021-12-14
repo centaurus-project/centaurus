@@ -46,7 +46,7 @@ namespace Centaurus.Domain
                         hasQuantaToSend = requestsToSend != null;
                         if (hasQuantaToSend)
                         {
-                            if (!Context.NodesManager.TryGetNode(Context.Constellation.Alpha, out var node))
+                            if (!Context.NodesManager.TryGetNode(Context.ConstellationSettingsManager.Current.Alpha, out var node))
                                 throw new Exception($"Unable to get Alpha node.");
                             var connection = node.GetConnection();
                             if (connection == null)
@@ -79,11 +79,11 @@ namespace Centaurus.Domain
 
         public OutgoingConnection AlphaConnection { get; private set; }
 
-        public void AddRequestsToQueue(params MessageEnvelopeBase[] clientRequests)
+        public void AddRequestsToQueue(params MessageEnvelopeBase[] requests)
         {
-            if (!Context.IsAlpha)
+            if (!Context.NodesManager.IsAlpha)
                 lock (quantaCollectionSyncRoot)
-                    requests.AddRange(clientRequests);
+                    this.requests.AddRange(requests);
             //TODO: add to QuantumHandler
         }
 

@@ -23,7 +23,7 @@ namespace Centaurus.Domain
             {
                 await SendMessage(new HandshakeRequest { HandshakeData = handshakeData });
                 await Task.Delay(5000); //wait for 5 sec to validate connection
-                if (ConnectionState == ConnectionState.Connected)
+                if (!IsAuthenticated)
                     await CloseConnection(WebSocketCloseStatus.ProtocolError, "Handshake response wasn't send.");
             });
         }
@@ -32,11 +32,10 @@ namespace Centaurus.Domain
 
         public bool TryValidate(HandshakeData handshakeData)
         {
-            if (handshakeData == null
-                || !handshakeData.Equals(this.handshakeData))
+            if (!this.handshakeData.Equals(handshakeData))
                 return false;
 
-            ConnectionState = ConnectionState.Ready;
+            Authenticated();
             return true;
         }
     }

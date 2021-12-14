@@ -28,7 +28,7 @@ namespace Centaurus.Domain
         private Dictionary<RawPubKey, CatchupQuantaBatch> validAuditorStates = new Dictionary<RawPubKey, CatchupQuantaBatch>();
         private System.Timers.Timer applyDataTimer;
 
-        public async Task AddAuditorState(RawPubKey pubKey, CatchupQuantaBatch auditorState)
+        public async Task AddNodeBatch(RawPubKey pubKey, CatchupQuantaBatch nodeBatch)
         {
             await semaphoreSlim.WaitAsync();
             try
@@ -40,24 +40,13 @@ namespace Centaurus.Domain
                     return;
                 }
 
-                if (!(applyDataTimer.Enabled || pubKey.Equals(Context.Settings.KeyPair))) //start timer
+                if (!(applyDataTimer.Enabled)) //start timer
                     applyDataTimer.Start();
 
-                if (!allAuditorStates.TryGetValue(pubKey, out var pendingAuditorBatch))
-                {
-                    pendingAuditorBatch = auditorState;
-                    allAuditorStates.Add(pubKey, auditorState);
-                    if (applyDataTimer.Enabled)
-                        applyDataTimer.Reset();
-                    logger.Trace($"Auditor state from {pubKey.GetAccountId()} added.");
-                }
-                else if (!AddQuanta(pubKey, pendingAuditorBatch, auditorState)) //check if auditor sent all quanta already
-                {
-                    logger.Warn($"Unable to add auditor {pubKey.GetAccountId()} state.");
+                if (!TryGetNodeBatch(pubKey, nodeBatch, out var aggregatedNodeBatch))
                     return;
-                }
 
-                if (pendingAuditorBatch.HasMore) //wait while auditor will send all quanta it has
+                if (aggregatedNodeBatch.HasMore) //wait while auditor will send all quanta it has
                 {
                     logger.Trace($"Auditor {pubKey.GetAccountId()} has more quanta. Timer is reset.");
                     applyDataTimer.Reset(); //if timer is running reset it. We need to try to wait all possible auditors data 
@@ -66,7 +55,7 @@ namespace Centaurus.Domain
 
                 logger.Trace($"Auditor {pubKey.GetAccountId()} state is validated.");
 
-                validAuditorStates.Add(pubKey, pendingAuditorBatch);
+                validAuditorStates.Add(pubKey, aggregatedNodeBatch);
 
                 int majority = Context.GetMajorityCount(),
                 totalAuditorsCount = Context.GetTotalAuditorsCount();
@@ -82,6 +71,24 @@ namespace Centaurus.Domain
             {
                 semaphoreSlim.Release();
             }
+        }
+
+        private bool TryGetNodeBatch(RawPubKey pubKey, CatchupQuantaBatch batch, out CatchupQuantaBatch aggregatedNodeBatch)
+        {
+            if (!allAuditorStates.TryGetValue(pubKey, out aggregatedNodeBatch))
+            {
+                aggregatedNodeBatch = batch;
+                allAuditorStates.Add(pubKey, batch);
+                applyDataTimer.Reset();
+                logger.Trace($"Auditor state from {pubKey.GetAccountId()} added.");
+            }
+            else if (!AddQuanta(pubKey, aggregatedNodeBatch, batch)) //check if auditor sent all quanta already
+            {
+                logger.Warn($"Unable to add auditor {pubKey.GetAccountId()} state.");
+                return false;
+            }
+
+            return true;
         }
 
         private bool AddQuanta(RawPubKey pubKey, CatchupQuantaBatch currentBatch, CatchupQuantaBatch newBatch)
@@ -118,7 +125,7 @@ namespace Centaurus.Domain
                 int majority = Context.GetMajorityCount(),
                 totalAuditorsCount = Context.GetTotalAuditorsCount();
 
-                if (Context.HasMajority(validAuditorStates.Count))
+                if (Context.HasMajority(validAuditorStates.Count) || !Context.NodesManager.IsAlpha)
                 {
                     await ApplyAuditorsData();
                     allAuditorStates.Clear();
@@ -146,7 +153,7 @@ namespace Centaurus.Domain
         private void InitTimer()
         {
             applyDataTimer = new System.Timers.Timer();
-            applyDataTimer.Interval = 15000; //15 sec
+            applyDataTimer.Interval = TimeSpan.FromSeconds(Context.Settings.CatchupTimeout).TotalMilliseconds;
             applyDataTimer.AutoReset = false;
             applyDataTimer.Elapsed += ApplyDataTimer_Elapsed;
         }
@@ -162,7 +169,6 @@ namespace Centaurus.Domain
             {
                 semaphoreSlim.Release();
             }
-
         }
 
         private async Task ApplyAuditorsData()
@@ -176,7 +182,7 @@ namespace Centaurus.Domain
         {
             foreach (var quantumItem in quanta)
             {
-                Context.ResultManager.Add(new QuantumSignatures { Apex = quantumItem.quantum.Apex, Signatures = quantumItem.signatures });
+                Context.ResultManager.Add(new MajoritySignaturesBatchItem { Apex = quantumItem.quantum.Apex, Signatures = quantumItem.signatures });
 
                 //compute quantum hash before processing
                 var originalQuantumHash = quantumItem.quantum.ComputeHash();
@@ -209,7 +215,7 @@ namespace Centaurus.Domain
             //get last known apex
             var lastQuantumApex = Context.DataProvider.GetLastApex();
             //get current auditors settings
-            var auditorsSettings = GetAuditorsSettings(Context.Constellation);
+            var auditorsSettings = GetAuditorsSettings(Context.ConstellationSettingsManager.Current);
 
             foreach (var currentQuantaGroup in quanta)
             {
@@ -238,14 +244,10 @@ namespace Centaurus.Domain
 
         private (int alphaId, List<RawPubKey> auditors) GetAuditorsSettings(ConstellationSettings constellation)
         {
-            var auditors = constellation.Auditors
-             .Select(a => new RawPubKey(a.PubKey))
-             .ToList();
-            var alphaId = constellation.GetAuditorId(constellation.Alpha);
-            if (alphaId < 0)
-                throw new ArgumentNullException("Unable to find Alpha id.");
+            if (Context.NodesManager.AlphaNode == null)
+                throw new ArgumentNullException("Alpha node is not connected.");
 
-            return (alphaId, auditors);
+            return (Context.NodesManager.AlphaNode.Id, Context.NodesManager.AllNodes.Select(n => n.PubKey).ToList());
         }
 
         private (Quantum quantum, List<NodeSignatureInternal> signatures) GetQuantumData(ulong apex, List<CatchupQuantaBatchItem> allQuanta, int alphaId, List<RawPubKey> auditors)
@@ -262,18 +264,18 @@ namespace Centaurus.Domain
                 var currentPayloadHash = currentQuantum.GetPayloadHash();
 
                 //verify that quantum has alpha signature
-                if (!currentItem.Signatures.Any(s => s.AuditorId == alphaId))
+                if (!currentItem.Signatures.Any(s => s.NodeId == alphaId))
                     continue;
 
                 //validate each signature
                 foreach (var signature in currentItem.Signatures)
                 {
                     //skip if current auditor is already presented in signatures, but force alpha signature to be checked
-                    if (signature.AuditorId != alphaId && signatures.ContainsKey(signature.AuditorId))
+                    if (signature.NodeId != alphaId && signatures.ContainsKey(signature.NodeId))
                         continue;
 
                     //try get auditor
-                    var signer = auditors.ElementAtOrDefault(signature.AuditorId);
+                    var signer = auditors.ElementAtOrDefault(signature.NodeId);
                     //if auditor is not found or it's signature already added, move to the next signature
                     if (signer == null || !signature.PayloadSignature.IsValid(signer, currentPayloadHash))
                         continue;
@@ -281,7 +283,7 @@ namespace Centaurus.Domain
                     if (payloadHash != null && !ByteArrayPrimitives.Equals(payloadHash, currentPayloadHash))
                     {
                         //if there are several quanta with same apex but with different hash signed by Alpha
-                        if (alphaId == signature.AuditorId)
+                        if (alphaId == signature.NodeId)
                             throw new Exception($"Alpha {signer.GetAccountId()} private key is compromised. Apex {apex}.");
                         //skip invalid signature
                         continue;
@@ -298,7 +300,7 @@ namespace Centaurus.Domain
                             //skip invalid signature
                             continue;
                     }
-                    signatures[signature.AuditorId] = signature;
+                    signatures[signature.NodeId] = signature;
                 }
 
                 //continue if quantum already set

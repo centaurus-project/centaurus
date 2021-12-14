@@ -17,11 +17,11 @@ namespace Centaurus.Domain
         {
         }
 
-        public override ConnectionState[] ValidConnectionStates { get; } = new ConnectionState[] { ConnectionState.Ready };
+        public override bool IsAuthenticatedOnly => true;
 
         public override Task HandleMessage(ConnectionBase connection, IncomingMessage message)
         {
-            if (Context.IsAlpha)
+            if (Context.NodesManager.IsAlpha)
             {
                 Context.QuantumHandler.HandleAsync(RequestQuantumHelper.GetQuantum(message.Envelope), Task.FromResult(true));
             }

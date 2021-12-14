@@ -22,7 +22,9 @@ namespace Centaurus.Domain
                     return new WithdrawalRequestQuantum { RequestEnvelope = envelope };
                 default:
                     if (envelope.Message is SequentialRequestMessage)
-                        return new RequestQuantum { RequestEnvelope = envelope };
+                        return new ClientRequestQuantum { RequestEnvelope = envelope };
+                    else if (envelope.Message is ConstellationRequestMessage)
+                        return new ConstellationQuantum { RequestEnvelope = envelope };
                     else
                         throw new Exception($"{envelope.Message.GetMessageType()} is not request quantum message.");
             }

@@ -19,7 +19,7 @@ namespace Centaurus
             if (alphaHostFactory == null)
                 throw new ArgumentNullException(nameof(alphaHostFactory));
 
-            if (context.RoleManager.ParticipationLevel == CentaurusNodeParticipationLevel.Prime)
+            if (context.Settings.IsPrimeNode)
                 AlphaStartup = new AlphaStartup(context, alphaHostFactory);
         }
 

@@ -12,7 +12,7 @@ namespace Centaurus.Domain
             this.quantumProcessingItem = quantumProcessingItem ?? throw new ArgumentNullException(nameof(quantumProcessingItem));
             this.baseAsset = baseAsset ?? throw new ArgumentNullException(nameof(baseAsset));
             this.market = market ?? throw new ArgumentNullException(nameof(market));
-            var orderRequest = (OrderRequest)((RequestQuantumBase)quantumProcessingItem.Quantum).RequestMessage;
+            var orderRequest = (OrderRequest)((ClientRequestQuantumBase)quantumProcessingItem.Quantum).RequestMessage;
 
             takerOrder = new OrderWrapper(
                 new Order

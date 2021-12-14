@@ -43,7 +43,7 @@ namespace Centaurus.Test
 
             var depositAmount = (ulong)new Random().Next(10, 1000);
 
-            var providerSettings = context.Constellation.Providers.First();
+            var providerSettings = context.ConstellationSettingsManager.Current.Providers.First();
 
             var paymentNotification = new DepositNotificationModel
             {
@@ -105,7 +105,7 @@ namespace Centaurus.Test
 
             var envelope = order.CreateEnvelope();
             envelope.Sign(accountKeypair);
-            var quantum = new RequestQuantum
+            var quantum = new ClientRequestQuantum
             {
                 RequestEnvelope = envelope
             };
@@ -136,7 +136,7 @@ namespace Centaurus.Test
             };
 
             var envelope = order.CreateEnvelope().Sign(TestEnvironment.Client1KeyPair);
-            var quantum = new RequestQuantum { RequestEnvelope = envelope };
+            var quantum = new ClientRequestQuantum { RequestEnvelope = envelope };
 
             await AssertQuantumHandling(quantum);
 
@@ -152,7 +152,7 @@ namespace Centaurus.Test
             var ordersCount = acc.Orders.Count;
 
             envelope = orderCancellation.CreateEnvelope().Sign(useFakeSigner ? TestEnvironment.Client2KeyPair : TestEnvironment.Client1KeyPair);
-            quantum = new RequestQuantum { RequestEnvelope = envelope };
+            quantum = new ClientRequestQuantum { RequestEnvelope = envelope };
 
             await AssertQuantumHandling(quantum, excpectedException);
             if (excpectedException != null)
@@ -160,7 +160,7 @@ namespace Centaurus.Test
                 //remove created order
                 orderCancellation.OrderId = orderId - apexMod;
                 envelope = orderCancellation.CreateEnvelope().Sign(TestEnvironment.Client1KeyPair);
-                quantum = new RequestQuantum { RequestEnvelope = envelope };
+                quantum = new ClientRequestQuantum { RequestEnvelope = envelope };
                 await AssertQuantumHandling(quantum);
                 return;
             }
@@ -177,13 +177,13 @@ namespace Centaurus.Test
         public async Task WithdrawalQuantumTest(ulong amount, bool useFakeSigner, Type excpectedException)
         {
             var account = context.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
-            var providerSettings = context.Constellation.Providers.First();
+            var providerSettings = context.ConstellationSettingsManager.Current.Providers.First();
             var withdrawal = new WithdrawalRequest
             {
                 Account = account.Pubkey,
                 RequestId = (long)account.Nonce + 1,
                 Amount = amount,
-                Asset = context.Constellation.QuoteAsset.Code,
+                Asset = context.ConstellationSettingsManager.Current.QuoteAsset.Code,
                 Destination = KeyPair.Random().PublicKey,
                 Provider = PaymentProviderBase.GetProviderId(providerSettings.Provider, providerSettings.Name)
             };
@@ -207,7 +207,7 @@ namespace Centaurus.Test
             {
                 Account = account.Pubkey,
                 RequestId = (long)account.Nonce + 1,
-                Asset = context.Constellation.QuoteAsset.Code,
+                Asset = context.ConstellationSettingsManager.Current.QuoteAsset.Code,
                 Destination = TestEnvironment.Client2KeyPair,
                 Amount = amount
             };
@@ -215,9 +215,9 @@ namespace Centaurus.Test
             var envelope = withdrawal.CreateEnvelope();
             envelope.Sign(useFakeSigner ? TestEnvironment.Client2KeyPair : TestEnvironment.Client1KeyPair);
 
-            var quantum = new RequestQuantum { RequestEnvelope = envelope };
+            var quantum = new ClientRequestQuantum { RequestEnvelope = envelope };
 
-            var baseAsset = context.Constellation.QuoteAsset.Code;
+            var baseAsset = context.ConstellationSettingsManager.Current.QuoteAsset.Code;
             var expextedBalance = account.GetBalance(baseAsset).Amount - amount;
 
             await AssertQuantumHandling(quantum, excpectedException);
@@ -264,7 +264,7 @@ namespace Centaurus.Test
         //    if (requestLimit.HasValue)
         //        account.RequestRateLimits = new RequestRateLimits { HourLimit = (uint)requestLimit.Value, MinuteLimit = (uint)requestLimit.Value };
 
-        //    var minuteLimit = (account.RequestRateLimits ?? context.Constellation.RequestRateLimits).MinuteLimit;
+        //    var minuteLimit = (account.RequestRateLimits ?? context.ConstellationSettingsManager.Current.RequestRateLimits).MinuteLimit;
         //    var minuteIterCount = minuteLimit + 1;
         //    for (var i = 0; i < minuteIterCount; i++)
         //    {

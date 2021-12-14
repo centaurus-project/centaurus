@@ -5,7 +5,7 @@ namespace Centaurus.Models
     /// <summary>
     /// Transaction must be build on Alpha and shared with the constellation. Each auditor can build different transactions.
     /// </summary>
-    public class WithdrawalRequestQuantum: RequestQuantumBase
+    public class WithdrawalRequestQuantum: ClientRequestQuantumBase
     {
         [XdrField(0)]
         public byte[] Transaction { get; set; }

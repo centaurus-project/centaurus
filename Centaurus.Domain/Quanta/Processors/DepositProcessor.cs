@@ -68,11 +68,11 @@ namespace Centaurus.Domain
             var account = Context.AccountStorage.GetAccount(deposit.Destination);
             if (account == null)
             {
-                var baseAsset = Context.Constellation.QuoteAsset.Code;
+                var baseAsset = Context.ConstellationSettingsManager.Current.QuoteAsset.Code;
                 //ignore registration with non-base asset or with amount that is less than MinAccountBalance
-                if (deposit.Asset != baseAsset || deposit.Amount < Context.Constellation.MinAccountBalance)
+                if (deposit.Asset != baseAsset || deposit.Amount < Context.ConstellationSettingsManager.Current.MinAccountBalance)
                     return;
-                quantumProcessingItem.AddAccountCreate(Context.AccountStorage, deposit.Destination, Context.Constellation.RequestRateLimits);
+                quantumProcessingItem.AddAccountCreate(Context.AccountStorage, deposit.Destination, Context.ConstellationSettingsManager.Current.RequestRateLimits);
                 account = Context.AccountStorage.GetAccount(deposit.Destination);
             }
 

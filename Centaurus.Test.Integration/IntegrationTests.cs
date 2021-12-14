@@ -137,7 +137,7 @@ namespace Centaurus.Test
                 .CreateEnvelope()
                 .Sign(clientPk);
 
-            var quantum = new RequestQuantum
+            var quantum = new ClientRequestQuantum
             {
                 Apex = lastApex + 1,
                 PrevHash = lastHash,
@@ -168,7 +168,7 @@ namespace Centaurus.Test
                     ((Quantum)quantum.Quantum).Timestamp = DateTime.UtcNow.Ticks;
                 if (invalidClientSignature)
                 {
-                    var request = (RequestQuantum)quantum.Quantum;
+                    var request = (ClientRequestQuantum)quantum.Quantum;
                     ((MessageEnvelope)request.RequestEnvelope).Signature = new TinySignature { Data = new byte[64] };
                     request.RequestEnvelope.Sign(KeyPair.Random());
                 }
@@ -213,20 +213,20 @@ namespace Centaurus.Test
 
             var amount = invalidBalance
                 ? client.GetBalance(environment.SDKConstellationInfo.QuoteAsset.Code).Amount + 1
-                : environment.AlphaWrapper.Context.Constellation.MinAllowedLotSize + 1;
+                : environment.AlphaWrapper.Context.ConstellationSettingsManager.Current.MinAllowedLotSize + 1;
             var sqamRequest = new OrderRequest
             {
                 Account = client.Pubkey,
                 Amount = amount,
                 Price = 1,
-                Asset = environment.AlphaWrapper.Context.Constellation.Assets[1].Code,
+                Asset = environment.AlphaWrapper.Context.ConstellationSettingsManager.Current.Assets[1].Code,
                 RequestId = 1,
                 Side = OrderSide.Buy
             }.CreateEnvelope().Sign(useFakeClient ? KeyPair.Random() : clientPk);
 
             var apex = environment.AlphaWrapper.Context.QuantumHandler.CurrentApex + 1;
             var lastQuantumHash = environment.AlphaWrapper.Context.QuantumHandler.LastQuantumHash;
-            var requestQuantum = new RequestQuantum
+            var requestQuantum = new ClientRequestQuantum
             {
                 Apex = apex,
                 EffectsProof = new byte[] { },
@@ -235,18 +235,7 @@ namespace Centaurus.Test
                 Timestamp = DateTime.UtcNow.Ticks
             };
 
-            syncStorage.AddQuantum(apex, new SyncQuantaBatchItem
-            {
-                Quantum = requestQuantum,
-                AlphaSignature = new NodeSignatureInternal
-                {
-                    AuditorId = environment.AlphaWrapper.Context.AlphaId,
-                    PayloadSignature = new TinySignature
-                    {
-                        Data = environment.AlphaWrapper.Context.Settings.KeyPair.Sign(requestQuantum.GetPayloadHash())
-                    }
-                }
-            });
+            syncStorage.AddQuantum(new SyncQuantaBatchItem { Quantum = requestQuantum });
 
             var expectedState = useFakeClient || useFakeAlpha || invalidBalance ? State.Failed : State.Ready;
 

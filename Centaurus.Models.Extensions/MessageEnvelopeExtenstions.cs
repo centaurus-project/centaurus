@@ -114,7 +114,7 @@ namespace Centaurus
                 throw new ArgumentNullException(nameof(envelope));
             var resultMessage = Activator.CreateInstance<TResultMessage>();
             var messageId = envelope.Message.MessageId;
-            if (envelope.Message is RequestQuantumBase request)
+            if (envelope.Message is ClientRequestQuantumBase request)
                 messageId = request.RequestMessage.MessageId;
             resultMessage.OriginalMessageId = messageId;
             resultMessage.Status = status;
@@ -127,8 +127,8 @@ namespace Centaurus
                 throw new ArgumentNullException(nameof(envelope));
 
             var messageType = envelope.Message;
-            if (envelope.Message is RequestQuantumBase)
-                messageType = ((RequestQuantumBase)envelope.Message).RequestEnvelope.Message;
+            if (envelope.Message is ClientRequestQuantumBase)
+                messageType = ((ClientRequestQuantumBase)envelope.Message).RequestEnvelope.Message;
 
             //for not Success result return generic message
             if (status == ResultStatusCode.Success)

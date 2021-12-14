@@ -1,9 +1,6 @@
-﻿using Centaurus.Domain.Quanta.Sync;
-using Centaurus.Domain.StateManagers;
+﻿using Centaurus.Domain.Nodes.Common;
 using Centaurus.Models;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace Centaurus.Domain
 {
@@ -15,6 +12,19 @@ namespace Centaurus.Domain
             PubKey = rawPubKey ?? throw new ArgumentNullException(nameof(rawPubKey));
             AccountId = rawPubKey.GetAccountId();
         }
+
+        public bool IsAlpha => Context.NodesManager.AlphaNode == this;
+
+        public abstract bool IsPrimeNode { get; }
+
+        public void UpdateSettings(NodeSettings nodeSettings)
+        {
+            Settings = nodeSettings;
+        }
+
+        public NodeSettings Settings { get; protected set; }
+
+        public byte Id => (byte)(Settings?.Id ?? 0);
 
         public RawPubKey PubKey { get; }
 

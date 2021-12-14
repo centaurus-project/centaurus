@@ -2,15 +2,17 @@
 using NLog;
 using System;
 
-namespace Centaurus.Domain.StateManagers
+namespace Centaurus.Domain
 {
     internal class CurrentNode : NodeBase
     {
-        public CurrentNode(ExecutionContext context, RawPubKey rawPubKey, State initState)
-            :base(context, rawPubKey)
+        public CurrentNode(ExecutionContext context, State initState)
+            :base(context, context?.Settings.KeyPair)
         {
             State = initState;
         }
+
+        public override bool IsPrimeNode => Context.Settings.IsPrimeNode;
 
         public event Action<StateChangedEventArgs> StateChanged;
 
@@ -68,13 +70,13 @@ namespace Centaurus.Domain.StateManagers
         /// </summary>
         private void UpdateDelay()
         {
-            if (Context.IsAlpha)
+            if (Context.NodesManager.IsAlpha)
                 return;
             lock (syncRoot)
             {
                 var isDelayed = State.Chasing == State;
                 var currentApex = Context.QuantumHandler.CurrentApex;
-                var syncApex = Context.NodesManager.SyncSource.LastApex;
+                var syncApex = Context.NodesManager.SyncSourceManager.Source?.LastApex;
                 if (isDelayed)
                 {
                     if (syncApex <= currentApex || syncApex - currentApex < RunningDelayTreshold)
