@@ -44,7 +44,7 @@ namespace Centaurus.Domain
         {
             var quantaBatchStart = GetBatchApexStart(from + 1);
             var batch = GetBatch(quantaBatchStart);
-        
+
             return batch.Quanta.GetData(from, force);
         }
 
@@ -255,10 +255,13 @@ namespace Centaurus.Domain
             var quanta = new List<SyncQuantaBatchItem>();
             var majoritySignatures = new List<MajoritySignaturesBatchItem>();
             var currentNodeSignatures = new List<SingleNodeSignaturesBatchItem>();
+            var currentPubKey = (RawPubKey)Context.Settings.KeyPair;
             foreach (var rawQuantum in rawQuanta)
             {
                 quanta.Add(rawQuantum.ToBatchItemQuantum());
-                majoritySignatures.Add(rawQuantum.ToMajoritySignatures());
+                var signatures = rawQuantum.ToMajoritySignatures();
+                majoritySignatures.Add(signatures);
+                currentNodeSignatures.Add(GetCurrentNodeSignature(currentPubKey, rawQuantum, signatures));
             }
 
             if (batchStartApex == 0) //insert null at 0 position, otherwise index will not be relevant to apex
@@ -271,10 +274,31 @@ namespace Centaurus.Domain
             return new SyncStorageItem(Context, batchStartApex, PortionSize, quanta, majoritySignatures, currentNodeSignatures);
         }
 
-        class SyncStorageItem: ContextualBase
+        private SingleNodeSignaturesBatchItem GetCurrentNodeSignature(RawPubKey currentPubKey, QuantumPersistentModel rawQuantum, MajoritySignaturesBatchItem signatures)
+        {
+            try
+            {
+                if (!Context.ConstellationSettingsManager.TryGetForApex(rawQuantum.Apex, out var constellation))
+                    throw new Exception($"Unable to get constellation for apex {rawQuantum.Apex}");
+
+                var nodeId = constellation.GetNodeId(currentPubKey);
+                var currentNodeSignature = signatures.Signatures.FirstOrDefault(s => s.NodeId == nodeId);
+                if (currentNodeSignature == null)
+                    throw new Exception("Unable to find signature for current node.");
+
+                return new SingleNodeSignaturesBatchItem { Apex = rawQuantum.Apex, Signature = currentNodeSignature };
+            }
+            catch (Exception exc)
+            {
+                Context.NodesManager.CurrentNode.Failed(exc);
+                throw;
+            }
+        }
+
+        class SyncStorageItem : ContextualBase
         {
             public SyncStorageItem(ExecutionContext context, ulong batchId, int portionSize, List<SyncQuantaBatchItem> quanta, List<MajoritySignaturesBatchItem> majoritySignatures, List<SingleNodeSignaturesBatchItem> signatures)
-                :base(context)
+                : base(context)
             {
                 BatchStart = batchId;
                 BatchEnd = batchId + BatchSize - 1; //batch start is inclusive

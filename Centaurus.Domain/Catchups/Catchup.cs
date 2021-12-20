@@ -123,11 +123,12 @@ namespace Centaurus.Domain
                     return;
 
                 int majority = Context.GetMajorityCount(),
-                totalAuditorsCount = Context.GetTotalAuditorsCount();
+                    totalAuditorsCount = Context.GetTotalAuditorsCount();
 
                 if (Context.HasMajority(validAuditorStates.Count) || !Context.NodesManager.IsAlpha)
                 {
-                    await ApplyAuditorsData();
+                    var validQuanta = GetValidQuanta();
+                    await ApplyQuanta(validQuanta);
                     allAuditorStates.Clear();
                     validAuditorStates.Clear();
                     Context.NodesManager.CurrentNode.Rised();
@@ -171,35 +172,28 @@ namespace Centaurus.Domain
             }
         }
 
-        private async Task ApplyAuditorsData()
-        {
-            var validQuanta = GetValidQuanta();
-
-            await ApplyQuanta(validQuanta);
-        }
-
-        private async Task ApplyQuanta(List<(Quantum quantum, List<NodeSignatureInternal> signatures)> quanta)
+        private async Task ApplyQuanta(List<ValidatedQuantumData> quanta)
         {
             foreach (var quantumItem in quanta)
             {
-                Context.ResultManager.Add(new MajoritySignaturesBatchItem { Apex = quantumItem.quantum.Apex, Signatures = quantumItem.signatures });
+                Context.ResultManager.Add(new MajoritySignaturesBatchItem { Apex = quantumItem.Quantum.Apex, Signatures = quantumItem.Signatures });
 
                 //compute quantum hash before processing
-                var originalQuantumHash = quantumItem.quantum.ComputeHash();
+                var originalQuantumHash = quantumItem.Quantum.ComputeHash();
 
-                var processingItem = Context.QuantumHandler.HandleAsync(quantumItem.quantum, QuantumSignatureValidator.Validate(quantumItem.quantum));
+                var processingItem = Context.QuantumHandler.HandleAsync(quantumItem.Quantum, QuantumSignatureValidator.Validate(quantumItem.Quantum));
 
                 await processingItem.OnAcknowledged;
 
                 //compute quantum hash after processing
-                var processedQuantumHash = quantumItem.quantum.ComputeHash();
+                var processedQuantumHash = quantumItem.Quantum.ComputeHash();
                 //TODO: do we need some extra checks here?
                 if (!ByteArrayPrimitives.Equals(originalQuantumHash, processedQuantumHash))
                     throw new Exception("Quantum hash are not equal on restore.");
             }
         }
 
-        private List<(Quantum quantum, List<NodeSignatureInternal> signatures)> GetValidQuanta()
+        private List<ValidatedQuantumData> GetValidQuanta()
         {
             //group all quanta by their apex
             var quanta = allAuditorStates.Values
@@ -207,7 +201,7 @@ namespace Centaurus.Domain
                 .GroupBy(q => ((Quantum)q.Quantum).Apex)
                 .OrderBy(q => q.Key);
 
-            var validQuanta = new List<(Quantum quantum, List<NodeSignatureInternal> signatures)>();
+            var validQuanta = new List<ValidatedQuantumData>();
 
             if (quanta.Count() == 0)
                 return validQuanta;
@@ -222,17 +216,14 @@ namespace Centaurus.Domain
                 if (lastQuantumApex + 1 != currentQuantaGroup.Key)
                     throw new Exception("A quantum is missing");
 
-                var (quantum, signatures) = GetQuantumData(currentQuantaGroup.Key, currentQuantaGroup.ToList(), auditorsSettings.alphaId, auditorsSettings.auditors);
+                var validatedQuantumData = GetQuantumData(currentQuantaGroup.Key, currentQuantaGroup.ToList(), auditorsSettings.alphaId, auditorsSettings.auditors);
 
-                if (quantum == null)
-                    throw new Exception($"Unable to get quantum data for apex {currentQuantaGroup.Key}.");
-
-                validQuanta.Add((quantum, signatures));
+                validQuanta.Add(validatedQuantumData);
 
                 lastQuantumApex++;
 
                 //try to update constellation info
-                if (quantum is ConstellationQuantum constellationQuantum
+                if (validatedQuantumData.Quantum is ConstellationQuantum constellationQuantum
                     && constellationQuantum.RequestMessage is ConstellationUpdate constellationUpdate)
                 {
                     auditorsSettings = GetAuditorsSettings(constellationUpdate.ToConstellationSettings(currentQuantaGroup.Key));
@@ -250,74 +241,89 @@ namespace Centaurus.Domain
             return (Context.NodesManager.AlphaNode.Id, Context.NodesManager.AllNodes.Select(n => n.PubKey).ToList());
         }
 
-        private (Quantum quantum, List<NodeSignatureInternal> signatures) GetQuantumData(ulong apex, List<CatchupQuantaBatchItem> allQuanta, int alphaId, List<RawPubKey> auditors)
+        private ValidatedQuantumData GetQuantumData(ulong apex, List<CatchupQuantaBatchItem> allApexQuanta, int alphaId, List<RawPubKey> auditors)
         {
-            var payloadHash = default(byte[]);
-            var quantum = default(Quantum);
-            var signatures = new Dictionary<int, NodeSignatureInternal>();
+            //compute and group quanta by payload hash
+            var grouped = allApexQuanta
+                .GroupBy(q => ((Quantum)q.Quantum).GetPayloadHash(), ByteArrayComparer.Default);
 
-            foreach (var currentItem in allQuanta)
+            //validate each quantum data group
+            var validatedQuantaData = new List<ValidatedQuantumData>();
+            foreach (var quantaGroup in grouped)
             {
-                var currentQuantum = (Quantum)currentItem.Quantum;
+                validatedQuantaData.Add(ProcessQuantumGroup(auditors, quantaGroup));
+            }
+            //get majority for current auditors set
+            var majorityCount = MajorityHelper.GetMajorityCount(auditors.Count);
+            //get all quanta data with majority
+            var quantaDataWithMajority = validatedQuantaData.Where(a => a.Signatures.Count > majorityCount).ToList();
+            if (quantaDataWithMajority.Count > 1)
+                throw new Exception($"Conflict found for apex {apex}. {quantaDataWithMajority.Count} quanta data sets with majority.");
+            else if (quantaDataWithMajority.Count == 0 && validatedQuantaData.Count > 1)
+                throw new Exception($"Conflict found for apex {apex}. {validatedQuantaData.Count} quanta data sets, but no majority.");
 
-                //compute current quantum payload hash
-                var currentPayloadHash = currentQuantum.GetPayloadHash();
+            //if we have quanta data with majority, return it
+            if (quantaDataWithMajority.Count > 0)
+                return quantaDataWithMajority.First();
+            else
+                return validatedQuantaData.First();
+        }
 
-                //verify that quantum has alpha signature
-                if (!currentItem.Signatures.Any(s => s.NodeId == alphaId))
+        private ValidatedQuantumData ProcessQuantumGroup(List<RawPubKey> auditors, IGrouping<byte[], CatchupQuantaBatchItem> quantaGroup)
+        {
+            var quantumHash = quantaGroup.Key;
+            var quantum = (Quantum)quantaGroup.First().Quantum;
+            var allSignatures = quantaGroup.SelectMany(q => q.Signatures);
+            var validSignatures = new Dictionary<int, NodeSignatureInternal>();
+
+            //validate each signature
+            foreach (var signature in allSignatures)
+            {
+                //skip if current auditor is already presented in signatures
+                if (validSignatures.ContainsKey(signature.NodeId))
                     continue;
 
-                //validate each signature
-                foreach (var signature in currentItem.Signatures)
+                //try to get the node public key
+                var signer = auditors.ElementAtOrDefault(signature.NodeId - 1); //node id is index + 1
+
+                //if the node is not found or it's signature is invalid, move to the next signature
+                if (signer == null || !signature.PayloadSignature.IsValid(signer, quantumHash))
+                    continue;
+
+                //check transaction and it's signatures
+                if (quantum is WithdrawalRequestQuantum transactionQuantum)
                 {
-                    //skip if current auditor is already presented in signatures, but force alpha signature to be checked
-                    if (signature.NodeId != alphaId && signatures.ContainsKey(signature.NodeId))
-                        continue;
+                    var provider = Context.PaymentProvidersManager.GetManager(transactionQuantum.Provider);
+                    if (!provider.IsTransactionValid(transactionQuantum.Transaction, transactionQuantum.WithdrawalRequest.ToProviderModel(), out var error))
+                        throw new Exception($"Transaction is invalid.\nReason: {error}");
 
-                    //try get auditor
-                    var signer = auditors.ElementAtOrDefault(signature.NodeId);
-                    //if auditor is not found or it's signature already added, move to the next signature
-                    if (signer == null || !signature.PayloadSignature.IsValid(signer, currentPayloadHash))
-                        continue;
-
-                    if (payloadHash != null && !ByteArrayPrimitives.Equals(payloadHash, currentPayloadHash))
-                    {
-                        //if there are several quanta with same apex but with different hash signed by Alpha
-                        if (alphaId == signature.NodeId)
-                            throw new Exception($"Alpha {signer.GetAccountId()} private key is compromised. Apex {apex}.");
+                    if (!provider.AreSignaturesValid(transactionQuantum.Transaction, new SignatureModel { Signer = signature.TxSigner, Signature = signature.TxSignature }))
                         //skip invalid signature
                         continue;
-                    }
-
-                    //check transaction and it's signatures
-                    if (currentItem.Quantum is WithdrawalRequestQuantum transactionQuantum)
-                    {
-                        var provider = Context.PaymentProvidersManager.GetManager(transactionQuantum.Provider);
-                        if (!provider.IsTransactionValid(transactionQuantum.Transaction, transactionQuantum.WithdrawalRequest.ToProviderModel(), out var error))
-                            throw new Exception($"Transaction is invalid.\nReason: {error}");
-
-                        if (!provider.AreSignaturesValid(transactionQuantum.Transaction, new SignatureModel { Signer = signature.TxSigner, Signature = signature.TxSignature }))
-                            //skip invalid signature
-                            continue;
-                    }
-                    signatures[signature.NodeId] = signature;
                 }
-
-                //continue if quantum already set
-                if (quantum != null)
-                    continue;
-
-                quantum = currentQuantum;
-                payloadHash = currentPayloadHash;
+                //add valid signatures
+                validSignatures.Add(signature.NodeId, signature);
             }
-
-            return (quantum, signatures.Values.ToList());
+            return new ValidatedQuantumData(quantum, validSignatures.Values.ToList());
         }
 
         public void Dispose()
         {
             applyDataTimer?.Dispose();
             applyDataTimer = null;
+        }
+
+        class ValidatedQuantumData
+        {
+            public ValidatedQuantumData(Quantum quantum, List<NodeSignatureInternal> signatures)
+            {
+                Quantum = quantum;
+                Signatures = signatures;
+            }
+
+            public Quantum Quantum { get; }
+
+            public List<NodeSignatureInternal> Signatures { get; }
         }
     }
 }

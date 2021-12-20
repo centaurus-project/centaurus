@@ -37,14 +37,18 @@ namespace Centaurus
 
         private void Context_OnComplete()
         {
+            isContextStopped = true;
             var isSet = resetEvent.WaitOne(0);
             if (!isSet)
                 resetEvent.Set();
         }
 
+        bool isContextStopped;
+
         public void Shutdown()
         {
-            Context.Complete();
+            if (!isContextStopped)
+                Context.Complete();
             if (AlphaStartup != null)
                 AlphaStartup.Shutdown();
         }

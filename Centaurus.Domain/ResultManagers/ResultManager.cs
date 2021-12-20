@@ -245,6 +245,7 @@ namespace Centaurus.Domain
             private HashSet<int> processedAuditors = new HashSet<int>();
             private List<NodeSignatureInternal> signatures = new List<NodeSignatureInternal>();
             private List<NodeSignatureInternal> outrunResults = new List<NodeSignatureInternal>();
+            private ConstellationSettings constellation;
 
             public List<NodeSignatureInternal> GetSignatures()
             {
@@ -269,8 +270,7 @@ namespace Centaurus.Domain
                     }
 
                     //obtain auditor from constellation
-                    if (!(Manager.Context.ConstellationSettingsManager.TryGetForApex(Apex, out var constellation) 
-                        && constellation.TryGetNodePubKey((byte)signature.NodeId, out var nodePubKey)))
+                    if (!(constellation.TryGetNodePubKey((byte)signature.NodeId, out var nodePubKey)))
                         return;
 
                     //check if signature is valid and tx signature is presented for TxResultMessage
@@ -306,6 +306,11 @@ namespace Centaurus.Domain
             {
                 lock (syncRoot)
                 {
+                    if (!Manager.Context.ConstellationSettingsManager.TryGetForApex(Apex, out constellation))
+                    {
+                        Manager.Context.NodesManager.CurrentNode.Failed(new Exception($"Unable to get constellation settings for apex {Apex}."));
+                        return;
+                    }
                     ProcessingItem = quantumProcessingItem;
                     var signature = AddCurrentNodeSignature();
                     //mark as acknowledged

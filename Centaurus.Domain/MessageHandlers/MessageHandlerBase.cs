@@ -19,6 +19,7 @@ namespace Centaurus.Domain
         /// </summary>
         public abstract string SupportedMessageType { get; }
 
+        //TODO: set it to true if IsAuditorOnly == true
         /// <summary>
         /// Only messages from the authenticated connections are allowed.
         /// </summary>

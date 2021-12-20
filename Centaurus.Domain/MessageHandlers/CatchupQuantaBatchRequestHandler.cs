@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    internal class CatchupQuantaBatchRequestHandler : MessageHandlerBase<OutgoingConnection>
+    internal class CatchupQuantaBatchRequestHandler : MessageHandlerBase
     {
         public CatchupQuantaBatchRequestHandler(ExecutionContext context)
             : base(context)
@@ -17,13 +17,17 @@ namespace Centaurus.Domain
         }
         public override string SupportedMessageType => typeof(CatchupQuantaBatchRequest).Name;
 
-        public override async Task HandleMessage(OutgoingConnection connection, IncomingMessage message)
+        public override bool IsAuditorOnly => true;
+
+        public override bool IsAuthenticatedOnly => true;
+
+        public override async Task HandleMessage(ConnectionBase connection, IncomingMessage message)
         {
             var batchRequest = (CatchupQuantaBatchRequest)message.Envelope.Message;
             await SendQuanta(connection, batchRequest);
         }
 
-        private async Task SendQuanta(OutgoingConnection connection, CatchupQuantaBatchRequest batchRequest)
+        private async Task SendQuanta(ConnectionBase connection, CatchupQuantaBatchRequest batchRequest)
         {
             var aboveApex = batchRequest.LastKnownApex;
             var batchSize = Context.Settings.SyncBatchSize;

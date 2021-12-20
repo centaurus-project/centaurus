@@ -5,6 +5,7 @@ using Centaurus.Models;
 using Centaurus.PaymentProvider;
 using Centaurus.PersistentStorage;
 using Centaurus.PersistentStorage.Abstraction;
+using Microsoft.Extensions.Caching.Memory;
 using NLog;
 using System;
 using System.Collections.Generic;
@@ -94,8 +95,7 @@ namespace Centaurus.Domain
             else
                 SetNodes().Wait();
 
-            if (persistentData.pendingQuanta != null)
-                HandlePendingQuanta(persistentData.pendingQuanta);
+            HandlePendingQuanta(persistentData.pendingQuanta);
 
             SyncStorage = new SyncStorage(this, lastApex);
 
@@ -115,7 +115,11 @@ namespace Centaurus.Domain
 
         private void HandlePendingQuanta(List<CatchupQuantaBatchItem> pendingQuanta)
         {
-            _ = Catchup.AddNodeBatch(Settings.KeyPair, new CatchupQuantaBatch { Quanta = pendingQuanta, HasMore = false });
+            _ = Catchup.AddNodeBatch(Settings.KeyPair, new CatchupQuantaBatch
+            {
+                Quanta = pendingQuanta ?? new List<CatchupQuantaBatchItem>(),
+                HasMore = false
+            });
         }
 
         private string GetAbsolutePath(string path)
@@ -154,7 +158,8 @@ namespace Centaurus.Domain
 
         public async Task UpdateConstellationSettings(ConstellationSettings constellationSettings)
         {
-            ConstellationSettingsManager.Add(constellationSettings);
+            if (constellationSettings != null)
+                ConstellationSettingsManager.Update(constellationSettings);
 
             //update current auditors
             await SetNodes();
@@ -172,6 +177,8 @@ namespace Centaurus.Domain
             );
 
             PersistPendingQuanta();
+
+            OnComplete?.Invoke();
         }
 
         private void PersistPendingQuanta()

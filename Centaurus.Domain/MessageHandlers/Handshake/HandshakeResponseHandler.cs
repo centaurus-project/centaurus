@@ -52,19 +52,11 @@ namespace Centaurus.Domain
             await clientConnection.SendMessage(envelope.CreateResult(ResultStatusCode.Success));
         }
 
-        private async Task HandleAuditorHandshake(IncomingNodeConnection auditorConnection)
+        private Task HandleAuditorHandshake(IncomingNodeConnection auditorConnection)
         {
             //register connection
             auditorConnection.Node.RegisterIncomingConnection(auditorConnection);
-
-            //request quanta on rising
-            if (Context.NodesManager.CurrentNode.State == State.Rising)
-            {
-                await auditorConnection.SendMessage(new CatchupQuantaBatchRequest
-                {
-                    LastKnownApex = Context.QuantumHandler.CurrentApex
-                }.CreateEnvelope<MessageEnvelopeSignless>());
-            }
+            return Task.CompletedTask;
         }
     }
 }

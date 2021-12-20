@@ -61,13 +61,6 @@ namespace Centaurus.Domain.RemoteNodes
                 var connectionAttempts = 0;
                 while (!isAborted)
                 {
-                    //TODO: remove this condition after refactoring result message broadcasting
-                    //wait while all pending quanta will be handled
-                    if (Context.NodesManager.CurrentNode.State == State.Rising)
-                    {
-                        Thread.Sleep(1000);
-                        continue;
-                    }
                     lock (syncRoot)
                     {
                         if (isAborted)

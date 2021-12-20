@@ -16,7 +16,7 @@ namespace Centaurus.Domain
         public QuantumHandler(ExecutionContext context, ulong lastApex, byte[] lastQuantumHash)
             : base(context)
         {
-            CurrentApex = lastApex;
+            CurrentApex = LastAddedApex = lastApex;
             LastQuantumHash = lastQuantumHash ?? throw new ArgumentNullException(nameof(lastQuantumHash));
             Task.Factory.StartNew(RunQuantumWorker).Unwrap();
         }
@@ -25,6 +25,8 @@ namespace Centaurus.Domain
 
         object awaitedQuantaSyncRoot = new { };
         Queue<QuantumProcessingItem> awaitedQuanta = new Queue<QuantumProcessingItem>();
+
+        public ulong LastAddedApex { get; private set; }
 
         /// <summary>
         /// Handles the quantum and returns Task.
@@ -37,8 +39,7 @@ namespace Centaurus.Domain
                 && QuantaThrottlingManager.Current.MaxItemsPerSecond <= awaitedQuanta.Count)
                 throw new TooManyRequestsException("Server is too busy. Try again later.");
             var processingItem = new QuantumProcessingItem(quantum, signatureValidation);
-            lock (awaitedQuantaSyncRoot)
-                awaitedQuanta.Enqueue(processingItem);
+            EnqueueHandlingItem(processingItem);
             return processingItem;
         }
 
@@ -48,10 +49,24 @@ namespace Centaurus.Domain
 
         public int QuantaQueueLenght => awaitedQuanta.Count;
 
-        private bool TryGetHandlingItem(out QuantumProcessingItem handlingItem)
+        private void EnqueueHandlingItem(QuantumProcessingItem processingItem)
         {
             lock (awaitedQuantaSyncRoot)
-               return awaitedQuanta.TryDequeue(out handlingItem);
+            {
+                awaitedQuanta.Enqueue(processingItem);
+                if (processingItem.Apex > LastAddedApex)
+                    LastAddedApex = processingItem.Apex;
+            }
+        }
+
+        private bool TryDequeueHandlingItem(out QuantumProcessingItem handlingItem)
+        {
+            lock (awaitedQuantaSyncRoot)
+            {
+                if (CurrentApex > LastAddedApex)
+                    LastAddedApex = CurrentApex;
+                return awaitedQuanta.TryDequeue(out handlingItem);
+            }
         }
 
         private async Task RunQuantumWorker()
@@ -60,7 +75,7 @@ namespace Centaurus.Domain
             {
                 try
                 {
-                    if (TryGetHandlingItem(out var handlingItem))
+                    if (TryDequeueHandlingItem(out var handlingItem))
                     {
                         //after Alpha switch, quanta queue can contain requests that should be send to new Alpha server
                         if (!IsReadyToHandle(handlingItem))

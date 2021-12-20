@@ -32,7 +32,7 @@ namespace Centaurus.Domain
         {
             var quantaBatch = (SyncQuantaBatch)message.Envelope.Message;
             var quanta = quantaBatch.Quanta;
-            var lastKnownApex = Context.QuantumHandler.CurrentApex;
+            var lastKnownApex = Context.QuantumHandler.LastAddedApex;
             foreach (var processedQuantum in quanta)
             {
                 var quantum = (Quantum)processedQuantum.Quantum;
@@ -46,11 +46,11 @@ namespace Centaurus.Domain
                         Cursors = new List<SyncCursor> {
                             new SyncCursor {
                                 Type = XdrSyncCursorType.Quanta,
-                                Cursor = Context.QuantumHandler.CurrentApex
+                                Cursor = Context.QuantumHandler.LastAddedApex
                             }
                         }
                     }.CreateEnvelope<MessageEnvelopeSignless>());
-                    logger.Warn($"Batch has invalid quantum apexes (current: {Context.QuantumHandler.CurrentApex}, received: {quantum.Apex}). New apex cursor request sent.");
+                    logger.Warn($"Batch has invalid quantum apexes (current: {Context.QuantumHandler.LastAddedApex}, received: {quantum.Apex}). New apex cursor request sent.");
                     return;
                 }
 

@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    internal class CatchupQuantaBatchHandler: MessageHandlerBase<IncomingNodeConnection>
+    internal class CatchupQuantaBatchHandler: MessageHandlerBase
     {
         public CatchupQuantaBatchHandler(ExecutionContext context)
             :base(context)
@@ -15,7 +15,11 @@ namespace Centaurus.Domain
 
         public override string SupportedMessageType => typeof(CatchupQuantaBatch).Name;
 
-        public override Task HandleMessage(IncomingNodeConnection connection, IncomingMessage message)
+        public override bool IsAuditorOnly => true;
+
+        public override bool IsAuthenticatedOnly => true;
+
+        public override Task HandleMessage(ConnectionBase connection, IncomingMessage message)
         {
             _ = Context.Catchup.AddNodeBatch(connection.PubKey, (CatchupQuantaBatch)message.Envelope.Message);
             return Task.CompletedTask;

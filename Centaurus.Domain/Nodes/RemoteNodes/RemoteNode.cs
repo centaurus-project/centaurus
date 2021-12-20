@@ -27,16 +27,27 @@ namespace Centaurus.Domain
 
         private void ConnectionManager_OnConnected()
         {
+            var connection = connectionManager.GetConnection();
+
+            //request quanta on rising
+            if (Context.NodesManager.CurrentNode.State == State.Rising)
+            {
+                _ = connection.SendMessage(new CatchupQuantaBatchRequest
+                {
+                    LastKnownApex = Context.QuantumHandler.CurrentApex
+                }.CreateEnvelope<MessageEnvelopeSignless>());
+            }
+
             //subscribe for the current remote node signatures
             if (Context.NodesManager.CurrentNode.IsPrimeNode)
             {
-                var connection = connectionManager.GetConnection();
                 _ = connection.SendMessage(new SyncCursorReset
                 {
                     Cursors = new List<SyncCursor> {
                         new SyncCursor {
                             Type = XdrSyncCursorType.SingleNodeSignatures,
-                            Cursor = Context.PendingUpdatesManager.LastPersistedApex }
+                            Cursor = Context.PendingUpdatesManager.LastPersistedApex
+                        }
                     }
                 });
             }

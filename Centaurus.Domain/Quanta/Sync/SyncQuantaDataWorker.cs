@@ -61,6 +61,8 @@ namespace Centaurus.Domain
             currentCursorGroup.Nodes.Add(new NodeCursorData(node, timeToken, cursor));
             if (currentCursorGroup.LastUpdate == default || currentCursorGroup.LastUpdate > timeToken)
                 currentCursorGroup.LastUpdate = timeToken;
+            if (cursor > currentCursorGroup.HighestApex)
+                currentCursorGroup.HighestApex = cursor;
         }
 
         const int ForceTimeOut = 100;
@@ -96,21 +98,22 @@ namespace Centaurus.Domain
             return sendingQuantaTasks;
         }
 
-        private static Task<NodeSyncCursorUpdate> SendSingleBatch(SyncPortion batch, ulong currentCursor, SyncCursorType cursorType, NodeCursorData currentAuditor)
+        private static Task<NodeSyncCursorUpdate> SendSingleBatch(SyncPortion batch, ulong currentCursor, SyncCursorType cursorType, NodeCursorData nodeCursor)
         {
-            var connection = currentAuditor.Node.GetConnection();
-            if (currentAuditor.Cursor >= batch.LastDataApex || connection == null)
+            var connection = nodeCursor.Node.GetConnection();
+            if (nodeCursor.Cursor >= batch.LastDataApex || connection == null)
                 return null;
             var sendMessageTask = connection.SendMessage(batch.Data.AsMemory());
             return sendMessageTask.ContinueWith(t =>
             {
                 if (t.IsFaulted)
                 {
-                    HandleFaultedSendTask(t, currentCursor, batch, cursorType, currentAuditor);
+                    HandleFaultedSendTask(t, currentCursor, batch, cursorType, nodeCursor);
                     return null;
                 }
-                return new NodeSyncCursorUpdate(currentAuditor.Node,
-                    new SyncCursorUpdate(currentAuditor.TimeToken, batch.LastDataApex, cursorType)
+                logger.Trace($"Cursor update for node {nodeCursor.Node}. Cursor type: {cursorType}, last apex: {batch.LastDataApex}");
+                return new NodeSyncCursorUpdate(nodeCursor.Node,
+                    new SyncCursorUpdate(nodeCursor.TimeToken, batch.LastDataApex, cursorType)
                 );
             });
         }
@@ -138,13 +141,12 @@ namespace Centaurus.Domain
 
         private bool ValidateCursorGroup(CursorGroup cursorGroup)
         {
-            var currentCursor = cursorGroup.BatchId;
             var currentApex = Context.QuantumHandler.CurrentApex;
-            if (currentCursor == currentApex)
+            if (cursorGroup.HighestApex == currentApex)
                 return false;
-            if (currentCursor > currentApex && GetIsCurrentNodeReady())
+            if (cursorGroup.HighestApex > currentApex && GetIsCurrentNodeReady())
             {
-                var message = $"Node(s) {string.Join(',', cursorGroup.Nodes.Select(a => a.Node.AccountId))} is above current constellation state, cursor {currentCursor}, current apex {currentApex} type {cursorGroup.CursorType}.";
+                var message = $"Node(s) {string.Join(',', cursorGroup.Nodes.Select(a => a.Node.AccountId))} is above current constellation state, the nodes group highest apex is {cursorGroup.HighestApex}, current apex {currentApex} type {cursorGroup.CursorType}.";
                 if (cursorGroup.Nodes.Count >= Context.GetMajorityCount() - 1) //-1 is current server
                     logger.Error(message);
                 else

@@ -60,7 +60,6 @@ namespace Centaurus.Domain.Nodes
                 var candidateNode = Context.NodesManager.GetRemoteNodes()
                     .Where(n => n.IsConnected) //only connected
                     .OrderByDescending(n => n.IsAlpha) //first of all try to set alpha
-                    .ThenByDescending(n => n.IsPrimeNode) //then try to connect to prime node
                     .ThenByDescending(n => n.LastApex)
                     .FirstOrDefault();
 

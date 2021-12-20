@@ -20,6 +20,8 @@ namespace Centaurus.Domain
 
             public DateTime LastUpdate { get; set; }
 
+            public ulong HighestApex { get; set; }
+
             public List<NodeCursorData> Nodes { get; } = new List<NodeCursorData>();
         }
 

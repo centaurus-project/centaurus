@@ -13,7 +13,7 @@ namespace Centaurus.Domain.Nodes.Common
                 throw new ArgumentException("Data must contain at least two items to be able to calculate avg value.", nameof(maxItems));
         }
 
-        private List<Item<T>> data = new List<Item<T>>();
+        private List<Item> data = new List<Item>();
 
         private object syncRoot = new { };
 
@@ -21,7 +21,7 @@ namespace Centaurus.Domain.Nodes.Common
         {
             lock (syncRoot)
             {
-                data.Add(new Item<T> { AddedAt = dateTime, Value = value });
+                data.Add(new Item { AddedAt = dateTime, Value = value });
                 LastValue = value;
                 if (data.Count > 20) //remove old data
                     data.RemoveAt(0);
@@ -38,13 +38,13 @@ namespace Centaurus.Domain.Nodes.Common
 
         public abstract int GetAvg();
 
-        protected List<Item<T>> GetData()
+        protected List<Item> GetData()
         {
             lock (syncRoot)
                 return data.ToList();
         }
 
-        protected struct Item<T>
+        protected struct Item
         {
             public DateTime AddedAt { get; set; }
 
