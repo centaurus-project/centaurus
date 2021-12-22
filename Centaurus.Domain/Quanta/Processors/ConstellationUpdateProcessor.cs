@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public class ConstellationUpdateProcessor : QuantumProcessorBase
+    public class ConstellationUpdateProcessor : ConstellationUpdateProcessorBase
     {
         public ConstellationUpdateProcessor(ExecutionContext context)
             : base(context)
@@ -18,29 +18,36 @@ namespace Centaurus.Domain
 
         public override string SupportedMessageType { get; } = typeof(ConstellationUpdate).Name;
 
-        public override Task<QuantumResultMessageBase> Process(QuantumProcessingItem processingItem)
+        public override async Task<QuantumResultMessageBase> Process(QuantumProcessingItem processingItem)
         {
             var updateQuantum = (ConstellationUpdate)((ConstellationQuantum)processingItem.Quantum).RequestMessage;
 
             var settings = updateQuantum.ToConstellationSettings(processingItem.Apex);
 
-            processingItem.AddConstellationUpdate(settings, Context.ConstellationSettingsManager.Current);
-
-            var updateSnapshot = settings.ToSnapshot(
-                processingItem.Apex,
-                Context.AccountStorage?.GetAll().ToList() ?? new List<Account>(),
-                Context.Exchange?.OrderMap.GetAllOrders().ToList() ?? new List<OrderWrapper>(),
-                GetCursors(settings.Providers),
-                processingItem.Quantum.ComputeHash()
-            );
-            Context.Init(updateSnapshot);
+            await UpdateConstellationSettings(processingItem, settings);
 
             var currentNode = Context.NodesManager.CurrentNode;
-            //if state is undefined, than we need to init it
+            var cursors = GetCursors(settings.Providers);
+            //if state is WaitingForInit, than we need to init it
             if (currentNode.State == State.WaitingForInit)
-                currentNode.Init(State.Running);
+            {
+                var updateSnapshot = settings.ToSnapshot(
+                    processingItem.Apex,
+                    Context.AccountStorage?.GetAll().ToList() ?? new List<Account>(),
+                    Context.Exchange?.OrderMap.GetAllOrders().ToList() ?? new List<OrderWrapper>(),
+                    cursors,
+                    processingItem.Quantum.ComputeHash()
+                );
 
-            return Task.FromResult((QuantumResultMessageBase)processingItem.Quantum.CreateEnvelope<MessageEnvelopeSignless>().CreateResult(ResultStatusCode.Success));
+                Context.Init(updateSnapshot);
+                currentNode.Init(State.Running);
+            }
+            else
+            {
+                Context.PaymentProvidersManager.RegisterProviders(settings, cursors);
+            }
+
+            return (QuantumResultMessageBase)processingItem.Quantum.CreateEnvelope<MessageEnvelopeSignless>().CreateResult(ResultStatusCode.Success);
         }
 
         private Dictionary<string, string> GetCursors(List<ProviderSettings> providers)
@@ -63,7 +70,9 @@ namespace Centaurus.Domain
 
         public override Task Validate(QuantumProcessingItem processingItem)
         {
-            ((ConstellationQuantum)processingItem.Quantum).Validate(Context);
+            base.Validate(processingItem);
+
+            var currentConstellation = Context.ConstellationSettingsManager.Current;
 
             var requestEnvelope = ((ConstellationQuantum)processingItem.Quantum).RequestEnvelope;
 
@@ -73,7 +82,7 @@ namespace Centaurus.Domain
             if (constellationUpdate.Auditors == null || constellationUpdate.Auditors.Count() < minAuditorsCount)
                 throw new ArgumentException($"Min auditors count is {minAuditorsCount}");
 
-            if (constellationUpdate.LastUpdateApex != (Context.ConstellationSettingsManager.Current?.Apex ?? 0ul))
+            if (constellationUpdate.LastUpdateApex != (currentConstellation?.Apex ?? 0ul))
                 throw new InvalidOperationException($"Last update apex is invalid.");
 
             if (!constellationUpdate.Auditors.All(a => a.Address == null || Uri.TryCreate($"http://{a.Address}", UriKind.Absolute, out _)))
@@ -101,6 +110,14 @@ namespace Centaurus.Domain
             if (constellationUpdate.RequestRateLimits == null || constellationUpdate.RequestRateLimits.HourLimit < 1 || constellationUpdate.RequestRateLimits.MinuteLimit < 1)
                 throw new ArgumentException("Request rate limit values should be greater than 0");
 
+            if (currentConstellation != null)
+            {
+                if (!currentConstellation.Assets.All(a => constellationUpdate.Assets.Any(cua => cua.Code == a.Code)))
+                    throw new ArgumentException("Constellation update doesn't contain one or more assets.");
+
+                if (!currentConstellation.Providers.All(p => constellationUpdate.Providers.Any(cua => cua.Name == p.Name && cua.Provider == p.Provider)))
+                    throw new ArgumentException("Constellation update doesn't contain one or more payment provider.");
+            }
             return Task.CompletedTask;
         }
     }

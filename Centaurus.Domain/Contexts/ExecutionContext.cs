@@ -69,9 +69,10 @@ namespace Centaurus.Domain
 
             Catchup = new Catchup(this);
 
-            ConstellationSettingsManager = new ConstellationSettingsManager(this);
-
             var persistentData = DataProvider.GetPersistentData();
+
+            ConstellationSettingsManager = new ConstellationSettingsManager(this, persistentData.snapshot?.ConstellationSettings);
+
             var currentState = persistentData == default ? State.WaitingForInit : State.Rising;
             NodesManager = new NodesManager(this, currentState);
             NodesManager.CurrentNode.StateChanged += CurrentNode_StateChanged;
@@ -89,17 +90,33 @@ namespace Centaurus.Domain
 
             PerformanceStatisticsManager = new PerformanceStatisticsManager(this);
 
-            //apply snapshot if not null
-            if (persistentData.snapshot != null)
-                Init(persistentData.snapshot);
-            else
-                SetNodes().Wait();
-
-            HandlePendingQuanta(persistentData.pendingQuanta);
-
             SyncStorage = new SyncStorage(this, lastApex);
 
             SyncQuantaDataWorker = new SyncQuantaDataWorker(this);
+
+            PaymentProvidersManager = new PaymentProvidersManager(PaymentProviderFactory, GetAbsolutePath(Settings.PaymentConfigPath));
+            PaymentProvidersManager.OnRegistered += PaymentProvidersManager_OnRegistered;
+            PaymentProvidersManager.OnRemoved += PaymentProvidersManager_OnRemoved;
+
+            SetNodes().Wait();
+
+            //apply snapshot if not null
+            if (persistentData.snapshot != null)
+                Init(persistentData.snapshot);
+
+            HandlePendingQuanta(persistentData.pendingQuanta);
+        }
+
+        private void PaymentProvidersManager_OnRemoved(PaymentProviderBase provider)
+        {
+            provider.OnPaymentCommit -= PaymentProvider_OnPaymentCommit;
+            provider.OnError -= PaymentProvider_OnError;
+        }
+
+        private void PaymentProvidersManager_OnRegistered(PaymentProviderBase provider)
+        {
+            provider.OnPaymentCommit += PaymentProvider_OnPaymentCommit;
+            provider.OnError += PaymentProvider_OnError;
         }
 
         private void CurrentNode_StateChanged(StateChangedEventArgs stateChangedEventArgs)
@@ -133,13 +150,11 @@ namespace Centaurus.Domain
 
         public void Init(Snapshot snapshot)
         {
-            UpdateConstellationSettings(snapshot.ConstellationSettings).Wait();
-
             AccountStorage = new AccountStorage(snapshot.Accounts);
 
             Exchange = Exchange.RestoreExchange(ConstellationSettingsManager.Current.Assets, snapshot.Orders, Settings.IsPrimeNode);
 
-            SetupPaymentProviders(snapshot.Cursors);
+            PaymentProvidersManager.RegisterProviders(ConstellationSettingsManager.Current, snapshot.Cursors);
 
             AnalyticsManager = new AnalyticsManager(
                 PersistentStorage,
@@ -154,15 +169,6 @@ namespace Centaurus.Domain
             AnalyticsManager.OnError += AnalyticsManager_OnError;
             AnalyticsManager.OnUpdate += AnalyticsManager_OnUpdate;
             Exchange.OnUpdates += Exchange_OnUpdates;
-        }
-
-        public async Task UpdateConstellationSettings(ConstellationSettings constellationSettings)
-        {
-            if (constellationSettings != null)
-                ConstellationSettingsManager.Update(constellationSettings);
-
-            //update current auditors
-            await SetNodes();
         }
 
         public void Complete()
@@ -206,28 +212,7 @@ namespace Centaurus.Domain
             var auditors = ConstellationSettingsManager.Current != null
                 ? ConstellationSettingsManager.Current.Auditors.ToList()
                 : Settings.GenesisAuditors.Select(a => new Auditor { PubKey = a.PubKey, Address = a.Address }).ToList();
-            await NodesManager.SetAuditors(auditors);
-        }
-
-        private void SetupPaymentProviders(Dictionary<string, string> cursors)
-        {
-            PaymentProvidersManager?.Dispose();
-
-            var settings = ConstellationSettingsManager.Current.Providers.Select(p =>
-            {
-                var providerId = PaymentProviderBase.GetProviderId(p.Provider, p.Name);
-                cursors.TryGetValue(providerId, out var cursor);
-                var settings = p.ToProviderModel(cursor);
-                return settings;
-            }).ToList();
-
-            PaymentProvidersManager = new PaymentProvidersManager(PaymentProviderFactory, settings, GetAbsolutePath(Settings.PaymentConfigPath));
-
-            foreach (var paymentProvider in PaymentProvidersManager.GetAll())
-            {
-                paymentProvider.OnPaymentCommit += PaymentProvider_OnPaymentCommit;
-                paymentProvider.OnError += PaymentProvider_OnError;
-            }
+            await NodesManager.SetNodes(auditors);
         }
 
         private void PaymentProvider_OnPaymentCommit(PaymentProviderBase paymentProvider, PaymentProvider.Models.DepositNotificationModel notification)
@@ -246,7 +231,9 @@ namespace Centaurus.Domain
         public void Dispose()
         {
             ExtensionsManager?.Dispose();
-            PaymentProvidersManager?.Dispose();
+            PaymentProvidersManager.Dispose();
+
+            SyncQuantaDataWorker.Dispose();
 
             ResultManager.Dispose();
             DisposeAnalyticsManager();
@@ -297,7 +284,7 @@ namespace Centaurus.Domain
 
         public MessageHandlers MessageHandlers { get; }
 
-        public PaymentProvidersManager PaymentProvidersManager { get; private set; }
+        public PaymentProvidersManager PaymentProvidersManager { get; }
 
         public Exchange Exchange { get; private set; }
 

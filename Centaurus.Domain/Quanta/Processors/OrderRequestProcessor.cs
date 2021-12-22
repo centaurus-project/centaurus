@@ -12,7 +12,6 @@ namespace Centaurus.Domain
         public OrderRequestProcessor(ExecutionContext context)
             :base(context)
         {
-
         }
 
         public override string SupportedMessageType { get; } = typeof(OrderRequest).Name;
@@ -43,8 +42,8 @@ namespace Centaurus.Domain
                 throw new BadRequestException("Order asset must be different from quote asset.");
 
             var orderAsset = Context.ConstellationSettingsManager.Current.Assets.FirstOrDefault(a => a.Code == orderRequest.Asset);
-            if (orderAsset == null)
-                throw new BadRequestException("Invalid asset identifier: " + orderRequest.Asset);
+            if (orderAsset == null || orderAsset.IsSuspended)
+                throw new BadRequestException($"Asset {orderRequest.Asset} is not supported or suspended.");
 
             if (processingItem.Initiator.Orders.Any(o => o.Value.Asset == orderRequest.Asset && o.Value.Side != orderRequest.Side))
                 throw new BadRequestException("You cannot place order that crosses own order.");
@@ -91,7 +90,7 @@ namespace Centaurus.Domain
                 if (counterOrdersSum >= orderRequest.Amount)
                     break;
                 if (counterOrdersCount > MaxCrossOrdersCount)
-                    throw new BadRequestException("Failed to execute order. Maximum crossed orders length exceeded");
+                    throw new BadRequestException("Failed to execute order. Maximum crossed orders length exceeded.");
             }
         }
     }

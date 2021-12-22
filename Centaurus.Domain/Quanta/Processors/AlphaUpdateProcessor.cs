@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public class AlphaUpdateProcessor : QuantumProcessorBase
+    public class AlphaUpdateProcessor : ConstellationUpdateProcessorBase
     {
         public AlphaUpdateProcessor(ExecutionContext context)
             : base(context)
@@ -29,9 +29,7 @@ namespace Centaurus.Domain
             newConstellationSettings.Apex = processingItem.Apex;
             newConstellationSettings.Alpha = alphaUpdate.Alpha;
 
-            processingItem.AddConstellationUpdate(Context.ConstellationSettingsManager.Current, Context.ConstellationSettingsManager.Current);
-
-            await Context.UpdateConstellationSettings(newConstellationSettings);
+            await UpdateConstellationSettings(processingItem, newConstellationSettings);
 
             return (QuantumResultMessageBase)processingItem.Quantum.CreateEnvelope<MessageEnvelopeSignless>().CreateResult(ResultStatusCode.Success);
         }
@@ -42,7 +40,7 @@ namespace Centaurus.Domain
             if (currentState == State.Undefined || currentState == State.WaitingForInit)
                 throw new InvalidOperationException($"ConstellationSettingsManager.Current is not initialized yet.");
 
-            ((ConstellationQuantum)processingItem.Quantum).Validate(Context);
+            base.Validate(processingItem);
 
             var alphaUpdate = (AlphaUpdate)((ConstellationQuantum)processingItem.Quantum).RequestMessage;
 

@@ -67,8 +67,9 @@ namespace Centaurus.Domain
             if (payment.Amount <= 0)
                 throw new BadRequestException("Amount should be greater than 0");
 
-            if (!Context.ConstellationSettingsManager.Current.Assets.Any(a => a.Code == payment.Asset))
-                throw new BadRequestException($"Asset {payment.Asset} is not supported");
+            var paymentAsset = Context.ConstellationSettingsManager.Current.Assets.FirstOrDefault(a => a.Code == payment.Asset);
+            if (paymentAsset == null || paymentAsset.IsSuspended)
+                throw new BadRequestException($"Asset {payment.Asset} is not supported or suspended.");
 
             var minBalance = payment.Asset == baseAsset ? Context.ConstellationSettingsManager.Current.MinAccountBalance : 0;
             if (!(quantumProcessingItem.Initiator.GetBalance(payment.Asset)?.HasSufficientBalance(payment.Amount, minBalance) ?? false))

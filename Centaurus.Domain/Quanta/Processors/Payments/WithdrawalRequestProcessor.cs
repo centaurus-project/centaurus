@@ -37,7 +37,7 @@ namespace Centaurus.Domain
             var withdrawalRequest = (WithdrawalRequest)withdrawalQuantum.RequestMessage;
 
             var centaurusAsset = Context.ConstellationSettingsManager.Current.Assets.FirstOrDefault(a => a.Code == withdrawalRequest.Asset);
-            if (centaurusAsset == null || centaurusAsset.IsSuspended)
+            if (centaurusAsset == null)
                 throw new BadRequestException($"Constellation doesn't support asset '{withdrawalRequest.Asset}'.");
 
             if (!Context.PaymentProvidersManager.TryGetManager(withdrawalRequest.Provider, out var paymentProvider))

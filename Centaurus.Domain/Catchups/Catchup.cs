@@ -33,10 +33,10 @@ namespace Centaurus.Domain
             await semaphoreSlim.WaitAsync();
             try
             {
-                logger.Trace($"Auditor state from {pubKey.GetAccountId()} received by AlphaCatchup.");
+                logger.Trace($"Catchup quanta batch from {pubKey.GetAccountId()} received by Catchup.");
                 if (Context.NodesManager.CurrentNode.State != State.Rising)
                 {
-                    logger.Warn($"Auditor state messages can be only handled when Alpha is in rising state. State sent by {((KeyPair)pubKey).AccountId}");
+                    logger.Warn($"Catchup quanta batch messages can be only handled when Alpha is in rising state. State sent by {((KeyPair)pubKey).AccountId}");
                     return;
                 }
 
@@ -125,7 +125,7 @@ namespace Centaurus.Domain
                 int majority = Context.GetMajorityCount(),
                     totalAuditorsCount = Context.GetTotalAuditorsCount();
 
-                if (Context.HasMajority(validAuditorStates.Count) || !Context.NodesManager.IsAlpha)
+                if (Context.HasMajority(validAuditorStates.Count))
                 {
                     var validQuanta = GetValidQuanta();
                     await ApplyQuanta(validQuanta);
@@ -216,7 +216,8 @@ namespace Centaurus.Domain
                 if (lastQuantumApex + 1 != currentQuantaGroup.Key)
                     throw new Exception("A quantum is missing");
 
-                var validatedQuantumData = GetQuantumData(currentQuantaGroup.Key, currentQuantaGroup.ToList(), auditorsSettings.alphaId, auditorsSettings.auditors);
+                if (!TryGetQuantumData(currentQuantaGroup.Key, currentQuantaGroup.ToList(), auditorsSettings, out var validatedQuantumData)) //if we unable to get quanta with majority, than stop processing newer quanta
+                    break;
 
                 validQuanta.Add(validatedQuantumData);
 
@@ -233,40 +234,45 @@ namespace Centaurus.Domain
             return validQuanta;
         }
 
-        private (int alphaId, List<RawPubKey> auditors) GetAuditorsSettings(ConstellationSettings constellation)
+        private List<RawPubKey> GetAuditorsSettings(ConstellationSettings constellation)
         {
             if (Context.NodesManager.AlphaNode == null)
                 throw new ArgumentNullException("Alpha node is not connected.");
 
-            return (Context.NodesManager.AlphaNode.Id, Context.NodesManager.AllNodes.Select(n => n.PubKey).ToList());
+            return constellation.Auditors.Select(n => n.PubKey).ToList();
         }
 
-        private ValidatedQuantumData GetQuantumData(ulong apex, List<CatchupQuantaBatchItem> allApexQuanta, int alphaId, List<RawPubKey> auditors)
+        private bool TryGetQuantumData(ulong apex, List<CatchupQuantaBatchItem> allApexQuanta, List<RawPubKey> auditors, out ValidatedQuantumData validatedQuantumData)
         {
+            validatedQuantumData = null;
             //compute and group quanta by payload hash
             var grouped = allApexQuanta
                 .GroupBy(q => ((Quantum)q.Quantum).GetPayloadHash(), ByteArrayComparer.Default);
 
             //validate each quantum data group
-            var validatedQuantaData = new List<ValidatedQuantumData>();
-            foreach (var quantaGroup in grouped)
-            {
-                validatedQuantaData.Add(ProcessQuantumGroup(auditors, quantaGroup));
-            }
+            var validatedQuantaData = GetValidatedQuantaData(auditors, grouped);
+
             //get majority for current auditors set
             var majorityCount = MajorityHelper.GetMajorityCount(auditors.Count);
             //get all quanta data with majority
-            var quantaDataWithMajority = validatedQuantaData.Where(a => a.Signatures.Count > majorityCount).ToList();
+            var quantaDataWithMajority = validatedQuantaData.Where(a => a.Signatures.Count >= majorityCount).ToList();
             if (quantaDataWithMajority.Count > 1)
+            {
+                //throw exception. The case must be investigated
                 throw new Exception($"Conflict found for apex {apex}. {quantaDataWithMajority.Count} quanta data sets with majority.");
-            else if (quantaDataWithMajority.Count == 0 && validatedQuantaData.Count > 1)
-                throw new Exception($"Conflict found for apex {apex}. {validatedQuantaData.Count} quanta data sets, but no majority.");
+            }
 
             //if we have quanta data with majority, return it
-            if (quantaDataWithMajority.Count > 0)
-                return quantaDataWithMajority.First();
-            else
-                return validatedQuantaData.First();
+            validatedQuantumData = quantaDataWithMajority.FirstOrDefault();
+            return validatedQuantumData != null;
+        }
+
+        private List<ValidatedQuantumData> GetValidatedQuantaData(List<RawPubKey> auditors, IEnumerable<IGrouping<byte[], CatchupQuantaBatchItem>> grouped)
+        {
+            var validatedQuantaData = new List<ValidatedQuantumData>();
+            foreach (var quantaGroup in grouped)
+                validatedQuantaData.Add(ProcessQuantumGroup(auditors, quantaGroup));
+            return validatedQuantaData;
         }
 
         private ValidatedQuantumData ProcessQuantumGroup(List<RawPubKey> auditors, IGrouping<byte[], CatchupQuantaBatchItem> quantaGroup)

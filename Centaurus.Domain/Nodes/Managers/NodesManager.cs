@@ -54,7 +54,7 @@ namespace Centaurus.Domain
             return nodes.GetAllNodes();
         }
 
-        public async Task SetAuditors(List<Auditor> auditors)
+        public async Task SetNodes(List<Auditor> auditors)
         {
             var invalidatedNodes = await UpdateNodes(auditors);
             RemoveNodes(invalidatedNodes);

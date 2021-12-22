@@ -16,10 +16,12 @@ namespace Centaurus.Domain
     {
         private ConstellationSettingsCollection settingsCache;
 
-        public ConstellationSettingsManager(ExecutionContext context)
+        public ConstellationSettingsManager(ExecutionContext context, ConstellationSettings currentSettings)
             : base(context)
         {
             settingsCache = new ConstellationSettingsCollection(Context.DataProvider.GetConstellationSettings);
+            if (currentSettings != null)
+                Update(currentSettings);
         }
 
         public ConstellationSettings Current { get; private set; }

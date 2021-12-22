@@ -12,7 +12,6 @@ namespace Centaurus.Domain
         public DepositProcessor(ExecutionContext context)
             : base(context)
         {
-
         }
 
         public override string SupportedMessageType { get; } = typeof(DepositQuantum).Name;

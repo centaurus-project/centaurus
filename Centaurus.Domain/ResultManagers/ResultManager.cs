@@ -63,7 +63,7 @@ namespace Centaurus.Domain
 
         private void OnPostEviction(object key, object value, EvictionReason reason, object state)
         {
-            logger.Info($"Batch {key} with {((List<Aggregate>)value).Count} is removed because of {reason}. State: {state}.");
+            logger.Info($"Batch {key} is removed because of {reason}. State: {state}.");
         }
 
         private ulong GetBatchApexStart(ulong apex)
