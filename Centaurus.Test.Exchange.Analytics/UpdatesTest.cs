@@ -65,25 +65,29 @@ namespace Centaurus.Test.Exchange.Analytics
                 PaymentSubmitDelay = 0
             };
 
-            context.Init(new Snapshot
+            var constellation = new ConstellationSettings
             {
-                Accounts = new List<Account> { account1, account2 },
-                Apex = 0,
-                Orders = new List<OrderWrapper>(),
-                ConstellationSettings = new ConstellationSettings
-                {
-                    Providers = new List<ProviderSettings> { stellarPaymentProvider },
-                    Assets = new List<AssetSettings> { new AssetSettings { Code = "XLM", IsQuoteAsset = true }, new AssetSettings { Code = "USD" } },
-                    RequestRateLimits = new RequestRateLimits { HourLimit = 1000, MinuteLimit = 100 },
-                    Alpha = TestEnvironment.AlphaKeyPair,
-                    Auditors = new[] { TestEnvironment.AlphaKeyPair, TestEnvironment.Auditor1KeyPair }
+                Providers = new List<ProviderSettings> { stellarPaymentProvider },
+                Assets = new List<AssetSettings> { new AssetSettings { Code = "XLM", IsQuoteAsset = true }, new AssetSettings { Code = "USD" } },
+                RequestRateLimits = new RequestRateLimits { HourLimit = 1000, MinuteLimit = 100 },
+                Alpha = TestEnvironment.AlphaKeyPair,
+                Auditors = new[] { TestEnvironment.AlphaKeyPair, TestEnvironment.Auditor1KeyPair }
                         .Select(pk => new Auditor
                         {
                             PubKey = pk,
                             Address = $"{pk.AccountId}.com"
                         })
                         .ToList()
-                },
+            };
+
+            context.ConstellationSettingsManager.Update(constellation);
+
+            context.Init(new Snapshot
+            {
+                Accounts = new List<Account> { account1, account2 },
+                Apex = 0,
+                Orders = new List<OrderWrapper>(),
+                ConstellationSettings = constellation,
                 Cursors = new[] { stellarPaymentProvider }.ToDictionary(p => PaymentProviderBase.GetProviderId(p.Provider, p.Name), p => p.InitCursor)
             });
         }

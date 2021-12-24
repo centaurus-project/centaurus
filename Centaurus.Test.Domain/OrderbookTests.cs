@@ -50,14 +50,9 @@ namespace Centaurus.Test
             account2.CreateBalance(secondAsset);
             account2.GetBalance(secondAsset).UpdateBalance(10000000000, UpdateSign.Plus);
 
-            context.Init(new Snapshot
+            var constellation = new ConstellationSettings
             {
-                Accounts = new List<Account> { account1, account2 },
-                Apex = 0,
-                Orders = new List<OrderWrapper>(),
-                ConstellationSettings = new ConstellationSettings
-                {
-                    Providers = new List<ProviderSettings> {
+                Providers = new List<ProviderSettings> {
                         new ProviderSettings {
                             Assets = new List<ProviderAsset> { new ProviderAsset {  CentaurusAsset = baseAsset, Token = "native" } },
                             InitCursor = "0",
@@ -67,19 +62,28 @@ namespace Centaurus.Test
                             Vault = KeyPair.Random().AccountId
                         }
                     },
-                    Assets = new List<AssetSettings> { new AssetSettings { Code = baseAsset, IsQuoteAsset = true }, new AssetSettings { Code = secondAsset } },
-                    Alpha = TestEnvironment.AlphaKeyPair,
-                    Auditors = new[] { TestEnvironment.AlphaKeyPair, TestEnvironment.Auditor1KeyPair }
+                Assets = new List<AssetSettings> { new AssetSettings { Code = baseAsset, IsQuoteAsset = true }, new AssetSettings { Code = secondAsset } },
+                Alpha = TestEnvironment.AlphaKeyPair,
+                Auditors = new[] { TestEnvironment.AlphaKeyPair, TestEnvironment.Auditor1KeyPair }
                         .Select(pk => new Auditor
                         {
                             PubKey = pk,
                             Address = $"{pk.AccountId}.com"
                         })
                         .ToList(),
-                    MinAccountBalance = 1,
-                    MinAllowedLotSize = 1,
-                    RequestRateLimits = requestRateLimits
-                },
+                MinAccountBalance = 1,
+                MinAllowedLotSize = 1,
+                RequestRateLimits = requestRateLimits
+            };
+
+            context.ConstellationSettingsManager.Update(constellation);
+
+            context.Init(new Snapshot
+            {
+                Accounts = new List<Account> { account1, account2 },
+                Apex = 0,
+                Orders = new List<OrderWrapper>(),
+                ConstellationSettings = constellation,
                 Cursors = new Dictionary<string, string> { { "Stellar-Main", "0" } }
             });
 

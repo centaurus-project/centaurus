@@ -64,7 +64,23 @@ namespace Centaurus.Test
             context = new ExecutionContext(settings, storage, new MockPaymentProviderFactory(), new DummyConnectionWrapperFactory());
             Assert.AreEqual(State.Rising, context.NodesManager.CurrentNode.State);
 
-            await context.Catchup.AddNodeBatch(TestEnvironment.Auditor1KeyPair, new CatchupQuantaBatch { Quanta = new List<CatchupQuantaBatchItem>(), HasMore = false });
+            await context.Catchup.AddNodeBatch(TestEnvironment.AlphaKeyPair, new CatchupQuantaBatch
+            {
+                Quanta = new List<CatchupQuantaBatchItem> { item },
+                HasMore = false
+            });
+
+            item.Signatures.Add(new NodeSignatureInternal
+            {
+                NodeId = 2,
+                PayloadSignature = quantum.GetPayloadHash().Sign(TestEnvironment.Auditor1KeyPair)
+            });
+
+            await context.Catchup.AddNodeBatch(TestEnvironment.Auditor1KeyPair, new CatchupQuantaBatch
+            {
+                Quanta = new List<CatchupQuantaBatchItem> { item },
+                HasMore = false
+            });
 
             Assert.AreEqual(State.Running, context.NodesManager.CurrentNode.State);
 

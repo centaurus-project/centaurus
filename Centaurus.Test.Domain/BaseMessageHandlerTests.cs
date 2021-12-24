@@ -37,9 +37,7 @@ namespace Centaurus.Test
 
             if (isAuthenticated)
             {
-                var connectionType = typeof(IncomingConnectionBase);
-                var authField = connectionType.GetField("isAuthenticated", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-                authField.SetValue(connection, true);
+                MarkAsAuthenticated(connection);
             }
             return connection;
         }
@@ -48,7 +46,15 @@ namespace Centaurus.Test
         {
             context.NodesManager.TryGetNode(pubKey, out var node);
             var connection = new OutgoingConnection(context, node, new DummyConnectionWrapper(new DummyWebSocket()));
+            MarkAsAuthenticated(connection);
             return connection;
+        }
+
+        private void MarkAsAuthenticated(ConnectionBase connection)
+        {
+            var connectionType = typeof(ConnectionBase);
+            var authField = connectionType.GetProperty("IsAuthenticated", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+            authField.SetValue(connection, true);
         }
     }
 }
