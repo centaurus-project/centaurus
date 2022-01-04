@@ -57,10 +57,7 @@ namespace Centaurus.Domain
 
                 validAuditorStates.Add(pubKey, aggregatedNodeBatch);
 
-                int majority = Context.GetMajorityCount(),
-                totalAuditorsCount = Context.GetTotalAuditorsCount();
-                var completedStatesCount = allAuditorStates.Count(s => !s.Value.HasMore);
-                if (completedStatesCount == totalAuditorsCount)
+                if (AreAllNodesConnected())
                     await TryApplyAuditorsData();
             }
             catch (Exception exc)
@@ -122,24 +119,19 @@ namespace Centaurus.Domain
                 if (Context.NodesManager.CurrentNode.State != State.Rising)
                     return;
 
-                int majority = Context.GetMajorityCount(),
-                    totalAuditorsCount = Context.GetTotalAuditorsCount();
-
-                if (Context.HasMajority(validAuditorStates.Count))
-                {
-                    var validQuanta = GetValidQuanta();
-                    await ApplyQuanta(validQuanta);
-                    allAuditorStates.Clear();
-                    validAuditorStates.Clear();
-                    Context.NodesManager.CurrentNode.Rised();
-                    logger.Trace($"Alpha is risen.");
-                }
-                else
+                if (!IsReadyToApplyQuantumData())
                 {
                     var connectedAccounts = allAuditorStates.Keys.Select(a => a.GetAccountId());
                     var validatedAccounts = validAuditorStates.Keys.Select(a => a.GetAccountId());
-                    throw new Exception($"Unable to raise. Connected auditors: {string.Join(',', connectedAccounts)}; validated auditors: {string.Join(',', validatedAccounts)}; majority is {majority}.");
+                    throw new Exception($"Unable to raise. Connected auditors: {string.Join(',', connectedAccounts)}; validated auditors: {string.Join(',', validatedAccounts)}; majority is {Context.GetMajorityCount()}.");
                 }
+
+                var validQuanta = GetValidQuanta();
+                await ApplyQuanta(validQuanta);
+                allAuditorStates.Clear();
+                validAuditorStates.Clear();
+                Context.NodesManager.CurrentNode.Rised();
+                logger.Trace($"Alpha is risen.");
             }
             catch (Exception exc)
             {
@@ -149,6 +141,23 @@ namespace Centaurus.Domain
             {
                 applyDataTimer.Stop();
             }
+        }
+
+        private bool AreAllNodesConnected()
+        {
+            var totalAuditorsCount = Context.GetTotalAuditorsCount();
+            var completedStatesCount = allAuditorStates.Count(s => !s.Value.HasMore);
+            return completedStatesCount == totalAuditorsCount;
+        }
+
+        private bool IsReadyToApplyQuantumData()
+        {
+            //a prime node should be connected with the all nodes
+            if (Context.Settings.IsPrimeNode())
+                return Context.HasMajority(validAuditorStates.Count);
+
+            //connect to at least one prime node
+            return validAuditorStates.Count > 1;
         }
 
         private void InitTimer()

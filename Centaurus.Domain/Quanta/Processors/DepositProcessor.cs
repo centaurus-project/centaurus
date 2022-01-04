@@ -24,11 +24,14 @@ namespace Centaurus.Domain
             if (!Context.PaymentProvidersManager.TryGetManager(depositNotification.Provider, out var paymentProvider))
                 throw new Exception($"Payment provider {paymentProvider} is not registered.");
 
+            var notification = default(DepositNotification);
             if (depositQuantum.Source == null
-                || !TryGetNotification(paymentProvider, out var notification)
+                || !TryGetNotification(paymentProvider, out notification)
                 || !ByteArrayPrimitives.Equals(notification.ComputeHash(), depositQuantum.Source.ComputeHash()))
             {
-                throw new InvalidOperationException("Unexpected tx notification.");
+                var notificationInfo = $"Deposit source cursor: {depositQuantum.Source?.Cursor ?? "n\\a"}; " +
+                    $"provider cursor: {notification?.Cursor ?? "n\\a"}";
+                throw new InvalidOperationException($"Unexpected tx notification. {notificationInfo}.");
             }
 
             quantumProcessingItem.AddCursorUpdate(paymentProvider.NotificationsManager, depositNotification.Provider, depositNotification.Cursor, paymentProvider.Cursor);
