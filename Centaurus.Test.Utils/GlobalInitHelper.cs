@@ -44,7 +44,7 @@ namespace Centaurus.Test
             settings.CWD = "AppData";
             settings.GenesisAuditors = new[] { TestEnvironment.AlphaKeyPair.AccountId, TestEnvironment.Auditor1KeyPair.AccountId }.Select(a => new Settings.Auditor($"{a}={a}.com")).ToList();
             settings.Secret = secret;
-            settings.IsPrimeNode = true;
+            settings.ParticipationLevel = ParticipationLevel.Prime;
             settings.SyncBatchSize = 500;
             settings.CatchupTimeout = 1;
         }

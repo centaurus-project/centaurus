@@ -12,7 +12,7 @@ namespace Centaurus.Domain
             State = initState;
         }
 
-        public override bool IsPrimeNode => Context.Settings.IsPrimeNode;
+        public override bool IsPrimeNode => Context.Settings.IsPrimeNode();
 
         public event Action<StateChangedEventArgs> StateChanged;
 

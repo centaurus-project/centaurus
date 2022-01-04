@@ -152,7 +152,7 @@ namespace Centaurus.Domain
         {
             AccountStorage = new AccountStorage(snapshot.Accounts);
 
-            Exchange = Exchange.RestoreExchange(ConstellationSettingsManager.Current.Assets, snapshot.Orders, Settings.IsPrimeNode);
+            Exchange = Exchange.RestoreExchange(ConstellationSettingsManager.Current.Assets, snapshot.Orders, Settings.IsPrimeNode());
 
             PaymentProvidersManager.RegisterProviders(ConstellationSettingsManager.Current, snapshot.Cursors);
 
