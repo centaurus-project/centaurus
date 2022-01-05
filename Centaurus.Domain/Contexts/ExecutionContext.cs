@@ -128,6 +128,8 @@ namespace Centaurus.Domain
             if (prevState == State.Rising && (state == State.Running || state == State.Ready))
                 //after node successfully started, the pending quanta can be deleted
                 PersistentStorage.DeletePendingQuanta();
+            if (state == State.Failed)
+                Complete();
         }
 
         private void HandlePendingQuanta(List<CatchupQuantaBatchItem> pendingQuanta)
