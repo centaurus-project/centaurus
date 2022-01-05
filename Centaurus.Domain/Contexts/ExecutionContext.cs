@@ -134,11 +134,12 @@ namespace Centaurus.Domain
 
         private void HandlePendingQuanta(List<CatchupQuantaBatchItem> pendingQuanta)
         {
-            _ = Catchup.AddNodeBatch(Settings.KeyPair, new CatchupQuantaBatch
-            {
-                Quanta = pendingQuanta ?? new List<CatchupQuantaBatchItem>(),
-                HasMore = false
-            });
+            if (NodesManager.CurrentNode.State == State.Rising)
+                _ = Catchup.AddNodeBatch(Settings.KeyPair, new CatchupQuantaBatch
+                {
+                    Quanta = pendingQuanta ?? new List<CatchupQuantaBatchItem>(),
+                    HasMore = false
+                });
         }
 
         private string GetAbsolutePath(string path)
