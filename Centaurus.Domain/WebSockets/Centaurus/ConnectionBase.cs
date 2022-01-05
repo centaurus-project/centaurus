@@ -10,22 +10,6 @@ using System.Threading.Tasks;
 
 namespace Centaurus
 {
-    public enum ConnectionState
-    {
-        /// <summary>
-        /// Connection established.
-        /// </summary>
-        Connected = 0,
-        /// <summary>
-        /// Ready to receive and send messages.
-        /// </summary>
-        Ready = 1,
-        /// <summary>
-        /// Connection was closed.
-        /// </summary>
-        Closed = 3
-    }
-
     public abstract class ConnectionBase : ContextualBase, IDisposable
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
@@ -53,40 +37,24 @@ namespace Centaurus
 
         public string PubKeyAddress { get; }
 
+        public abstract bool IsAuditor { get; }
+
+        public bool IsAuthenticated { get; private set; }
+
         protected virtual int inBufferSize { get; } = 1024;
         protected virtual int outBufferSize { get; } = 64 * 1024;
 
         protected XdrBufferFactory.RentedBuffer incommingBuffer;
         protected XdrBufferFactory.RentedBuffer outgoingBuffer;
 
-        public bool IsAuditor => this is IAuditorConnection;
-
-        ConnectionState connectionState;
-        /// <summary>
-        /// Current connection state
-        /// </summary>
-        public ConnectionState ConnectionState
+        protected void Authenticated()
         {
-            get
-            {
-                return connectionState;
-            }
-            set
-            {
-                if (connectionState != value)
-                {
-                    var prevValue = connectionState;
-                    connectionState = value;
-                    logger.Trace($"Connection {PubKeyAddress} is in {connectionState} state. Prev state is {prevValue}.");
-                    OnConnectionStateChanged?.Invoke((this, prevValue, connectionState));
-
-                    if (value == ConnectionState.Ready && prevValue == ConnectionState.Connected) //prevent multiple invocation
-                        Context.ExtensionsManager.ConnectionReady(this);
-                }
-            }
+            IsAuthenticated = true;
+            OnAuthenticated?.Invoke(this);
         }
 
-        public event Action<(ConnectionBase connection, ConnectionState prev, ConnectionState current)> OnConnectionStateChanged;
+        public event Action<ConnectionBase> OnAuthenticated;
+        public event Action<ConnectionBase> OnClosed;
 
         protected readonly CancellationTokenSource cancellationTokenSource;
         protected readonly CancellationToken cancellationToken;
@@ -147,19 +115,18 @@ namespace Centaurus
 
                 Context.ExtensionsManager.BeforeSendMessage(this, envelope);
 
-                if (!(envelope.Message is AuditorPerfStatistics))
+                var isStateMessage = envelope.Message is StateMessage;
+                if (!isStateMessage)
                     logger.Trace($"Connection {PubKeyAddress}, about to send {envelope.Message.GetMessageType()} message.");
 
                 using (var writer = new XdrBufferWriter(outgoingBuffer.Buffer))
                 {
                     XdrConverter.Serialize(envelope, writer);
-                    if (webSocket == null)
-                        throw new ObjectDisposedException(nameof(webSocket));
-                    if (webSocket.State == WebSocketState.Open)
-                        await webSocket.SendAsync(outgoingBuffer.Buffer.AsMemory(0, writer.Length), WebSocketMessageType.Binary, true, cancellationToken);
                     Context.ExtensionsManager.AfterSendMessage(this, envelope);
 
-                    if (!(envelope.Message is AuditorPerfStatistics))
+                    await SendRawMessageInternal(outgoingBuffer.Buffer.AsMemory(0, writer.Length));
+
+                    if (!isStateMessage)
                         logger.Trace($"Connection {PubKeyAddress}, message {envelope.Message.GetMessageType()} sent. Size: {writer.Length}");
                 }
             }
@@ -184,6 +151,32 @@ namespace Centaurus
             }
         }
 
+        public async Task SendMessage(Memory<byte> message)
+        {
+            await sendMessageSemaphore.WaitAsync();
+            try
+            {
+                await SendRawMessageInternal(message);
+            }
+            //TODO: log failed messages
+            catch (OperationCanceledException) { }
+            catch (WebSocketException exc)
+            {
+                if (!(exc.WebSocketErrorCode == WebSocketError.InvalidState && cancellationToken.IsCancellationRequested))
+                    throw;
+            }
+            finally
+            {
+                sendMessageSemaphore.Release();
+            }
+        }
+
+        private async Task SendRawMessageInternal(Memory<byte> message)
+        {
+            if (webSocket.State == WebSocketState.Open)
+                await webSocket.SendAsync(message, WebSocketMessageType.Binary, true, cancellationToken);
+        }
+
         public async Task Listen()
         {
             try
@@ -191,7 +184,7 @@ namespace Centaurus
                 while (webSocket.State != WebSocketState.Closed && webSocket.State != WebSocketState.Aborted && !cancellationToken.IsCancellationRequested)
                 {
                     //if connection isn't validated yet 256 bytes of max message is enough for handling handshake response
-                    var maxLength = ConnectionState == ConnectionState.Connected ? WebSocketExtension.ChunkSize : 0;
+                    var maxLength = IsAuthenticated ? 0 : WebSocketExtension.ChunkSize;
                     var messageType = await webSocket.GetWebsocketBuffer(incommingBuffer, cancellationToken, maxLength);
                     if (!cancellationToken.IsCancellationRequested)
                     {
@@ -220,11 +213,12 @@ namespace Centaurus
                                 var reader = new XdrBufferReader(incommingBuffer.Buffer, incommingBuffer.Length);
                                 envelope = XdrConverter.Deserialize<MessageEnvelopeBase>(reader);
 
-                                if (!(envelope.Message is AuditorPerfStatistics))
+                                var isStateMessage = envelope.Message is StateMessage;
+                                if (!isStateMessage)
                                     logger.Trace($"Connection {PubKeyAddress}, message {envelope.Message.GetMessageType()} received.");
                                 if (!await HandleMessage(envelope))
                                     throw new UnexpectedMessageException($"No handler registered for message type {envelope.Message.GetMessageType()}.");
-                                if (!(envelope.Message is AuditorPerfStatistics))
+                                if (!isStateMessage)
                                     logger.Trace($"Connection {PubKeyAddress}, message {envelope.Message.GetMessageType()} handled.");
                             }
                             catch (BaseClientException exc)
@@ -235,8 +229,8 @@ namespace Centaurus
 
                                 //prevent recursive error sending
                                 if (!IsAuditor && !(envelope == null || envelope.Message is ResultMessage))
-                                    _ = SendMessage(envelope.CreateResult(statusCode).CreateEnvelope<MessageEnvelopeSignless>());
-                                if (statusCode == ResultStatusCode.InternalError || !Context.IsAlpha)
+                                    await SendMessage(envelope.CreateResult(statusCode).CreateEnvelope<MessageEnvelopeSignless>());
+                                if (statusCode == ResultStatusCode.InternalError || !Context.NodesManager.IsAlpha)
                                     logger.Error(exc);
                             }
                         }
@@ -265,7 +259,7 @@ namespace Centaurus
             }
             finally
             {
-                ConnectionState = ConnectionState.Closed;
+                OnClosed?.Invoke(this);
             }
         }
 

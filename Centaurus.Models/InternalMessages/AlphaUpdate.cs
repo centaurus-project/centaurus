@@ -1,13 +1,6 @@
-﻿using Centaurus.Xdr;
-using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace Centaurus.Models
+﻿namespace Centaurus.Models
 {
-    public abstract class AlphaUpdate: ConstellationRequestMessage
+    public class AlphaUpdate: AlphaUpdateBase
     {
-        [XdrField(0)]
-        public RawPubKey Alpha { get; set; }
     }
 }

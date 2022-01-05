@@ -11,13 +11,15 @@ namespace Centaurus
     {
         private ManualResetEvent resetEvent;
 
+
+
         public Startup(Domain.ExecutionContext context, AlphaHostFactoryBase alphaHostFactory)
             : base(context)
         {
             if (alphaHostFactory == null)
                 throw new ArgumentNullException(nameof(alphaHostFactory));
 
-            if (context.RoleManager.ParticipationLevel == CentaurusNodeParticipationLevel.Prime)
+            if (context.Settings.IsPrimeNode())
                 AlphaStartup = new AlphaStartup(context, alphaHostFactory);
         }
 
@@ -30,22 +32,23 @@ namespace Centaurus
             if (AlphaStartup != null)
                 AlphaStartup.Run();
 
-            Context.StateManager.StateChanged += Current_StateChanged;
+            Context.OnComplete += Context_OnComplete;
         }
 
-        private void Current_StateChanged(StateChangedEventArgs eventArgs)
+        private void Context_OnComplete()
         {
-            if (eventArgs.State == State.Failed)
-            {
-                var isSet = resetEvent.WaitOne(0);
-                if (!isSet)
-                    resetEvent.Set();
-            }
+            isContextStopped = true;
+            var isSet = resetEvent.WaitOne(0);
+            if (!isSet)
+                resetEvent.Set();
         }
+
+        bool isContextStopped;
 
         public void Shutdown()
         {
-            Context.Complete();
+            if (!isContextStopped)
+                Context.Complete();
             if (AlphaStartup != null)
                 AlphaStartup.Shutdown();
         }

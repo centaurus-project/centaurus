@@ -56,9 +56,9 @@ namespace Centaurus.Test
         [Test]
         public void NullValueSerializationTest()
         {
-            var signature = new AuditorSignatureInternal { AuditorId = 1, PayloadSignature = new TinySignature { Data = BinaryExtensions.RandomBytes(64) } };
+            var signature = new NodeSignatureInternal { NodeId = 1, PayloadSignature = new TinySignature { Data = BinaryExtensions.RandomBytes(64) } };
             var rawData = XdrConverter.Serialize(signature);
-            signature = XdrConverter.Deserialize<AuditorSignatureInternal>(rawData);
+            signature = XdrConverter.Deserialize<NodeSignatureInternal>(rawData);
             Assert.AreEqual(null, signature.TxSignature);
         }
 

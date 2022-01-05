@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public abstract class MessageHandlerBase : ContextualBase
+    internal abstract class MessageHandlerBase : ContextualBase
     {
         protected MessageHandlerBase(ExecutionContext context)
             : base(context)
@@ -19,10 +19,11 @@ namespace Centaurus.Domain
         /// </summary>
         public abstract string SupportedMessageType { get; }
 
+        //TODO: set it to true if IsAuditorOnly == true
         /// <summary>
-        /// Only specified states are valid for the handler. Should be null or empty if any state is valid.
+        /// Only messages from the authenticated connections are allowed.
         /// </summary>
-        public virtual ConnectionState[] ValidConnectionStates { get; }
+        public virtual bool IsAuthenticatedOnly { get; }
 
         /// <summary>
         /// If set to true, than messages will be handled only if the other side is an auditor. 
@@ -36,14 +37,10 @@ namespace Centaurus.Domain
         public virtual Task Validate(ConnectionBase connection, IncomingMessage message)
         {
 
-            if ((ValidConnectionStates?.Length ?? 0) > 0
-                && Array.IndexOf(ValidConnectionStates, connection.ConnectionState) < 0)
-                throw new InvalidStateException(
-                    SupportedMessageType.ToString(),
-                    connection.ConnectionState.ToString(),
-                    ValidConnectionStates.Select(s => s.ToString()).ToArray());
+            if (IsAuthenticatedOnly && !connection.IsAuthenticated)
+                throw new UnauthorizedException();
 
-            if (!message.Envelope.IsSignatureValid(connection.PubKey, message.MessageHash, connection.IsAuditor && connection.ConnectionState == ConnectionState.Ready))
+            if (!message.Envelope.IsSignatureValid(connection.PubKey, message.MessageHash, connection.IsAuditor && connection.IsAuthenticated))
             {
                 throw new UnauthorizedException();
             }
@@ -63,7 +60,7 @@ namespace Centaurus.Domain
         private void ValidateClient(ConnectionBase connection)
         {
             if (connection is IncomingClientConnection clientConnection //check requests count only for a client connection 
-                && clientConnection.ConnectionState == ConnectionState.Ready //increment requests count only for validated connection
+                && clientConnection.IsAuthenticated //increment requests count only for validated connection
                 && !clientConnection.Account.RequestCounter.IncRequestCount(DateTime.UtcNow.Ticks, out var error))
                 throw new TooManyRequestsException(error);
         }
@@ -76,7 +73,7 @@ namespace Centaurus.Domain
         public abstract Task HandleMessage(ConnectionBase connection, IncomingMessage message);
     }
 
-    public abstract class MessageHandlerBase<T> : MessageHandlerBase
+    internal abstract class MessageHandlerBase<T> : MessageHandlerBase
         where T: ConnectionBase
     {
         protected MessageHandlerBase(ExecutionContext context)

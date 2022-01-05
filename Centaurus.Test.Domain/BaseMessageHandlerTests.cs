@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Test
 {
-    public abstract class BaseMessageHandlerTests
+    internal abstract class BaseMessageHandlerTests
     {
         protected async Task AssertMessageHandling<T>(T connection, IncomingMessage message, Type excpectedException = null)
             where T : ConnectionBase
@@ -27,25 +27,34 @@ namespace Centaurus.Test
                     });
         }
 
-        protected IncomingConnectionBase GetIncomingConnection(ExecutionContext context, RawPubKey pubKey, ConnectionState? state = null)
+        protected IncomingConnectionBase GetIncomingConnection(ExecutionContext context, RawPubKey pubKey, bool isAuthenticated = false)
         {
             var connection = default(IncomingConnectionBase);
-            if (context.Constellation.Auditors.Any(a => a.PubKey.Equals(pubKey)))
-                connection = new IncomingAuditorConnection(context, pubKey, new DummyWebSocket(), "127.0.0.1");
+            if (context.NodesManager.TryGetNode(pubKey, out var node))
+                connection = new IncomingNodeConnection(context, new DummyWebSocket(), "127.0.0.1", node);
             else
                 connection = new IncomingClientConnection(context, pubKey, new DummyWebSocket(), "127.0.0.1");
 
-            if (state != null)
-                connection.ConnectionState = state.Value;
+            if (isAuthenticated)
+            {
+                MarkAsAuthenticated(connection);
+            }
             return connection;
         }
 
-        protected OutgoingConnection GetOutgoingConnection(ExecutionContext context, RawPubKey keyPair, ConnectionState? state = null)
+        protected OutgoingConnection GetOutgoingConnection(ExecutionContext context, RawPubKey pubKey)
         {
-            var connection = new OutgoingConnection(context, keyPair, new OutgoingMessageStorage(), new DummyConnectionWrapper(new DummyWebSocket()));
-            if (state != null)
-                connection.ConnectionState = state.Value;
+            context.NodesManager.TryGetNode(pubKey, out var node);
+            var connection = new OutgoingConnection(context, node, new DummyConnectionWrapper(new DummyWebSocket()));
+            MarkAsAuthenticated(connection);
             return connection;
+        }
+
+        private void MarkAsAuthenticated(ConnectionBase connection)
+        {
+            var connectionType = typeof(ConnectionBase);
+            var authField = connectionType.GetProperty("IsAuthenticated", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+            authField.SetValue(connection, true);
         }
     }
 }

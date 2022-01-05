@@ -6,7 +6,7 @@ using Centaurus.Models;
 
 namespace Centaurus.Domain
 {
-    public class OrderCancellationMessageHandler : QuantumHandlerBase
+    internal class OrderCancellationMessageHandler : QuantumHandlerBase
     {
         public OrderCancellationMessageHandler(ExecutionContext context) 
             : base(context)

@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public class WithdrawalMessageHandler : QuantumHandlerBase
+    internal class WithdrawalMessageHandler : QuantumHandlerBase
     {
         public WithdrawalMessageHandler(ExecutionContext context) 
             : base(context)
@@ -14,10 +14,5 @@ namespace Centaurus.Domain
         }
 
         public override string SupportedMessageType { get; } = typeof(WithdrawalRequest).Name;
-
-        protected override Quantum GetQuantum(ConnectionBase connection, IncomingMessage message)
-        {
-            return new WithdrawalRequestQuantum { RequestEnvelope = message.Envelope };
-        }
     }
 }

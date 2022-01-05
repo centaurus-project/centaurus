@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public class CatchupQuantaBatchRequestHandler : MessageHandlerBase<OutgoingConnection>
+    internal class CatchupQuantaBatchRequestHandler : MessageHandlerBase
     {
         public CatchupQuantaBatchRequestHandler(ExecutionContext context)
             : base(context)
@@ -17,13 +17,17 @@ namespace Centaurus.Domain
         }
         public override string SupportedMessageType => typeof(CatchupQuantaBatchRequest).Name;
 
-        public override async Task HandleMessage(OutgoingConnection connection, IncomingMessage message)
+        public override bool IsAuditorOnly => true;
+
+        public override bool IsAuthenticatedOnly => true;
+
+        public override async Task HandleMessage(ConnectionBase connection, IncomingMessage message)
         {
             var batchRequest = (CatchupQuantaBatchRequest)message.Envelope.Message;
             await SendQuanta(connection, batchRequest);
         }
 
-        private async Task SendQuanta(OutgoingConnection connection, CatchupQuantaBatchRequest batchRequest)
+        private async Task SendQuanta(ConnectionBase connection, CatchupQuantaBatchRequest batchRequest)
         {
             var aboveApex = batchRequest.LastKnownApex;
             var batchSize = Context.Settings.SyncBatchSize;
@@ -33,7 +37,9 @@ namespace Centaurus.Domain
                 if (currentBatch.Count < 1 && aboveApex < Context.QuantumHandler.CurrentApex)
                     throw new Exception("No quanta from database.");
 
-                var signaturesBatch = Context.SyncStorage.GetSignatures(aboveApex, batchSize).ToDictionary(s => s.Apex, s => s.Signatures);
+                var majoritySignaturesBatch = Context.SyncStorage
+                    .GetMajoritySignatures(aboveApex, batchSize)
+                    .ToDictionary(s => s.Apex, s => s.Signatures);
 
                 var batch = new CatchupQuantaBatch
                 {
@@ -45,23 +51,16 @@ namespace Centaurus.Domain
                 {
                     var apex = ((Quantum)quantum.Quantum).Apex;
 
-                    var quantumSignatures = default(List<AuditorSignatureInternal>);
+                    var quantumSignatures = default(List<NodeSignatureInternal>);
                     //if quantum was persisted, than it contains majority signatures already. Otherwise we need to obtain it from the result manager
-                    if (apex > Context.PendingUpdatesManager.LastSavedApex)
+                    if (apex > Context.PendingUpdatesManager.LastPersistedApex)
                         Context.ResultManager.TryGetSignatures(apex, out quantumSignatures);
-                    else
+                    else if (!majoritySignaturesBatch.TryGetValue(apex, out quantumSignatures))
                     {
-                        var alphaSignature = quantum.AlphaSignature;
-                        if (signaturesBatch.TryGetValue(apex, out quantumSignatures))
-                            quantumSignatures.Insert(0, quantum.AlphaSignature);
-                        else
-                            quantumSignatures = new List<AuditorSignatureInternal> { quantum.AlphaSignature };
-                    }
-                    if (quantumSignatures.Count < 1)
-                    {
-                        Context.StateManager.Failed(new Exception($"Unable to find signatures for quantum {apex}"));
+                        Context.NodesManager.CurrentNode.Failed(new Exception($"Unable to find signatures for quantum {apex}"));
                         return;
                     }
+
                     batch.Quanta.Add(new CatchupQuantaBatchItem
                     {
                         Quantum = quantum.Quantum,

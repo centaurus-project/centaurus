@@ -6,18 +6,18 @@ using System.Text;
 namespace Centaurus.Models
 {
     [XdrContract]
-    [XdrUnion(0, typeof(AuditorSignatureInternal))]
+    [XdrUnion(0, typeof(NodeSignatureInternal))]
     [XdrUnion(1, typeof(AuditorSignature))]
     public class AuditorSignatureBase
     {
         [XdrField(0)]
-        public int AuditorId { get; set; }
+        public int NodeId { get; set; }
 
         [XdrField(1)]
         public TinySignature PayloadSignature { get; set; }
     }
 
-    public class AuditorSignatureInternal: AuditorSignatureBase
+    public class NodeSignatureInternal: AuditorSignatureBase
     {
 
         [XdrField(0, Optional = true)]

@@ -1,4 +1,5 @@
 ﻿using Centaurus.Domain;
+using Centaurus.Domain.Models;
 using Centaurus.Models;
 using Microsoft.AspNetCore.Mvc;
 using System;
@@ -21,33 +22,7 @@ namespace Centaurus.Controllers
         [HttpGet("[action]")]
         public ConstellationInfo Info()
         {
-            ConstellationInfo info;
-
-            var state = -1;
-            if (Context.StateManager != null)
-                state = (int)Context.StateManager.State;
-            if (state < (int)State.Running)
-                info = new ConstellationInfo
-                {
-                    State = (State)state
-                };
-            else
-            {
-                info = new ConstellationInfo
-                {
-                    State = Context.StateManager.State,
-                    Providers = Context.Constellation.Providers.ToArray(),
-                    Auditors = Context.Constellation.Auditors
-                        .Select(a => new ConstellationInfo.Auditor { PubKey = a.PubKey.GetAccountId(), Address = a.Address })
-                        .ToArray(),
-                    MinAccountBalance = Context.Constellation.MinAccountBalance,
-                    MinAllowedLotSize = Context.Constellation.MinAllowedLotSize,
-                    Assets = Context.Constellation.Assets.ToArray(),
-                    RequestRateLimits = Context.Constellation.RequestRateLimits
-                };
-            }
-
-            return info;
+            return Context.GetInfo();
         }
 
         [HttpPost("[action]")]
@@ -64,15 +39,9 @@ namespace Centaurus.Controllers
                 if (constellationInitEnvelope == null)
                     return StatusCode(415);
 
-                var constellationQuantum = new ConstellationQuantum { RequestEnvelope = constellationInitEnvelope };
+                var apex = await Context.HandleConstellationQuantum(constellationInitEnvelope);
 
-                constellationQuantum.Validate(Context);
-
-                var quantumProcessingItem = Context.QuantumHandler.HandleAsync(constellationQuantum, Task.FromResult(true));
-
-                await quantumProcessingItem.OnProcessed;
-
-                return new JsonResult(new InitResult { IsSuccess = true });
+                return new JsonResult(new InitResult { IsSuccess = true, Apex = apex  });
             }
             catch (Exception exc)
             {
@@ -83,6 +52,8 @@ namespace Centaurus.Controllers
         public class InitResult
         {
             public bool IsSuccess { get; set; }
+
+            public ulong Apex { get; set; }
 
             public string Error { get; set; }
         }

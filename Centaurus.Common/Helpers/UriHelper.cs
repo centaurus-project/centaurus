@@ -25,7 +25,7 @@ namespace Centaurus
         public static bool TryCreateWsConnection(string address, bool useSecureConnection, out Uri uri)
         {
             uri = null;
-            if (!TryCreateUriBuilder(address, useSecureConnection, out var uriBuilder))
+            if (!(address != null && TryCreateUriBuilder(address, useSecureConnection, out var uriBuilder)))
                 return false;
             uriBuilder.Scheme = useSecureConnection ? "wss" : "ws";
             uri = uriBuilder.Uri;

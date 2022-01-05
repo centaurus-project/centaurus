@@ -12,7 +12,6 @@ namespace Centaurus.Domain
         public OrderRequestProcessor(ExecutionContext context)
             :base(context)
         {
-
         }
 
         public override string SupportedMessageType { get; } = typeof(OrderRequest).Name;
@@ -21,10 +20,10 @@ namespace Centaurus.Domain
         {
             UpdateNonce(processingItem);
 
-            var quantum = (RequestQuantumBase)processingItem.Quantum;
+            var quantum = (ClientRequestQuantumBase)processingItem.Quantum;
             var orderRequest = (OrderRequest)quantum.RequestEnvelope.Message;
 
-            Context.Exchange.ExecuteOrder(orderRequest.Asset, Context.Constellation.QuoteAsset.Code, processingItem);
+            Context.Exchange.ExecuteOrder(orderRequest.Asset, Context.ConstellationSettingsManager.Current.QuoteAsset.Code, processingItem);
 
             return Task.FromResult((QuantumResultMessageBase)quantum.CreateEnvelope<MessageEnvelopeSignless>().CreateResult(ResultStatusCode.Success));
         }
@@ -35,16 +34,16 @@ namespace Centaurus.Domain
         {
             ValidateNonce(processingItem);
 
-            var quantum = (RequestQuantumBase)processingItem.Quantum;
+            var quantum = (ClientRequestQuantumBase)processingItem.Quantum;
             var orderRequest = (OrderRequest)quantum.RequestEnvelope.Message;
-            var baseAsset = Context.Constellation.QuoteAsset;
+            var baseAsset = Context.ConstellationSettingsManager.Current.QuoteAsset;
 
             if (baseAsset.Code == orderRequest.Asset)
                 throw new BadRequestException("Order asset must be different from quote asset.");
 
-            var orderAsset = Context.Constellation.Assets.FirstOrDefault(a => a.Code == orderRequest.Asset);
-            if (orderAsset == null)
-                throw new BadRequestException("Invalid asset identifier: " + orderRequest.Asset);
+            var orderAsset = Context.ConstellationSettingsManager.Current.Assets.FirstOrDefault(a => a.Code == orderRequest.Asset);
+            if (orderAsset == null || orderAsset.IsSuspended)
+                throw new BadRequestException($"Asset {orderRequest.Asset} is not supported or suspended.");
 
             if (processingItem.Initiator.Orders.Any(o => o.Value.Asset == orderRequest.Asset && o.Value.Side != orderRequest.Side))
                 throw new BadRequestException("You cannot place order that crosses own order.");
@@ -53,7 +52,7 @@ namespace Centaurus.Domain
             var quoteAmount = OrderMatcher.EstimateQuoteAmount(orderRequest.Amount, orderRequest.Price, orderRequest.Side);
 
             //check that lot size is greater than minimum allowed lot
-            if (quoteAmount < Context.Constellation.MinAllowedLotSize)
+            if (quoteAmount < Context.ConstellationSettingsManager.Current.MinAllowedLotSize)
                 throw new BadRequestException("Lot size is smaller than the minimum allowed lot.");
 
             //check required balances
@@ -66,7 +65,7 @@ namespace Centaurus.Domain
             else
             {
                 var balance = processingItem.Initiator.GetBalance(baseAsset.Code);
-                if (!balance.HasSufficientBalance(quoteAmount, Context.Constellation.MinAccountBalance))
+                if (!balance.HasSufficientBalance(quoteAmount, Context.ConstellationSettingsManager.Current.MinAccountBalance))
                     throw new BadRequestException("Insufficient funds");
             }
 
@@ -91,7 +90,7 @@ namespace Centaurus.Domain
                 if (counterOrdersSum >= orderRequest.Amount)
                     break;
                 if (counterOrdersCount > MaxCrossOrdersCount)
-                    throw new BadRequestException("Failed to execute order. Maximum crossed orders length exceeded");
+                    throw new BadRequestException("Failed to execute order. Maximum crossed orders length exceeded.");
             }
         }
     }

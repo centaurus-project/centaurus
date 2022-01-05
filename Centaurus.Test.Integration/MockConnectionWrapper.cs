@@ -32,8 +32,8 @@ namespace Centaurus.Test
             if (!startupWrappers.TryGetValue(host, out var startup))
                 throw new Exception("Server is unavailable.");
 
-            if (!AlphaHostBuilder.ValidStates.Contains(startup.Context?.StateManager?.State ?? Models.State.Undefined))
-                throw new InvalidOperationException("Alpha is not ready");
+            //if (!AlphaHostBuilder.ValidStates.Contains(startup.Context?.NodesManager.CurrentNode.State ?? Models.State.Undefined))
+            //    throw new InvalidOperationException("Alpha is not ready");
 
             var currentSideSocket = (MockWebSocket)WebSocket;
             currentSideSocket.KeyPair = new KeyPair(pubkey);

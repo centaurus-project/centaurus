@@ -12,7 +12,6 @@ namespace Centaurus.Domain
         public DepositProcessor(ExecutionContext context)
             : base(context)
         {
-
         }
 
         public override string SupportedMessageType { get; } = typeof(DepositQuantum).Name;
@@ -25,11 +24,14 @@ namespace Centaurus.Domain
             if (!Context.PaymentProvidersManager.TryGetManager(depositNotification.Provider, out var paymentProvider))
                 throw new Exception($"Payment provider {paymentProvider} is not registered.");
 
+            var notification = default(DepositNotification);
             if (depositQuantum.Source == null
-                || !TryGetNotification(paymentProvider, out var notification)
+                || !TryGetNotification(paymentProvider, out notification)
                 || !ByteArrayPrimitives.Equals(notification.ComputeHash(), depositQuantum.Source.ComputeHash()))
             {
-                throw new InvalidOperationException("Unexpected tx notification.");
+                var notificationInfo = $"Deposit source cursor: {depositQuantum.Source?.Cursor ?? "n\\a"}; " +
+                    $"provider cursor: {notification?.Cursor ?? "n\\a"}";
+                throw new InvalidOperationException($"Unexpected tx notification. {notificationInfo}.");
             }
 
             quantumProcessingItem.AddCursorUpdate(paymentProvider.NotificationsManager, depositNotification.Provider, depositNotification.Cursor, paymentProvider.Cursor);
@@ -68,11 +70,11 @@ namespace Centaurus.Domain
             var account = Context.AccountStorage.GetAccount(deposit.Destination);
             if (account == null)
             {
-                var baseAsset = Context.Constellation.QuoteAsset.Code;
+                var baseAsset = Context.ConstellationSettingsManager.Current.QuoteAsset.Code;
                 //ignore registration with non-base asset or with amount that is less than MinAccountBalance
-                if (deposit.Asset != baseAsset || deposit.Amount < Context.Constellation.MinAccountBalance)
+                if (deposit.Asset != baseAsset || deposit.Amount < Context.ConstellationSettingsManager.Current.MinAccountBalance)
                     return;
-                quantumProcessingItem.AddAccountCreate(Context.AccountStorage, deposit.Destination, Context.Constellation.RequestRateLimits);
+                quantumProcessingItem.AddAccountCreate(Context.AccountStorage, deposit.Destination, Context.ConstellationSettingsManager.Current.RequestRateLimits);
                 account = Context.AccountStorage.GetAccount(deposit.Destination);
             }
 

@@ -66,7 +66,6 @@ namespace Centaurus.PersistentStorage
                 Assert.AreEqual(2, aboveApexQuanta.Count);
                 aboveApexQuanta = storage.Find<QuantumPersistentModel>(QueryOrder.Desc).From(UlongConverter.Encode(150)).ToList();
                 Assert.AreEqual(3, aboveApexQuanta.Count);
-                Assert.AreEqual(quantaBatch.Count - 1, aboveApexQuanta.Count());
             }
         }
 

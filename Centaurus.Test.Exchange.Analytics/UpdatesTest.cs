@@ -65,25 +65,29 @@ namespace Centaurus.Test.Exchange.Analytics
                 PaymentSubmitDelay = 0
             };
 
-            context.Setup(new Snapshot
+            var constellation = new ConstellationSettings
             {
-                Accounts = new List<Account> { account1, account2 },
-                Apex = 0,
-                Orders = new List<OrderWrapper>(),
-                Settings = new ConstellationSettings
-                {
-                    Providers = new List<ProviderSettings> { stellarPaymentProvider },
-                    Assets = new List<AssetSettings> { new AssetSettings { Code = "XLM", IsQuoteAsset = true }, new AssetSettings { Code = "USD" } },
-                    RequestRateLimits = new RequestRateLimits { HourLimit = 1000, MinuteLimit = 100 },
-                    Alpha = TestEnvironment.AlphaKeyPair,
-                    Auditors = new[] { TestEnvironment.AlphaKeyPair, TestEnvironment.Auditor1KeyPair }
+                Providers = new List<ProviderSettings> { stellarPaymentProvider },
+                Assets = new List<AssetSettings> { new AssetSettings { Code = "XLM", IsQuoteAsset = true }, new AssetSettings { Code = "USD" } },
+                RequestRateLimits = new RequestRateLimits { HourLimit = 1000, MinuteLimit = 100 },
+                Alpha = TestEnvironment.AlphaKeyPair,
+                Auditors = new[] { TestEnvironment.AlphaKeyPair, TestEnvironment.Auditor1KeyPair }
                         .Select(pk => new Auditor
                         {
                             PubKey = pk,
                             Address = $"{pk.AccountId}.com"
                         })
                         .ToList()
-                },
+            };
+
+            context.ConstellationSettingsManager.Update(constellation);
+
+            context.Init(new Snapshot
+            {
+                Accounts = new List<Account> { account1, account2 },
+                Apex = 0,
+                Orders = new List<OrderWrapper>(),
+                ConstellationSettings = constellation,
                 Cursors = new[] { stellarPaymentProvider }.ToDictionary(p => PaymentProviderBase.GetProviderId(p.Provider, p.Name), p => p.InitCursor)
             });
         }
@@ -93,11 +97,11 @@ namespace Centaurus.Test.Exchange.Analytics
             var rnd = new Random();
             var asset = "USD";
             var orderRequestProcessor = new OrderRequestProcessor(context);
-            var testTradeResults = new Dictionary<RequestQuantum, QuantumProcessingItem>();
+            var testTradeResults = new Dictionary<ClientRequestQuantum, QuantumProcessingItem>();
             for (var i = 1; i < iterations; i++)
             {
                 var price = useNormalDistribution ? rnd.NextNormallyDistributed() + 50 : rnd.NextDouble() * 100;
-                var trade = new RequestQuantum
+                var trade = new ClientRequestQuantum
                 {
                     Apex = (ulong)i,
                     RequestEnvelope = new MessageEnvelope
@@ -122,7 +126,7 @@ namespace Centaurus.Test.Exchange.Analytics
             PerfCounter.MeasureTime(() =>
             {
                 foreach (var trade in testTradeResults)
-                    context.Exchange.ExecuteOrder(asset, context.Constellation.QuoteAsset.Code, trade.Value);
+                    context.Exchange.ExecuteOrder(asset, context.ConstellationSettingsManager.Current.QuoteAsset.Code, trade.Value);
             }, () =>
             {
                 var market = context.Exchange.GetMarket(asset);
@@ -141,7 +145,7 @@ namespace Centaurus.Test.Exchange.Analytics
         {
             try
             {
-                foreach (var asset in context.Constellation.Assets)
+                foreach (var asset in context.ConstellationSettingsManager.Current.Assets)
                 {
                     if (asset.IsQuoteAsset) //base asset
                         continue;

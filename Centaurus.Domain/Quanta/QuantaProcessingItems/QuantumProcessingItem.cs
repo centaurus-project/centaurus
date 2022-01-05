@@ -45,8 +45,6 @@ namespace Centaurus.Domain
 
         public QuantumPersistentModel PersistentModel { get; private set; }
 
-        public byte AlphaId { get; private set; }
-
         public byte CurrentAuditorId { get; private set; }
 
         public Task<QuantumResultMessageBase> OnProcessed => onProcessedTaskSource.Task;
@@ -167,7 +165,7 @@ namespace Centaurus.Domain
             //add quantum data to updates batch and assign persistent model
             PersistentModel = context.PendingUpdatesManager.AddQuantum(this);
 
-            AlphaId = context.AlphaId;
+            CurrentAuditorId = context.NodesManager.CurrentNode.Id;
         }
 
         List<RawEffectsDataContainer> GetRawEffectsDataContainer()
@@ -224,7 +222,6 @@ namespace Centaurus.Domain
             PayloadHash = payloadHash;
             Effects = rawEffects;
             ResultMessage = quantumResultMessage;
-            CurrentAuditorId = context.AuditorPubKeys[context.Settings.KeyPair];
 
             //assign the serialized quantum to the result
             ResultMessage.Request = new RequestInfo { Data = RawQuantum };

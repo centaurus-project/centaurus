@@ -4,7 +4,7 @@ using Centaurus.Xdr;
 
 namespace Centaurus.Models
 {
-    public class RequestQuantum : RequestQuantumBase
+    public class ClientRequestQuantum : ClientRequestQuantumBase
     {
     }
 }

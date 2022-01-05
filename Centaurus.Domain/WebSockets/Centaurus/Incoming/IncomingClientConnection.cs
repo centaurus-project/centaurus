@@ -6,7 +6,7 @@ using System.Net.WebSockets;
 
 namespace Centaurus
 {
-    public class IncomingClientConnection : IncomingConnectionBase
+    internal class IncomingClientConnection : IncomingConnectionBase
     {
         public IncomingClientConnection(ExecutionContext context, KeyPair keyPair, WebSocket webSocket, string ip)
             : base(context, keyPair, webSocket, ip)
@@ -17,5 +17,7 @@ namespace Centaurus
         }
 
         public Account Account { get; }
+
+        public override bool IsAuditor => false;
     }
 }

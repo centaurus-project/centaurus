@@ -76,14 +76,6 @@ namespace Centaurus.Models
         /// </summary>
         EffectsNotification = 106,
         /// <summary>
-        /// Auditor's performance statistics.
-        /// </summary>
-        AuditorPerfStatistics = 107, 
-        /// <summary>
-        /// Internal message. Contains quantum message envelope and effects signatures.
-        /// </summary>
-        PendingQuantum = 108,
-        /// <summary>
         /// Internal message. Contains new Auditor state.
         /// </summary>
         StateUpdate = 109,
@@ -96,6 +88,10 @@ namespace Centaurus.Models
         /// </summary>
         QuantumInfoResponse = 152,
         /// <summary>
+        /// Contains new Alpha server public key.
+        /// </summary>
+        AlphaUpdate = 200,
+        /// <summary>
         /// Update quorum, add/remove auditors, apply new settings etc.
         /// </summary>
         ConstellationUpdate = 201,
@@ -106,26 +102,34 @@ namespace Centaurus.Models
         /// <summary>
         /// Contains last saved Apex
         /// </summary>
-        CatchupQuantaBatchRequest = 211,
+        CatchupQuantaBatchRequest = 210,
         /// <summary>
         /// Contains batch of quanta, that was requested by Alpha
         /// </summary>
-        CatchupQuantaBatch = 212,
+        CatchupQuantaBatch = 211,
+        /// <summary>
+        /// Contains last apex processed by an auditor
+        /// </summary>
+        ApexUpdate = 212,
         /// <summary>
         /// Contains cursors for quanta and signatures
         /// </summary>
-        SyncCursorUpdate = 213,
+        SyncCursorReset = 213,
         /// <summary>
         /// Contains batch of quanta, that were processed by Alpha
         /// </summary>
-        AlphaQuantaBatch = 214,
+        SyncQuantaBatch = 214,
         /// <summary>
         /// Contains majority of signatures for quanta (except Alpha signatures, it will be send with quantum)
         /// </summary>
-        QuantumMajoritySignaturesBatch = 215,
+        MajoritySignaturesBatch = 215,
         /// <summary>
         /// Contains an array of the current auditor's quantum signatures
         /// </summary>
-        AuditorSignaturesBatch = 216
+        SingleNodeSignaturesBatch = 216,
+        /// <summary>
+        /// Contains an array of the client requests that must be resent to Alpha
+        /// </summary>
+        RequestQuantaBatch = 220
     }
 }

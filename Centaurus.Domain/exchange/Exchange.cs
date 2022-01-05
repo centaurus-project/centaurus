@@ -61,7 +61,7 @@ namespace Centaurus.Domain
 
         public void RemoveOrder(QuantumProcessingItem quantumProcessingItem, string baseAsset)
         {
-            var request = (RequestQuantumBase)quantumProcessingItem.Quantum;
+            var request = (ClientRequestQuantumBase)quantumProcessingItem.Quantum;
             var orderCancellation = (OrderCancellationRequest)request.RequestMessage;
             var orderWrapper = OrderMap.GetOrder(orderCancellation.OrderId);
             var orderbook = GetOrderbook(orderWrapper.Order.Asset, orderWrapper.Order.Side);

@@ -11,12 +11,12 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public class QuantumHandler : ContextualBase, IDisposable
+    public class QuantumHandler : ContextualBase
     {
         public QuantumHandler(ExecutionContext context, ulong lastApex, byte[] lastQuantumHash)
             : base(context)
         {
-            CurrentApex = LastAddedQuantumApex = lastApex;
+            CurrentApex = LastAddedApex = lastApex;
             LastQuantumHash = lastQuantumHash ?? throw new ArgumentNullException(nameof(lastQuantumHash));
             Task.Factory.StartNew(RunQuantumWorker).Unwrap();
         }
@@ -26,25 +26,22 @@ namespace Centaurus.Domain
         object awaitedQuantaSyncRoot = new { };
         Queue<QuantumProcessingItem> awaitedQuanta = new Queue<QuantumProcessingItem>();
 
+        public ulong LastAddedApex { get; private set; }
+
         /// <summary>
         /// Handles the quantum and returns Task.
         /// </summary>
         /// <param name="quantum">Quantum to handle</param>s
         public QuantumProcessingItem HandleAsync(Quantum quantum, Task<bool> signatureValidation)
         {
-            if (Context.IsAlpha //if current node is not alpha, than we need to keep process quanta
+            if (Context.NodesManager.IsAlpha //if current node is not alpha, than we need to keep process quanta
                 && QuantaThrottlingManager.Current.IsThrottlingEnabled
                 && QuantaThrottlingManager.Current.MaxItemsPerSecond <= awaitedQuanta.Count)
                 throw new TooManyRequestsException("Server is too busy. Try again later.");
             var processingItem = new QuantumProcessingItem(quantum, signatureValidation);
-            if (processingItem.Quantum.Apex > 0)
-                LastAddedQuantumApex = processingItem.Quantum.Apex;
-            lock (awaitedQuantaSyncRoot)
-                awaitedQuanta.Enqueue(processingItem);
+            EnqueueHandlingItem(processingItem);
             return processingItem;
         }
-
-        public ulong LastAddedQuantumApex { get; private set; }
 
         public ulong CurrentApex { get; private set; }
 
@@ -52,19 +49,47 @@ namespace Centaurus.Domain
 
         public int QuantaQueueLenght => awaitedQuanta.Count;
 
+        private void EnqueueHandlingItem(QuantumProcessingItem processingItem)
+        {
+            lock (awaitedQuantaSyncRoot)
+            {
+                awaitedQuanta.Enqueue(processingItem);
+                if (processingItem.Apex > LastAddedApex)
+                    LastAddedApex = processingItem.Apex;
+            }
+        }
+
+        private bool TryDequeueHandlingItem(out QuantumProcessingItem handlingItem)
+        {
+            lock (awaitedQuantaSyncRoot)
+            {
+                if (CurrentApex > LastAddedApex)
+                    LastAddedApex = CurrentApex;
+                return awaitedQuanta.TryDequeue(out handlingItem);
+            }
+        }
+
         private async Task RunQuantumWorker()
         {
             while (true)
             {
                 try
                 {
-                    var handlingItem = default(QuantumProcessingItem);
-                    lock (awaitedQuantaSyncRoot)
-                        awaitedQuanta.TryDequeue(out handlingItem);
-                    if (handlingItem != null)
+                    if (TryDequeueHandlingItem(out var handlingItem))
                     {
+                        //after Alpha switch, quanta queue can contain requests that should be send to new Alpha server
+                        if (!IsReadyToHandle(handlingItem))
+                        {
+                            //if the quantum is not client request, than new Alpha will generate it, so we can skip it
+                            if (handlingItem.Quantum is RequestQuantumBase request)
+                                Context.ProxyWorker.AddRequestsToQueue(request.RequestEnvelope);
+                            continue;
+                        }
+                        //skip delayed quanta
+                        if (handlingItem.Apex != 0 && handlingItem.Apex <= CurrentApex)
+                            continue;
                         await HandleItem(handlingItem);
-                        if (Context.IsAlpha && QuantaThrottlingManager.Current.IsThrottlingEnabled)
+                        if (Context.NodesManager.IsAlpha && QuantaThrottlingManager.Current.IsThrottlingEnabled)
                             Thread.Sleep(QuantaThrottlingManager.Current.SleepTime);
                     }
                     else
@@ -79,10 +104,25 @@ namespace Centaurus.Domain
                         while (awaitedQuanta.TryDequeue(out var item))
                             item.SetException(new Exception("Cancelled."));
                     }
-                    Context.StateManager.Failed(new Exception("Quantum worker failed.", exc));
+                    Context.NodesManager.CurrentNode.Failed(new Exception("Quantum worker failed.", exc));
                     return;
                 }
             }
+        }
+
+        private bool IsReadyToHandle(QuantumProcessingItem handlingItem)
+        {
+            return Context.NodesManager.IsAlpha
+                || handlingItem.Quantum.Apex != 0
+                || Context.NodesManager.CurrentNode.State == State.WaitingForInit
+                || ShouldProcessConstellationQuantum(handlingItem);
+        }
+
+        private bool ShouldProcessConstellationQuantum(QuantumProcessingItem handlingItem)
+        {
+            var isAlphaConnectionTimedOut = (Context.NodesManager.AlphaNode.UpdateDate - DateTime.UtcNow).TotalMilliseconds > 2000;
+            var isConstellationUpdateQuantum = handlingItem.Quantum is ConstellationQuantum;
+            return isAlphaConnectionTimedOut && isConstellationUpdateQuantum;
         }
 
         async Task HandleItem(QuantumProcessingItem processingItem)
@@ -106,7 +146,7 @@ namespace Centaurus.Domain
                 var originalException = exc.InnerException;
                 processingItem.SetException(originalException);
                 NotifyOnException(processingItem, originalException);
-                if (!Context.IsAlpha) //if current node is auditor, than all quanta received from Alpha must pass the validation
+                if (!Context.NodesManager.IsAlpha) //if current node is auditor, than all quanta received from Alpha must pass the validation
                     throw originalException;
             }
             catch (Exception exc)
@@ -120,7 +160,7 @@ namespace Centaurus.Domain
         void NotifyOnException(QuantumProcessingItem processingItem, Exception exc)
         {
             if (processingItem.Initiator != null && !EnvironmentHelper.IsTest)
-                Context.Notify(processingItem.Initiator.Pubkey, ((RequestQuantumBase)processingItem.Quantum).RequestEnvelope.CreateResult(exc).CreateEnvelope());
+                Context.Notify(processingItem.Initiator.Pubkey, ((ClientRequestQuantumBase)processingItem.Quantum).RequestEnvelope.CreateResult(exc).CreateEnvelope());
         }
 
         void ValidateQuantum(QuantumProcessingItem processingItem)
@@ -135,18 +175,20 @@ namespace Centaurus.Domain
             else
             {
                 if (quantum.Apex != CurrentApex + 1)
+                {
                     throw new Exception($"Current quantum apex is {quantum.Apex} but {CurrentApex + 1} was expected.");
+                }
 
                 if (!quantum.PrevHash.AsSpan().SequenceEqual(LastQuantumHash))
                     throw new Exception($"Quantum previous hash doesn't equal to last quantum hash.");
             }
-            if (!Context.IsAlpha || Context.StateManager.State == State.Rising)
+            if (!Context.NodesManager.IsAlpha || Context.NodesManager.CurrentNode.State == State.Rising)
                 ValidateRequestQuantum(processingItem);
         }
 
         Account GetAccountWrapper(Quantum quantum)
         {
-            if (quantum is RequestQuantumBase requestQuantum)
+            if (quantum is ClientRequestQuantumBase requestQuantum)
             {
                 var account = Context.AccountStorage.GetAccount(requestQuantum.RequestMessage.Account);
                 if (account == null)
@@ -182,8 +224,8 @@ namespace Centaurus.Domain
             CurrentApex = quantum.Apex;
             LastQuantumHash = processingItem.QuantumHash;
 
-            if (CurrentApex % 1000 == 0)
-                Context.StateManager.UpdateDelay();
+            //add quantum to quantum sync storage
+            Context.SyncStorage.AddQuantum(new SyncQuantaBatchItem { Quantum = quantum });
 
             ProcessResult(processingItem);
 
@@ -200,7 +242,7 @@ namespace Centaurus.Domain
 
         void ValidateRequestQuantum(QuantumProcessingItem processingItem)
         {
-            var request = processingItem.Quantum as RequestQuantumBase;
+            var request = processingItem.Quantum as ClientRequestQuantumBase;
             if (request == null)
                 return;
             if (!processingItem.Initiator.RequestCounter.IncRequestCount(request.Timestamp, out string error))
@@ -221,16 +263,11 @@ namespace Centaurus.Domain
 
         string GetMessageType(Quantum quantum)
         {
-            if (quantum is RequestQuantumBase requestQuantum)
+            if (quantum is ClientRequestQuantumBase requestQuantum)
                 return requestQuantum.RequestMessage.GetMessageType();
             else if (quantum is ConstellationQuantum constellationQuantum)
                 return constellationQuantum.RequestMessage.GetMessageType();
             return quantum.GetType().Name;
-        }
-
-        public void Dispose()
-        {
-            //awaitedQuanta.Dispose();
         }
 
         class QuantumValidationException : Exception

@@ -16,7 +16,7 @@ namespace Centaurus.Domain
 
         public static Task<bool> Validate(Quantum quantum)
         {
-            if (quantum is RequestQuantumBase request)
+            if (quantum is ClientRequestQuantumBase request)
             {
                 var verificationTask = new TaskCompletionSource<bool>();
                 verificationTasks.Add(() => VerifyQuantumSignature(verificationTask, request));
@@ -33,7 +33,7 @@ namespace Centaurus.Domain
             Parallel.ForEach(partitioner, options, verify => verify());
         }
 
-        private static void VerifyQuantumSignature(TaskCompletionSource<bool> verificationTask, RequestQuantumBase request)
+        private static void VerifyQuantumSignature(TaskCompletionSource<bool> verificationTask, ClientRequestQuantumBase request)
         {
             try
             {

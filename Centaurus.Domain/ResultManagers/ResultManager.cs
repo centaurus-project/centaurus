@@ -37,7 +37,7 @@ namespace Centaurus.Domain
             results.Add(processingResult);
         }
 
-        public void Add(QuantumSignatures resultMessage)
+        public void Add(MajoritySignaturesBatchItem resultMessage)
         {
             auditorResults.Add(resultMessage);
         }
@@ -63,7 +63,7 @@ namespace Centaurus.Domain
 
         private void OnPostEviction(object key, object value, EvictionReason reason, object state)
         {
-            logger.Info($"Batch {key} with {((List<Aggregate>)value).Count} is removed because of {reason}. State: {state}.");
+            logger.Info($"Batch {key} is removed because of {reason}. State: {state}.");
         }
 
         private ulong GetBatchApexStart(ulong apex)
@@ -73,7 +73,7 @@ namespace Centaurus.Domain
 
         private BlockingCollection<QuantumProcessingItem> results = new BlockingCollection<QuantumProcessingItem>();
 
-        private BlockingCollection<QuantumSignatures> auditorResults = new BlockingCollection<QuantumSignatures>();
+        private BlockingCollection<MajoritySignaturesBatchItem> auditorResults = new BlockingCollection<MajoritySignaturesBatchItem>();
 
         private void ProcessResults()
         {
@@ -87,7 +87,7 @@ namespace Centaurus.Domain
                 }
                 catch (Exception exc)
                 {
-                    Context.StateManager.Failed(new Exception($"Error on processing result for apex {result.Apex}", exc));
+                    Context.NodesManager.CurrentNode.Failed(new Exception($"Error on processing result for apex {result.Apex}", exc));
                     return;
                 }
             });
@@ -106,16 +106,16 @@ namespace Centaurus.Domain
                 }
                 catch (Exception exc)
                 {
-                    Context.StateManager.Failed(new Exception($"Error on auditor result for apex {result.Apex}", exc));
+                    Context.NodesManager.CurrentNode.Failed(new Exception($"Error on auditor result for apex {result.Apex}", exc));
                     return;
                 }
             });
         }
 
-        private void AddInternal(QuantumSignatures signaturesMessage)
+        private void AddInternal(MajoritySignaturesBatchItem signaturesMessage)
         {
             //auditor can send delayed results
-            if (signaturesMessage.Apex <= Context.PendingUpdatesManager.LastSavedApex)
+            if (signaturesMessage.Apex <= Context.PendingUpdatesManager.LastPersistedApex)
                 return;
             //add the signature to the aggregate
             var aggregate = GetAggregate(signaturesMessage.Apex);
@@ -146,7 +146,7 @@ namespace Centaurus.Domain
             GetAggregate(processingResult.Apex).Add(processingResult);
         }
 
-        public bool TryGetSignatures(ulong apex, out List<AuditorSignatureInternal> signatures)
+        public bool TryGetSignatures(ulong apex, out List<NodeSignatureInternal> signatures)
         {
             TryGetAggregate(apex, out var aggregate);
             signatures = aggregate?.GetSignatures();
@@ -185,12 +185,12 @@ namespace Centaurus.Domain
                 var _currentBatchIds = currentBatchIds.ToList();
                 foreach (var batchId in _currentBatchIds)
                 {
-                    if (batchId == currentBatchId || batchId + batchSize > Context.PendingUpdatesManager.LastSavedApex)
+                    if (batchId == currentBatchId || batchId + batchSize > Context.PendingUpdatesManager.LastPersistedApex)
                         break;
                     currentBatchIds.Remove(batchId);
                     if (!resultCache.TryGetValue(batchId, out var batch))
                     {
-                        Context.StateManager.Failed(new Exception($"Result batch {batchId} is not found."));
+                        Context.NodesManager.CurrentNode.Failed(new Exception($"Result batch {batchId} is not found."));
                         return;
                     }
                     var memoryCacheOption = new MemoryCacheEntryOptions { SlidingExpiration = TimeSpan.FromSeconds(15) };
@@ -243,22 +243,23 @@ namespace Centaurus.Domain
             private bool IsFinalized;
             private object syncRoot = new { };
             private HashSet<int> processedAuditors = new HashSet<int>();
-            private List<AuditorSignatureInternal> signatures = new List<AuditorSignatureInternal>();
-            private List<AuditorSignatureInternal> outrunResults = new List<AuditorSignatureInternal>();
+            private List<NodeSignatureInternal> signatures = new List<NodeSignatureInternal>();
+            private List<NodeSignatureInternal> outrunResults = new List<NodeSignatureInternal>();
+            private ConstellationSettings constellation;
 
-            public List<AuditorSignatureInternal> GetSignatures()
+            public List<NodeSignatureInternal> GetSignatures()
             {
                 lock (syncRoot)
                     return signatures.ToList();
             }
 
-            public void Add(AuditorSignatureInternal signature)
+            public void Add(NodeSignatureInternal signature)
             {
                 var majorityResult = MajorityResult.Unknown;
                 lock (syncRoot)
                 {
 
-                    if (processedAuditors.Contains(signature.AuditorId))
+                    if (processedAuditors.Contains(signature.NodeId))
                         return;
 
                     //if current server is not Alpha than it can delay
@@ -269,22 +270,22 @@ namespace Centaurus.Domain
                     }
 
                     //obtain auditor from constellation
-                    if (!Manager.Context.AuditorIds.TryGetValue((byte)signature.AuditorId, out var auditor))
+                    if (!(constellation.TryGetNodePubKey((byte)signature.NodeId, out var nodePubKey)))
                         return;
 
                     //check if signature is valid and tx signature is presented for TxResultMessage
-                    if (signature.PayloadSignature.IsValid(auditor, ProcessingItem.PayloadHash))
+                    if (signature.PayloadSignature.IsValid(nodePubKey, ProcessingItem.PayloadHash))
                         AddValidSignature(signature);
 
                     majorityResult = GetMajorityResult();
-                    if (IsFinalized || majorityResult == MajorityResult.Unknown || !IsSignedByAlpha())
+                    if (IsFinalized || majorityResult == MajorityResult.Unknown)
                         return;
                     else if (majorityResult == MajorityResult.Unreachable)
                     {
                         var votesCount = signatures.Count;
 
                         var quantum = ProcessingItem.Quantum;
-                        SequentialRequestMessage requestMessage = quantum is RequestQuantumBase requestQuantum
+                        SequentialRequestMessage requestMessage = quantum is ClientRequestQuantumBase requestQuantum
                             ? requestQuantum.RequestMessage
                             : null;
 
@@ -293,7 +294,7 @@ namespace Centaurus.Domain
                             $" is unreachable. Results received count is {processedAuditors.Count}," +
                             $" valid results count is {votesCount}. The constellation collapsed.");
                         ProcessingItem.SetException(exc);
-                        Manager.Context.StateManager.Failed(exc);
+                        Manager.Context.NodesManager.CurrentNode.Failed(exc);
                     }
 
                     IsFinalized = true;
@@ -305,48 +306,33 @@ namespace Centaurus.Domain
             {
                 lock (syncRoot)
                 {
+                    if (!Manager.Context.ConstellationSettingsManager.TryGetForApex(Apex, out constellation))
+                    {
+                        Manager.Context.NodesManager.CurrentNode.Failed(new Exception($"Unable to get constellation settings for apex {Apex}."));
+                        return;
+                    }
                     ProcessingItem = quantumProcessingItem;
                     var signature = AddCurrentNodeSignature();
                     //mark as acknowledged
                     ProcessingItem.Acknowledged();
                     //send result to auditors
-                    Manager.Context.OutgoingConnectionManager.EnqueueResult(new AuditorResult { Apex = Apex, Signature = signature });
+                    Manager.Context.SyncStorage.AddCurrentNodeSignature(new SingleNodeSignaturesBatchItem { Apex = Apex, Signature = signature });
                     ProcessOutrunSignatures(this);
                 }
             }
 
-            private void AddValidSignature(AuditorSignatureInternal signature)
+            private void AddValidSignature(NodeSignatureInternal signature)
             {
-                processedAuditors.Add(signature.AuditorId);
+                processedAuditors.Add(signature.NodeId);
                 //skip if processed or current auditor already sent the result
                 if (IsFinalized)
                     return;
-                //Alpha signature must always be first
-                if (signature.AuditorId == ProcessingItem.AlphaId)
-                {
-                    signatures.Insert(0, signature);
-                    ProcessingItem.ResultMessage.PayloadProof.Signatures.Insert(0, signature.PayloadSignature);
-                    //add quantum to quantum sync storage
-                    Manager.Context.SyncStorage.AddQuantum(Apex,
-                        new SyncQuantaBatchItem
-                        {
-                            Quantum = ProcessingItem.Quantum,
-                            AlphaSignature = signature
-                        });
-                }
-                else
-                {
-                    signatures.Add(signature);
-                    ProcessingItem.ResultMessage.PayloadProof.Signatures.Add(signature.PayloadSignature);
-                }
+
+                signatures.Add(signature);
+                ProcessingItem.ResultMessage.PayloadProof.Signatures.Add(signature.PayloadSignature);
             }
 
-            private bool IsSignedByAlpha()
-            {
-                return signatures.Any(s => s.AuditorId == ProcessingItem.AlphaId);
-            }
-
-            private AuditorSignatureInternal AddCurrentNodeSignature()
+            private NodeSignatureInternal AddCurrentNodeSignature()
             {
                 //get current node signature
                 var signature = GetSignature();
@@ -355,11 +341,11 @@ namespace Centaurus.Domain
                 return signature;
             }
 
-            private AuditorSignatureInternal GetSignature()
+            private NodeSignatureInternal GetSignature()
             {
-                var currentAuditorSignature = new AuditorSignatureInternal
+                var currentAuditorSignature = new NodeSignatureInternal
                 {
-                    AuditorId = ProcessingItem.CurrentAuditorId,
+                    NodeId = ProcessingItem.CurrentAuditorId,
                     PayloadSignature = ProcessingItem.PayloadHash.Sign(Manager.Context.Settings.KeyPair)
                 };
 
@@ -425,10 +411,10 @@ namespace Centaurus.Domain
                 //assign signatures to persistent model
                 ProcessingItem.PersistentModel.Signatures = signatures.Select(s => s.ToPersistenModel()).ToList();
                 //add signatures to sync storage
-                Manager.Context.SyncStorage.AddSignatures(Apex, new QuantumSignatures
-                {
-                    Apex = Apex,
-                    Signatures = signatures.Skip(1).ToList() //skip first. The first signature will be synced with quantum
+                Manager.Context.SyncStorage.AddSignatures(new MajoritySignaturesBatchItem 
+                { 
+                    Apex = Apex, 
+                    Signatures = signatures.ToList() 
                 });
             }
 

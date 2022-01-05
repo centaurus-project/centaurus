@@ -10,15 +10,15 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Test
 {
-    public class QuantumHandlerPerformanceTest : BaseMessageHandlerTests
+    internal class QuantumHandlerPerformanceTest : BaseMessageHandlerTests
     {
         private ExecutionContext context;
 
         [SetUp]
-        public void Setup()
+        public async Task Setup()
         {
             EnvironmentHelper.SetTestEnvironmentVariable();
-            context = GlobalInitHelper.DefaultAlphaSetup().Result;
+            context = await GlobalInitHelper.DefaultAlphaSetup();
         }
 
 
@@ -29,10 +29,10 @@ namespace Centaurus.Test
             context.SetState(State.Ready);
 
             var accountId = context.AccountStorage.GetAccount(TestEnvironment.Client1KeyPair);
-            var messages = new Dictionary<RequestQuantum, Task<bool>>();
+            var messages = new Dictionary<ClientRequestQuantum, Task<bool>>();
             for (var i = 0; i < 100_000; i++)
             {
-                var quantumRequest = new RequestQuantum
+                var quantumRequest = new ClientRequestQuantum
                 {
                     RequestEnvelope = new PaymentRequest
                     {

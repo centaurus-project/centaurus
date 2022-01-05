@@ -50,14 +50,9 @@ namespace Centaurus.Test
             account2.CreateBalance(secondAsset);
             account2.GetBalance(secondAsset).UpdateBalance(10000000000, UpdateSign.Plus);
 
-            context.Setup(new Snapshot
+            var constellation = new ConstellationSettings
             {
-                Accounts = new List<Account> { account1, account2 },
-                Apex = 0,
-                Orders = new List<OrderWrapper>(),
-                Settings = new ConstellationSettings
-                {
-                    Providers = new List<ProviderSettings> {
+                Providers = new List<ProviderSettings> {
                         new ProviderSettings {
                             Assets = new List<ProviderAsset> { new ProviderAsset {  CentaurusAsset = baseAsset, Token = "native" } },
                             InitCursor = "0",
@@ -67,19 +62,28 @@ namespace Centaurus.Test
                             Vault = KeyPair.Random().AccountId
                         }
                     },
-                    Assets = new List<AssetSettings> { new AssetSettings { Code = baseAsset, IsQuoteAsset = true }, new AssetSettings { Code = secondAsset } },
-                    Alpha = TestEnvironment.AlphaKeyPair,
-                    Auditors = new[] { TestEnvironment.AlphaKeyPair, TestEnvironment.Auditor1KeyPair }
+                Assets = new List<AssetSettings> { new AssetSettings { Code = baseAsset, IsQuoteAsset = true }, new AssetSettings { Code = secondAsset } },
+                Alpha = TestEnvironment.AlphaKeyPair,
+                Auditors = new[] { TestEnvironment.AlphaKeyPair, TestEnvironment.Auditor1KeyPair }
                         .Select(pk => new Auditor
                         {
                             PubKey = pk,
                             Address = $"{pk.AccountId}.com"
                         })
                         .ToList(),
-                    MinAccountBalance = 1,
-                    MinAllowedLotSize = 1,
-                    RequestRateLimits = requestRateLimits
-                },
+                MinAccountBalance = 1,
+                MinAllowedLotSize = 1,
+                RequestRateLimits = requestRateLimits
+            };
+
+            context.ConstellationSettingsManager.Update(constellation);
+
+            context.Init(new Snapshot
+            {
+                Accounts = new List<Account> { account1, account2 },
+                Apex = 0,
+                Orders = new List<OrderWrapper>(),
+                ConstellationSettings = constellation,
                 Cursors = new Dictionary<string, string> { { "Stellar-Main", "0" } }
             });
 
@@ -97,12 +101,12 @@ namespace Centaurus.Test
         private void ExecuteWithOrderbook(int iterations, bool useNormalDistribution, Action<Action> executor)
         {
             var rnd = new Random();
-            var asset = context.Constellation.Assets[1].Code;
+            var asset = context.ConstellationSettingsManager.Current.Assets[1].Code;
             var market = context.Exchange.GetMarket(asset);
 
 
             var orderRequestProcessor = new OrderRequestProcessor(context);
-            var testTradeResults = new Dictionary<RequestQuantum, QuantumProcessingItem>();
+            var testTradeResults = new Dictionary<ClientRequestQuantum, QuantumProcessingItem>();
             for (var i = 1; i < iterations; i++)
             {
                 var price = useNormalDistribution ? rnd.NextNormallyDistributed() + 50 : rnd.NextDouble() * 100;
@@ -127,7 +131,7 @@ namespace Centaurus.Test
                     request.Side = OrderSide.Sell;
                 }
 
-                var trade = new RequestQuantum
+                var trade = new ClientRequestQuantum
                 {
                     Apex = (ulong)i,
                     RequestEnvelope = new MessageEnvelope
@@ -140,7 +144,7 @@ namespace Centaurus.Test
 
                 testTradeResults.Add(trade, new QuantumProcessingItem(trade, System.Threading.Tasks.Task.FromResult(true)) { Initiator = initiator });
             }
-            var baseAsset = context.Constellation.QuoteAsset.Code;
+            var baseAsset = context.ConstellationSettingsManager.Current.QuoteAsset.Code;
             var xlmStartBalance = account1.GetBalance(baseAsset).Amount + account2.GetBalance(baseAsset).Amount;
             var assetStartBalance = account1.GetBalance(asset).Amount + account2.GetBalance(asset).Amount;
 
@@ -192,7 +196,7 @@ namespace Centaurus.Test
         {
             ExecuteWithOrderbook(iterations, useNormalDistribution, executeOrders => PerfCounter.MeasureTime(executeOrders, () =>
             {
-                var market = context.Exchange.GetMarket(context.Constellation.Assets[1].Code);
+                var market = context.Exchange.GetMarket(context.ConstellationSettingsManager.Current.Assets[1].Code);
                 return $"{iterations} iterations, orderbook size: {market.Bids.Count} bids,  {market.Asks.Count} asks, {market.Bids.GetBestPrice().ToString("G3")}/{market.Asks.GetBestPrice().ToString("G3")} spread.";
             }));
         }
@@ -206,7 +210,7 @@ namespace Centaurus.Test
             var random = new Random();
             var price = 1D;
             var side = OrderSide.Buy;
-            var asset = context.Constellation.Assets[1].Code;
+            var asset = context.ConstellationSettingsManager.Current.Assets[1].Code;
 
             var orderbook = context.Exchange.GetOrderbook(asset, side);
             var ordersCount = 1000;

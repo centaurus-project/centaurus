@@ -6,7 +6,7 @@ using Centaurus.Models;
 
 namespace Centaurus.Domain
 {
-    public class AccountDataRequestHandler : QuantumHandlerBase
+    internal class AccountDataRequestHandler : QuantumHandlerBase
     {
         public AccountDataRequestHandler(ExecutionContext context) 
             : base(context)
@@ -14,10 +14,5 @@ namespace Centaurus.Domain
         }
 
         public override string SupportedMessageType => typeof(AccountDataRequest).Name;
-
-        protected override Quantum GetQuantum(ConnectionBase connection, IncomingMessage message)
-        {
-            return new AccountDataRequestQuantum { RequestEnvelope = message.Envelope };
-        }
     }
 }

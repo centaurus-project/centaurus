@@ -85,34 +85,6 @@ namespace Centaurus.Domain
         }
 
         /// <summary>
-        /// Fetches all quanta where apex is greater than the specified one.
-        /// </summary>
-        /// <param name="apex"></param>
-        /// <param name="count">Count of quanta to load. Loads all if equal or less than 0</param>
-        /// <returns></returns>
-        public List<SyncQuantaBatchItem> GetQuantaSyncBatchItemsAboveApex(ulong apex, int count = 0)
-        {
-            var query = (IEnumerable<QuantumPersistentModel>)Context.PersistentStorage.LoadQuantaAboveApex(apex, count)
-                .OrderBy(q => q.Apex);
-            if (count > 0)
-                query = query.Take(count);
-            return query.Select(q => q.ToBatchItemQuantum()).ToList();
-        }
-
-        /// <summary>
-        /// Fetches all quanta's signatures where apex is greater than the specified one.
-        /// </summary>
-        /// <param name="apex"></param>
-        /// <param name="count">Count of quanta to load. Loads all if equal or less than 0</param>
-        /// <returns></returns>
-        public List<QuantumSignatures> GetSignaturesSyncBatchItemsAboveApex(ulong apex, int count = 0)
-        {
-            var query = (IEnumerable<QuantumPersistentModel>)Context.PersistentStorage.LoadQuantaAboveApex(apex, count)
-                .OrderBy(q => q.Apex);
-            return query.Select(q => q.ToQuantumSignatures()).ToList();
-        }
-
-        /// <summary>
         /// Get last persisted apex
         /// </summary>
         /// <returns></returns>
@@ -121,9 +93,9 @@ namespace Centaurus.Domain
             return Context.PersistentStorage.GetLastApex();
         }
 
-        public (Snapshot snapshot, List<PendingQuantum> pendingQuanta) GetPersistentData()
+        public (Snapshot snapshot, List<CatchupQuantaBatchItem> pendingQuanta) GetPersistentData()
         {
-            (Snapshot snapshot, List<PendingQuantum> pendingQuanta) data = default;
+            (Snapshot snapshot, List<CatchupQuantaBatchItem> pendingQuanta) data = default;
             var lastApex = GetLastApex();
             if (lastApex > 0)
                 data.snapshot = GetSnapshot(lastApex);
@@ -147,7 +119,8 @@ namespace Centaurus.Domain
             if (minRevertApex == 0 && apex != lastApex || apex < minRevertApex)
                 throw new InvalidOperationException($"Lack of data to revert to {apex} apex.");
 
-            var settings = GetConstellationSettings();
+            //get current settings
+            var settings = GetConstellationSettings(ulong.MaxValue);
             if (settings == null)
                 return null;
 
@@ -275,7 +248,7 @@ namespace Centaurus.Domain
                 Apex = apex,
                 Accounts = accountStorage.GetAll().OrderBy(a => a.Pubkey.ToString()).ToList(),
                 Orders = allOrders.OrderBy(o => o.OrderId).ToList(),
-                Settings = settings,
+                ConstellationSettings = settings,
                 LastHash = lastQuantumData.ComputeHash(),
                 Cursors = cursors
             };
@@ -287,12 +260,12 @@ namespace Centaurus.Domain
                 Context.PersistentStorage.SaveBatch(updates);
         }
 
-        public List<PendingQuantum> LoadPendingQuanta()
+        public List<CatchupQuantaBatchItem> LoadPendingQuanta()
         {
             var pendingQuantaModel = Context.PersistentStorage.LoadPendingQuanta();
             if (pendingQuantaModel == null)
                 return null;
-            return pendingQuantaModel.Quanta.Select(q => q.ToDomainModel()).ToList();
+            return pendingQuantaModel.Quanta.Select(q => q.ToCatchupQuantaBatchItem()).ToList();
         }
 
         /// <summary>
@@ -300,9 +273,9 @@ namespace Centaurus.Domain
         /// </summary>
         /// <param name="apex"></param>
         /// <returns></returns>
-        private ConstellationSettings GetConstellationSettings()
+        public ConstellationSettings GetConstellationSettings(ulong apex)
         {
-            var settingsModel = Context.PersistentStorage.LoadSettings(ulong.MaxValue);
+            var settingsModel = Context.PersistentStorage.LoadSettings(apex);
             if (settingsModel == null)
                 return null;
 

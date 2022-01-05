@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Domain
 {
-    public class EffectsRequestMessageHandler : MessageHandlerBase<IncomingClientConnection>
+    internal class EffectsRequestMessageHandler : MessageHandlerBase<IncomingClientConnection>
     {
         static Logger logger = LogManager.GetCurrentClassLogger();
 
@@ -17,7 +17,7 @@ namespace Centaurus.Domain
 
         public override string SupportedMessageType { get; } = typeof(QuantumInfoRequest).Name;
 
-        public override ConnectionState[] ValidConnectionStates => new ConnectionState[] { ConnectionState.Ready };
+        public override bool IsAuthenticatedOnly => true;
 
         public override async Task HandleMessage(IncomingClientConnection connection, IncomingMessage message)
         {

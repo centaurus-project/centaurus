@@ -10,9 +10,6 @@ namespace Centaurus.Models
     {
         [XdrField(0)]
         public List<SyncQuantaBatchItem> Quanta { get; set; }
-
-        [XdrField(2)]
-        public ulong LastKnownApex { get; set; }
     }
 
     [XdrContract]
@@ -21,9 +18,6 @@ namespace Centaurus.Models
         //TODO: change type to Quantum after migrating to MessagePack
         [XdrField(0)]
         public Message Quantum { get; set; }
-
-        [XdrField(1)]
-        public AuditorSignatureInternal AlphaSignature { get; set; }
 
         public ulong Apex => ((Quantum)Quantum).Apex;
     }

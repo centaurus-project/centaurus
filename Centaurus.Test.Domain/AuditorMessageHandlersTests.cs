@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace Centaurus.Test
 {
-    public class AuditorMessageHandlersTests : BaseMessageHandlerTests
+    internal class AuditorMessageHandlersTests : BaseMessageHandlerTests
     {
 
         private ExecutionContext context;
@@ -42,21 +42,19 @@ namespace Centaurus.Test
 
         static object[] QuantaBatchTestCases =
         {
-            new object[] { TestEnvironment.Client1KeyPair, ConnectionState.Ready, typeof(UnauthorizedException) },
-            new object[] { TestEnvironment.AlphaKeyPair, ConnectionState.Connected, typeof(InvalidStateException) },
-            new object[] { TestEnvironment.AlphaKeyPair, ConnectionState.Ready, null }
+            new object[] { TestEnvironment.AlphaKeyPair, null }
         };
 
         [Test]
         [TestCaseSource(nameof(QuantaBatchTestCases))]
-        public async Task QuantaBatchTest(KeyPair alphaKeyPair, ConnectionState state, Type excpectedException)
+        public async Task QuantaBatchTest(KeyPair alphaKeyPair, Type excpectedException)
         {
             context.SetState(State.Ready);
 
             var connection = default(ConnectionBase);
             try
             {
-                connection = GetOutgoingConnection(context, alphaKeyPair, state);
+                connection = GetOutgoingConnection(context, alphaKeyPair);
             }
             catch (UnauthorizedException)
             {

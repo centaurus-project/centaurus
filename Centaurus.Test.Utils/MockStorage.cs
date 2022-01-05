@@ -47,7 +47,7 @@ namespace Centaurus.Test
 
         public SettingsPersistentModel LoadSettings(ulong fromApex)
         {
-            return settingsCollection.OrderBy(s => s.Apex).FirstOrDefault(s => s.Apex >= fromApex);
+            return settingsCollection.OrderByDescending(s => s.Apex).FirstOrDefault(s => s.Apex <= fromApex);
         }
 
         public QuantumPersistentModel LoadQuantum(ulong apex)

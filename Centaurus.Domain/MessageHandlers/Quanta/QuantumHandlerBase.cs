@@ -10,31 +10,26 @@ namespace Centaurus.Domain
     /// <summary>
     /// This handler should handle all quantum requests
     /// </summary>
-    public abstract class QuantumHandlerBase : MessageHandlerBase
+    internal abstract class QuantumHandlerBase : MessageHandlerBase
     {
         protected QuantumHandlerBase(ExecutionContext context)
             : base(context)
         {
         }
 
-        public override ConnectionState[] ValidConnectionStates { get; } = new ConnectionState[] { ConnectionState.Ready };
+        public override bool IsAuthenticatedOnly => true;
 
         public override Task HandleMessage(ConnectionBase connection, IncomingMessage message)
         {
-            if (Context.IsAlpha)
+            if (Context.NodesManager.IsAlpha)
             {
-                Context.QuantumHandler.HandleAsync(GetQuantum(connection, message), Task.FromResult(true));
+                Context.QuantumHandler.HandleAsync(RequestQuantumHelper.GetQuantum(message.Envelope), Task.FromResult(true));
             }
             else
             {
-                //TODO: send it to Alpha
+                Context.ProxyWorker.AddRequestsToQueue(message.Envelope);
             }
             return Task.CompletedTask;
-        }
-
-        protected virtual Quantum GetQuantum(ConnectionBase connection, IncomingMessage message)
-        {
-            return new RequestQuantum { RequestEnvelope = message.Envelope };
         }
     }
 }

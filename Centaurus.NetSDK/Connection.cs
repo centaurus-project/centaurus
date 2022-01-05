@@ -39,7 +39,7 @@ namespace Centaurus.NetSDK
 
         static Logger logger = LogManager.GetCurrentClassLogger();
 
-        private const int RequestTimeout = 5000;
+        private const int RequestTimeout = 15000;
 
         public event Action<Exception> OnException;
 

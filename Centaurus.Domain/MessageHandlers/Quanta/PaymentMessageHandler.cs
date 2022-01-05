@@ -5,7 +5,7 @@ using System.Text;
 
 namespace Centaurus.Domain
 {
-    public class PaymentMessageHandler : QuantumHandlerBase
+    internal class PaymentMessageHandler : QuantumHandlerBase
     {
         public PaymentMessageHandler(ExecutionContext context) 
             : base(context)
