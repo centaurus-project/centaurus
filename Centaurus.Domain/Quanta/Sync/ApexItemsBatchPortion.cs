@@ -10,7 +10,7 @@ namespace Centaurus.Domain.Quanta.Sync
         {
             public ApexItemsBatchPortion(ulong start, int size, ApexItemsBatch<T> source)
             {
-                Start = lastSerializedBatchApex = start;
+                Start = start;
                 Size = size;
                 LastApex = start + (ulong)size;
                 this.source = source ?? throw new ArgumentNullException(nameof(source));
@@ -26,12 +26,13 @@ namespace Centaurus.Domain.Quanta.Sync
                 if (batch != null && lastSerializedBatchApex == LastApex)
                     return batch;
 
-                if (force && source.LastApex >= lastSerializedBatchApex || source.LastApex >= LastApex)
-                    if (lastSerializedBatchApex < source.LastApex)
-                    {
-                        batch = GetBatchData();
-                        lastSerializedBatchApex = batch.LastDataApex;
-                    }
+                if (source.LastApex >= Start //the source has data for the batch 
+                    && source.LastApex > lastSerializedBatchApex //the source has fresh data
+                    && (force || source.LastApex >= LastApex)) //if force or all data for the batch is ready
+                {
+                    batch = GetBatchData();
+                    lastSerializedBatchApex = batch.LastDataApex;
+                }
                 return batch;
             }
 
